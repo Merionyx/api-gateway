@@ -97,6 +97,21 @@ func (q *Queries) GetListenersByEnvironmentUUID(ctx context.Context, environment
 	return items, nil
 }
 
+const mapListenerToEnvironment = `-- name: MapListenerToEnvironment :exec
+INSERT INTO control_plane.listeners_environments (listener_uuid, environment_uuid)
+VALUES ($1, $2)
+`
+
+type MapListenerToEnvironmentParams struct {
+	ListenerUuid    uuid.UUID `json:"listener_uuid"`
+	EnvironmentUuid uuid.UUID `json:"environment_uuid"`
+}
+
+func (q *Queries) MapListenerToEnvironment(ctx context.Context, arg MapListenerToEnvironmentParams) error {
+	_, err := q.db.Exec(ctx, mapListenerToEnvironment, arg.ListenerUuid, arg.EnvironmentUuid)
+	return err
+}
+
 const updateListener = `-- name: UpdateListener :exec
 UPDATE control_plane.listeners SET name = $2, config = $3 WHERE uuid = $1
 `

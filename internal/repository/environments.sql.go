@@ -96,3 +96,18 @@ func (q *Queries) GetEnvironmentsByTenantUUID(ctx context.Context, tenantUuid uu
 	}
 	return items, nil
 }
+
+const mapTenantToEnvironment = `-- name: MapTenantToEnvironment :exec
+INSERT INTO control_plane.tenants_environments (tenant_uuid, environment_uuid)
+VALUES ($1, $2)
+`
+
+type MapTenantToEnvironmentParams struct {
+	TenantUuid      uuid.UUID `json:"tenant_uuid"`
+	EnvironmentUuid uuid.UUID `json:"environment_uuid"`
+}
+
+func (q *Queries) MapTenantToEnvironment(ctx context.Context, arg MapTenantToEnvironmentParams) error {
+	_, err := q.db.Exec(ctx, mapTenantToEnvironment, arg.TenantUuid, arg.EnvironmentUuid)
+	return err
+}

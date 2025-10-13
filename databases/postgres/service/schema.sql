@@ -85,7 +85,7 @@ ALTER TABLE control_plane.tenants OWNER TO postgres;
 
 CREATE TABLE control_plane.tenants_environments (
     tenant_uuid uuid NOT NULL,
-    environmet_uuid uuid NOT NULL
+    environment_uuid uuid NOT NULL
 );
 
 
@@ -132,7 +132,7 @@ ALTER TABLE ONLY control_plane.listeners
 --
 
 ALTER TABLE ONLY control_plane.tenants_environments
-    ADD CONSTRAINT tenants_environments_pkey PRIMARY KEY (tenant_uuid, environmet_uuid);
+    ADD CONSTRAINT tenants_environments_pkey PRIMARY KEY (tenant_uuid, environment_uuid);
 
 
 --

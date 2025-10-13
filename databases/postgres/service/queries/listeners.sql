@@ -13,6 +13,10 @@ WHERE le.environment_uuid = $1;
 INSERT INTO control_plane.listeners (uuid, name, config)
 VALUES ($1, $2, $3);
 
+-- name: MapListenerToEnvironment :exec
+INSERT INTO control_plane.listeners_environments (listener_uuid, environment_uuid)
+VALUES ($1, $2);
+
 -- name: UpdateListener :exec
 UPDATE control_plane.listeners SET name = $2, config = $3 WHERE uuid = $1;
 

@@ -31,8 +31,8 @@ type ControlPlaneTenant struct {
 }
 
 type ControlPlaneTenantsEnvironment struct {
-	TenantUuid     uuid.UUID `json:"tenant_uuid"`
-	EnvironmetUuid uuid.UUID `json:"environmet_uuid"`
+	TenantUuid      uuid.UUID `json:"tenant_uuid"`
+	EnvironmentUuid uuid.UUID `json:"environment_uuid"`
 }
 
 type SchemaMigration struct {

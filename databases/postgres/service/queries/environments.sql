@@ -13,5 +13,9 @@ WHERE te.tenant_uuid = $1;
 INSERT INTO control_plane.environments (uuid, name, config)
 VALUES ($1, $2, $3);
 
+-- name: MapTenantToEnvironment :exec
+INSERT INTO control_plane.tenants_environments (tenant_uuid, environment_uuid)
+VALUES ($1, $2);
+
 -- name: DeleteEnvironment :exec
 DELETE FROM control_plane.environments WHERE uuid = $1;
