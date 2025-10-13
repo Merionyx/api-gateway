@@ -16,8 +16,8 @@ CREATE TABLE "control_plane"."environments" (
 
 CREATE TABLE "control_plane"."tenants_environments" (
     "tenant_uuid" UUID NOT NULL,
-    "environmet_uuid" UUID NOT NULL DEFAULT NULL,
-    PRIMARY KEY ("tenant_uuid", "environmet_uuid")
+    "environment_uuid" UUID NOT NULL DEFAULT NULL,
+    PRIMARY KEY ("tenant_uuid", "environment_uuid")
 );
 
 CREATE TABLE "control_plane"."listeners" (
@@ -29,6 +29,6 @@ CREATE TABLE "control_plane"."listeners" (
 
 CREATE TABLE "control_plane"."listeners_environments" (
     "listener_uuid" UUID NOT NULL,
-    "environmet_uuid" UUID NOT NULL DEFAULT NULL,
-    PRIMARY KEY ("listener_uuid", "environmet_uuid")
+    "environment_uuid" UUID NOT NULL DEFAULT NULL,
+    PRIMARY KEY ("listener_uuid", "environment_uuid")
 );

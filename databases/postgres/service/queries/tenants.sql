@@ -1,5 +1,5 @@
 -- name: GetTenants :many
-SELECT * FROM control_plane.tenants
+SELECT * FROM control_plane.tenants;
 
 -- name: GetTenantByUUID :one
 SELECT * FROM control_plane.tenants WHERE uuid = $1;

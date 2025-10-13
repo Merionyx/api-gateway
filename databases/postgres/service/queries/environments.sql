@@ -1,5 +1,5 @@
 -- name: GetEnvironments :many
-SELECT * FROM control_plane.environments
+SELECT * FROM control_plane.environments;
 
 -- name: GetEnvironmentByUUID :one
 SELECT * FROM control_plane.environments WHERE uuid = $1;

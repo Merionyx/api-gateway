@@ -1,5 +1,5 @@
 -- name: GetListeners :many
-SELECT * FROM control_plane.listeners
+SELECT * FROM control_plane.listeners;
 
 -- name: GetListenerByUUID :one
 SELECT * FROM control_plane.listeners WHERE uuid = $1;

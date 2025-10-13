@@ -2,15 +2,12 @@
 -- PostgreSQL database dump
 --
 
-\restrict WEBUxSb3rcGqLeM8NsxV8VJEtsUafgvsnhsRT3dBoABVaQgcaDspeyBI7EhhcxY
-
--- Dumped from database version 17.6 (Debian 17.6-2.pgdg13+1)
--- Dumped by pg_dump version 17.6 (Homebrew)
+-- Dumped from database version 14.19 (Debian 14.19-1.pgdg13+1)
+-- Dumped by pg_dump version 14.17 (Homebrew)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
-SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -64,7 +61,7 @@ ALTER TABLE control_plane.listeners OWNER TO postgres;
 
 CREATE TABLE control_plane.listeners_environments (
     listener_uuid uuid NOT NULL,
-    environmet_uuid uuid NOT NULL
+    environment_uuid uuid NOT NULL
 );
 
 
@@ -119,7 +116,7 @@ ALTER TABLE ONLY control_plane.environments
 --
 
 ALTER TABLE ONLY control_plane.listeners_environments
-    ADD CONSTRAINT listeners_environments_pkey PRIMARY KEY (listener_uuid, environmet_uuid);
+    ADD CONSTRAINT listeners_environments_pkey PRIMARY KEY (listener_uuid, environment_uuid);
 
 
 --
@@ -157,6 +154,4 @@ ALTER TABLE ONLY public.schema_migrations
 --
 -- PostgreSQL database dump complete
 --
-
-\unrestrict WEBUxSb3rcGqLeM8NsxV8VJEtsUafgvsnhsRT3dBoABVaQgcaDspeyBI7EhhcxY
 

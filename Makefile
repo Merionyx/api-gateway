@@ -66,7 +66,7 @@ dev: ## Development mode with hot reload
 	air -c .air.toml
 
 pg-dump: ## Dump PostgreSQL schema
-	pg_dump-17 --schema-only "postgresql://postgres:postgres@localhost:5432/postgres" > ./databases/postgres/service/schema.sql
+	pg_dump --schema-only "postgresql://postgres:postgres@localhost:5432/postgres" > ./databases/postgres/service/schema.sql
 
 sqlc-generate: ## Generate SQLC code
 	sqlc generate
