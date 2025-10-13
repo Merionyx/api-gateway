@@ -1,0 +1,98 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+build/
+tmp/
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+coverage.xml
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Environment variables
+*.env
+.env.*
+!.env.example
+
+# IDE and editor files
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+build-errors.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# TLS Certificates (generated)
+certs/*.crt
+certs/*.key
+certs/*.pem
+!certs/.gitkeep
+
+# Envoy certificates
+deployments/docker/configs/envoy/ssl/*.crt
+deployments/docker/configs/envoy/ssl/*.key
+deployments/docker/configs/envoy/ssl/*.pem
+
+# Docker
+.dockerignore
+
+# Kubernetes secrets
+secrets/
+k8s-secrets/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+tmp/
+temp/
+
+# Air live reload
+.air.toml.local
+
+# Test coverage
+coverage.out
+coverage.html
+
+# Profiling data
+*.prof
+
+# Migration files (if auto-generated)
+migrations/*.sql.bak

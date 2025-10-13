@@ -1,0 +1,24 @@
+networks:
+    default:
+    kafka-network:
+        external: true
+    nats:
+        external: true
+    rabbitmq:
+        external: true
+
+services:
+  envoy:
+    image: envoyproxy/envoy:v1.28-latest
+    container_name: envoy-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./configs/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+      - ./configs/envoy/ssl:/etc/envoy/ssl:ro
+    depends_on:
+      - app
+      - grafana
+    restart: unless-stopped
+    command: /usr/local/bin/envoy -c /etc/envoy/envoy.yaml

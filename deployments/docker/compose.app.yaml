@@ -1,0 +1,35 @@
+networks:
+    default:
+
+services:
+    app:
+        container_name: merionyx-api-gateway-control-plane
+        build:
+            context: ../..
+            dockerfile: Dockerfile.dev
+        command: air -c .air.toml
+        environment:
+            - CONFIG_FILE=./configs/control-plane/config.yaml
+        ports:
+            - 9080:8080
+            - 9443:8443
+        develop:
+            watch:
+                - path: ../..
+                  target: /app
+                  action: sync
+                  ignore:
+                      - .air.toml
+                      - .gitignore
+                      - .git
+                      - .github
+                      - .vscode
+                      - .env
+                      - .env.example
+                      - .env.local
+                      - .env.development
+                      - .env.production
+        depends_on:
+            - postgres
+        networks:
+            - default
