@@ -8,13 +8,14 @@ import (
 )
 
 type Config struct {
-	Server    ServerConfig              `mapstructure:"server"`
-	Databases map[string]DatabaseConfig `mapstructure:"databases"`
+	Server   ServerConfig   `mapstructure:"server"`
+	Database DatabaseConfig `mapstructure:"database"`
 }
 
 type ServerConfig struct {
 	HTTP1Port string `mapstructure:"http1_port" validate:"required"`
 	HTTP2Port string `mapstructure:"http2_port" validate:"required"`
+	GRPCPort  string `mapstructure:"grpc_port" validate:"required"`
 	Host      string `mapstructure:"host"`
 }
 

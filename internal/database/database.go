@@ -58,6 +58,11 @@ func (dm *DatabaseManager) GetConnection(name string) Connection {
 	return dm.connections[name]
 }
 
+// GetDefaultConnection returns the default database connection
+func (dm *DatabaseManager) GetDefaultConnection() Connection {
+	return dm.connections["default"]
+}
+
 // GetPostgreSQLConnection returns a PostgreSQL connection by name (typed method)
 func (dm *DatabaseManager) GetPostgreSQLConnection(name string) *postgres.PostgreSQLConnection {
 	conn := dm.connections[name]
@@ -67,6 +72,11 @@ func (dm *DatabaseManager) GetPostgreSQLConnection(name string) *postgres.Postgr
 		}
 	}
 	return nil
+}
+
+// GetDefaultPostgreSQLConnection returns the default PostgreSQL connection
+func (dm *DatabaseManager) GetDefaultPostgreSQLConnection() *postgres.PostgreSQLConnection {
+	return dm.GetPostgreSQLConnection("default")
 }
 
 // GetAllConnections returns all connections
@@ -128,55 +138,25 @@ func (dm *DatabaseManager) GetConnectionsInfo() []ConnectionInfo {
 	return infos
 }
 
-// InitializeAllDatabases initializes all databases from the configuration
-func InitializeAllDatabases(ctx context.Context, cfg *config.Config) (*DatabaseManager, error) {
+// InitializeDatabase initializes a single database from the configuration
+func InitializeDatabase(ctx context.Context, cfg *config.Config) (*DatabaseManager, error) {
 	dm := NewDatabaseManager()
 
-	// Initialize from the new configuration structure
-	for name, dbConfig := range cfg.Databases {
-		slog.Info(fmt.Sprintf("Initializing %s database '%s': %s:%d/%s",
-			dbConfig.Type, name, dbConfig.Host, dbConfig.Port, dbConfig.Database))
+	// Use the single database configuration
+	dbConfig := cfg.Database
+	name := "default" // Используем стандартное имя для единственной БД
 
-		conn, err := dm.createConnection(ctx, name, dbConfig)
-		if err != nil {
-			dm.Close()
-			return nil, fmt.Errorf("failed to connect to %s database '%s': %w", dbConfig.Type, name, err)
-		}
+	slog.Info(fmt.Sprintf("Initializing %s database: %s:%d/%s",
+		dbConfig.Type, dbConfig.Host, dbConfig.Port, dbConfig.Database))
 
-		dm.AddConnection(name, conn)
-		slog.Info(fmt.Sprintf("Successfully connected to %s database '%s'", dbConfig.Type, name))
+	conn, err := dm.createConnection(ctx, name, dbConfig)
+	if err != nil {
+		dm.Close()
+		return nil, fmt.Errorf("failed to connect to %s database: %w", dbConfig.Type, err)
 	}
 
-	// Support for the old PostgreSQL configuration for backward compatibility
-	for name, pgConfig := range cfg.Databases {
-		slog.Info(fmt.Sprintf("Initializing PostgreSQL database '%s' (legacy config): %s:%d/%s",
-			name, pgConfig.Host, pgConfig.Port, pgConfig.Database))
-
-		// Convert the old configuration to the new one
-		dbConfig := config.DatabaseConfig{
-			Type:     "postgresql",
-			Host:     pgConfig.Host,
-			Port:     pgConfig.Port,
-			Username: pgConfig.Username,
-			Password: pgConfig.Password,
-			Database: pgConfig.Database,
-			Options: map[string]interface{}{
-				"ssl_mode":        pgConfig.Options["ssl_mode"].(string),
-				"max_open_conns":  pgConfig.Options["max_open_conns"].(int),
-				"max_idle_conns":  pgConfig.Options["max_idle_conns"].(int),
-				"migrations_path": pgConfig.Options["migrations_path"].(string),
-			},
-		}
-
-		conn, err := dm.createConnection(ctx, name, dbConfig)
-		if err != nil {
-			dm.Close()
-			return nil, fmt.Errorf("failed to connect to PostgreSQL database '%s': %w", name, err)
-		}
-
-		dm.AddConnection(name, conn)
-		slog.Info(fmt.Sprintf("Successfully connected to PostgreSQL database '%s'", name))
-	}
+	dm.AddConnection(name, conn)
+	slog.Info(fmt.Sprintf("Successfully connected to %s database", dbConfig.Type))
 
 	return dm, nil
 }

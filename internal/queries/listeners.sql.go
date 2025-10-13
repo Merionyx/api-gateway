@@ -3,7 +3,7 @@
 //   sqlc v1.30.0
 // source: listeners.sql
 
-package repository
+package queries
 
 import (
 	"context"
@@ -36,6 +36,26 @@ func (q *Queries) DeleteListener(ctx context.Context, argUuid uuid.UUID) error {
 	return err
 }
 
+const deleteListenerEnvironmentMappings = `-- name: DeleteListenerEnvironmentMappings :exec
+DELETE FROM control_plane.listeners_environments WHERE listener_uuid = $1
+`
+
+func (q *Queries) DeleteListenerEnvironmentMappings(ctx context.Context, listenerUuid uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteListenerEnvironmentMappings, listenerUuid)
+	return err
+}
+
+const getListenerByName = `-- name: GetListenerByName :one
+SELECT uuid, name, config FROM control_plane.listeners WHERE name = $1
+`
+
+func (q *Queries) GetListenerByName(ctx context.Context, name string) (ControlPlaneListener, error) {
+	row := q.db.QueryRow(ctx, getListenerByName, name)
+	var i ControlPlaneListener
+	err := row.Scan(&i.Uuid, &i.Name, &i.Config)
+	return i, err
+}
+
 const getListenerByUUID = `-- name: GetListenerByUUID :one
 SELECT uuid, name, config FROM control_plane.listeners WHERE uuid = $1
 `
@@ -49,6 +69,7 @@ func (q *Queries) GetListenerByUUID(ctx context.Context, argUuid uuid.UUID) (Con
 
 const getListeners = `-- name: GetListeners :many
 SELECT uuid, name, config FROM control_plane.listeners
+ORDER BY name
 `
 
 func (q *Queries) GetListeners(ctx context.Context) ([]ControlPlaneListener, error) {
@@ -75,6 +96,7 @@ const getListenersByEnvironmentUUID = `-- name: GetListenersByEnvironmentUUID :m
 SELECT l.uuid, l.name, l.config FROM control_plane.listeners l
 INNER JOIN control_plane.listeners_environments le ON l.uuid = le.listener_uuid
 WHERE le.environment_uuid = $1
+ORDER BY l.name
 `
 
 func (q *Queries) GetListenersByEnvironmentUUID(ctx context.Context, environmentUuid uuid.UUID) ([]ControlPlaneListener, error) {
@@ -109,6 +131,21 @@ type MapListenerToEnvironmentParams struct {
 
 func (q *Queries) MapListenerToEnvironment(ctx context.Context, arg MapListenerToEnvironmentParams) error {
 	_, err := q.db.Exec(ctx, mapListenerToEnvironment, arg.ListenerUuid, arg.EnvironmentUuid)
+	return err
+}
+
+const unmapListenerFromEnvironment = `-- name: UnmapListenerFromEnvironment :exec
+DELETE FROM control_plane.listeners_environments 
+WHERE listener_uuid = $1 AND environment_uuid = $2
+`
+
+type UnmapListenerFromEnvironmentParams struct {
+	ListenerUuid    uuid.UUID `json:"listener_uuid"`
+	EnvironmentUuid uuid.UUID `json:"environment_uuid"`
+}
+
+func (q *Queries) UnmapListenerFromEnvironment(ctx context.Context, arg UnmapListenerFromEnvironmentParams) error {
+	_, err := q.db.Exec(ctx, unmapListenerFromEnvironment, arg.ListenerUuid, arg.EnvironmentUuid)
 	return err
 }
 

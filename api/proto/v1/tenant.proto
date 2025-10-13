@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package api.tenant.v1;
+
+option go_package = "api/tenant/v1;tenantv1";
+
+import "google/protobuf/timestamp.proto";
+
+// Tenant message for tenant
+message Tenant {
+  string id = 1;
+  string name = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp updated_at = 4;
+}
+
+// CreateTenantRequest request for creating tenant
+message CreateTenantRequest {
+  string name = 1;
+}
+
+// CreateTenantResponse response for creating tenant
+message CreateTenantResponse {
+  Tenant tenant = 1;
+}
+
+// GetTenantRequest request for getting tenant
+message GetTenantRequest {
+  string id = 1;
+}
+
+// GetTenantResponse response for getting tenant
+message GetTenantResponse {
+  Tenant tenant = 1;
+}
+
+// GetTenantByNameRequest request for getting tenant by name
+message GetTenantByNameRequest {
+  string name = 1;
+}
+
+// GetTenantByNameResponse response for getting tenant by name
+message GetTenantByNameResponse {
+  Tenant tenant = 1;
+}
+
+// GetTenantsRequest request for getting list of tenants
+message GetTenantsRequest {}
+
+// GetTenantsResponse response for getting list of tenants
+message GetTenantsResponse {
+  repeated Tenant tenants = 1;
+}
+
+// UpdateTenantRequest request for updating tenant
+message UpdateTenantRequest {
+  string id = 1;
+  string name = 2;
+}
+
+// UpdateTenantResponse response for updating tenant
+message UpdateTenantResponse {
+  Tenant tenant = 1;
+}
+
+// DeleteTenantRequest request for deleting tenant
+message DeleteTenantRequest {
+  string id = 1;
+}
+
+// DeleteTenantResponse response for deleting tenant
+message DeleteTenantResponse {}
+
+// TenantService service for working with tenants
+service TenantService {
+  // CreateTenant creates new tenant
+  rpc CreateTenant(CreateTenantRequest) returns (CreateTenantResponse);
+  
+  // GetTenant gets tenant by ID
+  rpc GetTenant(GetTenantRequest) returns (GetTenantResponse);
+  
+  // GetTenantByName gets tenant by name
+  rpc GetTenantByName(GetTenantByNameRequest) returns (GetTenantByNameResponse);
+  
+  // GetTenants gets list of all tenants
+  rpc GetTenants(GetTenantsRequest) returns (GetTenantsResponse);
+  
+  // UpdateTenant updates tenant
+  rpc UpdateTenant(UpdateTenantRequest) returns (UpdateTenantResponse);
+  
+  // DeleteTenant deletes tenant
+  rpc DeleteTenant(DeleteTenantRequest) returns (DeleteTenantResponse);
+}

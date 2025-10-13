@@ -3,7 +3,7 @@
 //   sqlc v1.30.0
 // source: environments.sql
 
-package repository
+package queries
 
 import (
 	"context"
@@ -36,6 +36,35 @@ func (q *Queries) DeleteEnvironment(ctx context.Context, argUuid uuid.UUID) erro
 	return err
 }
 
+const deleteEnvironmentListenerMappings = `-- name: DeleteEnvironmentListenerMappings :exec
+DELETE FROM control_plane.listeners_environments WHERE environment_uuid = $1
+`
+
+func (q *Queries) DeleteEnvironmentListenerMappings(ctx context.Context, environmentUuid uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteEnvironmentListenerMappings, environmentUuid)
+	return err
+}
+
+const deleteEnvironmentTenantMappings = `-- name: DeleteEnvironmentTenantMappings :exec
+DELETE FROM control_plane.tenants_environments WHERE environment_uuid = $1
+`
+
+func (q *Queries) DeleteEnvironmentTenantMappings(ctx context.Context, environmentUuid uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteEnvironmentTenantMappings, environmentUuid)
+	return err
+}
+
+const getEnvironmentByName = `-- name: GetEnvironmentByName :one
+SELECT uuid, name, config FROM control_plane.environments WHERE name = $1
+`
+
+func (q *Queries) GetEnvironmentByName(ctx context.Context, name string) (ControlPlaneEnvironment, error) {
+	row := q.db.QueryRow(ctx, getEnvironmentByName, name)
+	var i ControlPlaneEnvironment
+	err := row.Scan(&i.Uuid, &i.Name, &i.Config)
+	return i, err
+}
+
 const getEnvironmentByUUID = `-- name: GetEnvironmentByUUID :one
 SELECT uuid, name, config FROM control_plane.environments WHERE uuid = $1
 `
@@ -49,6 +78,7 @@ func (q *Queries) GetEnvironmentByUUID(ctx context.Context, argUuid uuid.UUID) (
 
 const getEnvironments = `-- name: GetEnvironments :many
 SELECT uuid, name, config FROM control_plane.environments
+ORDER BY name
 `
 
 func (q *Queries) GetEnvironments(ctx context.Context) ([]ControlPlaneEnvironment, error) {
@@ -75,6 +105,7 @@ const getEnvironmentsByTenantUUID = `-- name: GetEnvironmentsByTenantUUID :many
 SELECT e.uuid, e.name, e.config FROM control_plane.environments e
 INNER JOIN control_plane.tenants_environments te ON e.uuid = te.environment_uuid
 WHERE te.tenant_uuid = $1
+ORDER BY e.name
 `
 
 func (q *Queries) GetEnvironmentsByTenantUUID(ctx context.Context, tenantUuid uuid.UUID) ([]ControlPlaneEnvironment, error) {
@@ -109,5 +140,35 @@ type MapTenantToEnvironmentParams struct {
 
 func (q *Queries) MapTenantToEnvironment(ctx context.Context, arg MapTenantToEnvironmentParams) error {
 	_, err := q.db.Exec(ctx, mapTenantToEnvironment, arg.TenantUuid, arg.EnvironmentUuid)
+	return err
+}
+
+const unmapTenantFromEnvironment = `-- name: UnmapTenantFromEnvironment :exec
+DELETE FROM control_plane.tenants_environments 
+WHERE tenant_uuid = $1 AND environment_uuid = $2
+`
+
+type UnmapTenantFromEnvironmentParams struct {
+	TenantUuid      uuid.UUID `json:"tenant_uuid"`
+	EnvironmentUuid uuid.UUID `json:"environment_uuid"`
+}
+
+func (q *Queries) UnmapTenantFromEnvironment(ctx context.Context, arg UnmapTenantFromEnvironmentParams) error {
+	_, err := q.db.Exec(ctx, unmapTenantFromEnvironment, arg.TenantUuid, arg.EnvironmentUuid)
+	return err
+}
+
+const updateEnvironment = `-- name: UpdateEnvironment :exec
+UPDATE control_plane.environments SET name = $2, config = $3 WHERE uuid = $1
+`
+
+type UpdateEnvironmentParams struct {
+	Uuid   uuid.UUID `json:"uuid"`
+	Name   string    `json:"name"`
+	Config []byte    `json:"config"`
+}
+
+func (q *Queries) UpdateEnvironment(ctx context.Context, arg UpdateEnvironmentParams) error {
+	_, err := q.db.Exec(ctx, updateEnvironment, arg.Uuid, arg.Name, arg.Config)
 	return err
 }

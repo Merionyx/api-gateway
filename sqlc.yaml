@@ -1,12 +1,12 @@
 version: "2"
 sql:
 - engine: "postgresql"
-  schema: "./databases/postgres/service/schema.sql"
-  queries: "./databases/postgres/service/queries"
+  schema: "./databases/postgres/schema.sql"
+  queries: "./databases/postgres/queries"
   gen:
     go:
-      package: "repository"
-      out: "internal/repository"
+      package: "queries"
+      out: "internal/queries"
       sql_package: "pgx/v5"
       emit_json_tags: true
       overrides:

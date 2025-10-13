@@ -1,0 +1,136 @@
+syntax = "proto3";
+
+package api.listener.v1;
+
+option go_package = "merionyx/api-gateway/control-plane/pkg/api/listener/v1;listenerv1";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+// Listener message for listener
+message Listener {
+  string id = 1;
+  string name = 2;
+  google.protobuf.Struct config = 3;
+  string environment_id = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+// CreateListenerRequest request for creating listener
+message CreateListenerRequest {
+  string name = 1;
+  google.protobuf.Struct config = 2;
+  string environment_id = 3;
+}
+
+// CreateListenerResponse response for creating listener
+message CreateListenerResponse {
+  Listener listener = 1;
+}
+
+// GetListenerRequest request for getting listener
+message GetListenerRequest {
+  string id = 1;
+}
+
+// GetListenerResponse response for getting listener
+message GetListenerResponse {
+  Listener listener = 1;
+}
+
+// GetListenerByNameRequest request for getting listener by name
+message GetListenerByNameRequest {
+  string name = 1;
+}
+
+// GetListenerByNameResponse response for getting listener by name
+message GetListenerByNameResponse {
+  Listener listener = 1;
+}
+
+// GetListenersRequest request for getting list of listeners
+message GetListenersRequest {}
+
+// GetListenersResponse response for getting list of listeners
+message GetListenersResponse {
+  repeated Listener listeners = 1;
+}
+
+// GetListenersByEnvironmentRequest request for getting listeners by environment
+message GetListenersByEnvironmentRequest {
+  string environment_id = 1;
+}
+
+// GetListenersByEnvironmentResponse response for getting listeners by environment
+message GetListenersByEnvironmentResponse {
+  repeated Listener listeners = 1;
+}
+
+// UpdateListenerRequest request for updating listener
+message UpdateListenerRequest {
+  string id = 1;
+  string name = 2;
+  google.protobuf.Struct config = 3;
+}
+
+// UpdateListenerResponse response for updating listener
+message UpdateListenerResponse {
+  Listener listener = 1;
+}
+
+// DeleteListenerRequest request for deleting listener
+message DeleteListenerRequest {
+  string id = 1;
+}
+
+// DeleteListenerResponse response for deleting listener
+message DeleteListenerResponse {}
+
+// MapListenerToEnvironmentRequest request for mapping listener to environment
+message MapListenerToEnvironmentRequest {
+  string listener_id = 1;
+  string environment_id = 2;
+}
+
+// MapListenerToEnvironmentResponse response for mapping listener to environment
+message MapListenerToEnvironmentResponse {}
+
+// UnmapListenerFromEnvironmentRequest request for unmapping listener from environment
+message UnmapListenerFromEnvironmentRequest {
+  string listener_id = 1;
+  string environment_id = 2;
+}
+
+// UnmapListenerFromEnvironmentResponse response for unmapping listener from environment
+message UnmapListenerFromEnvironmentResponse {}
+
+// ListenerService service for working with listeners
+service ListenerService {
+  // CreateListener creates new listener
+  rpc CreateListener(CreateListenerRequest) returns (CreateListenerResponse);
+  
+  // GetListener gets listener by ID
+  rpc GetListener(GetListenerRequest) returns (GetListenerResponse);
+  
+  // GetListenerByName gets listener by name
+  rpc GetListenerByName(GetListenerByNameRequest) returns (GetListenerByNameResponse);
+  
+  // GetListeners gets list of all listeners
+  rpc GetListeners(GetListenersRequest) returns (GetListenersResponse);
+  
+  // GetListenersByEnvironment gets listeners by environment
+  rpc GetListenersByEnvironment(GetListenersByEnvironmentRequest) returns (GetListenersByEnvironmentResponse);
+  
+  // UpdateListener updates listener
+  rpc UpdateListener(UpdateListenerRequest) returns (UpdateListenerResponse);
+  
+  // DeleteListener deletes listener
+  rpc DeleteListener(DeleteListenerRequest) returns (DeleteListenerResponse);
+  
+  // MapListenerToEnvironment maps listener to environment
+  rpc MapListenerToEnvironment(MapListenerToEnvironmentRequest) returns (MapListenerToEnvironmentResponse);
+  
+  // UnmapListenerFromEnvironment unmaps listener from environment
+  rpc UnmapListenerFromEnvironment(UnmapListenerFromEnvironmentRequest) returns (UnmapListenerFromEnvironmentResponse);
+}

@@ -3,7 +3,7 @@
 //   sqlc v1.30.0
 // source: tenants.sql
 
-package repository
+package queries
 
 import (
 	"context"
@@ -35,6 +35,26 @@ func (q *Queries) DeleteTenant(ctx context.Context, argUuid uuid.UUID) error {
 	return err
 }
 
+const deleteTenantEnvironmentMappings = `-- name: DeleteTenantEnvironmentMappings :exec
+DELETE FROM control_plane.tenants_environments WHERE tenant_uuid = $1
+`
+
+func (q *Queries) DeleteTenantEnvironmentMappings(ctx context.Context, tenantUuid uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteTenantEnvironmentMappings, tenantUuid)
+	return err
+}
+
+const getTenantByName = `-- name: GetTenantByName :one
+SELECT uuid, name FROM control_plane.tenants WHERE name = $1
+`
+
+func (q *Queries) GetTenantByName(ctx context.Context, name string) (ControlPlaneTenant, error) {
+	row := q.db.QueryRow(ctx, getTenantByName, name)
+	var i ControlPlaneTenant
+	err := row.Scan(&i.Uuid, &i.Name)
+	return i, err
+}
+
 const getTenantByUUID = `-- name: GetTenantByUUID :one
 SELECT uuid, name FROM control_plane.tenants WHERE uuid = $1
 `
@@ -48,6 +68,7 @@ func (q *Queries) GetTenantByUUID(ctx context.Context, argUuid uuid.UUID) (Contr
 
 const getTenants = `-- name: GetTenants :many
 SELECT uuid, name FROM control_plane.tenants
+ORDER BY name
 `
 
 func (q *Queries) GetTenants(ctx context.Context) ([]ControlPlaneTenant, error) {
@@ -68,4 +89,18 @@ func (q *Queries) GetTenants(ctx context.Context) ([]ControlPlaneTenant, error) 
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateTenant = `-- name: UpdateTenant :exec
+UPDATE control_plane.tenants SET name = $2 WHERE uuid = $1
+`
+
+type UpdateTenantParams struct {
+	Uuid uuid.UUID `json:"uuid"`
+	Name string    `json:"name"`
+}
+
+func (q *Queries) UpdateTenant(ctx context.Context, arg UpdateTenantParams) error {
+	_, err := q.db.Exec(ctx, updateTenant, arg.Uuid, arg.Name)
+	return err
 }

@@ -11,42 +11,36 @@ import (
 	"merionyx/api-gateway/control-plane/internal/config"
 )
 
-// RunMigrations runs migrations for all configured databases
+// RunMigrations runs migrations for the configured database
 func RunMigrations(cfg *config.Config) error {
-	for dbName, dbConfig := range cfg.Databases {
-		if dbConfig.Type != "postgresql" {
-			slog.Info(fmt.Sprintf("Skipping non-postgresql database %s", dbName))
-			continue
-		}
-
-		slog.Info(fmt.Sprintf("Running migrations for database %s", dbName))
-
-		if err := runMigrationForDB(dbName, &dbConfig); err != nil {
-			return fmt.Errorf("failed to run migrations for %s: %w", dbName, err)
-		}
-
-		slog.Info(fmt.Sprintf("Migrations completed successfully for database %s", dbName))
-	}
-
-	return nil
-}
-
-// RunMigrationForDatabase runs migrations for a specific database
-func RunMigrationForDatabase(cfg *config.Config, dbName string) error {
-	dbConfig, exists := cfg.Databases[dbName]
-	if !exists {
-		slog.Info(fmt.Sprintf("Database configuration not found %s", dbName))
+	dbConfig := cfg.Database
+	
+	if dbConfig.Type != "postgresql" {
+		slog.Info(fmt.Sprintf("Skipping non-postgresql database type: %s", dbConfig.Type))
 		return nil
 	}
 
-	return runMigrationForDB(dbName, &dbConfig)
+	slog.Info("Running migrations for database")
+
+	if err := runMigrationForDB(&dbConfig); err != nil {
+		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	slog.Info("Migrations completed successfully")
+	return nil
 }
 
-func runMigrationForDB(dbName string, dbConfig *config.DatabaseConfig) error {
+// RunMigrationForDatabase runs migrations for the database (deprecated, use RunMigrations)
+func RunMigrationForDatabase(cfg *config.Config, dbName string) error {
+	slog.Info("RunMigrationForDatabase is deprecated, using single database configuration")
+	return RunMigrations(cfg)
+}
+
+func runMigrationForDB(dbConfig *config.DatabaseConfig) error {
 	// Form the path to the migrations
 	migrationsPath := dbConfig.Options["migrations_path"].(string)
 	if migrationsPath == "" {
-		migrationsPath = fmt.Sprintf("./migrations/postgres/%s", dbName)
+		migrationsPath = "./databases/postgres/migrations"
 	}
 
 	// Create a migrate instance
@@ -67,30 +61,29 @@ func runMigrationForDB(dbName string, dbConfig *config.DatabaseConfig) error {
 	return nil
 }
 
-// RollbackMigrations rolls back migrations for all databases
+// RollbackMigrations rolls back migrations for the database
 func RollbackMigrations(cfg *config.Config, steps int) error {
-	for dbName, dbConfig := range cfg.Databases {
-		if dbConfig.Type != "postgresql" {
-			slog.Info(fmt.Sprintf("Skipping non-postgresql database %s", dbName))
-			continue
-		}
-
-		slog.Info(fmt.Sprintf("Rolling back migrations for database %s", dbName))
-
-		if err := rollbackMigrationForDB(dbName, &dbConfig, steps); err != nil {
-			return fmt.Errorf("failed to rollback migrations for %s: %w", dbName, err)
-		}
-
-		slog.Info(fmt.Sprintf("Rollback completed successfully for database %s", dbName))
+	dbConfig := cfg.Database
+	
+	if dbConfig.Type != "postgresql" {
+		slog.Info(fmt.Sprintf("Skipping non-postgresql database type: %s", dbConfig.Type))
+		return nil
 	}
 
+	slog.Info("Rolling back migrations for database")
+
+	if err := rollbackMigrationForDB(&dbConfig, steps); err != nil {
+		return fmt.Errorf("failed to rollback migrations: %w", err)
+	}
+
+	slog.Info("Rollback completed successfully")
 	return nil
 }
 
-func rollbackMigrationForDB(dbName string, dbConfig *config.DatabaseConfig, steps int) error {
+func rollbackMigrationForDB(dbConfig *config.DatabaseConfig, steps int) error {
 	migrationsPath := dbConfig.Options["migrations_path"].(string)
 	if migrationsPath == "" {
-		migrationsPath = fmt.Sprintf("./migrations/postgres/%s", dbName)
+		migrationsPath = "./databases/postgres/migrations"
 	}
 
 	m, err := migrate.New(

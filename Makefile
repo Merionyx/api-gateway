@@ -66,12 +66,28 @@ dev: ## Development mode with hot reload
 	air -c .air.toml
 
 pg-dump: ## Dump PostgreSQL schema
-	pg_dump --schema-only "postgresql://postgres:postgres@localhost:5432/postgres" > ./databases/postgres/service/schema.sql
+	pg_dump --schema-only "postgresql://postgres:postgres@localhost:5432/postgres" > ./databases/postgres/schema.sql
 
 sqlc-generate: ## Generate SQLC code
 	sqlc generate
 
 sqlc-update: pg-dump sqlc-generate ## Update SQLC code
+
+proto-generate: ## Generate protobuf code
+	protoc --go_out=. --go_opt=paths=source_relative \
+		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
+		api/proto/v1/*.proto && \
+	cp ./api/proto/v1/environment_grpc.pb.go ./pkg/api/environment/v1/environment_grpc.pb.go && \
+	cp ./api/proto/v1/environment.pb.go ./pkg/api/environment/v1/environment.pb.go && \
+	cp ./api/proto/v1/tenant_grpc.pb.go ./pkg/api/tenant/v1/tenant_grpc.pb.go && \
+	cp ./api/proto/v1/tenant.pb.go ./pkg/api/tenant/v1/tenant.pb.go && \
+	cp ./api/proto/v1/listener_grpc.pb.go ./pkg/api/listener/v1/listener_grpc.pb.go && \
+	cp ./api/proto/v1/listener.pb.go ./pkg/api/listener/v1/listener.pb.go && \
+	rm -rf ./api/proto/v1/*.pb.go
+
+proto-install: ## Install protobuf tools
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
 # Help
 help: ## Show help
