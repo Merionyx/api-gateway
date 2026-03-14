@@ -8,6 +8,7 @@ import (
 	httpHandler "merionyx/api-gateway/control-plane/internal/delivery/http/handler"
 	"merionyx/api-gateway/control-plane/internal/delivery/http/router"
 	"merionyx/api-gateway/control-plane/internal/domain/interfaces"
+	"merionyx/api-gateway/control-plane/internal/repository/git"
 	"merionyx/api-gateway/control-plane/internal/usecase"
 )
 
@@ -15,6 +16,9 @@ import (
 type Container struct {
 	// Config
 	Config *config.Config
+
+	// Repository Manager
+	GitRepositoryManager *git.RepositoryManager
 
 	// Repositories
 	TenantRepository      interfaces.TenantRepository
@@ -46,11 +50,17 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 		Config: cfg,
 	}
 
+	container.initGitRepositoryManager()
 	container.initUseCases()
 	container.initHandlers()
 	container.initRouter()
 
 	return container, nil
+}
+
+// initGitRepositoryManager initializes the git repository manager
+func (c *Container) initGitRepositoryManager() {
+	c.GitRepositoryManager = git.NewRepositoryManager()
 }
 
 // initUseCases initializes the use cases

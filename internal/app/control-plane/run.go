@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"merionyx/api-gateway/control-plane/internal/config"
 	"merionyx/api-gateway/control-plane/internal/container"
-	"merionyx/api-gateway/control-plane/internal/repository/git"
 	"merionyx/api-gateway/control-plane/internal/server"
 	"os"
 	"os/signal"
@@ -27,15 +26,6 @@ func Run() error {
 		os.Exit(1)
 	}
 	logger.Info("Config loade", "config", cfg)
-
-	// Initialize repositories
-
-	rm := git.NewRepositoryManager()
-
-	if err := rm.InitializeRepositories(cfg.Repositories); err != nil {
-		logger.Error(fmt.Sprintf("Failed to initialize repositories: %v", err))
-		os.Exit(1)
-	}
 
 	// Initialize DI container
 	container, err := container.NewContainer(cfg)
