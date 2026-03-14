@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"log/slog"
+	"os"
 
 	"github.com/spf13/viper"
 )
@@ -73,6 +74,39 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	var config Config
 	if err := viper.Unmarshal(&config); err != nil {
 		return nil, err
+	}
+
+	// Check if all repositories are valid
+	for _, repository := range config.Repositories {
+		if repository.Auth.Type == "ssh" {
+			if repository.Auth.SSHKeyPath == "" && repository.Auth.SSHKeyEnv == "" {
+				return nil, fmt.Errorf("ssh_key_path or ssh_key_env is required for ssh authentication")
+			}
+
+			// Check if the ssh key path is valid
+			if repository.Auth.SSHKeyPath != "" {
+				if _, err := os.Stat(repository.Auth.SSHKeyPath); err != nil {
+					return nil, fmt.Errorf("ssh_key_path is not valid: %v", err)
+				}
+			} else if repository.Auth.SSHKeyEnv != "" {
+				if os.Getenv(repository.Auth.SSHKeyEnv) == "" {
+					return nil, fmt.Errorf("ssh_key_env is not set: %s", repository.Auth.SSHKeyEnv)
+				}
+			} else {
+				return nil, fmt.Errorf("ssh_key_path or ssh_key_env is required for ssh authentication")
+			}
+		}
+
+		if repository.Auth.Type == "token" {
+			if repository.Auth.TokenEnv == "" {
+				return nil, fmt.Errorf("token_env is required for token authentication")
+			}
+
+			// Check if the token env is valid
+			if os.Getenv(repository.Auth.TokenEnv) == "" {
+				return nil, fmt.Errorf("token_env is not set: %s", repository.Auth.TokenEnv)
+			}
+		}
 	}
 
 	return &config, nil
