@@ -8,7 +8,8 @@ import (
 )
 
 type Config struct {
-	Server ServerConfig `mapstructure:"server"`
+	Server       ServerConfig       `mapstructure:"server"`
+	Repositories []RepositoryConfig `mapstructure:"repositories"`
 }
 
 type ServerConfig struct {
@@ -16,6 +17,18 @@ type ServerConfig struct {
 	HTTP2Port string `mapstructure:"http2_port" validate:"required"`
 	GRPCPort  string `mapstructure:"grpc_port" validate:"required"`
 	Host      string `mapstructure:"host"`
+}
+
+type RepositoryConfig struct {
+	Name string     `mapstructure:"name" validate:"required"`
+	URL  string     `mapstructure:"url" validate:"required"`
+	Auth AuthConfig `mapstructure:"auth"`
+}
+type AuthConfig struct {
+	Type       string `mapstructure:"type"` // "ssh", "token", "none"
+	SSHKeyPath string `mapstructure:"ssh_key_path"`
+	SSHKeyEnv  string `mapstructure:"ssh_key_env"`
+	TokenEnv   string `mapstructure:"token_env"`
 }
 
 func LoadConfig(configFile ...string) (*Config, error) {
