@@ -3,3 +3,22 @@ server:
   http2_port: "8443"
   grpc_port: "8090"
   host: "localhost"
+
+repositories:
+- name: api-gateway-schemas-https
+  url: "https://github.com/merionyx/api-gateway-schemas.git"
+  auth:
+    type: "token"
+    token_env: "GITHUB_ACCESS_TOKEN"
+- name: api-gateway-schemas-ssh
+  url: "git@github.com:MikhailMinaev/api-gateway-schemas.git"
+  auth:
+    type: "ssh"
+    ssh_key_path: "~/.ssh/id_rsa" # или через файл
+    # ssh_key_env: "SSH_PRIVATE_KEY"  # или через переменную окружени
+
+services:
+  be-service-01:
+    url: "http://localhost:8080"
+  be-service-02:
+    url: "http://localhost:8081"
