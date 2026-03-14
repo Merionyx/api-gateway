@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"merionyx/api-gateway/control-plane/internal/config"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/go-git/go-billy/v6/memfs"
@@ -109,6 +110,11 @@ func (rm *RepositoryManager) GetRepositoryFiles(name string, ref string, path st
 	err = util.Walk(w.Filesystem, path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
+		}
+
+		// Save only files with .yaml, .json, .yml extension
+		if !strings.HasSuffix(path, ".yaml") && !strings.HasSuffix(path, ".json") && !strings.HasSuffix(path, ".yml") {
+			return nil
 		}
 
 		if !info.IsDir() {
