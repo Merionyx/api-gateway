@@ -69,3 +69,14 @@ func (rm *RepositoryManager) InitializeRepositories(repos []config.RepositoryCon
 
 	return nil
 }
+
+func (rm *RepositoryManager) GetRepository(name string) (*git.Repository, error) {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+
+	repo, ok := rm.repos[name]
+	if !ok {
+		return nil, fmt.Errorf("repository %s not found", name)
+	}
+	return repo, nil
+}
