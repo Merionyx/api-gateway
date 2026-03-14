@@ -85,7 +85,11 @@ func (rm *RepositoryManager) GetRepository(name string) (*git.Repository, error)
 	return repo, nil
 }
 
-func (rm *RepositoryManager) GetRepositoryFiles(name string, ref string) ([]string, error) {
+func (rm *RepositoryManager) GetRepositoryFiles(name string, ref string, path string) ([]string, error) {
+	if path == "" {
+		path = "."
+	}
+
 	repo, err := rm.GetRepository(name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repository %s: %w", name, err)
@@ -102,7 +106,7 @@ func (rm *RepositoryManager) GetRepositoryFiles(name string, ref string) ([]stri
 	}
 	var filesNames []string
 
-	err = util.Walk(w.Filesystem, ".", func(path string, info os.FileInfo, err error) error {
+	err = util.Walk(w.Filesystem, path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
