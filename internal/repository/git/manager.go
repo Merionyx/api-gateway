@@ -6,7 +6,9 @@ import (
 	"merionyx/api-gateway/control-plane/internal/config"
 	"sync"
 
+	"github.com/go-git/go-billy/v6/memfs"
 	"github.com/go-git/go-git/v6"
+	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/go-git/go-git/v6/plumbing/transport"
 	"github.com/go-git/go-git/v6/storage/memory"
 )
@@ -53,7 +55,7 @@ func (rm *RepositoryManager) InitializeRepositories(repos []config.RepositoryCon
 		}
 
 		// Clone repository
-		repo, err := git.Clone(memory.NewStorage(), nil, &git.CloneOptions{
+		repo, err := git.Clone(memory.NewStorage(), memfs.New(), &git.CloneOptions{
 			URL:  repository.URL,
 			Auth: auth,
 		})
@@ -79,4 +81,45 @@ func (rm *RepositoryManager) GetRepository(name string) (*git.Repository, error)
 		return nil, fmt.Errorf("repository %s not found", name)
 	}
 	return repo, nil
+}
+
+func (rm *RepositoryManager) GetRepositoryFiles(name string, ref string) ([]string, error) {
+	repo, err := rm.GetRepository(name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get repository %s: %w", name, err)
+	}
+
+	w, err := repo.Worktree()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get worktree for repository %s: %w", name, err)
+	}
+
+	refs, err := repo.References()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get references for repository %s: %w", name, err)
+	}
+
+	refs.ForEach(func(ref *plumbing.Reference) error {
+		fmt.Println(ref.Name())
+		return nil
+	})
+
+	err = w.Checkout(&git.CheckoutOptions{
+		Branch: plumbing.ReferenceName("refs/remotes/origin/" + ref),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to checkout repository %s: %w", name, err)
+	}
+
+	files, err := w.Filesystem.ReadDir(".")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read directory for repository %s: %w", name, err)
+	}
+
+	filesNames := make([]string, len(files))
+	for i, file := range files {
+		filesNames[i] = file.Name()
+	}
+
+	return filesNames, nil
 }
