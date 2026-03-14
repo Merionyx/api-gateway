@@ -3,23 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
-	"net"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"merionyx/api-gateway/control-plane/internal/config"
 	"merionyx/api-gateway/control-plane/internal/container"
+	"merionyx/api-gateway/control-plane/internal/servers"
 	"merionyx/api-gateway/control-plane/internal/repository/git"
-	environmentv1 "merionyx/api-gateway/control-plane/pkg/api/environment/v1"
-	listenerv1 "merionyx/api-gateway/control-plane/pkg/api/listener/v1"
-	tenantv1 "merionyx/api-gateway/control-plane/pkg/api/tenant/v1"
-
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
 )
 
 func main() {
@@ -57,7 +49,7 @@ func main() {
 
 	// Start HTTP server
 	go func() {
-		if err := startHTTPServer(container); err != nil {
+		if err := servers.StartHTTPServer(container); err != nil {
 			logger.Error(fmt.Sprintf("HTTP server error: %v", err))
 			cancel()
 		}
@@ -65,7 +57,7 @@ func main() {
 
 	// Start gRPC server
 	go func() {
-		if err := startGRPCServer(container); err != nil {
+		if err := servers.StartGRPCServer(container); err != nil {
 			logger.Error(fmt.Sprintf("gRPC server error: %v", err))
 			cancel()
 		}
@@ -83,36 +75,4 @@ func main() {
 	}
 
 	logger.Info("Shutting down servers...")
-}
-
-func startHTTPServer(container *container.Container) error {
-	// Setup routes
-	handler := container.Router.SetupRoutes()
-
-	server := &http.Server{
-		Addr:    ":8080",
-		Handler: handler,
-	}
-
-	log.Printf("HTTP server starting on :8080")
-	return server.ListenAndServe()
-}
-
-func startGRPCServer(container *container.Container) error {
-	lis, err := net.Listen("tcp", ":"+container.Config.Server.GRPCPort)
-	if err != nil {
-		return fmt.Errorf("failed to listen on :%s: %w", container.Config.Server.GRPCPort, err)
-	}
-
-	server := grpc.NewServer()
-
-	// Register services
-	tenantv1.RegisterTenantServiceServer(server, container.TenantGRPCHandler)
-	environmentv1.RegisterEnvironmentServiceServer(server, container.EnvironmentGRPCHandler)
-	listenerv1.RegisterListenerServiceServer(server, container.ListenerGRPCHandler)
-
-	reflection.Register(server)
-
-	log.Printf("gRPC server starting on :9090")
-	return server.Serve(lis)
 }
