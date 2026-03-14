@@ -22,3 +22,11 @@ services:
     url: "http://localhost:8080"
   be-service-02:
     url: "http://localhost:8081"
+
+environments:
+- name: dev
+  contracts:
+    name: api-gateway-schemas
+    source: git
+    repository: api-gateway-schemas-https
+    ref: main
