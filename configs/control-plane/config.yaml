@@ -6,7 +6,7 @@ server:
 
 repositories:
 - name: api-gateway-schemas-https
-  url: "https://github.com/merionyx/api-gateway-schemas.git"
+  url: "https://github.com/MikhailMinaev/api-gateway-schemas.git"
   auth:
     type: "token"
     token_env: "GITHUB_ACCESS_TOKEN"
