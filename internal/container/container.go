@@ -63,6 +63,11 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 	return container, nil
 }
 
+type ContractSchema struct {
+	Paths       map[string]struct{} `mapstructure:"paths" json:"paths" yaml:"paths"`
+	XApiGateway XApiGatewaySchema   `mapstructure:"x-api-gateway" json:"x-api-gateway" yaml:"x-api-gateway"`
+}
+
 type XApiGatewaySchema struct {
 	Prefix                string `mapstructure:"prefix" json:"prefix" yaml:"prefix"`
 	AllowUndefinedMethods bool   `mapstructure:"allow_undefined_methods" json:"allow_undefined_methods" yaml:"allow_undefined_methods"`
@@ -88,17 +93,17 @@ func (c *Container) initGitRepositoryManager() {
 	}
 
 	for _, file := range files {
-		xApiGatewaySchema, err := parseXApiGateway(file.Path, file.Content)
+		contractSchema, err := parseContractSchema(file.Path, file.Content)
 		if err != nil {
 			log.Fatalf("Failed to parse x-api-gateway: %v", err)
 		}
-		log.Println("XApiGatewaySchema:", xApiGatewaySchema)
+		log.Println("ContractSchema:", contractSchema)
 	}
 
 	log.Println("Repository files:", files)
 }
 
-func parseXApiGateway(filename string, content []byte) (*XApiGatewaySchema, error) {
+func parseContractSchema(filename string, content []byte) (*ContractSchema, error) {
 	ext := filepath.Ext(filename)
 
 	switch ext {
@@ -112,23 +117,19 @@ func parseXApiGateway(filename string, content []byte) (*XApiGatewaySchema, erro
 		return nil, fmt.Errorf("unsupported file format: %s", ext)
 	}
 }
-func parseJSON(content []byte) (*XApiGatewaySchema, error) {
-	var doc struct {
-		XApiGateway XApiGatewaySchema `json:"x-api-gateway"`
-	}
+func parseJSON(content []byte) (*ContractSchema, error) {
+	var doc ContractSchema
 	if err := json.Unmarshal(content, &doc); err != nil {
 		return nil, err
 	}
-	return &doc.XApiGateway, nil
+	return &doc, nil
 }
-func parseYAML(content []byte) (*XApiGatewaySchema, error) {
-	var doc struct {
-		XApiGateway XApiGatewaySchema `yaml:"x-api-gateway"`
-	}
-	if err := yaml.Unmarshal(content, &doc); err != nil {
+func parseYAML(content []byte) (*ContractSchema, error) {
+	var contract ContractSchema
+	if err := yaml.Unmarshal(content, &contract); err != nil {
 		return nil, err
 	}
-	return &doc.XApiGateway, nil
+	return &contract, nil
 }
 
 // initUseCases initializes the use cases
