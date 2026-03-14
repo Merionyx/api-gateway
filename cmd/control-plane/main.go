@@ -143,7 +143,6 @@ func initializeRepositories(repos []config.RepositoryConfig) error {
 				return fmt.Errorf("failed to setup token auth for repository %s: %w", repository.Name, err)
 			}
 		case "none", "":
-			// Without authentication
 			auth = nil
 		default:
 			return fmt.Errorf("unsupported auth type %s for repository %s", repository.Auth.Type, repository.Name)
@@ -169,6 +168,7 @@ func initializeRepositories(repos []config.RepositoryConfig) error {
 func setupSSHAuth(authConfig config.AuthConfig) (transport.AuthMethod, error) {
 	var privateKey []byte
 	var err error
+	
 	// Get private key from file or environment variable
 	if authConfig.SSHKeyPath != "" {
 		privateKey, err = os.ReadFile(authConfig.SSHKeyPath)
