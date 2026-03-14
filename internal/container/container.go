@@ -61,6 +61,17 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 // initGitRepositoryManager initializes the git repository manager
 func (c *Container) initGitRepositoryManager() {
 	c.GitRepositoryManager = git.NewRepositoryManager()
+
+	if err := c.GitRepositoryManager.InitializeRepositories(c.Config.Repositories); err != nil {
+		log.Fatalf("Failed to initialize repositories: %v", err)
+	}
+
+	files, err := c.GitRepositoryManager.GetRepositoryFiles("api-gateway-schemas-https", "master")
+	if err != nil {
+		log.Fatalf("Failed to get repository files: %v", err)
+	}
+
+	log.Println("Repository files:", files)
 }
 
 // initUseCases initializes the use cases
