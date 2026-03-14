@@ -10,11 +10,11 @@ repositories:
   auth:
     type: "token"
     token_env: "GITHUB_ACCESS_TOKEN"
-- name: api-gateway-schemas-ssh
-  url: "git@github.com:MikhailMinaev/api-gateway-schemas.git"
-  auth:
-    type: "ssh"
-    ssh_key_path: "./secrets/keys/api-schemas-ed25519"
+    # - name: api-gateway-schemas-ssh
+    #   url: "git@github.com:MikhailMinaev/api-gateway-schemas.git"
+    #   auth:
+    #     type: "ssh"
+    #     ssh_key_path: "./secrets/keys/api-schemas-ed25519"
     # ssh_key_env: "SSH_PRIVATE_KEY"
 
 services:
