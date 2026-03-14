@@ -34,6 +34,7 @@ func main() {
 		logger.Error(fmt.Sprintf("Failed to load config: %v", err))
 		os.Exit(1)
 	}
+	logger.Info("Config loade", "config", cfg)
 
 	// Initialize DI container
 	container, err := container.NewContainer(cfg)
