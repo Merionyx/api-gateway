@@ -6,6 +6,7 @@ server:
 
 repositories:
 - name: api-gateway-schemas-https
+  source: git
   url: "https://github.com/MikhailMinaev/api-gateway-schemas.git"
   auth:
     type: "token"
@@ -27,6 +28,5 @@ environments:
 - name: dev
   contracts:
     name: api-gateway-schemas
-    source: git
     repository: api-gateway-schemas-https
     ref: main
