@@ -30,7 +30,5 @@ services:
                       - .env.local
                       - .env.development
                       - .env.production
-        depends_on:
-            - postgres
         networks:
             - default

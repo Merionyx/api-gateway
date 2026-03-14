@@ -8,8 +8,7 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig   `mapstructure:"server"`
-	Database DatabaseConfig `mapstructure:"database"`
+	Server ServerConfig `mapstructure:"server"`
 }
 
 type ServerConfig struct {
@@ -17,27 +16,6 @@ type ServerConfig struct {
 	HTTP2Port string `mapstructure:"http2_port" validate:"required"`
 	GRPCPort  string `mapstructure:"grpc_port" validate:"required"`
 	Host      string `mapstructure:"host"`
-}
-
-// DatabaseConfig represents a universal database configuration
-type DatabaseConfig struct {
-	Type     string                 `mapstructure:"type" validate:"required"`
-	Host     string                 `mapstructure:"host" validate:"required"`
-	Port     int                    `mapstructure:"port" validate:"required"`
-	Username string                 `mapstructure:"username" validate:"required"`
-	Password string                 `mapstructure:"password" validate:"required"`
-	Database string                 `mapstructure:"database" validate:"required"`
-	Options  map[string]interface{} `mapstructure:"options"`
-}
-
-// GetPostgresConnectionString returns the PostgreSQL connection string
-func (d *DatabaseConfig) GetPostgresConnectionString() string {
-	sslMode := d.Options["ssl_mode"].(string)
-	if sslMode == "" {
-		sslMode = "disable"
-	}
-	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
-		d.Username, d.Password, d.Host, d.Port, d.Database, sslMode)
 }
 
 func LoadConfig(configFile ...string) (*Config, error) {

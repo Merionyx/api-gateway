@@ -4,24 +4,17 @@ import (
 	"log"
 
 	"merionyx/api-gateway/control-plane/internal/config"
-	"merionyx/api-gateway/control-plane/internal/database/postgres"
 	"merionyx/api-gateway/control-plane/internal/delivery/grpc/handler"
 	httpHandler "merionyx/api-gateway/control-plane/internal/delivery/http/handler"
 	"merionyx/api-gateway/control-plane/internal/delivery/http/router"
 	"merionyx/api-gateway/control-plane/internal/domain/interfaces"
-	"merionyx/api-gateway/control-plane/internal/repository"
 	"merionyx/api-gateway/control-plane/internal/usecase"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Container DI for all dependencies
 type Container struct {
 	// Config
 	Config *config.Config
-
-	// Database
-	DB *pgxpool.Pool
 
 	// Repositories
 	TenantRepository      interfaces.TenantRepository
@@ -53,39 +46,11 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 		Config: cfg,
 	}
 
-	// Initialize components in the correct order
-	if err := container.initDatabase(); err != nil {
-		return nil, err
-	}
-
-	container.initRepositories()
 	container.initUseCases()
 	container.initHandlers()
 	container.initRouter()
 
 	return container, nil
-}
-
-// initDatabase initializes the database connection
-func (c *Container) initDatabase() error {
-	dbFactory := postgres.NewFactory(c.Config)
-	db, err := dbFactory.CreateConnection()
-	if err != nil {
-		return err
-	}
-
-	c.DB = db
-	log.Println("Database connection initialized")
-	return nil
-}
-
-// initRepositories initializes the repositories
-func (c *Container) initRepositories() {
-	c.TenantRepository = repository.NewTenantRepository(c.DB)
-	c.EnvironmentRepository = repository.NewEnvironmentRepository(c.DB)
-	c.ListenerRepository = repository.NewListenerRepository(c.DB)
-
-	log.Println("Repositories initialized")
 }
 
 // initUseCases initializes the use cases
@@ -125,8 +90,5 @@ func (c *Container) initRouter() {
 
 // Close closes all resources in the container
 func (c *Container) Close() {
-	if c.DB != nil {
-		c.DB.Close()
-		log.Println("Database connection closed")
-	}
+
 }

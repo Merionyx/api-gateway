@@ -13,7 +13,6 @@ import (
 
 	"merionyx/api-gateway/control-plane/internal/config"
 	"merionyx/api-gateway/control-plane/internal/container"
-	"merionyx/api-gateway/control-plane/internal/database/migrations"
 	environmentv1 "merionyx/api-gateway/control-plane/pkg/api/environment/v1"
 	listenerv1 "merionyx/api-gateway/control-plane/pkg/api/listener/v1"
 	tenantv1 "merionyx/api-gateway/control-plane/pkg/api/tenant/v1"
@@ -33,12 +32,6 @@ func main() {
 	cfg, err := config.LoadConfig(os.Getenv("CONFIG_PATH"))
 	if err != nil {
 		logger.Error(fmt.Sprintf("Failed to load config: %v", err))
-		os.Exit(1)
-	}
-
-	// Run migrations
-	if err := migrations.RunMigrations(cfg); err != nil {
-		logger.Error(fmt.Sprintf("Failed to run migrations: %v", err))
 		os.Exit(1)
 	}
 

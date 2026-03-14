@@ -51,14 +51,12 @@ docker-run: ## Run Docker container
 docker-up:
 	docker-compose \
 		-p 'merionyx-api-gateway-control-plane' \
-		-f ./deployments/docker/compose.postgresql.yaml \
 		-f ./deployments/docker/compose.app.yaml \
 		up --build --watch
 
 docker-down:
 	docker-compose \
 		-p 'merionyx-api-gateway-control-plane' \
-		-f ./deployments/docker/compose.postgresql.yaml \
 		-f ./deployments/docker/compose.app.yaml \
 		down
 
