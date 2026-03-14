@@ -29,3 +29,13 @@ environments:
     upstream: "http://localhost:8080"
   - name: be-service-02
     upstream: "http://localhost:8081"
+- name: prod
+  contracts:
+  - name: api-gateway-schemas
+    repository: api-gateway-schemas-https
+    ref: main
+  services:
+  - name: be-service-01
+    upstream: "http://localhost:8090"
+  - name: be-service-02
+    upstream: "http://localhost:8091"
