@@ -1,7 +1,10 @@
 package container
 
 import (
+	"encoding/json"
+	"fmt"
 	"log"
+	"path/filepath"
 
 	"merionyx/api-gateway/control-plane/internal/config"
 	"merionyx/api-gateway/control-plane/internal/delivery/grpc/handler"
@@ -10,6 +13,8 @@ import (
 	"merionyx/api-gateway/control-plane/internal/domain/interfaces"
 	"merionyx/api-gateway/control-plane/internal/repository/git"
 	"merionyx/api-gateway/control-plane/internal/usecase"
+
+	"go.yaml.in/yaml/v3"
 )
 
 // Container DI for all dependencies
@@ -58,6 +63,17 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 	return container, nil
 }
 
+type XApiGatewaySchema struct {
+	Prefix                string `mapstructure:"prefix" json:"prefix" yaml:"prefix"`
+	AllowUndefinedMethods bool   `mapstructure:"allow_undefined_methods" json:"allow_undefined_methods" yaml:"allow_undefined_methods"`
+	Contract              struct {
+		Name string `mapstructure:"name" json:"name" yaml:"name"`
+	} `mapstructure:"contract" json:"contract" yaml:"contract"`
+	Service struct {
+		Name string `mapstructure:"name" json:"name" yaml:"name"`
+	} `mapstructure:"service" json:"service" yaml:"service"`
+}
+
 // initGitRepositoryManager initializes the git repository manager
 func (c *Container) initGitRepositoryManager() {
 	c.GitRepositoryManager = git.NewRepositoryManager()
@@ -71,7 +87,48 @@ func (c *Container) initGitRepositoryManager() {
 		log.Fatalf("Failed to get repository files: %v", err)
 	}
 
+	for _, file := range files {
+		xApiGatewaySchema, err := parseXApiGateway(file.Path, file.Content)
+		if err != nil {
+			log.Fatalf("Failed to parse x-api-gateway: %v", err)
+		}
+		log.Println("XApiGatewaySchema:", xApiGatewaySchema)
+	}
+
 	log.Println("Repository files:", files)
+}
+
+func parseXApiGateway(filename string, content []byte) (*XApiGatewaySchema, error) {
+	ext := filepath.Ext(filename)
+
+	switch ext {
+	case ".json":
+		log.Println("Parsing JSON file:", filename)
+		return parseJSON(content)
+	case ".yaml", ".yml":
+		log.Println("Parsing YAML file:", filename)
+		return parseYAML(content)
+	default:
+		return nil, fmt.Errorf("unsupported file format: %s", ext)
+	}
+}
+func parseJSON(content []byte) (*XApiGatewaySchema, error) {
+	var doc struct {
+		XApiGateway XApiGatewaySchema `json:"x-api-gateway"`
+	}
+	if err := json.Unmarshal(content, &doc); err != nil {
+		return nil, err
+	}
+	return &doc.XApiGateway, nil
+}
+func parseYAML(content []byte) (*XApiGatewaySchema, error) {
+	var doc struct {
+		XApiGateway XApiGatewaySchema `yaml:"x-api-gateway"`
+	}
+	if err := yaml.Unmarshal(content, &doc); err != nil {
+		return nil, err
+	}
+	return &doc.XApiGateway, nil
 }
 
 // initUseCases initializes the use cases

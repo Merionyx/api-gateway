@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
 	"merionyx/api-gateway/control-plane/internal/config"
 	"os"
@@ -86,7 +87,12 @@ func (rm *RepositoryManager) GetRepository(name string) (*git.Repository, error)
 	return repo, nil
 }
 
-func (rm *RepositoryManager) GetRepositoryFiles(name string, ref string, path string) ([]string, error) {
+type RepositoryFile struct {
+	Path    string
+	Content []byte
+}
+
+func (rm *RepositoryManager) GetRepositoryFiles(name string, ref string, path string) ([]RepositoryFile, error) {
 	if path == "" {
 		path = "."
 	}
@@ -105,7 +111,7 @@ func (rm *RepositoryManager) GetRepositoryFiles(name string, ref string, path st
 	if err != nil {
 		return nil, fmt.Errorf("failed to checkout repository %s: %w", name, err)
 	}
-	var filesNames []string
+	var files []RepositoryFile
 
 	err = util.Walk(w.Filesystem, path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -118,7 +124,21 @@ func (rm *RepositoryManager) GetRepositoryFiles(name string, ref string, path st
 		}
 
 		if !info.IsDir() {
-			filesNames = append(filesNames, path)
+			file, err := w.Filesystem.Open(path)
+			if err != nil {
+				return fmt.Errorf("failed to open file %s: %w", path, err)
+			}
+			defer file.Close()
+
+			content, err := io.ReadAll(file)
+			if err != nil {
+				return fmt.Errorf("failed to read file %s: %w", path, err)
+			}
+
+			files = append(files, RepositoryFile{
+				Path:    path,
+				Content: content,
+			})
 		}
 		return nil
 	})
@@ -126,5 +146,5 @@ func (rm *RepositoryManager) GetRepositoryFiles(name string, ref string, path st
 	if err != nil {
 		return nil, fmt.Errorf("failed to walk directory for repository %s: %w", name, err)
 	}
-	return filesNames, nil
+	return files, nil
 }
