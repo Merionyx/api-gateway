@@ -29,7 +29,10 @@ func Run() error {
 	logger.Info("Config loade", "config", cfg)
 
 	// Initialize repositories
-	if err := git.InitializeRepositories(cfg.Repositories); err != nil {
+
+	rm := git.NewRepositoryManager()
+
+	if err := rm.InitializeRepositories(cfg.Repositories); err != nil {
 		logger.Error(fmt.Sprintf("Failed to initialize repositories: %v", err))
 		os.Exit(1)
 	}

@@ -4,14 +4,29 @@ import (
 	"fmt"
 	"log/slog"
 	"merionyx/api-gateway/control-plane/internal/config"
+	"sync"
 
 	"github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/plumbing/transport"
 	"github.com/go-git/go-git/v6/storage/memory"
 )
 
-func InitializeRepositories(repos []config.RepositoryConfig) error {
+type RepositoryManager struct {
+	repos map[string]*git.Repository
+	mu    sync.RWMutex
+}
+
+func NewRepositoryManager() *RepositoryManager {
+	return &RepositoryManager{
+		repos: make(map[string]*git.Repository),
+	}
+}
+
+func (rm *RepositoryManager) InitializeRepositories(repos []config.RepositoryConfig) error {
 	slog.Info("Initializing repositories", "repositories", repos)
+
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
 
 	for _, repository := range repos {
 		slog.Info("Initializing repository", "name", repository.Name, "url", repository.URL, "auth", repository.Auth)
@@ -38,7 +53,7 @@ func InitializeRepositories(repos []config.RepositoryConfig) error {
 		}
 
 		// Clone repository
-		_, err = git.Clone(memory.NewStorage(), nil, &git.CloneOptions{
+		repo, err := git.Clone(memory.NewStorage(), nil, &git.CloneOptions{
 			URL:  repository.URL,
 			Auth: auth,
 		})
@@ -46,6 +61,8 @@ func InitializeRepositories(repos []config.RepositoryConfig) error {
 		if err != nil {
 			return fmt.Errorf("failed to clone repository %s: %w", repository.Name, err)
 		}
+
+		rm.repos[repository.Name] = repo
 
 		slog.Info("Successfully cloned repository", "name", repository.Name)
 	}
