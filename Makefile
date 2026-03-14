@@ -52,12 +52,14 @@ docker-up:
 	docker-compose \
 		-p 'merionyx-api-gateway-control-plane' \
 		-f ./deployments/docker/compose.app.yaml \
+		-f ./deployments/docker/compose.etcd.yaml \
 		up --build --watch
 
 docker-down:
 	docker-compose \
 		-p 'merionyx-api-gateway-control-plane' \
 		-f ./deployments/docker/compose.app.yaml \
+		-f ./deployments/docker/compose.etcd.yaml \
 		down
 
 dev: ## Development mode with hot reload
@@ -86,6 +88,81 @@ proto-generate: ## Generate protobuf code
 proto-install: ## Install protobuf tools
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+generate-etcd-certs: ## Generate etcd certificates
+	@echo "\033[1;34m🔐 Generating etcd certificates...\033[0m"
+	@mkdir -p secrets/certs/etcd
+	
+	@echo "\033[0;36m→ Generating CA private key...\033[0m"
+	@openssl ecparam -genkey -name prime256v1 -out secrets/certs/etcd/ca-key.pem
+	
+	@echo "\033[0;36m→ Generating CA certificate...\033[0m"
+	@openssl req -new -x509 -days 3650 -key secrets/certs/etcd/ca-key.pem \
+		-out secrets/certs/etcd/ca.pem \
+		-subj "/CN=etcd-ca"
+
+	@echo "\033[0;36m→ Generating server private key...\033[0m"
+	@openssl ecparam -genkey -name prime256v1 -out secrets/certs/etcd/server-key.pem
+	
+	@echo "\033[0;36m→ Generating server CSR...\033[0m"
+	@openssl req -new -key secrets/certs/etcd/server-key.pem \
+		-out secrets/certs/etcd/server.csr \
+		-subj "/CN=etcd-server"
+	
+	@echo "\033[0;36m→ Creating OpenSSL config for SAN...\033[0m"
+	@echo "subjectAltName=DNS:etcd,DNS:localhost,IP:127.0.0.1" > secrets/certs/etcd/san.cnf
+	
+	@echo "\033[0;36m→ Signing server certificate...\033[0m"
+	@openssl x509 -req -in secrets/certs/etcd/server.csr \
+		-CA secrets/certs/etcd/ca.pem \
+		-CAkey secrets/certs/etcd/ca-key.pem \
+		-CAcreateserial \
+		-out secrets/certs/etcd/server.pem \
+		-days 3650 \
+		-extfile secrets/certs/etcd/san.cnf
+	
+	@echo "\033[0;36m→ Generating peer private key...\033[0m"
+	@openssl ecparam -genkey -name prime256v1 -out secrets/certs/etcd/peer-key.pem
+	
+	@echo "\033[0;36m→ Generating peer CSR...\033[0m"
+	@openssl req -new -key secrets/certs/etcd/peer-key.pem \
+		-out secrets/certs/etcd/peer.csr \
+		-subj "/CN=etcd-peer"
+	
+	@echo "\033[0;36m→ Signing peer certificate...\033[0m"
+	@openssl x509 -req -in secrets/certs/etcd/peer.csr \
+		-CA secrets/certs/etcd/ca.pem \
+		-CAkey secrets/certs/etcd/ca-key.pem \
+		-CAcreateserial \
+		-out secrets/certs/etcd/peer.pem \
+		-days 3650 \
+		-extfile secrets/certs/etcd/san.cnf
+	
+	@echo "\033[0;36m→ Generating client private key...\033[0m"
+	@openssl ecparam -genkey -name prime256v1 -out secrets/certs/etcd/client-key.pem
+	
+	@echo "\033[0;36m→ Generating client CSR...\033[0m"
+	@openssl req -new -key secrets/certs/etcd/client-key.pem \
+		-out secrets/certs/etcd/client.csr \
+		-subj "/CN=etcd-client"
+	
+	@echo "\033[0;36m→ Signing client certificate...\033[0m"
+	@openssl x509 -req -in secrets/certs/etcd/client.csr \
+		-CA secrets/certs/etcd/ca.pem \
+		-CAkey secrets/certs/etcd/ca-key.pem \
+		-CAcreateserial \
+		-out secrets/certs/etcd/client.pem \
+		-days 3650
+	
+	@echo "\033[0;33m→ Cleaning up temporary files...\033[0m"
+	@rm -f secrets/certs/etcd/*.csr secrets/certs/etcd/*.srl secrets/certs/etcd/san.cnf
+	
+	@echo "\033[1;32m✓ etcd certificates generated successfully!\033[0m"
+	@echo "\033[0;32m  📁 Location: secrets/certs/etcd/\033[0m"
+	@echo "\033[0;90m  • CA: ca.pem, ca-key.pem\033[0m"
+	@echo "\033[0;90m  • Server: server.pem, server-key.pem\033[0m"
+	@echo "\033[0;90m  • Peer: peer.pem, peer-key.pem\033[0m"
+	@echo "\033[0;90m  • Client: client.pem, client-key.pem\033[0m"
 
 # Help
 help: ## Show help
