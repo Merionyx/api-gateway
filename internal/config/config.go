@@ -8,27 +8,27 @@ import (
 )
 
 type Config struct {
-	Server       ServerConfig       `mapstructure:"server"`
-	Repositories []RepositoryConfig `mapstructure:"repositories"`
+	Server       ServerConfig       `mapstructure:"server" validate:"required" json:"server"`
+	Repositories []RepositoryConfig `mapstructure:"repositories" validate:"required" json:"repositories"`
 }
 
 type ServerConfig struct {
-	HTTP1Port string `mapstructure:"http1_port" validate:"required"`
-	HTTP2Port string `mapstructure:"http2_port" validate:"required"`
-	GRPCPort  string `mapstructure:"grpc_port" validate:"required"`
-	Host      string `mapstructure:"host"`
+	HTTP1Port string `mapstructure:"http1_port" validate:"required" json:"http1_port"`
+	HTTP2Port string `mapstructure:"http2_port" validate:"required" json:"http2_port"`
+	GRPCPort  string `mapstructure:"grpc_port" validate:"required" json:"grpc_port"`
+	Host      string `mapstructure:"host" json:"host"`
 }
 
 type RepositoryConfig struct {
-	Name string     `mapstructure:"name" validate:"required"`
-	URL  string     `mapstructure:"url" validate:"required"`
-	Auth AuthConfig `mapstructure:"auth"`
+	Name string     `mapstructure:"name" validate:"required" json:"name"`
+	URL  string     `mapstructure:"url" validate:"required" json:"url"`
+	Auth AuthConfig `mapstructure:"auth" json:"auth"`
 }
 type AuthConfig struct {
-	Type       string `mapstructure:"type"` // "ssh", "token", "none"
-	SSHKeyPath string `mapstructure:"ssh_key_path"`
-	SSHKeyEnv  string `mapstructure:"ssh_key_env"`
-	TokenEnv   string `mapstructure:"token_env"`
+	Type       string `mapstructure:"type" json:"type"` // "ssh", "token", "none"
+	SSHKeyPath string `mapstructure:"ssh_key_path" json:"ssh_key_path"`
+	SSHKeyEnv  string `mapstructure:"ssh_key_env" json:"ssh_key_env"`
+	TokenEnv   string `mapstructure:"token_env" json:"token_env"`
 }
 
 func LoadConfig(configFile ...string) (*Config, error) {
