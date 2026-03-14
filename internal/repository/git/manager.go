@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"log/slog"
 	"merionyx/api-gateway/control-plane/internal/config"
+	"os"
 	"sync"
 
 	"github.com/go-git/go-billy/v6/memfs"
+	"github.com/go-git/go-billy/v6/util"
 	"github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/go-git/go-git/v6/plumbing/transport"
@@ -88,38 +90,31 @@ func (rm *RepositoryManager) GetRepositoryFiles(name string, ref string) ([]stri
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repository %s: %w", name, err)
 	}
-
 	w, err := repo.Worktree()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get worktree for repository %s: %w", name, err)
 	}
-
-	refs, err := repo.References()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get references for repository %s: %w", name, err)
-	}
-
-	refs.ForEach(func(ref *plumbing.Reference) error {
-		fmt.Println(ref.Name())
-		return nil
-	})
-
 	err = w.Checkout(&git.CheckoutOptions{
 		Branch: plumbing.ReferenceName("refs/remotes/origin/" + ref),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to checkout repository %s: %w", name, err)
 	}
+	var filesNames []string
 
-	files, err := w.Filesystem.ReadDir(".")
+	err = util.Walk(w.Filesystem, ".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !info.IsDir() {
+			filesNames = append(filesNames, path)
+		}
+		return nil
+	})
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to read directory for repository %s: %w", name, err)
+		return nil, fmt.Errorf("failed to walk directory for repository %s: %w", name, err)
 	}
-
-	filesNames := make([]string, len(files))
-	for i, file := range files {
-		filesNames[i] = file.Name()
-	}
-
 	return filesNames, nil
 }
