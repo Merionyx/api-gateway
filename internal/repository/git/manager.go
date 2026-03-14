@@ -112,7 +112,7 @@ func (rm *RepositoryManager) GetRepositoryFiles(name string, ref string, path st
 			return err
 		}
 
-		// Save only files with .yaml, .json, .yml extension
+		// Filter out files without .yaml, .json, .yml extension
 		if !strings.HasSuffix(path, ".yaml") && !strings.HasSuffix(path, ".json") && !strings.HasSuffix(path, ".yml") {
 			return nil
 		}
