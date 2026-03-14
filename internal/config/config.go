@@ -39,6 +39,7 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	viper.SetDefault("logging.enabled", false)
 	viper.SetDefault("logging.level", "info")
 	viper.SetDefault("logging.format", "[${time}] ${status} - ${method} ${path}")
+	viper.SetDefault("repositories.auth.type", "none")
 
 	// Support environment variables
 	viper.AutomaticEnv()
