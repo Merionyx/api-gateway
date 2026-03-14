@@ -18,15 +18,14 @@ repositories:
     #     ssh_key_path: "./secrets/keys/api-schemas-ed25519"
     # ssh_key_env: "SSH_PRIVATE_KEY"
 
-services:
-- name: be-service-01
-  url: "http://localhost:8080"
-- name: be-service-02
-  url: "http://localhost:8081"
-
 environments:
 - name: dev
   contracts:
-    name: api-gateway-schemas
+  - name: api-gateway-schemas
     repository: api-gateway-schemas-https
     ref: main
+  services:
+  - name: be-service-01
+    upstream: "http://localhost:8080"
+  - name: be-service-02
+    upstream: "http://localhost:8081"
