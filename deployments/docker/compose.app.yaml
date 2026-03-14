@@ -10,6 +10,8 @@ services:
         command: air -c .air.toml
         environment:
             - CONFIG_FILE=./configs/control-plane/config.yaml
+        env_file:
+            - ../../secrets/.env
         ports:
             - 8080:8080
             - 8443:8443
