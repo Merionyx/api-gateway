@@ -10,8 +10,8 @@ import (
 
 	"merionyx/api-gateway/control-plane/internal/config"
 	"merionyx/api-gateway/control-plane/internal/container"
-	"merionyx/api-gateway/control-plane/internal/servers"
-	"merionyx/api-gateway/control-plane/internal/repository/git"
+	git "merionyx/api-gateway/control-plane/internal/repository/git"
+	"merionyx/api-gateway/control-plane/internal/server"
 )
 
 func main() {
@@ -49,7 +49,7 @@ func main() {
 
 	// Start HTTP server
 	go func() {
-		if err := servers.StartHTTPServer(container); err != nil {
+		if err := server.StartHTTPServer(container); err != nil {
 			logger.Error(fmt.Sprintf("HTTP server error: %v", err))
 			cancel()
 		}
@@ -57,7 +57,7 @@ func main() {
 
 	// Start gRPC server
 	go func() {
-		if err := servers.StartGRPCServer(container); err != nil {
+		if err := server.StartGRPCServer(container); err != nil {
 			logger.Error(fmt.Sprintf("gRPC server error: %v", err))
 			cancel()
 		}
