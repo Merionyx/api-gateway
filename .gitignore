@@ -72,7 +72,7 @@ deployments/docker/configs/envoy/ssl/*.pem
 .dockerignore
 
 # Kubernetes secrets
-secrets/
+secrets
 k8s-secrets/
 
 # Database
