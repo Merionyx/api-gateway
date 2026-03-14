@@ -66,7 +66,7 @@ func (c *Container) initGitRepositoryManager() {
 		log.Fatalf("Failed to initialize repositories: %v", err)
 	}
 
-	files, err := c.GitRepositoryManager.GetRepositoryFiles("api-gateway-schemas-https", "master")
+	files, err := c.GitRepositoryManager.GetRepositoryFiles("api-gateway-schemas-https", "master", "openapi")
 	if err != nil {
 		log.Fatalf("Failed to get repository files: %v", err)
 	}
