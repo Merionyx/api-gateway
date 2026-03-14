@@ -18,10 +18,10 @@ repositories:
     # ssh_key_env: "SSH_PRIVATE_KEY"
 
 services:
-  be-service-01:
-    url: "http://localhost:8080"
-  be-service-02:
-    url: "http://localhost:8081"
+- name: be-service-01
+  url: "http://localhost:8080"
+- name: be-service-02
+  url: "http://localhost:8081"
 
 environments:
 - name: dev
