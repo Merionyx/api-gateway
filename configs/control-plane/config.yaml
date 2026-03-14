@@ -25,7 +25,7 @@ environments:
     list:
     - name: api-gateway-schemas
       repository: api-gateway-schemas-https
-      ref: main
+      ref: master
   services:
     type: static
     list:
@@ -39,7 +39,7 @@ environments:
     list:
     - name: api-gateway-schemas
       repository: api-gateway-schemas-https
-      ref: main
+      ref: master
   services:
     type: static
     list:
