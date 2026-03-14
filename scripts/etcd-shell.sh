@@ -6,5 +6,6 @@ export ETCDCTL_ENDPOINTS=https://localhost:2379
 export ETCDCTL_CACERT=$(pwd)/secrets/certs/etcd/ca.pem
 export ETCDCTL_CERT=$(pwd)/secrets/certs/etcd/client.pem
 export ETCDCTL_KEY=$(pwd)/secrets/certs/etcd/client-key.pem
+
+echo
 echo "✓ etcd environment variables set"
-echo "  ETCDCTL_ENDPOINTS=$ETCDCTL_ENDPOINTS"
