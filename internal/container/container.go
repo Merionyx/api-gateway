@@ -40,6 +40,9 @@ type Container struct {
 	EnvironmentGRPCHandler *handler.EnvironmentHandler
 	ListenerGRPCHandler    *handler.ListenerHandler
 
+	// Playground
+	EnvironmetsSnapshots map[string][]git.ContractSnapshot
+
 	// Router
 	Router *router.Router
 }
@@ -55,6 +58,8 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 	container.initHandlers()
 	container.initRouter()
 
+	container.playgroundInit()
+
 	return container, nil
 }
 
@@ -65,13 +70,6 @@ func (c *Container) initGitRepositoryManager() {
 	if err := c.GitRepositoryManager.InitializeRepositories(c.Config.Repositories); err != nil {
 		log.Fatalf("Failed to initialize repositories: %v", err)
 	}
-
-	files, err := c.GitRepositoryManager.GetRepositorySnapshots("api-gateway-schemas-https", "master", "openapi")
-	if err != nil {
-		log.Fatalf("Failed to get repository files: %v", err)
-	}
-
-	log.Println("Repository files:", files)
 }
 
 // initUseCases initializes the use cases
@@ -107,6 +105,20 @@ func (c *Container) initRouter() {
 	)
 
 	log.Println("Router initialized")
+}
+
+func (c *Container) playgroundInit() {
+	c.EnvironmetsSnapshots = make(map[string][]git.ContractSnapshot)
+
+	for _, environment := range c.Config.Environments {
+		snapshots, err := c.GitRepositoryManager.GetRepositorySnapshots(environment.Contracts.List[0].Repository, environment.Contracts.List[0].Ref, "openapi")
+		if err != nil {
+			log.Fatalf("Failed to get repository snapshots: %v", err)
+		}
+		c.EnvironmetsSnapshots[environment.Name] = snapshots
+	}
+
+	log.Println("EnvironmetsSnapshots:", c.EnvironmetsSnapshots)
 }
 
 // Close closes all resources in the container
