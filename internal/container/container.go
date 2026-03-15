@@ -41,7 +41,7 @@ type Container struct {
 	ListenerGRPCHandler    *handler.ListenerHandler
 
 	// Playground
-	EnvironmetsSnapshots map[string][]git.ContractSnapshot
+	Environments map[string]*Environment
 
 	// Router
 	Router *router.Router
@@ -50,8 +50,8 @@ type Container struct {
 type Environment struct {
 	Name      string
 	Snapshots []git.ContractSnapshot
-	Services  EnvironmentService
-	Contracts EnvironmentContract
+	Services  *EnvironmentServiceConfig
+	Contracts *EnvironmentContractConfig
 }
 
 type EnvironmentServiceConfig struct {
@@ -136,17 +136,65 @@ func (c *Container) initRouter() {
 }
 
 func (c *Container) playgroundInit() {
-	c.EnvironmetsSnapshots = make(map[string][]git.ContractSnapshot)
 
-	for _, environment := range c.Config.Environments {
-		snapshots, err := c.GitRepositoryManager.GetRepositorySnapshots(environment.Contracts.List[0].Repository, environment.Contracts.List[0].Ref, "openapi")
-		if err != nil {
-			log.Fatalf("Failed to get repository snapshots: %v", err)
+	c.Environments = make(map[string]*Environment)
+
+	// Initialize environments from config
+	for _, configEnv := range c.Config.Environments {
+		env := &Environment{ // Создаём сразу указатель
+			Name: configEnv.Name,
+			Contracts: &EnvironmentContractConfig{
+				Type: configEnv.Contracts.Type,
+				List: make([]EnvironmentContract, 0),
+			},
+			Services: &EnvironmentServiceConfig{
+				Type: configEnv.Services.Type,
+				List: make([]EnvironmentService, 0),
+			},
+			Snapshots: make([]git.ContractSnapshot, 0),
 		}
-		c.EnvironmetsSnapshots[environment.Name] = snapshots
+		c.Environments[configEnv.Name] = env
 	}
 
-	log.Println("EnvironmetsSnapshots:", c.EnvironmetsSnapshots)
+	// Initialize contracts from config
+	for _, environment := range c.Config.Environments {
+		for _, contract := range environment.Contracts.List {
+			c.Environments[environment.Name].Contracts.List = append(c.Environments[environment.Name].Contracts.List, EnvironmentContract{
+				Name:       contract.Name,
+				Repository: contract.Repository,
+				Ref:        contract.Ref,
+			})
+		}
+	}
+
+	// Initialize services from config
+	for _, environment := range c.Config.Environments {
+		for _, service := range environment.Services.List {
+			c.Environments[environment.Name].Services.List = append(c.Environments[environment.Name].Services.List, EnvironmentService{
+				Name:     service.Name,
+				Upstream: service.Upstream,
+			})
+		}
+	}
+
+	for _, environment := range c.Environments {
+		for _, contract := range environment.Contracts.List {
+			snapshots, err := c.GitRepositoryManager.GetRepositorySnapshots(contract.Repository, contract.Ref, "openapi")
+			if err != nil {
+				log.Fatalf("Failed to get repository snapshots: %v", err)
+			}
+			for _, snapshot := range snapshots {
+				environment.Snapshots = append(environment.Snapshots, snapshot)
+			}
+		}
+	}
+
+	for _, environment := range c.Environments {
+		log.Println("Environment:", environment.Name)
+		log.Println("Contracts:", environment.Contracts.List)
+		log.Println("Services:", environment.Services.List)
+		log.Println("Snapshots:", environment.Snapshots)
+	}
 }
 
 // Close closes all resources in the container
