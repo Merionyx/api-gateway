@@ -1,7 +1,8 @@
 server:
   http1_port: "8080"
   http2_port: "8443"
-  grpc_port: "8090"
+  grpc_port: "19090"
+  xds_port: "19091"
   host: "localhost"
 
 repositories:
