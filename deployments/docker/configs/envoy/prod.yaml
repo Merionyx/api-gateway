@@ -42,7 +42,6 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: app # Для Docker на Mac/Windows
-                # address: 172.17.0.1         # Для Docker на Linux
+                address: app
                 port_value: 19091
     connect_timeout: 1s
