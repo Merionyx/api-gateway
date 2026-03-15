@@ -9,8 +9,9 @@ import (
 )
 
 type Config struct {
-	Server       ServerConfig       `mapstructure:"server" validate:"required" json:"server"`
-	Repositories []RepositoryConfig `mapstructure:"repositories" validate:"required" json:"repositories"`
+	Server       ServerConfig        `mapstructure:"server" validate:"required" json:"server"`
+	Repositories []RepositoryConfig  `mapstructure:"repositories" validate:"required" json:"repositories"`
+	Environments []EnvironmentConfig `mapstructure:"environments" validate:"required" json:"environments"`
 }
 
 type ServerConfig struct {
@@ -30,6 +31,34 @@ type AuthConfig struct {
 	SSHKeyPath string `mapstructure:"ssh_key_path" json:"ssh_key_path"`
 	SSHKeyEnv  string `mapstructure:"ssh_key_env" json:"ssh_key_env"`
 	TokenEnv   string `mapstructure:"token_env" json:"token_env"`
+}
+
+type EnvironmentConfig struct {
+	Name      string          `mapstructure:"name" validate:"required" json:"name"`
+	Contracts ContractsConfig `mapstructure:"contracts" validate:"required" json:"contracts"`
+	Services  ServicesConfig  `mapstructure:"services" validate:"required" json:"services"`
+}
+
+type ContractsConfig struct {
+	Type string `mapstructure:"type" validate:"required" json:"type"`
+
+	List []ContractConfig `mapstructure:"list" validate:"required" json:"list"`
+}
+
+type ContractConfig struct {
+	Name       string `mapstructure:"name" validate:"required" json:"name"`
+	Repository string `mapstructure:"repository" validate:"required" json:"repository"`
+	Ref        string `mapstructure:"ref" validate:"required" json:"ref"`
+}
+
+type ServicesConfig struct {
+	Type string          `mapstructure:"type" validate:"required" json:"type"`
+	List []ServiceConfig `mapstructure:"list" validate:"required" json:"list"`
+}
+
+type ServiceConfig struct {
+	Name     string `mapstructure:"name" validate:"required" json:"name"`
+	Upstream string `mapstructure:"upstream" validate:"required" json:"upstream"`
 }
 
 func LoadConfig(configFile ...string) (*Config, error) {
