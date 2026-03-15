@@ -9,6 +9,7 @@ import (
 	"merionyx/api-gateway/control-plane/internal/server"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 )
 
@@ -51,6 +52,19 @@ func Run() error {
 	go func() {
 		if err := server.StartGRPCServer(container); err != nil {
 			logger.Error(fmt.Sprintf("gRPC server error: %v", err))
+			cancel()
+		}
+	}()
+
+	// Start xDS server
+	go func() {
+		xdsPort, err := strconv.Atoi(container.Config.Server.XDSPort)
+		if err != nil {
+			logger.Error(fmt.Sprintf("Failed to convert xDS port to int: %v", err))
+			cancel()
+		}
+		if err := container.XDSServer.Start(xdsPort); err != nil {
+			logger.Error(fmt.Sprintf("xDS server error: %v", err))
 			cancel()
 		}
 	}()
