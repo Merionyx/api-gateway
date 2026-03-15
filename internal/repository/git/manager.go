@@ -1,11 +1,14 @@
 package git
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"log/slog"
 	"merionyx/api-gateway/control-plane/internal/config"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -15,6 +18,7 @@ import (
 	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/go-git/go-git/v6/plumbing/transport"
 	"github.com/go-git/go-git/v6/storage/memory"
+	"go.yaml.in/yaml/v3"
 )
 
 type RepositoryManager struct {
@@ -92,7 +96,40 @@ type RepositoryFile struct {
 	Content []byte
 }
 
-func (rm *RepositoryManager) GetRepositoryFiles(name string, ref string, path string) ([]RepositoryFile, error) {
+type ContractSnapshot struct {
+	Name string
+	// Routes                []ContractRoute
+	Prefix                string
+	Upstream              ContractUpstream
+	AllowUndefinedMethods bool
+}
+
+type ContractRoute struct {
+	Path   string
+	Method string
+}
+
+type ContractUpstream struct {
+	Name string
+}
+
+type ContractSchema struct {
+	Paths       map[string]struct{} `mapstructure:"paths" json:"paths" yaml:"paths"`
+	XApiGateway XApiGatewaySchema   `mapstructure:"x-api-gateway" json:"x-api-gateway" yaml:"x-api-gateway"`
+}
+
+type XApiGatewaySchema struct {
+	Prefix                string `mapstructure:"prefix" json:"prefix" yaml:"prefix"`
+	AllowUndefinedMethods bool   `mapstructure:"allow_undefined_methods" json:"allow_undefined_methods" yaml:"allow_undefined_methods"`
+	Contract              struct {
+		Name string `mapstructure:"name" json:"name" yaml:"name"`
+	} `mapstructure:"contract" json:"contract" yaml:"contract"`
+	Service struct {
+		Name string `mapstructure:"name" json:"name" yaml:"name"`
+	} `mapstructure:"service" json:"service" yaml:"service"`
+}
+
+func (rm *RepositoryManager) GetRepositorySnapshots(name string, ref string, path string) ([]ContractSnapshot, error) {
 	if path == "" {
 		path = "."
 	}
@@ -143,8 +180,58 @@ func (rm *RepositoryManager) GetRepositoryFiles(name string, ref string, path st
 		return nil
 	})
 
+	var snapshots []ContractSnapshot
+
+	for _, file := range files {
+		contractSchema, err := parseContractSchema(file.Path, file.Content)
+		if err != nil {
+			log.Fatalf("Failed to parse x-api-gateway: %v", err)
+		}
+		log.Println("ContractSchema:", contractSchema)
+
+		upstream := ContractUpstream{
+			Name: contractSchema.XApiGateway.Service.Name,
+		}
+
+		snapshots = append(snapshots, ContractSnapshot{
+			Name:                  contractSchema.XApiGateway.Contract.Name,
+			Prefix:                contractSchema.XApiGateway.Prefix,
+			Upstream:              upstream,
+			AllowUndefinedMethods: contractSchema.XApiGateway.AllowUndefinedMethods,
+		})
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to walk directory for repository %s: %w", name, err)
 	}
-	return files, nil
+	return snapshots, nil
+}
+
+func parseContractSchema(filename string, content []byte) (*ContractSchema, error) {
+	ext := filepath.Ext(filename)
+
+	switch ext {
+	case ".json":
+		log.Println("Parsing JSON file:", filename)
+		return parseJSON(content)
+	case ".yaml", ".yml":
+		log.Println("Parsing YAML file:", filename)
+		return parseYAML(content)
+	default:
+		return nil, fmt.Errorf("unsupported file format: %s", ext)
+	}
+}
+func parseJSON(content []byte) (*ContractSchema, error) {
+	var doc ContractSchema
+	if err := json.Unmarshal(content, &doc); err != nil {
+		return nil, err
+	}
+	return &doc, nil
+}
+func parseYAML(content []byte) (*ContractSchema, error) {
+	var contract ContractSchema
+	if err := yaml.Unmarshal(content, &contract); err != nil {
+		return nil, err
+	}
+	return &contract, nil
 }
