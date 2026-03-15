@@ -1,24 +1,32 @@
 networks:
-    default:
-    kafka-network:
-        external: true
-    nats:
-        external: true
-    rabbitmq:
-        external: true
+  default:
 
 services:
-  envoy:
-    image: envoyproxy/envoy:v1.28-latest
-    container_name: envoy-proxy
-    ports:
-      - "80:80"
-      - "443:443"
+  envoy-dev:
+    image: envoyproxy/envoy:v1.33-latest
+    container_name: envoy-dev
     volumes:
-      - ./configs/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
-      - ./configs/envoy/ssl:/etc/envoy/ssl:ro
+      - ./configs/envoy/dev.yaml:/etc/envoy/envoy.yaml:ro
+    ports:
+      - "10000:10000"
+      - "9901:9901"
+    command: ["-c", "/etc/envoy/envoy.yaml"]
+    restart: unless-stopped
+    networks:
+      - default
     depends_on:
       - app
-      - grafana
+  envoy-prod:
+    image: envoyproxy/envoy:v1.33-latest
+    container_name: envoy-prod
+    volumes:
+      - ./configs/envoy/prod.yaml:/etc/envoy/envoy.yaml:ro
+    ports:
+      - "10001:10000"
+      - "9902:9902"
+    command: ["-c", "/etc/envoy/envoy.yaml"]
     restart: unless-stopped
-    command: /usr/local/bin/envoy -c /etc/envoy/envoy.yaml
+    networks:
+      - default
+    depends_on:
+      - app

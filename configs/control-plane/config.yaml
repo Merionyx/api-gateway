@@ -31,9 +31,9 @@ environments:
     type: static
     list:
     - name: be-service-01
-      upstream: "http://localhost:8080"
+      upstream: "http://mock-be-service-01-dev:8080"
     - name: be-service-02
-      upstream: "http://localhost:8081"
+      upstream: "http://mock-be-service-02-dev:8080"
 - name: prod
   contracts:
     type: static
@@ -45,6 +45,6 @@ environments:
     type: static
     list:
     - name: be-service-01
-      upstream: "http://localhost:8090"
+      upstream: "http://mock-be-service-01-prod:8080"
     - name: be-service-02
-      upstream: "http://localhost:8091"
+      upstream: "http://mock-be-service-02-prod:8080"

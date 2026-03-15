@@ -53,6 +53,8 @@ docker-up:
 		-p 'merionyx-api-gateway-control-plane' \
 		-f ./deployments/docker/compose.app.yaml \
 		-f ./deployments/docker/compose.etcd.yaml \
+		-f ./deployments/docker/compose.envoy.yaml \
+		-f ./deployments/docker/compose.mock-service.yaml \
 		up --build --watch
 
 docker-down:
@@ -60,6 +62,8 @@ docker-down:
 		-p 'merionyx-api-gateway-control-plane' \
 		-f ./deployments/docker/compose.app.yaml \
 		-f ./deployments/docker/compose.etcd.yaml \
+		-f ./deployments/docker/compose.envoy.yaml \
+		-f ./deployments/docker/compose.mock-service.yaml \
 		down
 
 dev: ## Development mode with hot reload

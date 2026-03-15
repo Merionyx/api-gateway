@@ -1,0 +1,114 @@
+networks:
+  default:
+
+services:
+  # DEV Environment Services
+  mock-be-service-01-dev:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.mock-service
+    container_name: mock-be-service-01-dev
+    environment:
+      - SERVICE_NAME=be-service-01
+      - ENVIRONMENT=dev
+      - PORT=8080
+    ports:
+      - "8080:8080"
+    networks:
+      - default
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8080/health",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+  mock-be-service-02-dev:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.mock-service
+    container_name: mock-be-service-02-dev
+    environment:
+      - SERVICE_NAME=be-service-02
+      - ENVIRONMENT=dev
+      - PORT=8080
+    ports:
+      - "8081:8080"
+    networks:
+      - default
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8080/health",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+  # PROD Environment Services
+  mock-be-service-01-prod:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.mock-service
+    container_name: mock-be-service-01-prod
+    environment:
+      - SERVICE_NAME=be-service-01
+      - ENVIRONMENT=prod
+      - PORT=8080
+    ports:
+      - "8090:8080"
+    networks:
+      - default
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8080/health",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+  mock-be-service-02-prod:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.mock-service
+    container_name: mock-be-service-02-prod
+    environment:
+      - SERVICE_NAME=be-service-02
+      - ENVIRONMENT=prod
+      - PORT=8080
+    ports:
+      - "8091:8080"
+    networks:
+      - default
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8080/health",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 3
