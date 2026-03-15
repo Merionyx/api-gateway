@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package api.snapshots.v1;
+
+option go_package = "merionyx/api-gateway/control-plane/pkg/api/snapshots/v1;snapshotsv1";
+
+// UpdateSnapshotRequest request for updating snapshot
+message UpdateSnapshotRequest {
+  string environment = 1;
+}
+
+// UpdateSnapshotResponse response for updating snapshot
+message UpdateSnapshotResponse {
+  bool success = 1;
+}
+
+service SnapshotsService {
+  rpc UpdateSnapshot(UpdateSnapshotRequest) returns (UpdateSnapshotResponse);
+}

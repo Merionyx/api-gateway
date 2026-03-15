@@ -81,12 +81,8 @@ proto-generate: ## Generate protobuf code
 	protoc --go_out=. --go_opt=paths=source_relative \
 		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
 		api/proto/v1/*.proto && \
-	cp ./api/proto/v1/environment_grpc.pb.go ./pkg/api/environment/v1/environment_grpc.pb.go && \
-	cp ./api/proto/v1/environment.pb.go ./pkg/api/environment/v1/environment.pb.go && \
-	cp ./api/proto/v1/tenant_grpc.pb.go ./pkg/api/tenant/v1/tenant_grpc.pb.go && \
-	cp ./api/proto/v1/tenant.pb.go ./pkg/api/tenant/v1/tenant.pb.go && \
-	cp ./api/proto/v1/listener_grpc.pb.go ./pkg/api/listener/v1/listener_grpc.pb.go && \
-	cp ./api/proto/v1/listener.pb.go ./pkg/api/listener/v1/listener.pb.go && \
+	cp ./api/proto/v1/snapshots_grpc.pb.go ./pkg/api/snapshots/v1/snapshots_grpc.pb.go && \
+	cp ./api/proto/v1/snapshots.pb.go ./pkg/api/snapshots/v1/snapshots.pb.go && \
 	rm -rf ./api/proto/v1/*.pb.go
 
 proto-install: ## Install protobuf tools
