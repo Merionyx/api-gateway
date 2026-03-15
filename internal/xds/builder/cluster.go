@@ -16,15 +16,12 @@ import (
 func BuildClusters(env *models.Environment) []*clusterv3.Cluster {
 	clusters := make([]*clusterv3.Cluster, 0)
 
-	// Создаём map для уникальных сервисов (чтобы не дублировать)
-	uniqueServices := make(map[string]string) // serviceName -> upstream
+	uniqueServices := make(map[string]string)
 
-	// Собираем уникальные сервисы из Services.List
 	for _, service := range env.Services.List {
 		uniqueServices[service.Name] = service.Upstream
 	}
 
-	// Создаём cluster для каждого уникального сервиса
 	for serviceName, upstream := range uniqueServices {
 		cluster := buildCluster(serviceName, upstream)
 		clusters = append(clusters, cluster)
@@ -34,7 +31,6 @@ func BuildClusters(env *models.Environment) []*clusterv3.Cluster {
 }
 
 func buildCluster(name, upstream string) *clusterv3.Cluster {
-	// Парсим upstream (например: "http://localhost:8080" -> "localhost:8080")
 	host, port := parseUpstream(upstream)
 
 	return &clusterv3.Cluster{
@@ -69,18 +65,14 @@ func buildCluster(name, upstream string) *clusterv3.Cluster {
 }
 
 func parseUpstream(upstream string) (string, int) {
-	// Простой парсер для "http://host:port" или "host:port"
-	// Убираем протокол если есть
 	upstream = strings.TrimPrefix(upstream, "http://")
 	upstream = strings.TrimPrefix(upstream, "https://")
 
-	// Разделяем host:port
 	parts := strings.Split(upstream, ":")
 	if len(parts) == 2 {
 		port, _ := strconv.Atoi(parts[1])
 		return parts[0], port
 	}
 
-	// По умолчанию порт 80
 	return upstream, 80
 }

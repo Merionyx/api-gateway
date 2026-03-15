@@ -15,13 +15,11 @@ import (
 )
 
 func BuildListeners(env *models.Environment) []*listenerv3.Listener {
-	// Создаём один listener на environment
 	listener := buildHTTPListener(env)
 	return []*listenerv3.Listener{listener}
 }
 
 func buildHTTPListener(env *models.Environment) *listenerv3.Listener {
-	// HTTP Connection Manager
 	manager := &hcmv3.HttpConnectionManager{
 		CodecType:  hcmv3.HttpConnectionManager_AUTO,
 		StatPrefix: fmt.Sprintf("ingress_http_%s", env.Name),
@@ -56,7 +54,7 @@ func buildHTTPListener(env *models.Environment) *listenerv3.Listener {
 				SocketAddress: &corev3.SocketAddress{
 					Address: "0.0.0.0",
 					PortSpecifier: &corev3.SocketAddress_PortValue{
-						PortValue: 10000, // Можно сделать динамическим
+						PortValue: 10000,
 					},
 				},
 			},

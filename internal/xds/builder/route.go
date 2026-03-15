@@ -8,10 +8,8 @@ import (
 )
 
 func BuildRoutes(env *models.Environment) []*routev3.RouteConfiguration {
-	// Создаём одну RouteConfiguration для всего environment
 	routes := make([]*routev3.Route, 0)
 
-	// Для каждого контракта создаём route
 	for _, snapshot := range env.Snapshots {
 		route := &routev3.Route{
 			Name: snapshot.Name,
@@ -25,7 +23,6 @@ func BuildRoutes(env *models.Environment) []*routev3.RouteConfiguration {
 					ClusterSpecifier: &routev3.RouteAction_Cluster{
 						Cluster: snapshot.Upstream.Name,
 					},
-					// Убираем префикс при проксировании
 					PrefixRewrite: "/",
 				},
 			},
@@ -37,7 +34,7 @@ func BuildRoutes(env *models.Environment) []*routev3.RouteConfiguration {
 		Name: env.Name + "_routes",
 		VirtualHosts: []*routev3.VirtualHost{{
 			Name:    env.Name + "_vhost",
-			Domains: []string{"*"}, // Принимаем любые домены
+			Domains: []string{"*"},
 			Routes:  routes,
 		}},
 	}

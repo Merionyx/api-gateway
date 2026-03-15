@@ -56,5 +56,4 @@ func (c *Callbacks) OnStreamDeltaResponse(streamID int64, req *discoveryv3.Delta
 		streamID, resp.GetTypeUrl())
 }
 
-// Проверяем, что Callbacks реализует интерфейс
 var _ server.Callbacks = (*Callbacks)(nil)

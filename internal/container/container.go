@@ -15,14 +15,9 @@ import (
 	xdscache "merionyx/api-gateway/control-plane/internal/xds/cache"
 	xdsserver "merionyx/api-gateway/control-plane/internal/xds/server"
 
-	clusterv3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
-	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
-	endpointv3 "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
-	listenerv3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/resource/v3"
-	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 // Container DI for all dependencies
@@ -142,7 +137,7 @@ func (c *Container) playgroundInit() {
 
 	// Initialize environments from config
 	for _, configEnv := range c.Config.Environments {
-		env := &models.Environment{ // Создаём сразу указатель
+		env := &models.Environment{
 			Name: configEnv.Name,
 			Contracts: &models.EnvironmentContractConfig{
 				Type: configEnv.Contracts.Type,
@@ -209,69 +204,6 @@ func (c *Container) playgroundInit() {
 	}
 }
 
-func (c *Container) buildTestSnapshot(env *models.Environment) *cache.Snapshot {
-	version := fmt.Sprintf("v%d", time.Now().Unix())
-
-	// Простой listener для теста
-	listener := &listenerv3.Listener{
-		Name: fmt.Sprintf("listener_%s", env.Name),
-		Address: &corev3.Address{
-			Address: &corev3.Address_SocketAddress{
-				SocketAddress: &corev3.SocketAddress{
-					Address: "0.0.0.0",
-					PortSpecifier: &corev3.SocketAddress_PortValue{
-						PortValue: 10000,
-					},
-				},
-			},
-		},
-	}
-
-	// Простой cluster
-	cluster := &clusterv3.Cluster{
-		Name:           "test_cluster",
-		ConnectTimeout: durationpb.New(5 * time.Second),
-		ClusterDiscoveryType: &clusterv3.Cluster_Type{
-			Type: clusterv3.Cluster_STATIC,
-		},
-		LoadAssignment: &endpointv3.ClusterLoadAssignment{
-			ClusterName: "test_cluster",
-			Endpoints: []*endpointv3.LocalityLbEndpoints{{
-				LbEndpoints: []*endpointv3.LbEndpoint{{
-					HostIdentifier: &endpointv3.LbEndpoint_Endpoint{
-						Endpoint: &endpointv3.Endpoint{
-							Address: &corev3.Address{
-								Address: &corev3.Address_SocketAddress{
-									SocketAddress: &corev3.SocketAddress{
-										Address: "localhost",
-										PortSpecifier: &corev3.SocketAddress_PortValue{
-											PortValue: 8080,
-										},
-									},
-								},
-							},
-						},
-					},
-				}},
-			}},
-		},
-	}
-
-	snapshot, err := cache.NewSnapshot(
-		version,
-		map[resource.Type][]types.Resource{
-			resource.ListenerType: {listener},
-			resource.ClusterType:  {cluster},
-			resource.RouteType:    {},
-			resource.EndpointType: {},
-		},
-	)
-	if err != nil {
-		log.Fatalf("Failed to create snapshot: %v", err)
-	}
-	return snapshot
-}
-
 func (c *Container) buildEnvoySnapshot(env *models.Environment) *cache.Snapshot {
 	version := fmt.Sprintf("v%d", time.Now().Unix())
 
@@ -280,7 +212,6 @@ func (c *Container) buildEnvoySnapshot(env *models.Environment) *cache.Snapshot 
 	routes := builder.BuildRoutes(env)
 	endpoints := builder.BuildEndpoints(env)
 
-	// Преобразуем в []types.Resource
 	listenerResources := make([]types.Resource, len(listeners))
 	for i, l := range listeners {
 		listenerResources[i] = l
