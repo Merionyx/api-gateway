@@ -11,7 +11,7 @@ import (
 func BuildEndpoints(env *models.Environment) []*endpointv3.ClusterLoadAssignment {
 	endpoints := make([]*endpointv3.ClusterLoadAssignment, 0)
 
-	for _, service := range env.Services.List {
+	for _, service := range env.Services.Static {
 		host, port := parseUpstream(service.Upstream)
 
 		endpoint := &endpointv3.ClusterLoadAssignment{

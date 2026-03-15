@@ -18,7 +18,7 @@ func BuildClusters(env *models.Environment) []*clusterv3.Cluster {
 
 	uniqueServices := make(map[string]string)
 
-	for _, service := range env.Services.List {
+	for _, service := range env.Services.Static {
 		uniqueServices[service.Name] = service.Upstream
 	}
 

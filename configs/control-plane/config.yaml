@@ -22,28 +22,24 @@ repositories:
 environments:
 - name: dev
   contracts:
-    type: static
-    list:
+    static:
     - name: api-gateway-schemas
       repository: api-gateway-schemas-https
       ref: master
   services:
-    type: static
-    list:
+    static:
     - name: be-service-01
       upstream: "http://mock-be-service-01-dev:8080"
     - name: be-service-02
       upstream: "http://mock-be-service-02-dev:8080"
 - name: prod
   contracts:
-    type: static
-    list:
+    static:
     - name: api-gateway-schemas
       repository: api-gateway-schemas-https
       ref: master
   services:
-    type: static
-    list:
+    static:
     - name: be-service-01
       upstream: "http://mock-be-service-01-prod:8080"
     - name: be-service-02

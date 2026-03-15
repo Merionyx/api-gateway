@@ -10,21 +10,18 @@ type Environment struct {
 }
 
 type EnvironmentServiceConfig struct {
-	Type string
-	List []EnvironmentService
+	Static []StaticServiceConfig
 }
 
-type EnvironmentService struct {
+type StaticServiceConfig struct {
 	Name     string
 	Upstream string
 }
-
 type EnvironmentContractConfig struct {
-	Type string
-	List []EnvironmentContract
+	Static []StaticContractConfig
 }
 
-type EnvironmentContract struct {
+type StaticContractConfig struct {
 	Name       string
 	Repository string
 	Ref        string

@@ -41,23 +41,20 @@ type EnvironmentConfig struct {
 }
 
 type ContractsConfig struct {
-	Type string `mapstructure:"type" validate:"required" json:"type"`
-
-	List []ContractConfig `mapstructure:"list" validate:"required" json:"list"`
+	Static []StaticContractConfig `mapstructure:"static" validate:"required" json:"static"`
 }
 
-type ContractConfig struct {
+type StaticContractConfig struct {
 	Name       string `mapstructure:"name" validate:"required" json:"name"`
 	Repository string `mapstructure:"repository" validate:"required" json:"repository"`
 	Ref        string `mapstructure:"ref" validate:"required" json:"ref"`
 }
 
 type ServicesConfig struct {
-	Type string          `mapstructure:"type" validate:"required" json:"type"`
-	List []ServiceConfig `mapstructure:"list" validate:"required" json:"list"`
+	Static []StaticServiceConfig `mapstructure:"static" validate:"required" json:"static"`
 }
 
-type ServiceConfig struct {
+type StaticServiceConfig struct {
 	Name     string `mapstructure:"name" validate:"required" json:"name"`
 	Upstream string `mapstructure:"upstream" validate:"required" json:"upstream"`
 }

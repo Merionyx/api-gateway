@@ -140,12 +140,10 @@ func (c *Container) playgroundInit() {
 		env := &models.Environment{
 			Name: configEnv.Name,
 			Contracts: &models.EnvironmentContractConfig{
-				Type: configEnv.Contracts.Type,
-				List: make([]models.EnvironmentContract, 0),
+				Static: make([]models.StaticContractConfig, 0),
 			},
 			Services: &models.EnvironmentServiceConfig{
-				Type: configEnv.Services.Type,
-				List: make([]models.EnvironmentService, 0),
+				Static: make([]models.StaticServiceConfig, 0),
 			},
 			Snapshots: make([]git.ContractSnapshot, 0),
 		}
@@ -154,8 +152,8 @@ func (c *Container) playgroundInit() {
 
 	// Initialize contracts from config
 	for _, environment := range c.Config.Environments {
-		for _, contract := range environment.Contracts.List {
-			c.Environments[environment.Name].Contracts.List = append(c.Environments[environment.Name].Contracts.List, models.EnvironmentContract{
+		for _, contract := range environment.Contracts.Static {
+			c.Environments[environment.Name].Contracts.Static = append(c.Environments[environment.Name].Contracts.Static, models.StaticContractConfig{
 				Name:       contract.Name,
 				Repository: contract.Repository,
 				Ref:        contract.Ref,
@@ -165,8 +163,8 @@ func (c *Container) playgroundInit() {
 
 	// Initialize services from config
 	for _, environment := range c.Config.Environments {
-		for _, service := range environment.Services.List {
-			c.Environments[environment.Name].Services.List = append(c.Environments[environment.Name].Services.List, models.EnvironmentService{
+		for _, service := range environment.Services.Static {
+			c.Environments[environment.Name].Services.Static = append(c.Environments[environment.Name].Services.Static, models.StaticServiceConfig{
 				Name:     service.Name,
 				Upstream: service.Upstream,
 			})
@@ -174,7 +172,7 @@ func (c *Container) playgroundInit() {
 	}
 
 	for _, environment := range c.Environments {
-		for _, contract := range environment.Contracts.List {
+		for _, contract := range environment.Contracts.Static {
 			snapshots, err := c.GitRepositoryManager.GetRepositorySnapshots(contract.Repository, contract.Ref, "openapi")
 			if err != nil {
 				log.Fatalf("Failed to get repository snapshots: %v", err)
@@ -187,8 +185,8 @@ func (c *Container) playgroundInit() {
 
 	for _, environment := range c.Environments {
 		log.Println("Environment:", environment.Name)
-		log.Println("Contracts:", environment.Contracts.List)
-		log.Println("Services:", environment.Services.List)
+		log.Println("Contracts:", environment.Contracts.Static)
+		log.Println("Services:", environment.Services.Static)
 		log.Println("Snapshots:", environment.Snapshots)
 	}
 
