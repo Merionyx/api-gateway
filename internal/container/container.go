@@ -1,15 +1,28 @@
 package container
 
 import (
+	"fmt"
 	"log"
+	"strconv"
+	"time"
 
 	"merionyx/api-gateway/control-plane/internal/config"
-	"merionyx/api-gateway/control-plane/internal/delivery/grpc/handler"
-	httpHandler "merionyx/api-gateway/control-plane/internal/delivery/http/handler"
 	"merionyx/api-gateway/control-plane/internal/delivery/http/router"
-	"merionyx/api-gateway/control-plane/internal/domain/interfaces"
+	"merionyx/api-gateway/control-plane/internal/domain/models"
 	"merionyx/api-gateway/control-plane/internal/repository/git"
-	"merionyx/api-gateway/control-plane/internal/usecase"
+
+	"merionyx/api-gateway/control-plane/internal/xds/builder"
+	xdscache "merionyx/api-gateway/control-plane/internal/xds/cache"
+	xdsserver "merionyx/api-gateway/control-plane/internal/xds/server"
+
+	clusterv3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
+	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	endpointv3 "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
+	listenerv3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
+	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
+	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
+	"github.com/envoyproxy/go-control-plane/pkg/resource/v3"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 // Container DI for all dependencies
@@ -20,59 +33,35 @@ type Container struct {
 	// Repository Manager
 	GitRepositoryManager *git.RepositoryManager
 
-	// Repositories
-	TenantRepository      interfaces.TenantRepository
-	EnvironmentRepository interfaces.EnvironmentRepository
-	ListenerRepository    interfaces.ListenerRepository
+	// // Repositories
+	// TenantRepository      interfaces.TenantRepository
+	// EnvironmentRepository interfaces.EnvironmentRepository
+	// ListenerRepository    interfaces.ListenerRepository
 
-	// Use Cases
-	TenantUseCase      interfaces.TenantUseCase
-	EnvironmentUseCase interfaces.EnvironmentUseCase
-	ListenerUseCase    interfaces.ListenerUseCase
+	// // Use Cases
+	// TenantUseCase      interfaces.TenantUseCase
+	// EnvironmentUseCase interfaces.EnvironmentUseCase
+	// ListenerUseCase    interfaces.ListenerUseCase
 
-	// HTTP Handlers
-	TenantHTTPHandler      *httpHandler.TenantHandler
-	EnvironmentHTTPHandler *httpHandler.EnvironmentHandler
-	ListenerHTTPHandler    *httpHandler.ListenerHandler
+	// // HTTP Handlers
+	// TenantHTTPHandler      *httpHandler.TenantHandler
+	// EnvironmentHTTPHandler *httpHandler.EnvironmentHandler
+	// ListenerHTTPHandler    *httpHandler.ListenerHandler
 
-	// gRPC Handlers
-	TenantGRPCHandler      *handler.TenantHandler
-	EnvironmentGRPCHandler *handler.EnvironmentHandler
-	ListenerGRPCHandler    *handler.ListenerHandler
+	// // gRPC Handlers
+	// TenantGRPCHandler      *handler.TenantHandler
+	// EnvironmentGRPCHandler *handler.EnvironmentHandler
+	// ListenerGRPCHandler    *handler.ListenerHandler
 
 	// Playground
-	Environments map[string]*Environment
+	Environments map[string]*models.Environment
 
 	// Router
 	Router *router.Router
-}
 
-type Environment struct {
-	Name      string
-	Snapshots []git.ContractSnapshot
-	Services  *EnvironmentServiceConfig
-	Contracts *EnvironmentContractConfig
-}
-
-type EnvironmentServiceConfig struct {
-	Type string
-	List []EnvironmentService
-}
-
-type EnvironmentService struct {
-	Name     string
-	Upstream string
-}
-
-type EnvironmentContractConfig struct {
-	Type string
-	List []EnvironmentContract
-}
-
-type EnvironmentContract struct {
-	Name       string
-	Repository string
-	Ref        string
+	// xDS Components
+	XDSSnapshotManager *xdscache.SnapshotManager
+	XDSServer          *xdsserver.Server
 }
 
 // NewContainer creates and initializes a new DI container
@@ -85,6 +74,7 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 	container.initUseCases()
 	container.initHandlers()
 	container.initRouter()
+	container.initXDS()
 
 	container.playgroundInit()
 
@@ -102,9 +92,9 @@ func (c *Container) initGitRepositoryManager() {
 
 // initUseCases initializes the use cases
 func (c *Container) initUseCases() {
-	c.TenantUseCase = usecase.NewTenantUseCase(c.TenantRepository)
-	c.EnvironmentUseCase = usecase.NewEnvironmentUseCase(c.EnvironmentRepository, c.TenantRepository)
-	c.ListenerUseCase = usecase.NewListenerUseCase(c.ListenerRepository, c.EnvironmentRepository)
+	// c.TenantUseCase = usecase.NewTenantUseCase(c.TenantRepository)
+	// c.EnvironmentUseCase = usecase.NewEnvironmentUseCase(c.EnvironmentRepository, c.TenantRepository)
+	// c.ListenerUseCase = usecase.NewListenerUseCase(c.ListenerRepository, c.EnvironmentRepository)
 
 	log.Println("Use cases initialized")
 }
@@ -112,14 +102,14 @@ func (c *Container) initUseCases() {
 // initHandlers initializes the handlers
 func (c *Container) initHandlers() {
 	// HTTP handlers
-	c.TenantHTTPHandler = httpHandler.NewTenantHandler(c.TenantUseCase)
-	c.EnvironmentHTTPHandler = httpHandler.NewEnvironmentHandler(c.EnvironmentUseCase)
-	c.ListenerHTTPHandler = httpHandler.NewListenerHandler(c.ListenerUseCase)
+	// c.TenantHTTPHandler = httpHandler.NewTenantHandler(c.TenantUseCase)
+	// c.EnvironmentHTTPHandler = httpHandler.NewEnvironmentHandler(c.EnvironmentUseCase)
+	// c.ListenerHTTPHandler = httpHandler.NewListenerHandler(c.ListenerUseCase)
 
 	// gRPC handlers
-	c.TenantGRPCHandler = handler.NewTenantHandler(c.TenantUseCase)
-	c.EnvironmentGRPCHandler = handler.NewEnvironmentHandler(c.EnvironmentUseCase)
-	c.ListenerGRPCHandler = handler.NewListenerHandler(c.ListenerUseCase)
+	// c.TenantGRPCHandler = handler.NewTenantHandler(c.TenantUseCase)
+	// c.EnvironmentGRPCHandler = handler.NewEnvironmentHandler(c.EnvironmentUseCase)
+	// c.ListenerGRPCHandler = handler.NewListenerHandler(c.ListenerUseCase)
 
 	log.Println("Handlers initialized")
 }
@@ -127,29 +117,40 @@ func (c *Container) initHandlers() {
 // initRouter initializes the router
 func (c *Container) initRouter() {
 	c.Router = router.NewRouter(
-		c.TenantUseCase,
-		c.EnvironmentUseCase,
-		c.ListenerUseCase,
+	// c.TenantUseCase,
+	// c.EnvironmentUseCase,
+	// c.ListenerUseCase,
 	)
 
 	log.Println("Router initialized")
 }
 
+func (c *Container) initXDS() {
+	c.XDSSnapshotManager = xdscache.NewSnapshotManager()
+	xdsPort, err := strconv.Atoi(c.Config.Server.XDSPort)
+	if err != nil {
+		log.Fatalf("Failed to convert xDS port to int: %v", err)
+	}
+	c.XDSServer = xdsserver.NewXDSServer(c.XDSSnapshotManager.GetCache(), xdsPort)
+
+	log.Println("xDS server initialized")
+}
+
 func (c *Container) playgroundInit() {
 
-	c.Environments = make(map[string]*Environment)
+	c.Environments = make(map[string]*models.Environment)
 
 	// Initialize environments from config
 	for _, configEnv := range c.Config.Environments {
-		env := &Environment{ // Создаём сразу указатель
+		env := &models.Environment{ // Создаём сразу указатель
 			Name: configEnv.Name,
-			Contracts: &EnvironmentContractConfig{
+			Contracts: &models.EnvironmentContractConfig{
 				Type: configEnv.Contracts.Type,
-				List: make([]EnvironmentContract, 0),
+				List: make([]models.EnvironmentContract, 0),
 			},
-			Services: &EnvironmentServiceConfig{
+			Services: &models.EnvironmentServiceConfig{
 				Type: configEnv.Services.Type,
-				List: make([]EnvironmentService, 0),
+				List: make([]models.EnvironmentService, 0),
 			},
 			Snapshots: make([]git.ContractSnapshot, 0),
 		}
@@ -159,7 +160,7 @@ func (c *Container) playgroundInit() {
 	// Initialize contracts from config
 	for _, environment := range c.Config.Environments {
 		for _, contract := range environment.Contracts.List {
-			c.Environments[environment.Name].Contracts.List = append(c.Environments[environment.Name].Contracts.List, EnvironmentContract{
+			c.Environments[environment.Name].Contracts.List = append(c.Environments[environment.Name].Contracts.List, models.EnvironmentContract{
 				Name:       contract.Name,
 				Repository: contract.Repository,
 				Ref:        contract.Ref,
@@ -170,7 +171,7 @@ func (c *Container) playgroundInit() {
 	// Initialize services from config
 	for _, environment := range c.Config.Environments {
 		for _, service := range environment.Services.List {
-			c.Environments[environment.Name].Services.List = append(c.Environments[environment.Name].Services.List, EnvironmentService{
+			c.Environments[environment.Name].Services.List = append(c.Environments[environment.Name].Services.List, models.EnvironmentService{
 				Name:     service.Name,
 				Upstream: service.Upstream,
 			})
@@ -195,6 +196,125 @@ func (c *Container) playgroundInit() {
 		log.Println("Services:", environment.Services.List)
 		log.Println("Snapshots:", environment.Snapshots)
 	}
+
+	for envName, env := range c.Environments {
+		snapshot := c.buildEnvoySnapshot(env)
+		nodeID := fmt.Sprintf("envoy-%s", envName)
+
+		if err := c.XDSSnapshotManager.UpdateSnapshot(nodeID, snapshot); err != nil {
+			log.Fatalf("Failed to update snapshot for %s: %v", nodeID, err)
+		}
+
+		log.Printf("Created xDS snapshot for environment: %s (nodeID: %s)", envName, nodeID)
+	}
+}
+
+func (c *Container) buildTestSnapshot(env *models.Environment) *cache.Snapshot {
+	version := fmt.Sprintf("v%d", time.Now().Unix())
+
+	// Простой listener для теста
+	listener := &listenerv3.Listener{
+		Name: fmt.Sprintf("listener_%s", env.Name),
+		Address: &corev3.Address{
+			Address: &corev3.Address_SocketAddress{
+				SocketAddress: &corev3.SocketAddress{
+					Address: "0.0.0.0",
+					PortSpecifier: &corev3.SocketAddress_PortValue{
+						PortValue: 10000,
+					},
+				},
+			},
+		},
+	}
+
+	// Простой cluster
+	cluster := &clusterv3.Cluster{
+		Name:           "test_cluster",
+		ConnectTimeout: durationpb.New(5 * time.Second),
+		ClusterDiscoveryType: &clusterv3.Cluster_Type{
+			Type: clusterv3.Cluster_STATIC,
+		},
+		LoadAssignment: &endpointv3.ClusterLoadAssignment{
+			ClusterName: "test_cluster",
+			Endpoints: []*endpointv3.LocalityLbEndpoints{{
+				LbEndpoints: []*endpointv3.LbEndpoint{{
+					HostIdentifier: &endpointv3.LbEndpoint_Endpoint{
+						Endpoint: &endpointv3.Endpoint{
+							Address: &corev3.Address{
+								Address: &corev3.Address_SocketAddress{
+									SocketAddress: &corev3.SocketAddress{
+										Address: "localhost",
+										PortSpecifier: &corev3.SocketAddress_PortValue{
+											PortValue: 8080,
+										},
+									},
+								},
+							},
+						},
+					},
+				}},
+			}},
+		},
+	}
+
+	snapshot, err := cache.NewSnapshot(
+		version,
+		map[resource.Type][]types.Resource{
+			resource.ListenerType: {listener},
+			resource.ClusterType:  {cluster},
+			resource.RouteType:    {},
+			resource.EndpointType: {},
+		},
+	)
+	if err != nil {
+		log.Fatalf("Failed to create snapshot: %v", err)
+	}
+	return snapshot
+}
+
+func (c *Container) buildEnvoySnapshot(env *models.Environment) *cache.Snapshot {
+	version := fmt.Sprintf("v%d", time.Now().Unix())
+
+	listeners := builder.BuildListeners(env)
+	clusters := builder.BuildClusters(env)
+	routes := builder.BuildRoutes(env)
+	endpoints := builder.BuildEndpoints(env)
+
+	// Преобразуем в []types.Resource
+	listenerResources := make([]types.Resource, len(listeners))
+	for i, l := range listeners {
+		listenerResources[i] = l
+	}
+
+	clusterResources := make([]types.Resource, len(clusters))
+	for i, c := range clusters {
+		clusterResources[i] = c
+	}
+
+	routeResources := make([]types.Resource, len(routes))
+	for i, r := range routes {
+		routeResources[i] = r
+	}
+
+	endpointResources := make([]types.Resource, len(endpoints))
+	for i, e := range endpoints {
+		endpointResources[i] = e
+	}
+
+	snapshot, err := cache.NewSnapshot(
+		version,
+		map[resource.Type][]types.Resource{
+			resource.ListenerType: listenerResources,
+			resource.ClusterType:  clusterResources,
+			resource.RouteType:    routeResources,
+			resource.EndpointType: endpointResources,
+		},
+	)
+	if err != nil {
+		log.Fatalf("Failed to create snapshot: %v", err)
+	}
+
+	return snapshot
 }
 
 // Close closes all resources in the container
