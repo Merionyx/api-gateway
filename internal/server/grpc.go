@@ -4,9 +4,6 @@ import (
 	"fmt"
 	"log"
 	"merionyx/api-gateway/control-plane/internal/container"
-	environmentv1 "merionyx/api-gateway/control-plane/pkg/api/environment/v1"
-	listenerv1 "merionyx/api-gateway/control-plane/pkg/api/listener/v1"
-	tenantv1 "merionyx/api-gateway/control-plane/pkg/api/tenant/v1"
 	"net"
 
 	"google.golang.org/grpc"
@@ -22,12 +19,12 @@ func StartGRPCServer(container *container.Container) error {
 	server := grpc.NewServer()
 
 	// Register services
-	tenantv1.RegisterTenantServiceServer(server, container.TenantGRPCHandler)
-	environmentv1.RegisterEnvironmentServiceServer(server, container.EnvironmentGRPCHandler)
-	listenerv1.RegisterListenerServiceServer(server, container.ListenerGRPCHandler)
+	// tenantv1.RegisterTenantServiceServer(server, container.TenantGRPCHandler)
+	// environmentv1.RegisterEnvironmentServiceServer(server, container.EnvironmentGRPCHandler)
+	// listenerv1.RegisterListenerServiceServer(server, container.ListenerGRPCHandler)
 
 	reflection.Register(server)
 
-	log.Printf("gRPC server starting on :9090")
+	log.Printf("gRPC server starting on :%s", container.Config.Server.GRPCPort)
 	return server.Serve(lis)
 }

@@ -1,157 +1,147 @@
 package handler
 
-import (
-	"encoding/json"
-	"net/http"
+// // TenantHandler HTTP handler for tenants
+// type TenantHandler struct {
+// 	tenantUseCase interfaces.TenantUseCase
+// }
 
-	"merionyx/api-gateway/control-plane/internal/domain/interfaces"
-	"merionyx/api-gateway/control-plane/internal/domain/models"
+// // NewTenantHandler creates a new instance of TenantHandler
+// func NewTenantHandler(tenantUseCase interfaces.TenantUseCase) *TenantHandler {
+// 	return &TenantHandler{
+// 		tenantUseCase: tenantUseCase,
+// 	}
+// }
 
-	"github.com/google/uuid"
-)
+// // CreateTenant creates a new tenant
+// func (h *TenantHandler) CreateTenant(w http.ResponseWriter, r *http.Request) {
+// 	if r.Method != http.MethodPost {
+// 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+// 		return
+// 	}
 
-// TenantHandler HTTP handler for tenants
-type TenantHandler struct {
-	tenantUseCase interfaces.TenantUseCase
-}
+// 	var req models.CreateTenantRequest
+// 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+// 		writeErrorResponse(w, http.StatusBadRequest, "Invalid request data", err.Error())
+// 		return
+// 	}
 
-// NewTenantHandler creates a new instance of TenantHandler
-func NewTenantHandler(tenantUseCase interfaces.TenantUseCase) *TenantHandler {
-	return &TenantHandler{
-		tenantUseCase: tenantUseCase,
-	}
-}
+// 	tenant, err := h.tenantUseCase.CreateTenant(r.Context(), &req)
+// 	if err != nil {
+// 		writeErrorResponse(w, http.StatusInternalServerError, "Error creating tenant", err.Error())
+// 		return
+// 	}
 
-// CreateTenant creates a new tenant
-func (h *TenantHandler) CreateTenant(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
+// 	writeSuccessResponse(w, http.StatusCreated, tenant)
+// }
 
-	var req models.CreateTenantRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeErrorResponse(w, http.StatusBadRequest, "Invalid request data", err.Error())
-		return
-	}
+// // GetTenant gets a tenant by ID
+// func (h *TenantHandler) GetTenant(w http.ResponseWriter, r *http.Request) {
+// 	if r.Method != http.MethodGet {
+// 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+// 		return
+// 	}
 
-	tenant, err := h.tenantUseCase.CreateTenant(r.Context(), &req)
-	if err != nil {
-		writeErrorResponse(w, http.StatusInternalServerError, "Error creating tenant", err.Error())
-		return
-	}
+// 	idStr := getPathParam(r.URL.Path, "/api/v1/tenants/")
+// 	id, err := uuid.Parse(idStr)
+// 	if err != nil {
+// 		writeErrorResponse(w, http.StatusBadRequest, "Invalid tenant ID", err.Error())
+// 		return
+// 	}
 
-	writeSuccessResponse(w, http.StatusCreated, tenant)
-}
+// 	tenant, err := h.tenantUseCase.GetTenantByID(r.Context(), id)
+// 	if err != nil {
+// 		writeErrorResponse(w, http.StatusNotFound, "Tenant not found", err.Error())
+// 		return
+// 	}
 
-// GetTenant gets a tenant by ID
-func (h *TenantHandler) GetTenant(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
+// 	writeSuccessResponse(w, http.StatusOK, tenant)
+// }
 
-	idStr := getPathParam(r.URL.Path, "/api/v1/tenants/")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		writeErrorResponse(w, http.StatusBadRequest, "Invalid tenant ID", err.Error())
-		return
-	}
+// // GetTenantByName gets a tenant by name
+// func (h *TenantHandler) GetTenantByName(w http.ResponseWriter, r *http.Request) {
+// 	if r.Method != http.MethodGet {
+// 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+// 		return
+// 	}
 
-	tenant, err := h.tenantUseCase.GetTenantByID(r.Context(), id)
-	if err != nil {
-		writeErrorResponse(w, http.StatusNotFound, "Tenant not found", err.Error())
-		return
-	}
+// 	name := r.URL.Query().Get("name")
+// 	if name == "" {
+// 		writeErrorResponse(w, http.StatusBadRequest, "Tenant name is required", "Parameter 'name' cannot be empty")
+// 		return
+// 	}
 
-	writeSuccessResponse(w, http.StatusOK, tenant)
-}
+// 	tenant, err := h.tenantUseCase.GetTenantByName(r.Context(), name)
+// 	if err != nil {
+// 		writeErrorResponse(w, http.StatusNotFound, "Tenant not found", err.Error())
+// 		return
+// 	}
 
-// GetTenantByName gets a tenant by name
-func (h *TenantHandler) GetTenantByName(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
+// 	writeSuccessResponse(w, http.StatusOK, tenant)
+// }
 
-	name := r.URL.Query().Get("name")
-	if name == "" {
-		writeErrorResponse(w, http.StatusBadRequest, "Tenant name is required", "Parameter 'name' cannot be empty")
-		return
-	}
+// // GetTenants gets a list of all tenants
+// func (h *TenantHandler) GetTenants(w http.ResponseWriter, r *http.Request) {
+// 	if r.Method != http.MethodGet {
+// 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+// 		return
+// 	}
 
-	tenant, err := h.tenantUseCase.GetTenantByName(r.Context(), name)
-	if err != nil {
-		writeErrorResponse(w, http.StatusNotFound, "Tenant not found", err.Error())
-		return
-	}
+// 	tenants, err := h.tenantUseCase.GetAllTenants(r.Context())
+// 	if err != nil {
+// 		writeErrorResponse(w, http.StatusInternalServerError, "Error getting list of tenants", err.Error())
+// 		return
+// 	}
 
-	writeSuccessResponse(w, http.StatusOK, tenant)
-}
+// 	writeSuccessResponse(w, http.StatusOK, tenants)
+// }
 
-// GetTenants gets a list of all tenants
-func (h *TenantHandler) GetTenants(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
+// // UpdateTenant updates a tenant
+// func (h *TenantHandler) UpdateTenant(w http.ResponseWriter, r *http.Request) {
+// 	if r.Method != http.MethodPut {
+// 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+// 		return
+// 	}
 
-	tenants, err := h.tenantUseCase.GetAllTenants(r.Context())
-	if err != nil {
-		writeErrorResponse(w, http.StatusInternalServerError, "Error getting list of tenants", err.Error())
-		return
-	}
+// 	idStr := getPathParam(r.URL.Path, "/api/v1/tenants/")
+// 	id, err := uuid.Parse(idStr)
+// 	if err != nil {
+// 		writeErrorResponse(w, http.StatusBadRequest, "Invalid tenant ID", err.Error())
+// 		return
+// 	}
 
-	writeSuccessResponse(w, http.StatusOK, tenants)
-}
+// 	var req models.UpdateTenantRequest
+// 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+// 		writeErrorResponse(w, http.StatusBadRequest, "Invalid request data", err.Error())
+// 		return
+// 	}
 
-// UpdateTenant updates a tenant
-func (h *TenantHandler) UpdateTenant(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPut {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
+// 	tenant, err := h.tenantUseCase.UpdateTenant(r.Context(), id, &req)
+// 	if err != nil {
+// 		writeErrorResponse(w, http.StatusInternalServerError, "Error updating tenant", err.Error())
+// 		return
+// 	}
 
-	idStr := getPathParam(r.URL.Path, "/api/v1/tenants/")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		writeErrorResponse(w, http.StatusBadRequest, "Invalid tenant ID", err.Error())
-		return
-	}
+// 	writeSuccessResponse(w, http.StatusOK, tenant)
+// }
 
-	var req models.UpdateTenantRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeErrorResponse(w, http.StatusBadRequest, "Invalid request data", err.Error())
-		return
-	}
+// // DeleteTenant deletes a tenant
+// func (h *TenantHandler) DeleteTenant(w http.ResponseWriter, r *http.Request) {
+// 	if r.Method != http.MethodDelete {
+// 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+// 		return
+// 	}
 
-	tenant, err := h.tenantUseCase.UpdateTenant(r.Context(), id, &req)
-	if err != nil {
-		writeErrorResponse(w, http.StatusInternalServerError, "Error updating tenant", err.Error())
-		return
-	}
+// 	idStr := getPathParam(r.URL.Path, "/api/v1/tenants/")
+// 	id, err := uuid.Parse(idStr)
+// 	if err != nil {
+// 		writeErrorResponse(w, http.StatusBadRequest, "Invalid tenant ID", err.Error())
+// 		return
+// 	}
 
-	writeSuccessResponse(w, http.StatusOK, tenant)
-}
+// 	if err := h.tenantUseCase.DeleteTenant(r.Context(), id); err != nil {
+// 		writeErrorResponse(w, http.StatusInternalServerError, "Error deleting tenant", err.Error())
+// 		return
+// 	}
 
-// DeleteTenant deletes a tenant
-func (h *TenantHandler) DeleteTenant(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodDelete {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	idStr := getPathParam(r.URL.Path, "/api/v1/tenants/")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		writeErrorResponse(w, http.StatusBadRequest, "Invalid tenant ID", err.Error())
-		return
-	}
-
-	if err := h.tenantUseCase.DeleteTenant(r.Context(), id); err != nil {
-		writeErrorResponse(w, http.StatusInternalServerError, "Error deleting tenant", err.Error())
-		return
-	}
-
-	writeSuccessMessage(w, http.StatusNoContent, "Tenant successfully deleted")
-}
+// 	writeSuccessMessage(w, http.StatusNoContent, "Tenant successfully deleted")
+// }

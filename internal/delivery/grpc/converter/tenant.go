@@ -1,53 +1,46 @@
 package converter
 
-import (
-	"merionyx/api-gateway/control-plane/internal/domain/models"
-	tenantv1 "merionyx/api-gateway/control-plane/pkg/api/tenant/v1"
+// // TenantToProto converts the domain model of the tenant to a protobuf message
+// func TenantToProto(tenant *models.Tenant) *tenantv1.Tenant {
+// 	if tenant == nil {
+// 		return nil
+// 	}
 
-	"google.golang.org/protobuf/types/known/timestamppb"
-)
+// 	return &tenantv1.Tenant{
+// 		Id:        tenant.ID.String(),
+// 		Name:      tenant.Name,
+// 		CreatedAt: timestamppb.New(tenant.CreatedAt),
+// 		UpdatedAt: timestamppb.New(tenant.UpdatedAt),
+// 	}
+// }
 
-// TenantToProto converts the domain model of the tenant to a protobuf message
-func TenantToProto(tenant *models.Tenant) *tenantv1.Tenant {
-	if tenant == nil {
-		return nil
-	}
+// // TenantsToProto converts a list of domain models of tenants to protobuf messages
+// func TenantsToProto(tenants []*models.Tenant) []*tenantv1.Tenant {
+// 	result := make([]*tenantv1.Tenant, len(tenants))
+// 	for i, tenant := range tenants {
+// 		result[i] = TenantToProto(tenant)
+// 	}
+// 	return result
+// }
 
-	return &tenantv1.Tenant{
-		Id:        tenant.ID.String(),
-		Name:      tenant.Name,
-		CreatedAt: timestamppb.New(tenant.CreatedAt),
-		UpdatedAt: timestamppb.New(tenant.UpdatedAt),
-	}
-}
+// // CreateTenantRequestFromProto converts a protobuf request to a domain model
+// func CreateTenantRequestFromProto(req *tenantv1.CreateTenantRequest) *models.CreateTenantRequest {
+// 	if req == nil {
+// 		return nil
+// 	}
 
-// TenantsToProto converts a list of domain models of tenants to protobuf messages
-func TenantsToProto(tenants []*models.Tenant) []*tenantv1.Tenant {
-	result := make([]*tenantv1.Tenant, len(tenants))
-	for i, tenant := range tenants {
-		result[i] = TenantToProto(tenant)
-	}
-	return result
-}
+// 	return &models.CreateTenantRequest{
+// 		Name: req.Name,
+// 	}
+// }
 
-// CreateTenantRequestFromProto converts a protobuf request to a domain model
-func CreateTenantRequestFromProto(req *tenantv1.CreateTenantRequest) *models.CreateTenantRequest {
-	if req == nil {
-		return nil
-	}
+// // UpdateTenantRequestFromProto converts a protobuf request to a domain model
+// func UpdateTenantRequestFromProto(req *tenantv1.UpdateTenantRequest) *models.UpdateTenantRequest {
+// 	if req == nil {
+// 		return nil
+// 	}
 
-	return &models.CreateTenantRequest{
-		Name: req.Name,
-	}
-}
-
-// UpdateTenantRequestFromProto converts a protobuf request to a domain model
-func UpdateTenantRequestFromProto(req *tenantv1.UpdateTenantRequest) *models.UpdateTenantRequest {
-	if req == nil {
-		return nil
-	}
-
-	return &models.UpdateTenantRequest{
-		Name: req.Name,
-	}
-}
+// 	return &models.UpdateTenantRequest{
+// 		Name: req.Name,
+// 	}
+// }
