@@ -25,7 +25,7 @@ environments:
     static:
     - name: api-gateway-schemas
       repository: api-gateway-schemas-https
-      ref: master
+      ref: remotes/origin/master
   services:
     static:
     - name: be-service-01
@@ -37,7 +37,7 @@ environments:
     static:
     - name: api-gateway-schemas
       repository: api-gateway-schemas-https
-      ref: master
+      ref: tags/v0.0.1
   services:
     static:
     - name: be-service-01

@@ -142,9 +142,32 @@ func (rm *RepositoryManager) GetRepositorySnapshots(name string, ref string, pat
 	if err != nil {
 		return nil, fmt.Errorf("failed to get worktree for repository %s: %w", name, err)
 	}
-	err = w.Checkout(&git.CheckoutOptions{
-		Branch: plumbing.ReferenceName("refs/remotes/origin/" + ref),
+	refs, err := repo.References()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get references for repository %s: %w", name, err)
+	}
+	refs.ForEach(func(r *plumbing.Reference) error {
+		fmt.Println(r.Name())
+		return nil
 	})
+
+	var checkoutOptions *git.CheckoutOptions
+
+	if isCommitHash(ref) {
+		hash, success := plumbing.FromHex(ref)
+		if !success {
+			return nil, fmt.Errorf("failed to convert hex to hash")
+		}
+		checkoutOptions = &git.CheckoutOptions{
+			Hash: hash,
+		}
+	} else {
+		checkoutOptions = &git.CheckoutOptions{
+			Branch: plumbing.ReferenceName("refs/" + ref),
+		}
+	}
+
+	err = w.Checkout(checkoutOptions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to checkout repository %s: %w", name, err)
 	}
@@ -234,4 +257,8 @@ func parseYAML(content []byte) (*ContractSchema, error) {
 		return nil, err
 	}
 	return &contract, nil
+}
+
+func isCommitHash(ref string) bool {
+	return len(ref) == 40
 }
