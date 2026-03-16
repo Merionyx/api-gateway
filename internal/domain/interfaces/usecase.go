@@ -1,12 +1,10 @@
 package interfaces
 
-// import (
-// 	"context"
+import (
+	"context"
 
-// 	"merionyx/api-gateway/control-plane/internal/domain/models"
-
-// 	"github.com/google/uuid"
-// )
+	"merionyx/api-gateway/control-plane/internal/domain/models"
+)
 
 // // TenantUseCase interface for tenant business logic
 // type TenantUseCase interface {
@@ -88,3 +86,9 @@ package interfaces
 // 	// UnmapListenerFromEnvironment unmaps a listener from an environment
 // 	UnmapListenerFromEnvironment(ctx context.Context, listenerID, environmentID uuid.UUID) error
 // }
+
+// SnapshotsUseCase interface for snapshots business logic
+type SnapshotsUseCase interface {
+	// UpdateSnapshot updates a snapshot
+	UpdateSnapshot(ctx context.Context, req *models.UpdateSnapshotRequest) (*models.UpdateSnapshotResponse, error)
+}

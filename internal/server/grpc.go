@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"merionyx/api-gateway/control-plane/internal/container"
+	snapshotsv1 "merionyx/api-gateway/control-plane/pkg/api/snapshots/v1"
 	"net"
 
 	"google.golang.org/grpc"
@@ -22,6 +23,7 @@ func StartGRPCServer(container *container.Container) error {
 	// tenantv1.RegisterTenantServiceServer(server, container.TenantGRPCHandler)
 	// environmentv1.RegisterEnvironmentServiceServer(server, container.EnvironmentGRPCHandler)
 	// listenerv1.RegisterListenerServiceServer(server, container.ListenerGRPCHandler)
+	snapshotsv1.RegisterSnapshotsServiceServer(server, container.SnapshotGRPCHandler)
 
 	reflection.Register(server)
 

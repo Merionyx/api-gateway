@@ -4,20 +4,18 @@ import (
 	"fmt"
 	"log"
 	"strconv"
-	"time"
 
 	"merionyx/api-gateway/control-plane/internal/config"
+	"merionyx/api-gateway/control-plane/internal/delivery/grpc/handler"
 	"merionyx/api-gateway/control-plane/internal/delivery/http/router"
+	"merionyx/api-gateway/control-plane/internal/domain/interfaces"
 	"merionyx/api-gateway/control-plane/internal/domain/models"
 	"merionyx/api-gateway/control-plane/internal/repository/git"
+	"merionyx/api-gateway/control-plane/internal/usecase"
 
-	"merionyx/api-gateway/control-plane/internal/xds/builder"
 	xdscache "merionyx/api-gateway/control-plane/internal/xds/cache"
 	xdsserver "merionyx/api-gateway/control-plane/internal/xds/server"
-
-	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
-	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
-	"github.com/envoyproxy/go-control-plane/pkg/resource/v3"
+	"merionyx/api-gateway/control-plane/internal/xds/snapshot"
 )
 
 // Container DI for all dependencies
@@ -28,25 +26,27 @@ type Container struct {
 	// Repository Manager
 	GitRepositoryManager *git.RepositoryManager
 
-	// // Repositories
+	// Repositories
 	// TenantRepository      interfaces.TenantRepository
 	// EnvironmentRepository interfaces.EnvironmentRepository
 	// ListenerRepository    interfaces.ListenerRepository
 
-	// // Use Cases
+	// Use Cases
 	// TenantUseCase      interfaces.TenantUseCase
 	// EnvironmentUseCase interfaces.EnvironmentUseCase
 	// ListenerUseCase    interfaces.ListenerUseCase
+	SnapshotsUseCase interfaces.SnapshotsUseCase
 
-	// // HTTP Handlers
+	// HTTP Handlers
 	// TenantHTTPHandler      *httpHandler.TenantHandler
 	// EnvironmentHTTPHandler *httpHandler.EnvironmentHandler
 	// ListenerHTTPHandler    *httpHandler.ListenerHandler
 
-	// // gRPC Handlers
+	// gRPC Handlers
 	// TenantGRPCHandler      *handler.TenantHandler
 	// EnvironmentGRPCHandler *handler.EnvironmentHandler
 	// ListenerGRPCHandler    *handler.ListenerHandler
+	SnapshotGRPCHandler *handler.SnapshotHandler
 
 	// Playground
 	Environments map[string]*models.Environment
@@ -65,11 +65,11 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 		Config: cfg,
 	}
 
+	container.initXDS()
 	container.initGitRepositoryManager()
 	container.initUseCases()
 	container.initHandlers()
 	container.initRouter()
-	container.initXDS()
 
 	container.playgroundInit()
 
@@ -90,6 +90,9 @@ func (c *Container) initUseCases() {
 	// c.TenantUseCase = usecase.NewTenantUseCase(c.TenantRepository)
 	// c.EnvironmentUseCase = usecase.NewEnvironmentUseCase(c.EnvironmentRepository, c.TenantRepository)
 	// c.ListenerUseCase = usecase.NewListenerUseCase(c.ListenerRepository, c.EnvironmentRepository)
+	c.SnapshotsUseCase = usecase.NewSnapshotsUseCase(&c.Environments, c.XDSSnapshotManager)
+
+	log.Println("SnapshotsUseCase:", c.SnapshotsUseCase)
 
 	log.Println("Use cases initialized")
 }
@@ -105,6 +108,7 @@ func (c *Container) initHandlers() {
 	// c.TenantGRPCHandler = handler.NewTenantHandler(c.TenantUseCase)
 	// c.EnvironmentGRPCHandler = handler.NewEnvironmentHandler(c.EnvironmentUseCase)
 	// c.ListenerGRPCHandler = handler.NewListenerHandler(c.ListenerUseCase)
+	c.SnapshotGRPCHandler = handler.NewSnapshotHandler(c.SnapshotsUseCase)
 
 	log.Println("Handlers initialized")
 }
@@ -191,7 +195,7 @@ func (c *Container) playgroundInit() {
 	}
 
 	for envName, env := range c.Environments {
-		snapshot := c.buildEnvoySnapshot(env)
+		snapshot := snapshot.BuildEnvoySnapshot(env)
 		nodeID := fmt.Sprintf("envoy-%s", envName)
 
 		if err := c.XDSSnapshotManager.UpdateSnapshot(nodeID, snapshot); err != nil {
@@ -200,50 +204,6 @@ func (c *Container) playgroundInit() {
 
 		log.Printf("Created xDS snapshot for environment: %s (nodeID: %s)", envName, nodeID)
 	}
-}
-
-func (c *Container) buildEnvoySnapshot(env *models.Environment) *cache.Snapshot {
-	version := fmt.Sprintf("v%d", time.Now().Unix())
-
-	listeners := builder.BuildListeners(env)
-	clusters := builder.BuildClusters(env)
-	routes := builder.BuildRoutes(env)
-	endpoints := builder.BuildEndpoints(env)
-
-	listenerResources := make([]types.Resource, len(listeners))
-	for i, l := range listeners {
-		listenerResources[i] = l
-	}
-
-	clusterResources := make([]types.Resource, len(clusters))
-	for i, c := range clusters {
-		clusterResources[i] = c
-	}
-
-	routeResources := make([]types.Resource, len(routes))
-	for i, r := range routes {
-		routeResources[i] = r
-	}
-
-	endpointResources := make([]types.Resource, len(endpoints))
-	for i, e := range endpoints {
-		endpointResources[i] = e
-	}
-
-	snapshot, err := cache.NewSnapshot(
-		version,
-		map[resource.Type][]types.Resource{
-			resource.ListenerType: listenerResources,
-			resource.ClusterType:  clusterResources,
-			resource.RouteType:    routeResources,
-			resource.EndpointType: endpointResources,
-		},
-	)
-	if err != nil {
-		log.Fatalf("Failed to create snapshot: %v", err)
-	}
-
-	return snapshot
 }
 
 // Close closes all resources in the container

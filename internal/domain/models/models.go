@@ -26,3 +26,11 @@ type StaticContractConfig struct {
 	Repository string
 	Ref        string
 }
+
+type UpdateSnapshotRequest struct {
+	Environment string
+}
+
+type UpdateSnapshotResponse struct {
+	Success bool
+}
