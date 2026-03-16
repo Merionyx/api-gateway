@@ -2,9 +2,9 @@ networks:
   default:
 
 services:
-  envoy-dev:
+  envoy-dev-0:
     image: envoyproxy/envoy:v1.33-latest
-    container_name: envoy-dev
+    container_name: envoy-dev-0
     volumes:
       - ./configs/envoy/dev.yaml:/etc/envoy/envoy.yaml:ro
     ports:
@@ -16,14 +16,42 @@ services:
       - default
     depends_on:
       - app
-  envoy-prod:
+  envoy-dev-1:
     image: envoyproxy/envoy:v1.33-latest
-    container_name: envoy-prod
+    container_name: envoy-dev-1
+    volumes:
+      - ./configs/envoy/dev.yaml:/etc/envoy/envoy.yaml:ro
+    ports:
+      - "10001:10000"
+      - "9902:9901"
+    command: ["-c", "/etc/envoy/envoy.yaml"]
+    restart: unless-stopped
+    networks:
+      - default
+    depends_on:
+      - app
+  envoy-prod-0:
+    image: envoyproxy/envoy:v1.33-latest
+    container_name: envoy-prod-0
     volumes:
       - ./configs/envoy/prod.yaml:/etc/envoy/envoy.yaml:ro
     ports:
-      - "10001:10000"
-      - "9902:9902"
+      - "10002:10000"
+      - "9903:9902"
+    command: ["-c", "/etc/envoy/envoy.yaml"]
+    restart: unless-stopped
+    networks:
+      - default
+    depends_on:
+      - app
+  envoy-prod-1:
+    image: envoyproxy/envoy:v1.33-latest
+    container_name: envoy-prod-1
+    volumes:
+      - ./configs/envoy/prod.yaml:/etc/envoy/envoy.yaml:ro
+    ports:
+      - "10003:10000"
+      - "9904:9902"
     command: ["-c", "/etc/envoy/envoy.yaml"]
     restart: unless-stopped
     networks:
