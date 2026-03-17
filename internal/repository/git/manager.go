@@ -92,25 +92,24 @@ func (rm *RepositoryManager) GetRepository(name string) (*git.Repository, error)
 }
 
 type RepositoryFile struct {
-	Path    string
-	Content []byte
+	Path    string `json:"path"`
+	Content []byte `json:"content"`
 }
 
 type ContractSnapshot struct {
-	Name string
-	// Routes                []ContractRoute
-	Prefix                string
-	Upstream              ContractUpstream
-	AllowUndefinedMethods bool
+	Name                  string           `json:"name"`
+	Prefix                string           `json:"prefix"`
+	Upstream              ContractUpstream `json:"upstream"`
+	AllowUndefinedMethods bool             `json:"allow_undefined_methods"`
 }
 
 type ContractRoute struct {
-	Path   string
-	Method string
+	Path   string `json:"path"`
+	Method string `json:"method"`
 }
 
 type ContractUpstream struct {
-	Name string
+	Name string `json:"name"`
 }
 
 type ContractSchema struct {
