@@ -21,14 +21,19 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
+type ManagedRepo struct {
+	Repo *git.Repository
+	Auth transport.AuthMethod
+}
+
 type RepositoryManager struct {
-	repos map[string]*git.Repository
+	repos map[string]*ManagedRepo
 	mu    sync.RWMutex
 }
 
 func NewRepositoryManager() *RepositoryManager {
 	return &RepositoryManager{
-		repos: make(map[string]*git.Repository),
+		repos: make(map[string]*ManagedRepo),
 	}
 }
 
@@ -72,7 +77,10 @@ func (rm *RepositoryManager) InitializeRepositories(repos []config.RepositoryCon
 			return fmt.Errorf("failed to clone repository %s: %w", repository.Name, err)
 		}
 
-		rm.repos[repository.Name] = repo
+		rm.repos[repository.Name] = &ManagedRepo{
+			Repo: repo,
+			Auth: auth,
+		}
 
 		slog.Info("Successfully cloned repository", "name", repository.Name)
 	}
@@ -88,7 +96,17 @@ func (rm *RepositoryManager) GetRepository(name string) (*git.Repository, error)
 	if !ok {
 		return nil, fmt.Errorf("repository %s not found", name)
 	}
-	return repo, nil
+	return repo.Repo, nil
+}
+
+func (rm *RepositoryManager) getAuth(name string) (transport.AuthMethod, error) {
+	rm.mu.RLock()
+	defer rm.mu.RUnlock()
+	repo, ok := rm.repos[name]
+	if !ok {
+		return nil, fmt.Errorf("repository %s not found", name)
+	}
+	return repo.Auth, nil
 }
 
 type RepositoryFile struct {
@@ -163,12 +181,21 @@ func (rm *RepositoryManager) GetRepositorySnapshots(name string, ref string, pat
 		return nil, fmt.Errorf("failed to checkout repository %s: %w", name, err)
 	}
 
-	w.Pull(&git.PullOptions{
+	auth, err := rm.getAuth(name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get auth for repository %s: %w", name, err)
+	}
+
+	err = w.Pull(&git.PullOptions{
 		Force: true,
+		Auth:  auth,
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to pull repository %s: %w", name, err)
+		if err != git.NoErrAlreadyUpToDate {
+			return nil, fmt.Errorf("failed to pull repository %s: %w", name, err)
+		}
+		log.Println("Repository", name, "is already up to date")
 	}
 
 	log.Println("Pulled repository", name)
