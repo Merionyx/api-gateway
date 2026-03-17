@@ -8,6 +8,7 @@ import (
 
 	"merionyx/api-gateway/control-plane/internal/domain/interfaces"
 	"merionyx/api-gateway/control-plane/internal/domain/models"
+	"merionyx/api-gateway/control-plane/internal/repository/git"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
@@ -61,6 +62,30 @@ func (r *environmentRepository) GetEnvironment(ctx context.Context, name string)
 		return nil, fmt.Errorf("failed to unmarshal environment: %w", err)
 	}
 
+	for _, bundle := range env.Bundles.Static {
+		fmt.Println("bundle", bundle.Name, bundle.Repository, bundle.Ref)
+		safeRef := strings.ReplaceAll(bundle.Ref, "/", "%2F")
+		prefix := fmt.Sprintf("%s%s/%s/contracts/", schemaPrefix, bundle.Repository, safeRef)
+		fmt.Println("prefix", prefix)
+		resp, err := r.client.Get(ctx, prefix, clientv3.WithPrefix())
+		if err != nil {
+			return nil, fmt.Errorf("failed to list contract snapshots from etcd: %w", err)
+		}
+		fmt.Println("resp", resp.Kvs)
+		var snapshots []git.ContractSnapshot
+		for _, kv := range resp.Kvs {
+			if !strings.HasSuffix(string(kv.Key), "/snapshot") {
+				continue
+			}
+			var snapshot git.ContractSnapshot
+			if err := json.Unmarshal(kv.Value, &snapshot); err != nil {
+				continue
+			}
+			snapshots = append(snapshots, snapshot)
+		}
+		env.Snapshots = append(env.Snapshots, snapshots...)
+	}
+
 	return &env, nil
 }
 
@@ -81,6 +106,27 @@ func (r *environmentRepository) ListEnvironments(ctx context.Context) (map[strin
 		var env models.Environment
 		if err := json.Unmarshal(kv.Value, &env); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal environment: %w", err)
+		}
+
+		for _, bundle := range env.Bundles.Static {
+			safeRef := strings.ReplaceAll(bundle.Ref, "/", "%2F")
+			prefix := fmt.Sprintf("%s%s/%s/contracts/", schemaPrefix, bundle.Repository, safeRef)
+			resp, err := r.client.Get(ctx, prefix, clientv3.WithPrefix())
+			if err != nil {
+				return nil, fmt.Errorf("failed to list contract snapshots from etcd: %w", err)
+			}
+			var snapshots []git.ContractSnapshot
+			for _, kv := range resp.Kvs {
+				if !strings.HasSuffix(string(kv.Key), "/snapshot") {
+					continue
+				}
+				var snapshot git.ContractSnapshot
+				if err := json.Unmarshal(kv.Value, &snapshot); err != nil {
+					continue
+				}
+				snapshots = append(snapshots, snapshot)
+			}
+			env.Snapshots = append(env.Snapshots, snapshots...)
 		}
 
 		environments[env.Name] = &env
