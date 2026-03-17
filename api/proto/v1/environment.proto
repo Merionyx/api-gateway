@@ -7,9 +7,10 @@ option go_package = "merionyx/api-gateway/control-plane/pkg/api/environments/v1;
 // Environment represents an environment
 message Environment {
   string name = 1;
-  EnvironmentBundleConfig bundles = 2;
-  EnvironmentServiceConfig services = 3;
-  repeated ContractSnapshot snapshots = 4;
+  string type = 2;
+  EnvironmentBundleConfig bundles = 3;
+  EnvironmentServiceConfig services = 4;
+  repeated ContractSnapshot snapshots = 5;
 }
 
 // EnvironmentContractConfig represents the contract configuration for an environment

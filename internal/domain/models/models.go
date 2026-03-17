@@ -4,6 +4,7 @@ import "merionyx/api-gateway/control-plane/internal/repository/git"
 
 type Environment struct {
 	Name      string
+	Type      string
 	Snapshots []git.ContractSnapshot
 	Services  *EnvironmentServiceConfig
 	Bundles   *EnvironmentBundleConfig
@@ -55,6 +56,7 @@ type GetSnapshotStatusResponse struct {
 // Environments UseCase models
 type CreateEnvironmentRequest struct {
 	Name     string
+	Type     string
 	Bundles  *EnvironmentBundleConfig
 	Services *EnvironmentServiceConfig
 }

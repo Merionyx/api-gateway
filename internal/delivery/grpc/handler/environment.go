@@ -28,6 +28,7 @@ func (h *EnvironmentsHandler) CreateEnvironment(ctx context.Context, req *enviro
 
 	env, err := h.environmentsUseCase.CreateEnvironment(ctx, &models.CreateEnvironmentRequest{
 		Name:     req.Name,
+		Type:     "manual",
 		Bundles:  protoToModelBundlesConfig(req.Bundles),
 		Services: protoToModelServicesConfig(req.Services),
 	})
@@ -109,6 +110,7 @@ func (h *EnvironmentsHandler) DeleteEnvironment(ctx context.Context, req *enviro
 func modelToProtoEnvironment(env *models.Environment) *environmentsv1.Environment {
 	return &environmentsv1.Environment{
 		Name:      env.Name,
+		Type:      env.Type,
 		Bundles:   modelToProtoBundlesConfig(env.Bundles),
 		Services:  modelToProtoServicesConfig(env.Services),
 		Snapshots: modelToProtoSnapshots(env.Snapshots),

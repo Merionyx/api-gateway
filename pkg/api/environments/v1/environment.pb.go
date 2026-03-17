@@ -25,9 +25,10 @@ const (
 type Environment struct {
 	state         protoimpl.MessageState    `protogen:"open.v1"`
 	Name          string                    `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Bundles       *EnvironmentBundleConfig  `protobuf:"bytes,2,opt,name=bundles,proto3" json:"bundles,omitempty"`
-	Services      *EnvironmentServiceConfig `protobuf:"bytes,3,opt,name=services,proto3" json:"services,omitempty"`
-	Snapshots     []*ContractSnapshot       `protobuf:"bytes,4,rep,name=snapshots,proto3" json:"snapshots,omitempty"`
+	Type          string                    `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
+	Bundles       *EnvironmentBundleConfig  `protobuf:"bytes,3,opt,name=bundles,proto3" json:"bundles,omitempty"`
+	Services      *EnvironmentServiceConfig `protobuf:"bytes,4,opt,name=services,proto3" json:"services,omitempty"`
+	Snapshots     []*ContractSnapshot       `protobuf:"bytes,5,rep,name=snapshots,proto3" json:"snapshots,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -65,6 +66,13 @@ func (*Environment) Descriptor() ([]byte, []int) {
 func (x *Environment) GetName() string {
 	if x != nil {
 		return x.Name
+	}
+	return ""
+}
+
+func (x *Environment) GetType() string {
+	if x != nil {
+		return x.Type
 	}
 	return ""
 }
@@ -894,12 +902,13 @@ var File_api_proto_v1_environment_proto protoreflect.FileDescriptor
 
 const file_api_proto_v1_environment_proto_rawDesc = "" +
 	"\n" +
-	"\x1eapi/proto/v1/environment.proto\x12\x13api.environments.v1\"\xf9\x01\n" +
+	"\x1eapi/proto/v1/environment.proto\x12\x13api.environments.v1\"\x8d\x02\n" +
 	"\vEnvironment\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12F\n" +
-	"\abundles\x18\x02 \x01(\v2,.api.environments.v1.EnvironmentBundleConfigR\abundles\x12I\n" +
-	"\bservices\x18\x03 \x01(\v2-.api.environments.v1.EnvironmentServiceConfigR\bservices\x12C\n" +
-	"\tsnapshots\x18\x04 \x03(\v2%.api.environments.v1.ContractSnapshotR\tsnapshots\"Z\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
+	"\x04type\x18\x02 \x01(\tR\x04type\x12F\n" +
+	"\abundles\x18\x03 \x01(\v2,.api.environments.v1.EnvironmentBundleConfigR\abundles\x12I\n" +
+	"\bservices\x18\x04 \x01(\v2-.api.environments.v1.EnvironmentServiceConfigR\bservices\x12C\n" +
+	"\tsnapshots\x18\x05 \x03(\v2%.api.environments.v1.ContractSnapshotR\tsnapshots\"Z\n" +
 	"\x17EnvironmentBundleConfig\x12?\n" +
 	"\x06static\x18\x01 \x03(\v2'.api.environments.v1.StaticBundleConfigR\x06static\"n\n" +
 	"\x12StaticBundleConfig\x12\x12\n" +

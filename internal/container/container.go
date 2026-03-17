@@ -173,6 +173,7 @@ func (c *Container) playgroundInit() {
 	for _, configEnv := range c.Config.Environments {
 		env := &models.Environment{
 			Name: configEnv.Name,
+			Type: "static",
 			Bundles: &models.EnvironmentBundleConfig{
 				Static: make([]models.StaticContractBundleConfig, 0),
 			},

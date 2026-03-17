@@ -37,6 +37,7 @@ func (uc *environmentsUseCase) CreateEnvironment(ctx context.Context, req *model
 
 	env := &models.Environment{
 		Name:      req.Name,
+		Type:      req.Type,
 		Bundles:   req.Bundles,
 		Services:  req.Services,
 		Snapshots: make([]git.ContractSnapshot, 0),
