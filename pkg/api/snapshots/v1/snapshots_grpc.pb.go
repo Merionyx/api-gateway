@@ -19,14 +19,18 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	SnapshotsService_UpdateSnapshot_FullMethodName = "/api.snapshots.v1.SnapshotsService/UpdateSnapshot"
+	SnapshotsService_UpdateSnapshot_FullMethodName    = "/api.snapshots.v1.SnapshotsService/UpdateSnapshot"
+	SnapshotsService_GetSnapshotStatus_FullMethodName = "/api.snapshots.v1.SnapshotsService/GetSnapshotStatus"
 )
 
 // SnapshotsServiceClient is the client API for SnapshotsService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// SnapshotsService is the service for managing xDS snapshots
 type SnapshotsServiceClient interface {
 	UpdateSnapshot(ctx context.Context, in *UpdateSnapshotRequest, opts ...grpc.CallOption) (*UpdateSnapshotResponse, error)
+	GetSnapshotStatus(ctx context.Context, in *GetSnapshotStatusRequest, opts ...grpc.CallOption) (*GetSnapshotStatusResponse, error)
 }
 
 type snapshotsServiceClient struct {
@@ -47,11 +51,24 @@ func (c *snapshotsServiceClient) UpdateSnapshot(ctx context.Context, in *UpdateS
 	return out, nil
 }
 
+func (c *snapshotsServiceClient) GetSnapshotStatus(ctx context.Context, in *GetSnapshotStatusRequest, opts ...grpc.CallOption) (*GetSnapshotStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSnapshotStatusResponse)
+	err := c.cc.Invoke(ctx, SnapshotsService_GetSnapshotStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SnapshotsServiceServer is the server API for SnapshotsService service.
 // All implementations must embed UnimplementedSnapshotsServiceServer
 // for forward compatibility.
+//
+// SnapshotsService is the service for managing xDS snapshots
 type SnapshotsServiceServer interface {
 	UpdateSnapshot(context.Context, *UpdateSnapshotRequest) (*UpdateSnapshotResponse, error)
+	GetSnapshotStatus(context.Context, *GetSnapshotStatusRequest) (*GetSnapshotStatusResponse, error)
 	mustEmbedUnimplementedSnapshotsServiceServer()
 }
 
@@ -64,6 +81,9 @@ type UnimplementedSnapshotsServiceServer struct{}
 
 func (UnimplementedSnapshotsServiceServer) UpdateSnapshot(context.Context, *UpdateSnapshotRequest) (*UpdateSnapshotResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateSnapshot not implemented")
+}
+func (UnimplementedSnapshotsServiceServer) GetSnapshotStatus(context.Context, *GetSnapshotStatusRequest) (*GetSnapshotStatusResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSnapshotStatus not implemented")
 }
 func (UnimplementedSnapshotsServiceServer) mustEmbedUnimplementedSnapshotsServiceServer() {}
 func (UnimplementedSnapshotsServiceServer) testEmbeddedByValue()                          {}
@@ -104,6 +124,24 @@ func _SnapshotsService_UpdateSnapshot_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SnapshotsService_GetSnapshotStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSnapshotStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SnapshotsServiceServer).GetSnapshotStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SnapshotsService_GetSnapshotStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SnapshotsServiceServer).GetSnapshotStatus(ctx, req.(*GetSnapshotStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SnapshotsService_ServiceDesc is the grpc.ServiceDesc for SnapshotsService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +152,10 @@ var SnapshotsService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateSnapshot",
 			Handler:    _SnapshotsService_UpdateSnapshot_Handler,
+		},
+		{
+			MethodName: "GetSnapshotStatus",
+			Handler:    _SnapshotsService_GetSnapshotStatus_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package api.schemas.v1;
+
+option go_package = "merionyx/api-gateway/control-plane/pkg/api/schemas/v1;schemasv1";
+
+// ContractSnapshot represents a contract snapshot
+message ContractSnapshot {
+  string name = 1;
+  string prefix = 2;
+  ContractUpstream upstream = 3;
+  bool allow_undefined_methods = 4;
+}
+
+// ContractUpstream represents an upstream for a contract
+message ContractUpstream {
+  string name = 1;
+}
+
+// Requests & Responses
+
+// SyncContractBundleRequest represents a request to sync a contract bundle
+message SyncContractBundleRequest {
+  string repository = 1;
+  string ref = 2;
+  string bundle = 3;
+  bool force = 4; // Force synchronization even if already in etcd
+}
+
+// SyncContractBundleResponse represents a response to sync a contract bundle
+message SyncContractBundleResponse {
+  repeated ContractSnapshot snapshots = 1;
+  bool from_cache = 2; // true if taken from etcd, false if from Git
+}
+
+// GetContractRequest represents a request to get a contract
+message GetContractRequest {
+    string contract = 1;
+}
+
+// GetContractSnapshotRequest represents a request to get a contract snapshot
+message GetContractSnapshotRequest {
+  string repository = 1;
+  string ref = 2;
+  string contract = 3;
+}
+
+// GetContractSnapshotResponse represents a response to get a contract snapshot
+message GetContractSnapshotResponse {
+  ContractSnapshot snapshot = 1;
+}
+
+// ListContractSnapshotsRequest represents a request to list contract snapshots
+message ListContractSnapshotsRequest {
+  string repository = 1;
+  string ref = 2;
+}
+
+// ListContractSnapshotsResponse represents a response to list contract snapshots
+message ListContractSnapshotsResponse {
+  repeated ContractSnapshot snapshots = 1;
+}
+
+// SyncAllContractsRequest represents a request to sync all contracts
+message SyncAllContractsRequest {
+  string environment = 1; // If empty, sync all environments
+}
+
+// SyncAllContractsResponse represents a response to sync all contracts
+message SyncAllContractsResponse {
+  int32 synced_count = 1;
+  repeated string errors = 2;
+}
+
+// SchemasService is the service for managing schemas
+service SchemasService {
+  rpc SyncContractBundle(SyncContractBundleRequest) returns (SyncContractBundleResponse);
+  rpc GetContractSnapshot(GetContractSnapshotRequest) returns (GetContractSnapshotResponse);
+  rpc ListContractSnapshots(ListContractSnapshotsRequest) returns (ListContractSnapshotsResponse);
+  rpc SyncAllContracts(SyncAllContractsRequest) returns (SyncAllContractsResponse);
+}

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"merionyx/api-gateway/control-plane/internal/container"
+	environmentsv1 "merionyx/api-gateway/control-plane/pkg/api/environments/v1"
+	schemasv1 "merionyx/api-gateway/control-plane/pkg/api/schemas/v1"
 	snapshotsv1 "merionyx/api-gateway/control-plane/pkg/api/snapshots/v1"
 	"net"
 
@@ -20,10 +22,9 @@ func StartGRPCServer(container *container.Container) error {
 	server := grpc.NewServer()
 
 	// Register services
-	// tenantv1.RegisterTenantServiceServer(server, container.TenantGRPCHandler)
-	// environmentv1.RegisterEnvironmentServiceServer(server, container.EnvironmentGRPCHandler)
-	// listenerv1.RegisterListenerServiceServer(server, container.ListenerGRPCHandler)
 	snapshotsv1.RegisterSnapshotsServiceServer(server, container.SnapshotGRPCHandler)
+	environmentsv1.RegisterEnvironmentsServiceServer(server, container.EnvironmentsGRPCHandler)
+	schemasv1.RegisterSchemasServiceServer(server, container.SchemasGRPCHandler)
 
 	reflection.Register(server)
 

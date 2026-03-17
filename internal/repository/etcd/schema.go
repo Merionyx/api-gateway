@@ -92,8 +92,30 @@ func (r *schemaRepository) GetEnvironmentSnapshots(ctx context.Context, envName 
 	return snapshots, nil
 }
 
+// ListContractSnapshots lists all contract snapshots for repository/ref
+func (r *schemaRepository) ListContractSnapshots(ctx context.Context, repo, ref string) ([]git.ContractSnapshot, error) {
+	safeRef := strings.ReplaceAll(ref, "/", "%2F")
+	prefix := fmt.Sprintf("%s%s/%s/contracts/", schemaPrefix, repo, safeRef)
+	resp, err := r.client.Get(ctx, prefix, clientv3.WithPrefix())
+	if err != nil {
+		return nil, fmt.Errorf("failed to list contract snapshots from etcd: %w", err)
+	}
+	var snapshots []git.ContractSnapshot
+	for _, kv := range resp.Kvs {
+		if !strings.HasSuffix(string(kv.Key), "/snapshot") {
+			continue
+		}
+		var snapshot git.ContractSnapshot
+		if err := json.Unmarshal(kv.Value, &snapshot); err != nil {
+			continue
+		}
+		snapshots = append(snapshots, snapshot)
+	}
+	return snapshots, nil
+}
+
 // buildContractKey builds key for contract in etcd
 func (r *schemaRepository) buildContractKey(repo, ref, contract string) string {
-	safeRef := strings.ReplaceAll(ref, "/", "_")
+	safeRef := strings.ReplaceAll(ref, "/", "%2F")
 	return fmt.Sprintf("%s%s/%s/contracts/%s/snapshot", schemaPrefix, repo, safeRef, contract)
 }

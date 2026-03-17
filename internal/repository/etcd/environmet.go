@@ -89,6 +89,16 @@ func (r *environmentRepository) ListEnvironments(ctx context.Context) (map[strin
 	return environments, nil
 }
 
+// DeleteEnvironment deletes environment from etcd
+func (r *environmentRepository) DeleteEnvironment(ctx context.Context, name string) error {
+	key := environmentPrefix + name + "/config"
+	_, err := r.client.Delete(ctx, key)
+	if err != nil {
+		return fmt.Errorf("failed to delete environment from etcd: %w", err)
+	}
+	return nil
+}
+
 // WatchEnvironments creates watch channel for watching changes
 func (r *environmentRepository) WatchEnvironments(ctx context.Context) clientv3.WatchChan {
 	return r.client.Watch(ctx, environmentPrefix, clientv3.WithPrefix())

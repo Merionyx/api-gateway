@@ -39,12 +39,16 @@ type Container struct {
 	EnvironmentRepository interfaces.EnvironmentRepository
 
 	// Use Cases
-	SnapshotsUseCase interfaces.SnapshotsUseCase
+	SnapshotsUseCase    interfaces.SnapshotsUseCase
+	EnvironmentsUseCase interfaces.EnvironmentsUseCase
+	SchemasUseCase      interfaces.SchemasUseCase
 
 	// HTTP Handlers
 
 	// gRPC Handlers
-	SnapshotGRPCHandler *handler.SnapshotHandler
+	SnapshotGRPCHandler     *handler.SnapshotHandler
+	EnvironmentsGRPCHandler *handler.EnvironmentsHandler
+	SchemasGRPCHandler      *handler.SchemasHandler
 
 	// Playground
 	Environments map[string]*models.Environment
@@ -114,7 +118,9 @@ func (c *Container) initGitRepositoryManager() {
 
 // initUseCases initializes the use cases
 func (c *Container) initUseCases() {
-	c.SnapshotsUseCase = usecase.NewSnapshotsUseCase(&c.Environments, c.XDSSnapshotManager)
+	c.SnapshotsUseCase = usecase.NewSnapshotsUseCase(c.EnvironmentRepository, c.XDSSnapshotManager)
+	c.EnvironmentsUseCase = usecase.NewEnvironmentsUseCase(c.EnvironmentRepository, c.XDSSnapshotManager)
+	c.SchemasUseCase = usecase.NewSchemasUseCase(c.SchemaRepository, c.EnvironmentRepository, c.GitRepositoryManager)
 
 	log.Println("SnapshotsUseCase:", c.SnapshotsUseCase)
 
@@ -127,6 +133,8 @@ func (c *Container) initHandlers() {
 
 	// gRPC handlers
 	c.SnapshotGRPCHandler = handler.NewSnapshotHandler(c.SnapshotsUseCase)
+	c.EnvironmentsGRPCHandler = handler.NewEnvironmentsHandler(c.EnvironmentsUseCase)
+	c.SchemasGRPCHandler = handler.NewSchemasHandler(c.SchemasUseCase)
 
 	log.Println("Handlers initialized")
 }
@@ -161,8 +169,8 @@ func (c *Container) playgroundInit() {
 	for _, configEnv := range c.Config.Environments {
 		env := &models.Environment{
 			Name: configEnv.Name,
-			Contracts: &models.EnvironmentContractConfig{
-				Static: make([]models.StaticContractConfig, 0),
+			Bundles: &models.EnvironmentBundleConfig{
+				Static: make([]models.StaticContractBundleConfig, 0),
 			},
 			Services: &models.EnvironmentServiceConfig{
 				Static: make([]models.StaticServiceConfig, 0),
@@ -174,11 +182,12 @@ func (c *Container) playgroundInit() {
 
 	// Initialize contracts from config
 	for _, environment := range c.Config.Environments {
-		for _, contract := range environment.Contracts.Static {
-			c.Environments[environment.Name].Contracts.Static = append(c.Environments[environment.Name].Contracts.Static, models.StaticContractConfig{
-				Name:       contract.Name,
-				Repository: contract.Repository,
-				Ref:        contract.Ref,
+		for _, bundle := range environment.Bundles.Static {
+			c.Environments[environment.Name].Bundles.Static = append(c.Environments[environment.Name].Bundles.Static, models.StaticContractBundleConfig{
+				Name:       bundle.Name,
+				Repository: bundle.Repository,
+				Ref:        bundle.Ref,
+				Path:       bundle.Path,
 			})
 		}
 	}
@@ -194,8 +203,8 @@ func (c *Container) playgroundInit() {
 	}
 
 	for _, environment := range c.Environments {
-		for _, contract := range environment.Contracts.Static {
-			snapshots, err := c.GitRepositoryManager.GetRepositorySnapshots(contract.Repository, contract.Ref, "openapi")
+		for _, bundle := range environment.Bundles.Static {
+			snapshots, err := c.GitRepositoryManager.GetRepositorySnapshots(bundle.Repository, bundle.Ref, bundle.Path)
 			if err != nil {
 				log.Fatalf("Failed to get repository snapshots: %v", err)
 			}
@@ -207,7 +216,7 @@ func (c *Container) playgroundInit() {
 
 	for _, environment := range c.Environments {
 		log.Println("Environment:", environment.Name)
-		log.Println("Contracts:", environment.Contracts.Static)
+		log.Println("Bundles:", environment.Bundles.Static)
 		log.Println("Services:", environment.Services.Static)
 		log.Println("Snapshots:", environment.Snapshots)
 	}

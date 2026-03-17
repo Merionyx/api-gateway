@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
@@ -24,4 +25,17 @@ func (sm *SnapshotManager) UpdateSnapshot(nodeID string, snapshot *cache.Snapsho
 
 func (sm *SnapshotManager) GetCache() cache.SnapshotCache {
 	return sm.cache
+}
+
+func (sm *SnapshotManager) GetSnapshot(nodeID string) (*cache.Snapshot, error) {
+	snapshot, err := sm.cache.GetSnapshot(nodeID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get snapshot: %w", err)
+	}
+	return snapshot.(*cache.Snapshot), nil
+}
+
+func (sm *SnapshotManager) DeleteSnapshot(nodeID string) error {
+	sm.cache.ClearSnapshot(nodeID)
+	return nil
 }

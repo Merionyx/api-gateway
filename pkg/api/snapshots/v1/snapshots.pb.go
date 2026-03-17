@@ -21,10 +21,10 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// UpdateSnapshotRequest request for updating snapshot
+// UpdateSnapshotRequest request for updating xDS snapshot
 type UpdateSnapshotRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Environment   string                 `protobuf:"bytes,1,opt,name=environment,proto3" json:"environment,omitempty"`
+	Environment   string                 `protobuf:"bytes,1,opt,name=environment,proto3" json:"environment,omitempty"` // If empty, update all environments
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -66,12 +66,13 @@ func (x *UpdateSnapshotRequest) GetEnvironment() string {
 	return ""
 }
 
-// UpdateSnapshotResponse response for updating snapshot
+// UpdateSnapshotResponse response for updating xDS snapshot
 type UpdateSnapshotResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Success             bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	UpdatedEnvironments []string               `protobuf:"bytes,2,rep,name=updated_environments,json=updatedEnvironments,proto3" json:"updated_environments,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *UpdateSnapshotResponse) Reset() {
@@ -111,17 +112,165 @@ func (x *UpdateSnapshotResponse) GetSuccess() bool {
 	return false
 }
 
+func (x *UpdateSnapshotResponse) GetUpdatedEnvironments() []string {
+	if x != nil {
+		return x.UpdatedEnvironments
+	}
+	return nil
+}
+
+// GetSnapshotStatusRequest request for getting xDS snapshot status
+type GetSnapshotStatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Environment   string                 `protobuf:"bytes,1,opt,name=environment,proto3" json:"environment,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSnapshotStatusRequest) Reset() {
+	*x = GetSnapshotStatusRequest{}
+	mi := &file_api_proto_v1_snapshots_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSnapshotStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSnapshotStatusRequest) ProtoMessage() {}
+
+func (x *GetSnapshotStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_v1_snapshots_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSnapshotStatusRequest.ProtoReflect.Descriptor instead.
+func (*GetSnapshotStatusRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_v1_snapshots_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *GetSnapshotStatusRequest) GetEnvironment() string {
+	if x != nil {
+		return x.Environment
+	}
+	return ""
+}
+
+// GetSnapshotStatusResponse response for getting xDS snapshot status
+type GetSnapshotStatusResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Environment    string                 `protobuf:"bytes,1,opt,name=environment,proto3" json:"environment,omitempty"`
+	Version        string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
+	LastUpdated    int64                  `protobuf:"varint,3,opt,name=last_updated,json=lastUpdated,proto3" json:"last_updated,omitempty"` // Unix timestamp
+	ContractsCount int32                  `protobuf:"varint,4,opt,name=contracts_count,json=contractsCount,proto3" json:"contracts_count,omitempty"`
+	ClustersCount  int32                  `protobuf:"varint,5,opt,name=clusters_count,json=clustersCount,proto3" json:"clusters_count,omitempty"`
+	RoutesCount    int32                  `protobuf:"varint,6,opt,name=routes_count,json=routesCount,proto3" json:"routes_count,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *GetSnapshotStatusResponse) Reset() {
+	*x = GetSnapshotStatusResponse{}
+	mi := &file_api_proto_v1_snapshots_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSnapshotStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSnapshotStatusResponse) ProtoMessage() {}
+
+func (x *GetSnapshotStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_v1_snapshots_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSnapshotStatusResponse.ProtoReflect.Descriptor instead.
+func (*GetSnapshotStatusResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_v1_snapshots_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *GetSnapshotStatusResponse) GetEnvironment() string {
+	if x != nil {
+		return x.Environment
+	}
+	return ""
+}
+
+func (x *GetSnapshotStatusResponse) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *GetSnapshotStatusResponse) GetLastUpdated() int64 {
+	if x != nil {
+		return x.LastUpdated
+	}
+	return 0
+}
+
+func (x *GetSnapshotStatusResponse) GetContractsCount() int32 {
+	if x != nil {
+		return x.ContractsCount
+	}
+	return 0
+}
+
+func (x *GetSnapshotStatusResponse) GetClustersCount() int32 {
+	if x != nil {
+		return x.ClustersCount
+	}
+	return 0
+}
+
+func (x *GetSnapshotStatusResponse) GetRoutesCount() int32 {
+	if x != nil {
+		return x.RoutesCount
+	}
+	return 0
+}
+
 var File_api_proto_v1_snapshots_proto protoreflect.FileDescriptor
 
 const file_api_proto_v1_snapshots_proto_rawDesc = "" +
 	"\n" +
 	"\x1capi/proto/v1/snapshots.proto\x12\x10api.snapshots.v1\"9\n" +
 	"\x15UpdateSnapshotRequest\x12 \n" +
-	"\venvironment\x18\x01 \x01(\tR\venvironment\"2\n" +
+	"\venvironment\x18\x01 \x01(\tR\venvironment\"e\n" +
 	"\x16UpdateSnapshotResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess2w\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x121\n" +
+	"\x14updated_environments\x18\x02 \x03(\tR\x13updatedEnvironments\"<\n" +
+	"\x18GetSnapshotStatusRequest\x12 \n" +
+	"\venvironment\x18\x01 \x01(\tR\venvironment\"\xed\x01\n" +
+	"\x19GetSnapshotStatusResponse\x12 \n" +
+	"\venvironment\x18\x01 \x01(\tR\venvironment\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\tR\aversion\x12!\n" +
+	"\flast_updated\x18\x03 \x01(\x03R\vlastUpdated\x12'\n" +
+	"\x0fcontracts_count\x18\x04 \x01(\x05R\x0econtractsCount\x12%\n" +
+	"\x0eclusters_count\x18\x05 \x01(\x05R\rclustersCount\x12!\n" +
+	"\froutes_count\x18\x06 \x01(\x05R\vroutesCount2\xe5\x01\n" +
 	"\x10SnapshotsService\x12c\n" +
-	"\x0eUpdateSnapshot\x12'.api.snapshots.v1.UpdateSnapshotRequest\x1a(.api.snapshots.v1.UpdateSnapshotResponseBEZCmerionyx/api-gateway/control-plane/pkg/api/snapshots/v1;snapshotsv1b\x06proto3"
+	"\x0eUpdateSnapshot\x12'.api.snapshots.v1.UpdateSnapshotRequest\x1a(.api.snapshots.v1.UpdateSnapshotResponse\x12l\n" +
+	"\x11GetSnapshotStatus\x12*.api.snapshots.v1.GetSnapshotStatusRequest\x1a+.api.snapshots.v1.GetSnapshotStatusResponseBEZCmerionyx/api-gateway/control-plane/pkg/api/snapshots/v1;snapshotsv1b\x06proto3"
 
 var (
 	file_api_proto_v1_snapshots_proto_rawDescOnce sync.Once
@@ -135,16 +284,20 @@ func file_api_proto_v1_snapshots_proto_rawDescGZIP() []byte {
 	return file_api_proto_v1_snapshots_proto_rawDescData
 }
 
-var file_api_proto_v1_snapshots_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_api_proto_v1_snapshots_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_api_proto_v1_snapshots_proto_goTypes = []any{
-	(*UpdateSnapshotRequest)(nil),  // 0: api.snapshots.v1.UpdateSnapshotRequest
-	(*UpdateSnapshotResponse)(nil), // 1: api.snapshots.v1.UpdateSnapshotResponse
+	(*UpdateSnapshotRequest)(nil),     // 0: api.snapshots.v1.UpdateSnapshotRequest
+	(*UpdateSnapshotResponse)(nil),    // 1: api.snapshots.v1.UpdateSnapshotResponse
+	(*GetSnapshotStatusRequest)(nil),  // 2: api.snapshots.v1.GetSnapshotStatusRequest
+	(*GetSnapshotStatusResponse)(nil), // 3: api.snapshots.v1.GetSnapshotStatusResponse
 }
 var file_api_proto_v1_snapshots_proto_depIdxs = []int32{
 	0, // 0: api.snapshots.v1.SnapshotsService.UpdateSnapshot:input_type -> api.snapshots.v1.UpdateSnapshotRequest
-	1, // 1: api.snapshots.v1.SnapshotsService.UpdateSnapshot:output_type -> api.snapshots.v1.UpdateSnapshotResponse
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
+	2, // 1: api.snapshots.v1.SnapshotsService.GetSnapshotStatus:input_type -> api.snapshots.v1.GetSnapshotStatusRequest
+	1, // 2: api.snapshots.v1.SnapshotsService.UpdateSnapshot:output_type -> api.snapshots.v1.UpdateSnapshotResponse
+	3, // 3: api.snapshots.v1.SnapshotsService.GetSnapshotStatus:output_type -> api.snapshots.v1.GetSnapshotStatusResponse
+	2, // [2:4] is the sub-list for method output_type
+	0, // [0:2] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -161,7 +314,7 @@ func file_api_proto_v1_snapshots_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_proto_v1_snapshots_proto_rawDesc), len(file_api_proto_v1_snapshots_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

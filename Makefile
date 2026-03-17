@@ -83,6 +83,10 @@ proto-generate: ## Generate protobuf code
 		api/proto/v1/*.proto && \
 	cp ./api/proto/v1/snapshots_grpc.pb.go ./pkg/api/snapshots/v1/snapshots_grpc.pb.go && \
 	cp ./api/proto/v1/snapshots.pb.go ./pkg/api/snapshots/v1/snapshots.pb.go && \
+	cp ./api/proto/v1/schemas_grpc.pb.go ./pkg/api/schemas/v1/schemas_grpc.pb.go && \
+	cp ./api/proto/v1/schemas.pb.go ./pkg/api/schemas/v1/schemas.pb.go && \
+	cp ./api/proto/v1/environment_grpc.pb.go ./pkg/api/environments/v1/environment_grpc.pb.go && \
+	cp ./api/proto/v1/environment.pb.go ./pkg/api/environments/v1/environment.pb.go && \
 	rm -rf ./api/proto/v1/*.pb.go
 
 proto-install: ## Install protobuf tools

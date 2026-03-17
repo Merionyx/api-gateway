@@ -49,19 +49,20 @@ type AuthConfig struct {
 }
 
 type EnvironmentConfig struct {
-	Name      string          `mapstructure:"name" validate:"required" json:"name"`
-	Contracts ContractsConfig `mapstructure:"contracts" validate:"required" json:"contracts"`
-	Services  ServicesConfig  `mapstructure:"services" validate:"required" json:"services"`
+	Name     string         `mapstructure:"name" validate:"required" json:"name"`
+	Bundles  BundlesConfig  `mapstructure:"bundles" validate:"required" json:"bundles"`
+	Services ServicesConfig `mapstructure:"services" validate:"required" json:"services"`
 }
 
-type ContractsConfig struct {
-	Static []StaticContractConfig `mapstructure:"static" validate:"required" json:"static"`
+type BundlesConfig struct {
+	Static []StaticBundleConfig `mapstructure:"static" validate:"required" json:"static"`
 }
 
-type StaticContractConfig struct {
+type StaticBundleConfig struct {
 	Name       string `mapstructure:"name" validate:"required" json:"name"`
 	Repository string `mapstructure:"repository" validate:"required" json:"repository"`
 	Ref        string `mapstructure:"ref" validate:"required" json:"ref"`
+	Path       string `mapstructure:"path" validate:"required" json:"path"`
 }
 
 type ServicesConfig struct {
