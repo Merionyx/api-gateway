@@ -123,7 +123,7 @@ func (c *Container) initUseCases() {
 	c.SchemasUseCase = usecase.NewSchemasUseCase()
 
 	c.EnvironmentsUseCase.SetDependencies(c.EnvironmentRepository, c.SchemasUseCase, c.XDSSnapshotManager)
-	c.SnapshotsUseCase.SetDependencies(c.EnvironmentRepository, c.XDSSnapshotManager)
+	c.SnapshotsUseCase.SetDependencies(c.EnvironmentsUseCase, c.XDSSnapshotManager)
 	c.SchemasUseCase.SetDependencies(c.SchemaRepository, c.EnvironmentRepository, c.GitRepositoryManager)
 
 	log.Println("SnapshotsUseCase:", c.SnapshotsUseCase)

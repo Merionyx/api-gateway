@@ -15,7 +15,7 @@ import (
 )
 
 type snapshotsUseCase struct {
-	environmentRepo    interfaces.EnvironmentRepository
+	environmentUseCase    interfaces.EnvironmentsUseCase
 	xdsSnapshotManager *cache.SnapshotManager
 }
 
@@ -23,8 +23,8 @@ func NewSnapshotsUseCase() interfaces.SnapshotsUseCase {
 	return &snapshotsUseCase{}
 }
 
-func (uc *snapshotsUseCase) SetDependencies(environmentRepo interfaces.EnvironmentRepository, xdsSnapshotManager *cache.SnapshotManager) {
-	uc.environmentRepo = environmentRepo
+func (uc *snapshotsUseCase) SetDependencies(environmentUseCase interfaces.EnvironmentsUseCase, xdsSnapshotManager *cache.SnapshotManager) {
+	uc.environmentUseCase = environmentUseCase
 	uc.xdsSnapshotManager = xdsSnapshotManager
 }
 
@@ -33,7 +33,7 @@ func (uc *snapshotsUseCase) UpdateSnapshot(ctx context.Context, req *models.Upda
 
 	if req.Environment == "" {
 		// Update all environments
-		environments, err := uc.environmentRepo.ListEnvironments(ctx)
+		environments, err := uc.environmentUseCase.ListEnvironments(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list environments: %w", err)
 		}
@@ -47,7 +47,7 @@ func (uc *snapshotsUseCase) UpdateSnapshot(ctx context.Context, req *models.Upda
 		}
 	} else {
 		// Update specific environment
-		env, err := uc.environmentRepo.GetEnvironment(ctx, req.Environment)
+		env, err := uc.environmentUseCase.GetEnvironment(ctx, req.Environment)
 		if err != nil {
 			return nil, fmt.Errorf("environment %s not found: %w", req.Environment, err)
 		}
@@ -65,7 +65,7 @@ func (uc *snapshotsUseCase) UpdateSnapshot(ctx context.Context, req *models.Upda
 }
 
 func (uc *snapshotsUseCase) GetSnapshotStatus(ctx context.Context, req *models.GetSnapshotStatusRequest) (*models.GetSnapshotStatusResponse, error) {
-	env, err := uc.environmentRepo.GetEnvironment(ctx, req.Environment)
+	env, err := uc.environmentUseCase.GetEnvironment(ctx, req.Environment)
 	if err != nil {
 		return nil, fmt.Errorf("environment %s not found: %w", req.Environment, err)
 	}

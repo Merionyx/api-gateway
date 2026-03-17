@@ -11,7 +11,7 @@ import (
 
 // SnapshotsUseCase interface for xDS snapshots business logic
 type SnapshotsUseCase interface {
-	SetDependencies(environmentRepo EnvironmentRepository, xdsSnapshotManager *xdscache.SnapshotManager)
+	SetDependencies(environmentUseCase EnvironmentsUseCase, xdsSnapshotManager *xdscache.SnapshotManager)
 
 	UpdateSnapshot(ctx context.Context, req *models.UpdateSnapshotRequest) (*models.UpdateSnapshotResponse, error)
 	GetSnapshotStatus(ctx context.Context, req *models.GetSnapshotStatusRequest) (*models.GetSnapshotStatusResponse, error)
