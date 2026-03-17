@@ -2,7 +2,7 @@ networks:
     default:
 
 services:
-    app:
+    control-plane:
         container_name: merionyx-api-gateway-control-plane
         build:
             context: ../..

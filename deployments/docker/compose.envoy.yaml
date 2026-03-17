@@ -15,7 +15,7 @@ services:
     networks:
       - default
     depends_on:
-      - app
+      - control-plane
   envoy-dev-02:
     image: envoyproxy/envoy:v1.33-latest
     container_name: envoy-dev-02
@@ -29,7 +29,7 @@ services:
     networks:
       - default
     depends_on:
-      - app
+      - control-plane
   envoy-prod-01:
     image: envoyproxy/envoy:v1.33-latest
     container_name: envoy-prod-01
@@ -43,7 +43,7 @@ services:
     networks:
       - default
     depends_on:
-      - app
+      - control-plane
   envoy-prod-02:
     image: envoyproxy/envoy:v1.33-latest
     container_name: envoy-prod-02
@@ -57,4 +57,4 @@ services:
     networks:
       - default
     depends_on:
-      - app
+      - control-plane
