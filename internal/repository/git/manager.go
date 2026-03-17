@@ -142,14 +142,6 @@ func (rm *RepositoryManager) GetRepositorySnapshots(name string, ref string, pat
 	if err != nil {
 		return nil, fmt.Errorf("failed to get worktree for repository %s: %w", name, err)
 	}
-	refs, err := repo.References()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get references for repository %s: %w", name, err)
-	}
-	refs.ForEach(func(r *plumbing.Reference) error {
-		fmt.Println(r.Name())
-		return nil
-	})
 
 	var checkoutOptions *git.CheckoutOptions
 
