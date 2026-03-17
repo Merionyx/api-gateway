@@ -162,6 +162,17 @@ func (rm *RepositoryManager) GetRepositorySnapshots(name string, ref string, pat
 	if err != nil {
 		return nil, fmt.Errorf("failed to checkout repository %s: %w", name, err)
 	}
+
+	w.Pull(&git.PullOptions{
+		Force: true,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to pull repository %s: %w", name, err)
+	}
+
+	log.Println("Pulled repository", name)
+
 	var files []RepositoryFile
 
 	err = util.Walk(w.Filesystem, path, func(path string, info os.FileInfo, err error) error {
