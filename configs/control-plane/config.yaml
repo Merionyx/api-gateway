@@ -32,17 +32,9 @@ repositories:
 environments:
 - name: dev
   bundles:
-    static:
-    - name: api-gateway-schemas
-      repository: api-gateway-schemas-https
-      ref: remotes/origin/master
-      path: openapi
+    static: []
   services:
-    static:
-    - name: be-service-01
-      upstream: "http://mock-be-service-01-dev:8080"
-    - name: be-service-02
-      upstream: "http://mock-be-service-02-dev:8080"
+    static: []
 - name: prod
   bundles:
     static:
