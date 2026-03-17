@@ -21,6 +21,9 @@ type SchemaRepository interface {
 
 	// List contract snapshots
 	ListContractSnapshots(ctx context.Context, repository, ref string) ([]git.ContractSnapshot, error)
+
+	// Watch contract snapshots
+	WatchContractBundlesSnapshots(ctx context.Context) clientv3.WatchChan
 }
 type EnvironmentRepository interface {
 	// Save environment configuration

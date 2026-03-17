@@ -8,6 +8,7 @@ import (
 	"merionyx/api-gateway/control-plane/internal/domain/interfaces"
 	"merionyx/api-gateway/control-plane/internal/domain/models"
 	"merionyx/api-gateway/control-plane/internal/repository/git"
+	"merionyx/api-gateway/control-plane/internal/utils"
 	xdscache "merionyx/api-gateway/control-plane/internal/xds/cache"
 	"merionyx/api-gateway/control-plane/internal/xds/snapshot"
 )
@@ -155,5 +156,32 @@ func (uc *environmentsUseCase) rebuildXDSSnapshot(ctx context.Context, env *mode
 	}
 
 	log.Printf("xDS snapshot rebuilt for environment: %s", env.Name)
+	return nil
+}
+
+func (uc *environmentsUseCase) WatchSnapshotsUpdates(ctx context.Context) error {
+	watchChan := uc.schamasUseCase.WatchContractBundlesSnapshots(ctx)
+	for watchResp := range watchChan {
+		for _, event := range watchResp.Events {
+			log.Printf("Event: %s, Key: %s, Value: %s\n", event.Type, event.Kv.Key, event.Kv.Value)
+			repo, ref, contract := utils.ExtractRepoRefContractFromKey(event.Kv.Key)
+			log.Printf("Repo: %s, Ref: %s, Contract: %s\n", repo, ref, contract)
+
+			envs, err := uc.ListEnvironments(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to list environments: %w", err)
+			}
+			for _, env := range envs {
+				for _, bundle := range env.Bundles.Static {
+					if bundle.Repository == repo && bundle.Ref == ref {
+						log.Printf("Auto-rebuilding xDS snapshot for environment: %s\n", env.Name)
+						if err := uc.rebuildXDSSnapshot(ctx, env); err != nil {
+							log.Printf("Failed to rebuild xDS snapshot for environment: %s: %v", env.Name, err)
+						}
+					}
+				}
+			}
+		}
+	}
 	return nil
 }

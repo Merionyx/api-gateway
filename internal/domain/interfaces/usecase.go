@@ -7,6 +7,8 @@ import (
 	"merionyx/api-gateway/control-plane/internal/repository/git"
 
 	xdscache "merionyx/api-gateway/control-plane/internal/xds/cache"
+
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 // SnapshotsUseCase interface for xDS snapshots business logic
@@ -26,6 +28,8 @@ type EnvironmentsUseCase interface {
 	ListEnvironments(ctx context.Context) (map[string]*models.Environment, error)
 	UpdateEnvironment(ctx context.Context, req *models.UpdateEnvironmentRequest) (*models.Environment, error)
 	DeleteEnvironment(ctx context.Context, name string) error
+
+	WatchSnapshotsUpdates(ctx context.Context) error
 }
 
 // SchemasUseCase interface for schemas/contracts business logic
@@ -36,4 +40,6 @@ type SchemasUseCase interface {
 	GetContractSnapshot(ctx context.Context, repository, ref, contract string) (*git.ContractSnapshot, error)
 	ListContractSnapshots(ctx context.Context, repository, ref string) ([]git.ContractSnapshot, error)
 	SyncAllContracts(ctx context.Context, req *models.SyncAllContractsRequest) (*models.SyncAllContractsResponse, error)
+
+	WatchContractBundlesSnapshots(ctx context.Context) clientv3.WatchChan
 }

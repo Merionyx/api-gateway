@@ -119,3 +119,9 @@ func (r *schemaRepository) buildContractKey(repo, ref, contract string) string {
 	safeRef := strings.ReplaceAll(ref, "/", "%2F")
 	return fmt.Sprintf("%s%s/%s/contracts/%s/snapshot", schemaPrefix, repo, safeRef, contract)
 }
+
+// WatchContractBundlesSnapshots watches contract bundles snapshots for repository/ref
+func (r *schemaRepository) WatchContractBundlesSnapshots(ctx context.Context) clientv3.WatchChan {
+	prefix := schemaPrefix
+	return r.client.Watch(ctx, prefix, clientv3.WithPrefix())
+}

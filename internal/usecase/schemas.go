@@ -8,6 +8,8 @@ import (
 	"merionyx/api-gateway/control-plane/internal/domain/interfaces"
 	"merionyx/api-gateway/control-plane/internal/domain/models"
 	"merionyx/api-gateway/control-plane/internal/repository/git"
+
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 type schemasUseCase struct {
@@ -108,4 +110,8 @@ func (uc *schemasUseCase) SyncAllContracts(ctx context.Context, req *models.Sync
 		SyncedCount: syncedCount,
 		Errors:      errors,
 	}, nil
+}
+
+func (uc *schemasUseCase) WatchContractBundlesSnapshots(ctx context.Context) clientv3.WatchChan {
+	return uc.schemaRepo.WatchContractBundlesSnapshots(ctx)
 }

@@ -75,6 +75,7 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 	container.initUseCases()
 	container.initHandlers()
 	container.initRouter()
+	container.startWatchers()
 
 	container.playgroundInit()
 
@@ -163,6 +164,11 @@ func (c *Container) initXDS() {
 	c.XDSServer = xdsserver.NewXDSServer(c.XDSSnapshotManager.GetCache(), xdsPort)
 
 	log.Println("xDS server initialized")
+}
+
+// startWatchers starts watchers for watching changes of environments and schemas
+func (c *Container) startWatchers() {
+	go c.EnvironmentsUseCase.WatchSnapshotsUpdates(context.Background())
 }
 
 func (c *Container) playgroundInit() {
