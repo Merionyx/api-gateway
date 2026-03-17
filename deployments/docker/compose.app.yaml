@@ -36,3 +36,5 @@ services:
                       - .env.production
         networks:
             - default
+        depends_on:
+            - etcd

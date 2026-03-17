@@ -4,14 +4,28 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/spf13/viper"
 )
 
 type Config struct {
 	Server       ServerConfig        `mapstructure:"server" validate:"required" json:"server"`
+	Etcd         EtcdConfig          `mapstructure:"etcd"`
 	Repositories []RepositoryConfig  `mapstructure:"repositories" validate:"required" json:"repositories"`
 	Environments []EnvironmentConfig `mapstructure:"environments" validate:"required" json:"environments"`
+}
+
+type EtcdConfig struct {
+	Endpoints   []string      `mapstructure:"endpoints"`
+	DialTimeout time.Duration `mapstructure:"dial_timeout"`
+	TLS         EtcdTLSConfig `mapstructure:"tls"`
+}
+type EtcdTLSConfig struct {
+	Enabled  bool   `mapstructure:"enabled"`
+	CertFile string `mapstructure:"cert_file"`
+	KeyFile  string `mapstructure:"key_file"`
+	CAFile   string `mapstructure:"ca_file"`
 }
 
 type ServerConfig struct {

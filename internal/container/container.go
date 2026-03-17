@@ -1,21 +1,26 @@
 package container
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strconv"
+	"time"
 
 	"merionyx/api-gateway/control-plane/internal/config"
 	"merionyx/api-gateway/control-plane/internal/delivery/grpc/handler"
 	"merionyx/api-gateway/control-plane/internal/delivery/http/router"
 	"merionyx/api-gateway/control-plane/internal/domain/interfaces"
 	"merionyx/api-gateway/control-plane/internal/domain/models"
+	"merionyx/api-gateway/control-plane/internal/repository/etcd"
 	"merionyx/api-gateway/control-plane/internal/repository/git"
 	"merionyx/api-gateway/control-plane/internal/usecase"
 
 	xdscache "merionyx/api-gateway/control-plane/internal/xds/cache"
 	xdsserver "merionyx/api-gateway/control-plane/internal/xds/server"
 	"merionyx/api-gateway/control-plane/internal/xds/snapshot"
+
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 // Container DI for all dependencies
@@ -23,29 +28,22 @@ type Container struct {
 	// Config
 	Config *config.Config
 
+	// etcd
+	EtcdClient *clientv3.Client
+
 	// Repository Manager
 	GitRepositoryManager *git.RepositoryManager
 
 	// Repositories
-	// TenantRepository      interfaces.TenantRepository
-	// EnvironmentRepository interfaces.EnvironmentRepository
-	// ListenerRepository    interfaces.ListenerRepository
+	SchemaRepository      interfaces.SchemaRepository
+	EnvironmentRepository interfaces.EnvironmentRepository
 
 	// Use Cases
-	// TenantUseCase      interfaces.TenantUseCase
-	// EnvironmentUseCase interfaces.EnvironmentUseCase
-	// ListenerUseCase    interfaces.ListenerUseCase
 	SnapshotsUseCase interfaces.SnapshotsUseCase
 
 	// HTTP Handlers
-	// TenantHTTPHandler      *httpHandler.TenantHandler
-	// EnvironmentHTTPHandler *httpHandler.EnvironmentHandler
-	// ListenerHTTPHandler    *httpHandler.ListenerHandler
 
 	// gRPC Handlers
-	// TenantGRPCHandler      *handler.TenantHandler
-	// EnvironmentGRPCHandler *handler.EnvironmentHandler
-	// ListenerGRPCHandler    *handler.ListenerHandler
 	SnapshotGRPCHandler *handler.SnapshotHandler
 
 	// Playground
@@ -65,7 +63,10 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 		Config: cfg,
 	}
 
+	container.initEtcd()
 	container.initXDS()
+
+	container.initRepositories()
 	container.initGitRepositoryManager()
 	container.initUseCases()
 	container.initHandlers()
@@ -73,7 +74,33 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 
 	container.playgroundInit()
 
+	// container.startEtcdWatcher()
+
 	return container, nil
+}
+
+func (c *Container) initEtcd() {
+	etcdClient, err := etcd.NewEtcdClient(c.Config.Etcd)
+	if err != nil {
+		log.Fatalf("Failed to initialize etcd client: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if _, err := etcdClient.Status(ctx, c.Config.Etcd.Endpoints[0]); err != nil {
+		log.Fatalf("Failed to connect to etcd: %v", err)
+	}
+
+	c.EtcdClient = etcdClient
+	log.Println("etcd client initialized and connected successfully")
+}
+
+func (c *Container) initRepositories() {
+	c.SchemaRepository = etcd.NewSchemaRepository(c.EtcdClient)
+	c.EnvironmentRepository = etcd.NewEnvironmentRepository(c.EtcdClient)
+
+	log.Println("etcd repositories initialized")
 }
 
 // initGitRepositoryManager initializes the git repository manager
@@ -87,9 +114,6 @@ func (c *Container) initGitRepositoryManager() {
 
 // initUseCases initializes the use cases
 func (c *Container) initUseCases() {
-	// c.TenantUseCase = usecase.NewTenantUseCase(c.TenantRepository)
-	// c.EnvironmentUseCase = usecase.NewEnvironmentUseCase(c.EnvironmentRepository, c.TenantRepository)
-	// c.ListenerUseCase = usecase.NewListenerUseCase(c.ListenerRepository, c.EnvironmentRepository)
 	c.SnapshotsUseCase = usecase.NewSnapshotsUseCase(&c.Environments, c.XDSSnapshotManager)
 
 	log.Println("SnapshotsUseCase:", c.SnapshotsUseCase)
@@ -100,14 +124,8 @@ func (c *Container) initUseCases() {
 // initHandlers initializes the handlers
 func (c *Container) initHandlers() {
 	// HTTP handlers
-	// c.TenantHTTPHandler = httpHandler.NewTenantHandler(c.TenantUseCase)
-	// c.EnvironmentHTTPHandler = httpHandler.NewEnvironmentHandler(c.EnvironmentUseCase)
-	// c.ListenerHTTPHandler = httpHandler.NewListenerHandler(c.ListenerUseCase)
 
 	// gRPC handlers
-	// c.TenantGRPCHandler = handler.NewTenantHandler(c.TenantUseCase)
-	// c.EnvironmentGRPCHandler = handler.NewEnvironmentHandler(c.EnvironmentUseCase)
-	// c.ListenerGRPCHandler = handler.NewListenerHandler(c.ListenerUseCase)
 	c.SnapshotGRPCHandler = handler.NewSnapshotHandler(c.SnapshotsUseCase)
 
 	log.Println("Handlers initialized")
@@ -208,5 +226,10 @@ func (c *Container) playgroundInit() {
 
 // Close closes all resources in the container
 func (c *Container) Close() {
-
+	if c.EtcdClient != nil {
+		if err := c.EtcdClient.Close(); err != nil {
+			log.Printf("Failed to close etcd client: %v", err)
+		}
+		log.Println("etcd client closed")
+	}
 }
