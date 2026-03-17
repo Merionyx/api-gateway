@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -39,22 +40,28 @@ func main() {
 	hostname, _ := os.Hostname()
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// Собираем headers
+		// Check if timeout parameter is present
+		if timeoutStr := r.URL.Query().Get("timeout"); timeoutStr != "" {
+			if timeoutMs, err := strconv.Atoi(timeoutStr); err == nil && timeoutMs > 0 {
+				duration := time.Duration(timeoutMs) * time.Millisecond
+				log.Printf("[%s][%s] Sleeping for %v before responding", environment, serviceName, duration)
+				time.Sleep(duration)
+			}
+		}
+		// Collect headers
 		headers := make(map[string]string)
 		for name, values := range r.Header {
 			if len(values) > 0 {
 				headers[name] = values[0]
 			}
 		}
-
-		// Собираем query parameters
+		// Collect query parameters
 		query := make(map[string]string)
 		for name, values := range r.URL.Query() {
 			if len(values) > 0 {
 				query[name] = values[0]
 			}
 		}
-
 		response := Response{
 			Service:     serviceName,
 			Environment: environment,
@@ -65,20 +72,18 @@ func main() {
 			Query:       query,
 			Host:        hostname,
 		}
-
-		log.Printf("[%s][%s] %s %s from %s", 
-			environment, 
-			serviceName, 
-			r.Method, 
-			r.URL.Path, 
+		log.Printf("[%s][%s] %s %s from %s",
+			environment,
+			serviceName,
+			r.Method,
+			r.URL.Path,
 			r.RemoteAddr,
 		)
-
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Service-Name", serviceName)
 		w.Header().Set("X-Environment", environment)
 		w.WriteHeader(http.StatusOK)
-		
+
 		json.NewEncoder(w).Encode(response)
 	})
 
@@ -90,7 +95,7 @@ func main() {
 
 	addr := ":" + port
 	log.Printf("Starting %s service in %s environment on %s", serviceName, environment, addr)
-	
+
 	if err := http.ListenAndServe(addr, nil); err != nil {
 		log.Fatal(err)
 	}
