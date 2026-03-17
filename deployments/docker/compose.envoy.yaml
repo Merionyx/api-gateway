@@ -2,9 +2,9 @@ networks:
   default:
 
 services:
-  envoy-dev-0:
+  envoy-dev-01:
     image: envoyproxy/envoy:v1.33-latest
-    container_name: envoy-dev-0
+    container_name: envoy-dev-01
     volumes:
       - ./configs/envoy/dev.yaml:/etc/envoy/envoy.yaml:ro
     ports:
@@ -16,9 +16,9 @@ services:
       - default
     depends_on:
       - app
-  envoy-dev-1:
+  envoy-dev-02:
     image: envoyproxy/envoy:v1.33-latest
-    container_name: envoy-dev-1
+    container_name: envoy-dev-02
     volumes:
       - ./configs/envoy/dev.yaml:/etc/envoy/envoy.yaml:ro
     ports:
@@ -30,9 +30,9 @@ services:
       - default
     depends_on:
       - app
-  envoy-prod-0:
+  envoy-prod-01:
     image: envoyproxy/envoy:v1.33-latest
-    container_name: envoy-prod-0
+    container_name: envoy-prod-01
     volumes:
       - ./configs/envoy/prod.yaml:/etc/envoy/envoy.yaml:ro
     ports:
@@ -44,9 +44,9 @@ services:
       - default
     depends_on:
       - app
-  envoy-prod-1:
+  envoy-prod-02:
     image: envoyproxy/envoy:v1.33-latest
-    container_name: envoy-prod-1
+    container_name: envoy-prod-02
     volumes:
       - ./configs/envoy/prod.yaml:/etc/envoy/envoy.yaml:ro
     ports:
