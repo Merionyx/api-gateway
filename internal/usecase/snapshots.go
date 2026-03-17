@@ -19,14 +19,13 @@ type snapshotsUseCase struct {
 	xdsSnapshotManager *cache.SnapshotManager
 }
 
-func NewSnapshotsUseCase(
-	environmentRepo interfaces.EnvironmentRepository,
-	xdsSnapshotManager *cache.SnapshotManager,
-) interfaces.SnapshotsUseCase {
-	return &snapshotsUseCase{
-		environmentRepo:    environmentRepo,
-		xdsSnapshotManager: xdsSnapshotManager,
-	}
+func NewSnapshotsUseCase() interfaces.SnapshotsUseCase {
+	return &snapshotsUseCase{}
+}
+
+func (uc *snapshotsUseCase) SetDependencies(environmentRepo interfaces.EnvironmentRepository, xdsSnapshotManager *cache.SnapshotManager) {
+	uc.environmentRepo = environmentRepo
+	uc.xdsSnapshotManager = xdsSnapshotManager
 }
 
 func (uc *snapshotsUseCase) UpdateSnapshot(ctx context.Context, req *models.UpdateSnapshotRequest) (*models.UpdateSnapshotResponse, error) {

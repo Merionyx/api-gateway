@@ -118,9 +118,13 @@ func (c *Container) initGitRepositoryManager() {
 
 // initUseCases initializes the use cases
 func (c *Container) initUseCases() {
-	c.SnapshotsUseCase = usecase.NewSnapshotsUseCase(c.EnvironmentRepository, c.XDSSnapshotManager)
-	c.EnvironmentsUseCase = usecase.NewEnvironmentsUseCase(c.EnvironmentRepository, c.XDSSnapshotManager)
-	c.SchemasUseCase = usecase.NewSchemasUseCase(c.SchemaRepository, c.EnvironmentRepository, c.GitRepositoryManager)
+	c.SnapshotsUseCase = usecase.NewSnapshotsUseCase()
+	c.EnvironmentsUseCase = usecase.NewEnvironmentsUseCase()
+	c.SchemasUseCase = usecase.NewSchemasUseCase()
+
+	c.EnvironmentsUseCase.SetDependencies(c.EnvironmentRepository, c.SchemasUseCase, c.XDSSnapshotManager)
+	c.SnapshotsUseCase.SetDependencies(c.EnvironmentRepository, c.XDSSnapshotManager)
+	c.SchemasUseCase.SetDependencies(c.SchemaRepository, c.EnvironmentRepository, c.GitRepositoryManager)
 
 	log.Println("SnapshotsUseCase:", c.SnapshotsUseCase)
 

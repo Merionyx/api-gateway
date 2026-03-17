@@ -14,17 +14,18 @@ import (
 
 type environmentsUseCase struct {
 	environmentRepo    interfaces.EnvironmentRepository
+	schamasUseCase     interfaces.SchemasUseCase
 	xdsSnapshotManager *xdscache.SnapshotManager
 }
 
-func NewEnvironmentsUseCase(
-	environmentRepo interfaces.EnvironmentRepository,
-	xdsSnapshotManager *xdscache.SnapshotManager,
-) interfaces.EnvironmentsUseCase {
-	return &environmentsUseCase{
-		environmentRepo:    environmentRepo,
-		xdsSnapshotManager: xdsSnapshotManager,
-	}
+func NewEnvironmentsUseCase() interfaces.EnvironmentsUseCase {
+	return &environmentsUseCase{}
+}
+
+func (uc *environmentsUseCase) SetDependencies(environmentRepo interfaces.EnvironmentRepository, schamasUseCase interfaces.SchemasUseCase, xdsSnapshotManager *xdscache.SnapshotManager) {
+	uc.environmentRepo = environmentRepo
+	uc.schamasUseCase = schamasUseCase
+	uc.xdsSnapshotManager = xdsSnapshotManager
 }
 
 func (uc *environmentsUseCase) CreateEnvironment(ctx context.Context, req *models.CreateEnvironmentRequest) (*models.Environment, error) {
@@ -57,11 +58,44 @@ func (uc *environmentsUseCase) CreateEnvironment(ctx context.Context, req *model
 }
 
 func (uc *environmentsUseCase) GetEnvironment(ctx context.Context, name string) (*models.Environment, error) {
-	return uc.environmentRepo.GetEnvironment(ctx, name)
+	env, err := uc.environmentRepo.GetEnvironment(ctx, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get environment: %w", err)
+	}
+
+	for _, bundle := range env.Bundles.Static {
+		snapshots, err := uc.schamasUseCase.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get environment snapshots: %w", err)
+		}
+		env.Snapshots = append(env.Snapshots, snapshots...)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get environment snapshots: %w", err)
+	}
+
+	return env, nil
 }
 
 func (uc *environmentsUseCase) ListEnvironments(ctx context.Context) (map[string]*models.Environment, error) {
-	return uc.environmentRepo.ListEnvironments(ctx)
+	environments, err := uc.environmentRepo.ListEnvironments(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list environments: %w", err)
+	}
+	for _, environment := range environments {
+		for _, bundle := range environment.Bundles.Static {
+			snapshots, err := uc.schamasUseCase.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get environment snapshots: %w", err)
+			}
+			environment.Snapshots = append(environment.Snapshots, snapshots...)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to get environment snapshots: %w", err)
+		}
+		environments[environment.Name] = environment
+	}
+	return environments, nil
 }
 
 func (uc *environmentsUseCase) UpdateEnvironment(ctx context.Context, req *models.UpdateEnvironmentRequest) (*models.Environment, error) {

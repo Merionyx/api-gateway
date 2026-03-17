@@ -16,16 +16,14 @@ type schemasUseCase struct {
 	gitManager      *git.RepositoryManager
 }
 
-func NewSchemasUseCase(
-	schemaRepo interfaces.SchemaRepository,
-	environmentRepo interfaces.EnvironmentRepository,
-	gitManager *git.RepositoryManager,
-) interfaces.SchemasUseCase {
-	return &schemasUseCase{
-		schemaRepo:      schemaRepo,
-		environmentRepo: environmentRepo,
-		gitManager:      gitManager,
-	}
+func NewSchemasUseCase() interfaces.SchemasUseCase {
+	return &schemasUseCase{}
+}
+
+func (uc *schemasUseCase) SetDependencies(schemaRepo interfaces.SchemaRepository, environmentRepo interfaces.EnvironmentRepository, gitManager *git.RepositoryManager) {
+	uc.schemaRepo = schemaRepo
+	uc.environmentRepo = environmentRepo
+	uc.gitManager = gitManager
 }
 
 func (uc *schemasUseCase) SyncContractBundle(ctx context.Context, req *models.SyncContractBundleRequest) (*models.SyncContractBundleResponse, error) {
