@@ -195,120 +195,14 @@ func (rm *RepositoryManager) GetRepositorySnapshots(name string, ref string, pat
 	case "local-dir":
 		return rm.getSnapshotsFromLocalDir(managedRepo.Path, path)
 	case "local-git":
-		return rm.getSnapshotsFromLocalGit(managedRepo, ref, path)
+		return rm.getSnapshotsFromGit(managedRepo, ref, path)
 	case "git":
-		return rm.getSnapshotsFromRemoteGit(managedRepo, ref, path)
+		return rm.getSnapshotsFromGit(managedRepo, ref, path)
 	}
 	return nil, fmt.Errorf("unsupported repository source %s", managedRepo.Source)
 }
 
-func (rm *RepositoryManager) getSnapshotsFromLocalGit(managedRepo *ManagedRepo, ref string, path string) ([]ContractSnapshot, error) {
-	if path == "" {
-		path = "."
-	}
-
-	repo := managedRepo.Repo
-
-	w, err := repo.Worktree()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get worktree for repository %s: %w", managedRepo.Path, err)
-	}
-
-	var checkoutOptions *git.CheckoutOptions
-
-	if isCommitHash(ref) {
-		hash, success := plumbing.FromHex(ref)
-		if !success {
-			return nil, fmt.Errorf("failed to convert hex to hash")
-		}
-		checkoutOptions = &git.CheckoutOptions{
-			Hash: hash,
-		}
-	} else {
-		checkoutOptions = &git.CheckoutOptions{
-			Branch: plumbing.ReferenceName("refs/" + ref),
-		}
-	}
-
-	err = w.Checkout(checkoutOptions)
-	if err != nil {
-		return nil, fmt.Errorf("failed to checkout repository %s: %w", managedRepo.Name, err)
-	}
-
-	if err != nil {
-		if err != git.NoErrAlreadyUpToDate {
-			return nil, fmt.Errorf("failed to pull repository %s: %w", managedRepo.Name, err)
-		}
-		log.Println("Repository", managedRepo.Name, "is already up to date")
-	}
-
-	log.Println("Pulled repository", managedRepo.Name)
-
-	var files []RepositoryFile
-
-	err = util.Walk(w.Filesystem, path, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		// Filter out files without .yaml, .json, .yml extension
-		if !strings.HasSuffix(path, ".yaml") && !strings.HasSuffix(path, ".json") && !strings.HasSuffix(path, ".yml") {
-			return nil
-		}
-
-		if !info.IsDir() {
-			file, err := w.Filesystem.Open(path)
-			if err != nil {
-				return fmt.Errorf("failed to open file %s: %w", path, err)
-			}
-			defer file.Close()
-
-			content, err := io.ReadAll(file)
-			if err != nil {
-				return fmt.Errorf("failed to read file %s: %w", path, err)
-			}
-
-			files = append(files, RepositoryFile{
-				Path:    path,
-				Content: content,
-			})
-		}
-		return nil
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to walk directory for repository %s: %w", managedRepo.Name, err)
-	}
-
-	var snapshots []ContractSnapshot
-
-	for _, file := range files {
-		contractSchema, err := parseContractSchema(file.Path, file.Content)
-		if err != nil {
-			log.Fatalf("Failed to parse x-api-gateway: %v", err)
-		}
-		log.Println("ContractSchema:", contractSchema)
-
-		if contractSchema.XApiGateway == (XApiGatewaySchema{}) {
-			log.Println("ContractSchema is empty", file.Path)
-			continue
-		}
-
-		upstream := ContractUpstream{
-			Name: contractSchema.XApiGateway.Service.Name,
-		}
-
-		snapshots = append(snapshots, ContractSnapshot{
-			Name:                  contractSchema.XApiGateway.Contract.Name,
-			Prefix:                contractSchema.XApiGateway.Prefix,
-			Upstream:              upstream,
-			AllowUndefinedMethods: contractSchema.XApiGateway.AllowUndefinedMethods,
-		})
-	}
-	return snapshots, nil
-}
-
-func (rm *RepositoryManager) getSnapshotsFromRemoteGit(managedRepo *ManagedRepo, ref string, path string) ([]ContractSnapshot, error) {
+func (rm *RepositoryManager) getSnapshotsFromGit(managedRepo *ManagedRepo, ref string, path string) ([]ContractSnapshot, error) {
 	if path == "" {
 		path = "."
 	}
