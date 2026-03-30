@@ -41,7 +41,7 @@ type Container struct {
 	EnvironmentRepository interfaces.EnvironmentRepository
 
 	// In-memory repositories
-	ServiceRepository *memory.ServiceRepository
+	InMemoryServiceRepository *memory.ServiceRepository
 
 	// xDS Builder
 	XDSBuilder *builder.XDSBuilder
@@ -114,8 +114,8 @@ func (c *Container) initEtcd() {
 }
 
 func (c *Container) initInMemoryRepositories() {
-	c.ServiceRepository = memory.NewServiceRepository()
-	if err := c.ServiceRepository.Initialize(c.Config); err != nil {
+	c.InMemoryServiceRepository = memory.NewServiceRepository()
+	if err := c.InMemoryServiceRepository.Initialize(c.Config); err != nil {
 		log.Fatalf("Failed to initialize service repository: %v", err)
 	}
 
@@ -123,7 +123,7 @@ func (c *Container) initInMemoryRepositories() {
 }
 
 func (c *Container) initXDSBuilder() {
-	c.XDSBuilder = builder.NewXDSBuilder(c.ServiceRepository)
+	c.XDSBuilder = builder.NewXDSBuilder(c.InMemoryServiceRepository)
 
 	log.Println("xDS builder initialized")
 }
