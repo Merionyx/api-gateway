@@ -112,3 +112,14 @@ services:
       interval: 10s
       timeout: 3s
       retries: 3
+  mock-be-service-03:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.mock-service
+    container_name: mock-be-service-03
+    environment:
+      - SERVICE_NAME=be-service-03
+      - ENVIRONMENT=global
+      - PORT=8080
+    ports:
+      - "8092:8080"
