@@ -92,9 +92,12 @@ func (rm *RepositoryManager) InitializeRepositories(repos []config.RepositoryCon
 
 			slog.Info("Successfully cloned repository", "name", repository.Name)
 		case "local-git":
-			repo, err := git.PlainOpen(repository.Path)
+			repo, err := git.Clone(memory.NewStorage(), memfs.New(), &git.CloneOptions{
+				URL:          repository.Path,
+				SingleBranch: false,
+			})
 			if err != nil {
-				return fmt.Errorf("failed to open local git repository %s: %w", repository.Name, err)
+				return fmt.Errorf("failed to clone local git repository %s: %w", repository.Name, err)
 			}
 
 			rm.repos[repository.Name] = &ManagedRepo{
@@ -105,7 +108,7 @@ func (rm *RepositoryManager) InitializeRepositories(repos []config.RepositoryCon
 				Path:   repository.Path,
 			}
 
-			slog.Info("Successfully opened local git repository", "name", repository.Name)
+			slog.Info("Successfully cloned local git repository to memory", "name", repository.Name)
 
 		case "local-dir":
 			rm.repos[repository.Name] = &ManagedRepo{
