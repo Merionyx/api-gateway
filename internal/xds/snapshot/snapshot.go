@@ -15,10 +15,10 @@ import (
 func BuildEnvoySnapshot(xdsBuilder *builder.XDSBuilder, env *models.Environment) *cache.Snapshot {
 	version := fmt.Sprintf("v%d", time.Now().Unix())
 
-	listeners := builder.BuildListeners(env)
+	listeners := xdsBuilder.BuildListeners(env)
 	clusters := xdsBuilder.BuildClusters(env)
-	routes := builder.BuildRoutes(env)
-	endpoints := builder.BuildEndpoints(env)
+	routes := xdsBuilder.BuildRoutes(env)
+	endpoints := xdsBuilder.BuildEndpoints(env)
 
 	listenerResources := make([]types.Resource, len(listeners))
 	for i, l := range listeners {

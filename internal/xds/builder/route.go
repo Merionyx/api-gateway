@@ -7,7 +7,7 @@ import (
 	"merionyx/api-gateway/control-plane/internal/domain/models"
 )
 
-func BuildRoutes(env *models.Environment) []*routev3.RouteConfiguration {
+func (b *XDSBuilder) BuildRoutes(env *models.Environment) []*routev3.RouteConfiguration {
 	routes := make([]*routev3.Route, 0)
 
 	for _, snapshot := range env.Snapshots {
