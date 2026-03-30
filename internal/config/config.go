@@ -14,6 +14,7 @@ type Config struct {
 	Etcd         EtcdConfig          `mapstructure:"etcd"`
 	Repositories []RepositoryConfig  `mapstructure:"repositories" validate:"required" json:"repositories"`
 	Environments []EnvironmentConfig `mapstructure:"environments" validate:"required" json:"environments"`
+	Services     ServicesConfig      `mapstructure:"services" validate:"required" json:"services"`
 }
 
 type EtcdConfig struct {

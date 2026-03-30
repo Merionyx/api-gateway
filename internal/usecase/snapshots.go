@@ -7,6 +7,7 @@ import (
 
 	"merionyx/api-gateway/control-plane/internal/domain/interfaces"
 	"merionyx/api-gateway/control-plane/internal/domain/models"
+	"merionyx/api-gateway/control-plane/internal/repository/memory"
 	"merionyx/api-gateway/control-plane/internal/xds/cache"
 	"merionyx/api-gateway/control-plane/internal/xds/snapshot"
 
@@ -14,17 +15,19 @@ import (
 )
 
 type snapshotsUseCase struct {
-	environmentUseCase interfaces.EnvironmentsUseCase
-	xdsSnapshotManager *cache.SnapshotManager
+	environmentUseCase        interfaces.EnvironmentsUseCase
+	xdsSnapshotManager        *cache.SnapshotManager
+	inMemoryServiceRepository *memory.ServiceRepository
 }
 
 func NewSnapshotsUseCase() interfaces.SnapshotsUseCase {
 	return &snapshotsUseCase{}
 }
 
-func (uc *snapshotsUseCase) SetDependencies(environmentUseCase interfaces.EnvironmentsUseCase, xdsSnapshotManager *cache.SnapshotManager) {
+func (uc *snapshotsUseCase) SetDependencies(environmentUseCase interfaces.EnvironmentsUseCase, xdsSnapshotManager *cache.SnapshotManager, inMemoryServiceRepository *memory.ServiceRepository) {
 	uc.environmentUseCase = environmentUseCase
 	uc.xdsSnapshotManager = xdsSnapshotManager
+	uc.inMemoryServiceRepository = inMemoryServiceRepository
 }
 
 func (uc *snapshotsUseCase) UpdateSnapshot(ctx context.Context, req *models.UpdateSnapshotRequest) (*models.UpdateSnapshotResponse, error) {
@@ -89,7 +92,7 @@ func (uc *snapshotsUseCase) GetSnapshotStatus(ctx context.Context, req *models.G
 }
 
 func (uc *snapshotsUseCase) rebuildSnapshot(ctx context.Context, envName string, env *models.Environment) error {
-	xdsSnapshot := snapshot.BuildEnvoySnapshot(env)
+	xdsSnapshot := snapshot.BuildEnvoySnapshot(env, uc.inMemoryServiceRepository)
 	nodeID := fmt.Sprintf("envoy-%s", envName)
 
 	if err := uc.xdsSnapshotManager.UpdateSnapshot(nodeID, xdsSnapshot); err != nil {

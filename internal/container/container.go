@@ -14,6 +14,7 @@ import (
 	"merionyx/api-gateway/control-plane/internal/domain/models"
 	"merionyx/api-gateway/control-plane/internal/repository/etcd"
 	"merionyx/api-gateway/control-plane/internal/repository/git"
+	"merionyx/api-gateway/control-plane/internal/repository/memory"
 	"merionyx/api-gateway/control-plane/internal/usecase"
 
 	xdscache "merionyx/api-gateway/control-plane/internal/xds/cache"
@@ -37,6 +38,9 @@ type Container struct {
 	// Repositories
 	SchemaRepository      interfaces.SchemaRepository
 	EnvironmentRepository interfaces.EnvironmentRepository
+
+	// In-memory repositories
+	ServiceRepository *memory.ServiceRepository
 
 	// Use Cases
 	SnapshotsUseCase    interfaces.SnapshotsUseCase
@@ -70,6 +74,7 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 	container.initEtcd()
 	container.initXDS()
 
+	container.initInMemoryRepositories()
 	container.initRepositories()
 	container.initGitRepositoryManager()
 	container.initUseCases()
@@ -101,6 +106,15 @@ func (c *Container) initEtcd() {
 	log.Println("etcd client initialized and connected successfully")
 }
 
+func (c *Container) initInMemoryRepositories() {
+	c.ServiceRepository = memory.NewServiceRepository()
+	if err := c.ServiceRepository.Initialize(c.Config); err != nil {
+		log.Fatalf("Failed to initialize service repository: %v", err)
+	}
+
+	log.Println("In-memory repositories initialized")
+}
+
 func (c *Container) initRepositories() {
 	c.SchemaRepository = etcd.NewSchemaRepository(c.EtcdClient)
 	c.EnvironmentRepository = etcd.NewEnvironmentRepository(c.EtcdClient)
@@ -123,8 +137,8 @@ func (c *Container) initUseCases() {
 	c.EnvironmentsUseCase = usecase.NewEnvironmentsUseCase()
 	c.SchemasUseCase = usecase.NewSchemasUseCase()
 
-	c.EnvironmentsUseCase.SetDependencies(c.EnvironmentRepository, c.SchemasUseCase, c.XDSSnapshotManager)
-	c.SnapshotsUseCase.SetDependencies(c.EnvironmentsUseCase, c.XDSSnapshotManager)
+	c.EnvironmentsUseCase.SetDependencies(c.EnvironmentRepository, c.SchemasUseCase, c.XDSSnapshotManager, c.ServiceRepository)
+	c.SnapshotsUseCase.SetDependencies(c.EnvironmentsUseCase, c.XDSSnapshotManager, c.ServiceRepository)
 	c.SchemasUseCase.SetDependencies(c.SchemaRepository, c.EnvironmentRepository, c.GitRepositoryManager)
 
 	log.Println("SnapshotsUseCase:", c.SnapshotsUseCase)
@@ -233,7 +247,7 @@ func (c *Container) playgroundInit() {
 	}
 
 	for envName, env := range c.Environments {
-		snapshot := snapshot.BuildEnvoySnapshot(env)
+		snapshot := snapshot.BuildEnvoySnapshot(env, c.ServiceRepository)
 		nodeID := fmt.Sprintf("envoy-%s", envName)
 
 		if err := c.XDSSnapshotManager.UpdateSnapshot(nodeID, snapshot); err != nil {

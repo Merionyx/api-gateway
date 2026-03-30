@@ -11,22 +11,32 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"merionyx/api-gateway/control-plane/internal/domain/models"
+	"merionyx/api-gateway/control-plane/internal/repository/memory"
 )
 
-func BuildClusters(env *models.Environment) []*clusterv3.Cluster {
+func BuildClusters(env *models.Environment, serviceRepo *memory.ServiceRepository) []*clusterv3.Cluster {
 	clusters := make([]*clusterv3.Cluster, 0)
-
 	uniqueServices := make(map[string]string)
-
+	// 1. Добавляем сервисы из environment
 	for _, service := range env.Services.Static {
 		uniqueServices[service.Name] = service.Upstream
 	}
-
+	// 2. Добавляем глобальные сервисы
+	if serviceRepo != nil {
+		globalServices, err := serviceRepo.ListServices()
+		if err == nil {
+			for _, service := range globalServices {
+				// Environment-specific services override global ones
+				if _, exists := uniqueServices[service.Name]; !exists {
+					uniqueServices[service.Name] = service.Upstream
+				}
+			}
+		}
+	}
 	for serviceName, upstream := range uniqueServices {
 		cluster := buildCluster(serviceName, upstream)
 		clusters = append(clusters, cluster)
 	}
-
 	return clusters
 }
 

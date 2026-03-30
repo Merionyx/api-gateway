@@ -5,6 +5,7 @@ import (
 
 	"merionyx/api-gateway/control-plane/internal/domain/models"
 	"merionyx/api-gateway/control-plane/internal/repository/git"
+	"merionyx/api-gateway/control-plane/internal/repository/memory"
 
 	xdscache "merionyx/api-gateway/control-plane/internal/xds/cache"
 
@@ -13,7 +14,7 @@ import (
 
 // SnapshotsUseCase interface for xDS snapshots business logic
 type SnapshotsUseCase interface {
-	SetDependencies(environmentUseCase EnvironmentsUseCase, xdsSnapshotManager *xdscache.SnapshotManager)
+	SetDependencies(environmentUseCase EnvironmentsUseCase, xdsSnapshotManager *xdscache.SnapshotManager, inMemoryServiceRepository *memory.ServiceRepository)
 
 	UpdateSnapshot(ctx context.Context, req *models.UpdateSnapshotRequest) (*models.UpdateSnapshotResponse, error)
 	GetSnapshotStatus(ctx context.Context, req *models.GetSnapshotStatusRequest) (*models.GetSnapshotStatusResponse, error)
@@ -21,7 +22,7 @@ type SnapshotsUseCase interface {
 
 // EnvironmentsUseCase interface for environments business logic
 type EnvironmentsUseCase interface {
-	SetDependencies(environmentRepo EnvironmentRepository, schamasUseCase SchemasUseCase, xdsSnapshotManager *xdscache.SnapshotManager)
+	SetDependencies(environmentRepo EnvironmentRepository, schamasUseCase SchemasUseCase, xdsSnapshotManager *xdscache.SnapshotManager, inMemoryServiceRepository *memory.ServiceRepository)
 
 	CreateEnvironment(ctx context.Context, req *models.CreateEnvironmentRequest) (*models.Environment, error)
 	GetEnvironment(ctx context.Context, name string) (*models.Environment, error)
