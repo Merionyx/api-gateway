@@ -8,28 +8,28 @@ import (
 	"merionyx/api-gateway/control-plane/internal/domain/interfaces"
 	"merionyx/api-gateway/control-plane/internal/domain/models"
 	"merionyx/api-gateway/control-plane/internal/repository/git"
-	"merionyx/api-gateway/control-plane/internal/repository/memory"
 	"merionyx/api-gateway/control-plane/internal/utils"
+	"merionyx/api-gateway/control-plane/internal/xds/builder"
 	xdscache "merionyx/api-gateway/control-plane/internal/xds/cache"
 	"merionyx/api-gateway/control-plane/internal/xds/snapshot"
 )
 
 type environmentsUseCase struct {
-	environmentRepo           interfaces.EnvironmentRepository
-	schamasUseCase            interfaces.SchemasUseCase
-	xdsSnapshotManager        *xdscache.SnapshotManager
-	inMemoryServiceRepository *memory.ServiceRepository
+	environmentRepo    interfaces.EnvironmentRepository
+	schamasUseCase     interfaces.SchemasUseCase
+	xdsSnapshotManager *xdscache.SnapshotManager
+	xdsBuilder         *builder.XDSBuilder
 }
 
 func NewEnvironmentsUseCase() interfaces.EnvironmentsUseCase {
 	return &environmentsUseCase{}
 }
 
-func (uc *environmentsUseCase) SetDependencies(environmentRepo interfaces.EnvironmentRepository, schamasUseCase interfaces.SchemasUseCase, xdsSnapshotManager *xdscache.SnapshotManager, inMemoryServiceRepository *memory.ServiceRepository) {
+func (uc *environmentsUseCase) SetDependencies(environmentRepo interfaces.EnvironmentRepository, schamasUseCase interfaces.SchemasUseCase, xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder *builder.XDSBuilder) {
 	uc.environmentRepo = environmentRepo
 	uc.schamasUseCase = schamasUseCase
 	uc.xdsSnapshotManager = xdsSnapshotManager
-	uc.inMemoryServiceRepository = inMemoryServiceRepository
+	uc.xdsBuilder = xdsBuilder
 }
 
 func (uc *environmentsUseCase) CreateEnvironment(ctx context.Context, req *models.CreateEnvironmentRequest) (*models.Environment, error) {
@@ -145,7 +145,7 @@ func (uc *environmentsUseCase) DeleteEnvironment(ctx context.Context, name strin
 }
 
 func (uc *environmentsUseCase) rebuildXDSSnapshot(ctx context.Context, env *models.Environment) error {
-	xdsSnapshot := snapshot.BuildEnvoySnapshot(env, uc.inMemoryServiceRepository)
+	xdsSnapshot := snapshot.BuildEnvoySnapshot(uc.xdsBuilder, env)
 	nodeID := fmt.Sprintf("envoy-%s", env.Name)
 
 	if err := uc.xdsSnapshotManager.UpdateSnapshot(nodeID, xdsSnapshot); err != nil {

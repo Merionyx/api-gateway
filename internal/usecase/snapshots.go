@@ -7,7 +7,7 @@ import (
 
 	"merionyx/api-gateway/control-plane/internal/domain/interfaces"
 	"merionyx/api-gateway/control-plane/internal/domain/models"
-	"merionyx/api-gateway/control-plane/internal/repository/memory"
+	"merionyx/api-gateway/control-plane/internal/xds/builder"
 	"merionyx/api-gateway/control-plane/internal/xds/cache"
 	"merionyx/api-gateway/control-plane/internal/xds/snapshot"
 
@@ -15,19 +15,19 @@ import (
 )
 
 type snapshotsUseCase struct {
-	environmentUseCase        interfaces.EnvironmentsUseCase
-	xdsSnapshotManager        *cache.SnapshotManager
-	inMemoryServiceRepository *memory.ServiceRepository
+	environmentUseCase interfaces.EnvironmentsUseCase
+	xdsSnapshotManager *cache.SnapshotManager
+	xdsBuilder         *builder.XDSBuilder
 }
 
 func NewSnapshotsUseCase() interfaces.SnapshotsUseCase {
 	return &snapshotsUseCase{}
 }
 
-func (uc *snapshotsUseCase) SetDependencies(environmentUseCase interfaces.EnvironmentsUseCase, xdsSnapshotManager *cache.SnapshotManager, inMemoryServiceRepository *memory.ServiceRepository) {
+func (uc *snapshotsUseCase) SetDependencies(environmentUseCase interfaces.EnvironmentsUseCase, xdsSnapshotManager *cache.SnapshotManager, xdsBuilder *builder.XDSBuilder) {
 	uc.environmentUseCase = environmentUseCase
 	uc.xdsSnapshotManager = xdsSnapshotManager
-	uc.inMemoryServiceRepository = inMemoryServiceRepository
+	uc.xdsBuilder = xdsBuilder
 }
 
 func (uc *snapshotsUseCase) UpdateSnapshot(ctx context.Context, req *models.UpdateSnapshotRequest) (*models.UpdateSnapshotResponse, error) {
@@ -92,7 +92,7 @@ func (uc *snapshotsUseCase) GetSnapshotStatus(ctx context.Context, req *models.G
 }
 
 func (uc *snapshotsUseCase) rebuildSnapshot(ctx context.Context, envName string, env *models.Environment) error {
-	xdsSnapshot := snapshot.BuildEnvoySnapshot(env, uc.inMemoryServiceRepository)
+	xdsSnapshot := snapshot.BuildEnvoySnapshot(uc.xdsBuilder, env)
 	nodeID := fmt.Sprintf("envoy-%s", envName)
 
 	if err := uc.xdsSnapshotManager.UpdateSnapshot(nodeID, xdsSnapshot); err != nil {

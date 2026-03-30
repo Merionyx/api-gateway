@@ -11,10 +11,9 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"merionyx/api-gateway/control-plane/internal/domain/models"
-	"merionyx/api-gateway/control-plane/internal/repository/memory"
 )
 
-func BuildClusters(env *models.Environment, serviceRepo *memory.ServiceRepository) []*clusterv3.Cluster {
+func (b *XDSBuilder) BuildClusters(env *models.Environment) []*clusterv3.Cluster {
 	clusters := make([]*clusterv3.Cluster, 0)
 	uniqueServices := make(map[string]string)
 	// 1. Добавляем сервисы из environment
@@ -22,8 +21,8 @@ func BuildClusters(env *models.Environment, serviceRepo *memory.ServiceRepositor
 		uniqueServices[service.Name] = service.Upstream
 	}
 	// 2. Добавляем глобальные сервисы
-	if serviceRepo != nil {
-		globalServices, err := serviceRepo.ListServices()
+	if b.inMemoryServiceRepository != nil {
+		globalServices, err := b.inMemoryServiceRepository.ListServices()
 		if err == nil {
 			for _, service := range globalServices {
 				// Environment-specific services override global ones

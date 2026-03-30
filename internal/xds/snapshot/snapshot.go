@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"merionyx/api-gateway/control-plane/internal/domain/models"
-	"merionyx/api-gateway/control-plane/internal/repository/memory"
 	"merionyx/api-gateway/control-plane/internal/xds/builder"
 	"time"
 
@@ -13,11 +12,11 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/resource/v3"
 )
 
-func BuildEnvoySnapshot(env *models.Environment, serviceRepo *memory.ServiceRepository) *cache.Snapshot {
+func BuildEnvoySnapshot(xdsBuilder *builder.XDSBuilder, env *models.Environment) *cache.Snapshot {
 	version := fmt.Sprintf("v%d", time.Now().Unix())
 
 	listeners := builder.BuildListeners(env)
-	clusters := builder.BuildClusters(env, serviceRepo)
+	clusters := xdsBuilder.BuildClusters(env)
 	routes := builder.BuildRoutes(env)
 	endpoints := builder.BuildEndpoints(env)
 
