@@ -38,3 +38,5 @@ services:
             - default
         depends_on:
             - etcd
+        volumes:
+          - /Users/mikhailminaev/SoftwareDevelopment/02_Projects/01_Personal/api-gateway-schemas-local:/app/local-dir

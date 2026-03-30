@@ -37,10 +37,13 @@ type ServerConfig struct {
 }
 
 type RepositoryConfig struct {
-	Name string     `mapstructure:"name" validate:"required" json:"name"`
-	URL  string     `mapstructure:"url" validate:"required" json:"url"`
-	Auth AuthConfig `mapstructure:"auth" json:"auth"`
+	Name   string     `mapstructure:"name" validate:"required" json:"name"`
+	Source string     `mapstructure:"source" validate:"required" json:"source"` // "git", "local-git", "local-dir"
+	URL    string     `mapstructure:"url" json:"url"`                           // для source: git
+	Path   string     `mapstructure:"path" json:"path"`                         // для source: local-git, local-dir
+	Auth   AuthConfig `mapstructure:"auth" json:"auth"`
 }
+
 type AuthConfig struct {
 	Type       string `mapstructure:"type" json:"type"` // "ssh", "token", "none"
 	SSHKeyPath string `mapstructure:"ssh_key_path" json:"ssh_key_path"`
@@ -122,34 +125,59 @@ func LoadConfig(configFile ...string) (*Config, error) {
 
 	// Check if all repositories are valid
 	for _, repository := range config.Repositories {
-		if repository.Auth.Type == "ssh" {
-			if repository.Auth.SSHKeyPath == "" && repository.Auth.SSHKeyEnv == "" {
-				return nil, fmt.Errorf("ssh_key_path or ssh_key_env is required for ssh authentication")
+		switch repository.Source {
+		case "git":
+			if repository.URL == "" {
+				return nil, fmt.Errorf("url is required for git repository")
 			}
 
-			// Check if the ssh key path is valid
-			if repository.Auth.SSHKeyPath != "" {
-				if _, err := os.Stat(repository.Auth.SSHKeyPath); err != nil {
-					return nil, fmt.Errorf("ssh_key_path is not valid: %v", err)
+			if repository.Auth.Type == "ssh" {
+				if repository.Auth.SSHKeyPath == "" && repository.Auth.SSHKeyEnv == "" {
+					return nil, fmt.Errorf("ssh_key_path or ssh_key_env is required for ssh authentication")
 				}
-			} else if repository.Auth.SSHKeyEnv != "" {
-				if os.Getenv(repository.Auth.SSHKeyEnv) == "" {
-					return nil, fmt.Errorf("ssh_key_env is not set: %s", repository.Auth.SSHKeyEnv)
+
+				// Check if the ssh key path is valid
+				if repository.Auth.SSHKeyPath != "" {
+					if _, err := os.Stat(repository.Auth.SSHKeyPath); err != nil {
+						return nil, fmt.Errorf("ssh_key_path is not valid: %v", err)
+					}
+				} else if repository.Auth.SSHKeyEnv != "" {
+					if os.Getenv(repository.Auth.SSHKeyEnv) == "" {
+						return nil, fmt.Errorf("ssh_key_env is not set: %s", repository.Auth.SSHKeyEnv)
+					}
+				} else {
+					return nil, fmt.Errorf("ssh_key_path or ssh_key_env is required for ssh authentication")
 				}
-			} else {
-				return nil, fmt.Errorf("ssh_key_path or ssh_key_env is required for ssh authentication")
-			}
-		}
-
-		if repository.Auth.Type == "token" {
-			if repository.Auth.TokenEnv == "" {
-				return nil, fmt.Errorf("token_env is required for token authentication")
 			}
 
-			// Check if the token env is valid
-			if os.Getenv(repository.Auth.TokenEnv) == "" {
-				return nil, fmt.Errorf("token_env is not set: %s", repository.Auth.TokenEnv)
+			if repository.Auth.Type == "token" {
+				if repository.Auth.TokenEnv == "" {
+					return nil, fmt.Errorf("token_env is required for token authentication")
+				}
+
+				// Check if the token env is valid
+				if os.Getenv(repository.Auth.TokenEnv) == "" {
+					return nil, fmt.Errorf("token_env is not set: %s", repository.Auth.TokenEnv)
+				}
 			}
+		case "local-git":
+			if repository.Path == "" {
+				return nil, fmt.Errorf("path is required for local-git repository")
+			}
+
+			if _, err := os.Stat(repository.Path); err != nil {
+				return nil, fmt.Errorf("path is not valid: %v", err)
+			}
+		case "local-dir":
+			if repository.Path == "" {
+				return nil, fmt.Errorf("path is required for local-dir repository")
+			}
+
+			if _, err := os.Stat(repository.Path); err != nil {
+				return nil, fmt.Errorf("path is not valid: %v", err)
+			}
+		default:
+			return nil, fmt.Errorf("unsupported source %s for repository", repository.Source)
 		}
 	}
 

@@ -22,8 +22,11 @@ import (
 )
 
 type ManagedRepo struct {
-	Repo *git.Repository
-	Auth transport.AuthMethod
+	Name   string
+	Repo   *git.Repository
+	Auth   transport.AuthMethod
+	Source string
+	Path   string
 }
 
 type RepositoryManager struct {
@@ -46,43 +49,75 @@ func (rm *RepositoryManager) InitializeRepositories(repos []config.RepositoryCon
 	for _, repository := range repos {
 		slog.Info("Initializing repository", "name", repository.Name, "url", repository.URL, "auth", repository.Auth)
 
-		var auth transport.AuthMethod
-		var err error
+		switch repository.Source {
+		case "git":
+			var auth transport.AuthMethod
+			var err error
 
-		// Setup authentication depending on the type
-		switch repository.Auth.Type {
-		case "ssh":
-			auth, err = setupSSHAuth(repository.Auth)
-			if err != nil {
-				return fmt.Errorf("failed to setup SSH auth for repository %s: %w", repository.Name, err)
+			// Setup authentication depending on the type
+			switch repository.Auth.Type {
+			case "ssh":
+				auth, err = setupSSHAuth(repository.Auth)
+				if err != nil {
+					return fmt.Errorf("failed to setup SSH auth for repository %s: %w", repository.Name, err)
+				}
+			case "token":
+				auth, err = setupTokenAuth(repository.Auth)
+				if err != nil {
+					return fmt.Errorf("failed to setup token auth for repository %s: %w", repository.Name, err)
+				}
+			case "none", "":
+				auth = nil
+			default:
+				return fmt.Errorf("unsupported auth type %s for repository %s", repository.Auth.Type, repository.Name)
 			}
-		case "token":
-			auth, err = setupTokenAuth(repository.Auth)
+
+			// Clone repository
+			repo, err := git.Clone(memory.NewStorage(), memfs.New(), &git.CloneOptions{
+				URL:  repository.URL,
+				Auth: auth,
+			})
+
 			if err != nil {
-				return fmt.Errorf("failed to setup token auth for repository %s: %w", repository.Name, err)
+				return fmt.Errorf("failed to clone repository %s: %w", repository.Name, err)
 			}
-		case "none", "":
-			auth = nil
-		default:
-			return fmt.Errorf("unsupported auth type %s for repository %s", repository.Auth.Type, repository.Name)
+
+			rm.repos[repository.Name] = &ManagedRepo{
+				Name:   repository.Name,
+				Repo:   repo,
+				Auth:   auth,
+				Source: repository.Source,
+				Path:   repository.Path,
+			}
+
+			slog.Info("Successfully cloned repository", "name", repository.Name)
+		case "local-git":
+			repo, err := git.PlainOpen(repository.Path)
+			if err != nil {
+				return fmt.Errorf("failed to open local git repository %s: %w", repository.Name, err)
+			}
+
+			rm.repos[repository.Name] = &ManagedRepo{
+				Name:   repository.Name,
+				Repo:   repo,
+				Auth:   nil,
+				Source: repository.Source,
+				Path:   repository.Path,
+			}
+
+			slog.Info("Successfully opened local git repository", "name", repository.Name)
+
+		case "local-dir":
+			rm.repos[repository.Name] = &ManagedRepo{
+				Name:   repository.Name,
+				Repo:   nil,
+				Auth:   nil,
+				Source: repository.Source,
+				Path:   repository.Path,
+			}
+
+			slog.Info("Successfully opened local directory", "name", repository.Name)
 		}
-
-		// Clone repository
-		repo, err := git.Clone(memory.NewStorage(), memfs.New(), &git.CloneOptions{
-			URL:  repository.URL,
-			Auth: auth,
-		})
-
-		if err != nil {
-			return fmt.Errorf("failed to clone repository %s: %w", repository.Name, err)
-		}
-
-		rm.repos[repository.Name] = &ManagedRepo{
-			Repo: repo,
-			Auth: auth,
-		}
-
-		slog.Info("Successfully cloned repository", "name", repository.Name)
 	}
 
 	return nil
@@ -147,17 +182,33 @@ type XApiGatewaySchema struct {
 }
 
 func (rm *RepositoryManager) GetRepositorySnapshots(name string, ref string, path string) ([]ContractSnapshot, error) {
+	rm.mu.RLock()
+	managedRepo := rm.repos[name]
+	rm.mu.RUnlock()
+
+	log.Println("Getting repository snapshots for", name, ref, path)
+
+	switch managedRepo.Source {
+	case "local-dir":
+		return rm.getSnapshotsFromLocalDir(managedRepo.Path, path)
+	case "local-git":
+		return rm.getSnapshotsFromLocalGit(managedRepo, ref, path)
+	case "git":
+		return rm.getSnapshotsFromRemoteGit(managedRepo, ref, path)
+	}
+	return nil, fmt.Errorf("unsupported repository source %s", managedRepo.Source)
+}
+
+func (rm *RepositoryManager) getSnapshotsFromLocalGit(managedRepo *ManagedRepo, ref string, path string) ([]ContractSnapshot, error) {
 	if path == "" {
 		path = "."
 	}
 
-	repo, err := rm.GetRepository(name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get repository %s: %w", name, err)
-	}
+	repo := managedRepo.Repo
+
 	w, err := repo.Worktree()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get worktree for repository %s: %w", name, err)
+		return nil, fmt.Errorf("failed to get worktree for repository %s: %w", managedRepo.Path, err)
 	}
 
 	var checkoutOptions *git.CheckoutOptions
@@ -178,12 +229,118 @@ func (rm *RepositoryManager) GetRepositorySnapshots(name string, ref string, pat
 
 	err = w.Checkout(checkoutOptions)
 	if err != nil {
-		return nil, fmt.Errorf("failed to checkout repository %s: %w", name, err)
+		return nil, fmt.Errorf("failed to checkout repository %s: %w", managedRepo.Name, err)
 	}
 
-	auth, err := rm.getAuth(name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get auth for repository %s: %w", name, err)
+		if err != git.NoErrAlreadyUpToDate {
+			return nil, fmt.Errorf("failed to pull repository %s: %w", managedRepo.Name, err)
+		}
+		log.Println("Repository", managedRepo.Name, "is already up to date")
+	}
+
+	log.Println("Pulled repository", managedRepo.Name)
+
+	var files []RepositoryFile
+
+	err = util.Walk(w.Filesystem, path, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Filter out files without .yaml, .json, .yml extension
+		if !strings.HasSuffix(path, ".yaml") && !strings.HasSuffix(path, ".json") && !strings.HasSuffix(path, ".yml") {
+			return nil
+		}
+
+		if !info.IsDir() {
+			file, err := w.Filesystem.Open(path)
+			if err != nil {
+				return fmt.Errorf("failed to open file %s: %w", path, err)
+			}
+			defer file.Close()
+
+			content, err := io.ReadAll(file)
+			if err != nil {
+				return fmt.Errorf("failed to read file %s: %w", path, err)
+			}
+
+			files = append(files, RepositoryFile{
+				Path:    path,
+				Content: content,
+			})
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to walk directory for repository %s: %w", managedRepo.Name, err)
+	}
+
+	var snapshots []ContractSnapshot
+
+	for _, file := range files {
+		contractSchema, err := parseContractSchema(file.Path, file.Content)
+		if err != nil {
+			log.Fatalf("Failed to parse x-api-gateway: %v", err)
+		}
+		log.Println("ContractSchema:", contractSchema)
+
+		if contractSchema.XApiGateway == (XApiGatewaySchema{}) {
+			log.Println("ContractSchema is empty", file.Path)
+			continue
+		}
+
+		upstream := ContractUpstream{
+			Name: contractSchema.XApiGateway.Service.Name,
+		}
+
+		snapshots = append(snapshots, ContractSnapshot{
+			Name:                  contractSchema.XApiGateway.Contract.Name,
+			Prefix:                contractSchema.XApiGateway.Prefix,
+			Upstream:              upstream,
+			AllowUndefinedMethods: contractSchema.XApiGateway.AllowUndefinedMethods,
+		})
+	}
+	return snapshots, nil
+}
+
+func (rm *RepositoryManager) getSnapshotsFromRemoteGit(managedRepo *ManagedRepo, ref string, path string) ([]ContractSnapshot, error) {
+	if path == "" {
+		path = "."
+	}
+
+	repo := managedRepo.Repo
+
+	w, err := repo.Worktree()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get worktree for repository %s: %w", managedRepo.Path, err)
+	}
+
+	var checkoutOptions *git.CheckoutOptions
+
+	if isCommitHash(ref) {
+		hash, success := plumbing.FromHex(ref)
+		if !success {
+			return nil, fmt.Errorf("failed to convert hex to hash")
+		}
+		checkoutOptions = &git.CheckoutOptions{
+			Hash: hash,
+		}
+	} else {
+		checkoutOptions = &git.CheckoutOptions{
+			Branch: plumbing.ReferenceName("refs/" + ref),
+		}
+	}
+
+	err = w.Checkout(checkoutOptions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to checkout repository %s: %w", managedRepo.Name, err)
+	}
+
+	auth, err := rm.getAuth(managedRepo.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get auth for repository %s: %w", managedRepo.Name, err)
 	}
 
 	err = w.Pull(&git.PullOptions{
@@ -193,12 +350,12 @@ func (rm *RepositoryManager) GetRepositorySnapshots(name string, ref string, pat
 
 	if err != nil {
 		if err != git.NoErrAlreadyUpToDate {
-			return nil, fmt.Errorf("failed to pull repository %s: %w", name, err)
+			return nil, fmt.Errorf("failed to pull repository %s: %w", managedRepo.Name, err)
 		}
-		log.Println("Repository", name, "is already up to date")
+		log.Println("Repository", managedRepo.Name, "is already up to date")
 	}
 
-	log.Println("Pulled repository", name)
+	log.Println("Pulled repository", managedRepo.Name)
 
 	var files []RepositoryFile
 
@@ -241,6 +398,11 @@ func (rm *RepositoryManager) GetRepositorySnapshots(name string, ref string, pat
 		}
 		log.Println("ContractSchema:", contractSchema)
 
+		if contractSchema.XApiGateway == (XApiGatewaySchema{}) {
+			log.Println("ContractSchema is empty", file.Path)
+			continue
+		}
+
 		upstream := ContractUpstream{
 			Name: contractSchema.XApiGateway.Service.Name,
 		}
@@ -254,8 +416,63 @@ func (rm *RepositoryManager) GetRepositorySnapshots(name string, ref string, pat
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to walk directory for repository %s: %w", name, err)
+		return nil, fmt.Errorf("failed to walk directory for repository %s: %w", managedRepo.Name, err)
 	}
+	return snapshots, nil
+}
+
+func (rm *RepositoryManager) getSnapshotsFromLocalDir(basePath, subPath string) ([]ContractSnapshot, error) {
+	fullPath := filepath.Join(basePath, subPath)
+	var files []RepositoryFile
+
+	err := filepath.Walk(fullPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !info.IsDir() && isSchemaFile(path) {
+			content, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			files = append(files, RepositoryFile{
+				Path:    path,
+				Content: content,
+			})
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to walk directory for repository %s: %w", basePath, err)
+	}
+
+	var snapshots []ContractSnapshot
+
+	for _, file := range files {
+		contractSchema, err := parseContractSchema(file.Path, file.Content)
+		if err != nil {
+			log.Fatalf("Failed to parse x-api-gateway: %v", err)
+		}
+		log.Println("ContractSchema:", contractSchema)
+
+		if contractSchema.XApiGateway == (XApiGatewaySchema{}) {
+			log.Println("ContractSchema is empty", file.Path)
+			continue
+		}
+
+		upstream := ContractUpstream{
+			Name: contractSchema.XApiGateway.Service.Name,
+		}
+
+		snapshots = append(snapshots, ContractSnapshot{
+			Name:                  contractSchema.XApiGateway.Contract.Name,
+			Prefix:                contractSchema.XApiGateway.Prefix,
+			Upstream:              upstream,
+			AllowUndefinedMethods: contractSchema.XApiGateway.AllowUndefinedMethods,
+		})
+	}
+
 	return snapshots, nil
 }
 
@@ -290,4 +507,8 @@ func parseYAML(content []byte) (*ContractSchema, error) {
 
 func isCommitHash(ref string) bool {
 	return len(ref) == 40
+}
+
+func isSchemaFile(path string) bool {
+	return strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".json") || strings.HasSuffix(path, ".yml")
 }
