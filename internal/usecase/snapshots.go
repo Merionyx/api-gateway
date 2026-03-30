@@ -7,7 +7,6 @@ import (
 
 	"merionyx/api-gateway/control-plane/internal/domain/interfaces"
 	"merionyx/api-gateway/control-plane/internal/domain/models"
-	"merionyx/api-gateway/control-plane/internal/xds/builder"
 	"merionyx/api-gateway/control-plane/internal/xds/cache"
 	"merionyx/api-gateway/control-plane/internal/xds/snapshot"
 
@@ -17,14 +16,14 @@ import (
 type snapshotsUseCase struct {
 	environmentUseCase interfaces.EnvironmentsUseCase
 	xdsSnapshotManager *cache.SnapshotManager
-	xdsBuilder         *builder.XDSBuilder
+	xdsBuilder         interfaces.XDSBuilder
 }
 
 func NewSnapshotsUseCase() interfaces.SnapshotsUseCase {
 	return &snapshotsUseCase{}
 }
 
-func (uc *snapshotsUseCase) SetDependencies(environmentUseCase interfaces.EnvironmentsUseCase, xdsSnapshotManager *cache.SnapshotManager, xdsBuilder *builder.XDSBuilder) {
+func (uc *snapshotsUseCase) SetDependencies(environmentUseCase interfaces.EnvironmentsUseCase, xdsSnapshotManager *cache.SnapshotManager, xdsBuilder interfaces.XDSBuilder) {
 	uc.environmentUseCase = environmentUseCase
 	uc.xdsSnapshotManager = xdsSnapshotManager
 	uc.xdsBuilder = xdsBuilder

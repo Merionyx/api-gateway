@@ -13,7 +13,7 @@ import (
 	"merionyx/api-gateway/control-plane/internal/domain/models"
 )
 
-func (b *XDSBuilder) BuildClusters(env *models.Environment) []*clusterv3.Cluster {
+func (b *xdsBuilder) BuildClusters(env *models.Environment) []*clusterv3.Cluster {
 	clusters := make([]*clusterv3.Cluster, 0)
 	uniqueServices := make(map[string]string)
 	// 1. Добавляем сервисы из environment

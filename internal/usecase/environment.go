@@ -9,7 +9,6 @@ import (
 	"merionyx/api-gateway/control-plane/internal/domain/models"
 	"merionyx/api-gateway/control-plane/internal/repository/git"
 	"merionyx/api-gateway/control-plane/internal/utils"
-	"merionyx/api-gateway/control-plane/internal/xds/builder"
 	xdscache "merionyx/api-gateway/control-plane/internal/xds/cache"
 	"merionyx/api-gateway/control-plane/internal/xds/snapshot"
 )
@@ -18,14 +17,14 @@ type environmentsUseCase struct {
 	environmentRepo    interfaces.EnvironmentRepository
 	schamasUseCase     interfaces.SchemasUseCase
 	xdsSnapshotManager *xdscache.SnapshotManager
-	xdsBuilder         *builder.XDSBuilder
+	xdsBuilder         interfaces.XDSBuilder
 }
 
 func NewEnvironmentsUseCase() interfaces.EnvironmentsUseCase {
 	return &environmentsUseCase{}
 }
 
-func (uc *environmentsUseCase) SetDependencies(environmentRepo interfaces.EnvironmentRepository, schamasUseCase interfaces.SchemasUseCase, xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder *builder.XDSBuilder) {
+func (uc *environmentsUseCase) SetDependencies(environmentRepo interfaces.EnvironmentRepository, schamasUseCase interfaces.SchemasUseCase, xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder interfaces.XDSBuilder) {
 	uc.environmentRepo = environmentRepo
 	uc.schamasUseCase = schamasUseCase
 	uc.xdsSnapshotManager = xdsSnapshotManager

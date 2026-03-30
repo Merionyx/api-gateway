@@ -14,7 +14,7 @@ import (
 	"merionyx/api-gateway/control-plane/internal/domain/models"
 )
 
-func (b *XDSBuilder) BuildListeners(env *models.Environment) []*listenerv3.Listener {
+func (b *xdsBuilder) BuildListeners(env *models.Environment) []*listenerv3.Listener {
 	listener := buildHTTPListener(env)
 	return []*listenerv3.Listener{listener}
 }

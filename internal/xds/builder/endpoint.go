@@ -8,7 +8,7 @@ import (
 	"merionyx/api-gateway/control-plane/internal/domain/models"
 )
 
-func (b *XDSBuilder) BuildEndpoints(env *models.Environment) []*endpointv3.ClusterLoadAssignment {
+func (b *xdsBuilder) BuildEndpoints(env *models.Environment) []*endpointv3.ClusterLoadAssignment {
 	endpoints := make([]*endpointv3.ClusterLoadAssignment, 0)
 
 	for _, service := range env.Services.Static {

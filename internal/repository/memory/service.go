@@ -3,6 +3,7 @@ package memory
 import (
 	"fmt"
 	"merionyx/api-gateway/control-plane/internal/config"
+	"merionyx/api-gateway/control-plane/internal/domain/interfaces"
 	"merionyx/api-gateway/control-plane/internal/domain/models"
 )
 
@@ -10,7 +11,7 @@ type ServiceRepository struct {
 	services map[string]models.StaticServiceConfig
 }
 
-func NewServiceRepository() *ServiceRepository {
+func NewServiceRepository() interfaces.InMemoryServiceRepository {
 	return &ServiceRepository{
 		services: make(map[string]models.StaticServiceConfig),
 	}

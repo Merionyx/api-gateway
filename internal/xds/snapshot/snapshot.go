@@ -3,8 +3,8 @@ package snapshot
 import (
 	"fmt"
 	"log"
+	"merionyx/api-gateway/control-plane/internal/domain/interfaces"
 	"merionyx/api-gateway/control-plane/internal/domain/models"
-	"merionyx/api-gateway/control-plane/internal/xds/builder"
 	"time"
 
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
@@ -12,7 +12,7 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/resource/v3"
 )
 
-func BuildEnvoySnapshot(xdsBuilder *builder.XDSBuilder, env *models.Environment) *cache.Snapshot {
+func BuildEnvoySnapshot(xdsBuilder interfaces.XDSBuilder, env *models.Environment) *cache.Snapshot {
 	version := fmt.Sprintf("v%d", time.Now().Unix())
 
 	listeners := xdsBuilder.BuildListeners(env)

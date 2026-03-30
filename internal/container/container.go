@@ -2,7 +2,6 @@ package container
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"strconv"
 	"time"
@@ -11,7 +10,6 @@ import (
 	"merionyx/api-gateway/control-plane/internal/delivery/grpc/handler"
 	"merionyx/api-gateway/control-plane/internal/delivery/http/router"
 	"merionyx/api-gateway/control-plane/internal/domain/interfaces"
-	"merionyx/api-gateway/control-plane/internal/domain/models"
 	"merionyx/api-gateway/control-plane/internal/repository/etcd"
 	"merionyx/api-gateway/control-plane/internal/repository/git"
 	"merionyx/api-gateway/control-plane/internal/repository/memory"
@@ -20,7 +18,6 @@ import (
 	"merionyx/api-gateway/control-plane/internal/xds/builder"
 	xdscache "merionyx/api-gateway/control-plane/internal/xds/cache"
 	xdsserver "merionyx/api-gateway/control-plane/internal/xds/server"
-	"merionyx/api-gateway/control-plane/internal/xds/snapshot"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
@@ -41,10 +38,11 @@ type Container struct {
 	EnvironmentRepository interfaces.EnvironmentRepository
 
 	// In-memory repositories
-	InMemoryServiceRepository *memory.ServiceRepository
+	InMemoryServiceRepository      interfaces.InMemoryServiceRepository
+	InMemoryEnvironmentsRepository interfaces.InMemoryEnvironmentsRepository
 
 	// xDS Builder
-	XDSBuilder *builder.XDSBuilder
+	XDSBuilder interfaces.XDSBuilder
 
 	// Use Cases
 	SnapshotsUseCase    interfaces.SnapshotsUseCase
@@ -57,9 +55,6 @@ type Container struct {
 	SnapshotGRPCHandler     *handler.SnapshotHandler
 	EnvironmentsGRPCHandler *handler.EnvironmentsHandler
 	SchemasGRPCHandler      *handler.SchemasHandler
-
-	// Playground
-	Environments map[string]*models.Environment
 
 	// Router
 	Router *router.Router
@@ -78,7 +73,7 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 	container.initEtcd()
 	container.initXDS()
 
-	container.initInMemoryRepositories()
+	container.createInMemoryServiceRepository()
 	container.initRepositories()
 	container.initGitRepositoryManager()
 
@@ -89,7 +84,7 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 	container.initRouter()
 	container.startWatchers()
 
-	container.playgroundInit()
+	container.initInMemoryRepositories()
 
 	// container.startEtcdWatcher()
 
@@ -113,10 +108,20 @@ func (c *Container) initEtcd() {
 	log.Println("etcd client initialized and connected successfully")
 }
 
-func (c *Container) initInMemoryRepositories() {
+func (c *Container) createInMemoryServiceRepository() {
 	c.InMemoryServiceRepository = memory.NewServiceRepository()
+	c.InMemoryEnvironmentsRepository = memory.NewEnvironmentsRepository()
+}
+
+func (c *Container) initInMemoryRepositories() {
+	c.InMemoryEnvironmentsRepository.SetDependencies(c.XDSSnapshotManager, c.XDSBuilder, c.GitRepositoryManager)
+
 	if err := c.InMemoryServiceRepository.Initialize(c.Config); err != nil {
 		log.Fatalf("Failed to initialize service repository: %v", err)
+	}
+
+	if err := c.InMemoryEnvironmentsRepository.Initialize(c.Config); err != nil {
+		log.Fatalf("Failed to initialize environments repository: %v", err)
 	}
 
 	log.Println("In-memory repositories initialized")
@@ -196,79 +201,6 @@ func (c *Container) initXDS() {
 // startWatchers starts watchers for watching changes of environments and schemas
 func (c *Container) startWatchers() {
 	go c.EnvironmentsUseCase.WatchSnapshotsUpdates(context.Background())
-}
-
-func (c *Container) playgroundInit() {
-
-	c.Environments = make(map[string]*models.Environment)
-
-	// Initialize environments from config
-	for _, configEnv := range c.Config.Environments {
-		env := &models.Environment{
-			Name: configEnv.Name,
-			Type: "static",
-			Bundles: &models.EnvironmentBundleConfig{
-				Static: make([]models.StaticContractBundleConfig, 0),
-			},
-			Services: &models.EnvironmentServiceConfig{
-				Static: make([]models.StaticServiceConfig, 0),
-			},
-			Snapshots: make([]git.ContractSnapshot, 0),
-		}
-		c.Environments[configEnv.Name] = env
-	}
-
-	// Initialize contracts from config
-	for _, environment := range c.Config.Environments {
-		for _, bundle := range environment.Bundles.Static {
-			c.Environments[environment.Name].Bundles.Static = append(c.Environments[environment.Name].Bundles.Static, models.StaticContractBundleConfig{
-				Name:       bundle.Name,
-				Repository: bundle.Repository,
-				Ref:        bundle.Ref,
-				Path:       bundle.Path,
-			})
-		}
-	}
-
-	// Initialize services from config
-	for _, environment := range c.Config.Environments {
-		for _, service := range environment.Services.Static {
-			c.Environments[environment.Name].Services.Static = append(c.Environments[environment.Name].Services.Static, models.StaticServiceConfig{
-				Name:     service.Name,
-				Upstream: service.Upstream,
-			})
-		}
-	}
-
-	for _, environment := range c.Environments {
-		for _, bundle := range environment.Bundles.Static {
-			snapshots, err := c.GitRepositoryManager.GetRepositorySnapshots(bundle.Repository, bundle.Ref, bundle.Path)
-			if err != nil {
-				log.Fatalf("Failed to get repository snapshots: %v", err)
-			}
-			for _, snapshot := range snapshots {
-				environment.Snapshots = append(environment.Snapshots, snapshot)
-			}
-		}
-	}
-
-	for _, environment := range c.Environments {
-		log.Println("Environment:", environment.Name)
-		log.Println("Bundles:", environment.Bundles.Static)
-		log.Println("Services:", environment.Services.Static)
-		log.Println("Snapshots:", environment.Snapshots)
-	}
-
-	for envName, env := range c.Environments {
-		snapshot := snapshot.BuildEnvoySnapshot(c.XDSBuilder, env)
-		nodeID := fmt.Sprintf("envoy-%s", envName)
-
-		if err := c.XDSSnapshotManager.UpdateSnapshot(nodeID, snapshot); err != nil {
-			log.Fatalf("Failed to update snapshot for %s: %v", nodeID, err)
-		}
-
-		log.Printf("Created xDS snapshot for environment: %s (nodeID: %s)", envName, nodeID)
-	}
 }
 
 // Close closes all resources in the container

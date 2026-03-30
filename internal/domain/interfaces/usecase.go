@@ -6,7 +6,6 @@ import (
 	"merionyx/api-gateway/control-plane/internal/domain/models"
 	"merionyx/api-gateway/control-plane/internal/repository/git"
 
-	"merionyx/api-gateway/control-plane/internal/xds/builder"
 	xdscache "merionyx/api-gateway/control-plane/internal/xds/cache"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -14,7 +13,7 @@ import (
 
 // SnapshotsUseCase interface for xDS snapshots business logic
 type SnapshotsUseCase interface {
-	SetDependencies(environmentUseCase EnvironmentsUseCase, xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder *builder.XDSBuilder)
+	SetDependencies(environmentUseCase EnvironmentsUseCase, xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder XDSBuilder)
 
 	UpdateSnapshot(ctx context.Context, req *models.UpdateSnapshotRequest) (*models.UpdateSnapshotResponse, error)
 	GetSnapshotStatus(ctx context.Context, req *models.GetSnapshotStatusRequest) (*models.GetSnapshotStatusResponse, error)
@@ -22,7 +21,7 @@ type SnapshotsUseCase interface {
 
 // EnvironmentsUseCase interface for environments business logic
 type EnvironmentsUseCase interface {
-	SetDependencies(environmentRepo EnvironmentRepository, schamasUseCase SchemasUseCase, xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder *builder.XDSBuilder)
+	SetDependencies(environmentRepo EnvironmentRepository, schamasUseCase SchemasUseCase, xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder XDSBuilder)
 
 	CreateEnvironment(ctx context.Context, req *models.CreateEnvironmentRequest) (*models.Environment, error)
 	GetEnvironment(ctx context.Context, name string) (*models.Environment, error)

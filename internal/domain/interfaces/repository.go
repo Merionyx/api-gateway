@@ -3,8 +3,10 @@ package interfaces
 import (
 	"context"
 
+	"merionyx/api-gateway/control-plane/internal/config"
 	"merionyx/api-gateway/control-plane/internal/domain/models"
 	"merionyx/api-gateway/control-plane/internal/repository/git"
+	xdscache "merionyx/api-gateway/control-plane/internal/xds/cache"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
@@ -40,4 +42,15 @@ type EnvironmentRepository interface {
 
 	// Watch changes
 	WatchEnvironments(ctx context.Context) clientv3.WatchChan
+}
+
+type InMemoryServiceRepository interface {
+	Initialize(config *config.Config) error
+	GetService(name string) (*models.StaticServiceConfig, error)
+	ListServices() ([]models.StaticServiceConfig, error)
+}
+
+type InMemoryEnvironmentsRepository interface {
+	SetDependencies(xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder XDSBuilder, gitRepositoryManager *git.RepositoryManager)
+	Initialize(config *config.Config) error
 }

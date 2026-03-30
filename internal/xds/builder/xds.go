@@ -1,13 +1,13 @@
 package builder
 
-import "merionyx/api-gateway/control-plane/internal/repository/memory"
+import "merionyx/api-gateway/control-plane/internal/domain/interfaces"
 
-type XDSBuilder struct {
-	inMemoryServiceRepository *memory.ServiceRepository
+type xdsBuilder struct {
+	inMemoryServiceRepository interfaces.InMemoryServiceRepository
 }
 
-func NewXDSBuilder(inMemoryServiceRepository *memory.ServiceRepository) *XDSBuilder {
-	return &XDSBuilder{
+func NewXDSBuilder(inMemoryServiceRepository interfaces.InMemoryServiceRepository) interfaces.XDSBuilder {
+	return &xdsBuilder{
 		inMemoryServiceRepository: inMemoryServiceRepository,
 	}
 }
