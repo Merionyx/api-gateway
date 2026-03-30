@@ -72,9 +72,6 @@ func (uc *environmentsUseCase) GetEnvironment(ctx context.Context, name string) 
 		}
 		env.Snapshots = append(env.Snapshots, snapshots...)
 	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to get environment snapshots: %w", err)
-	}
 
 	return env, nil
 }
@@ -91,9 +88,6 @@ func (uc *environmentsUseCase) ListEnvironments(ctx context.Context) (map[string
 				return nil, fmt.Errorf("failed to get environment snapshots: %w", err)
 			}
 			environment.Snapshots = append(environment.Snapshots, snapshots...)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to get environment snapshots: %w", err)
 		}
 		environments[environment.Name] = environment
 	}
