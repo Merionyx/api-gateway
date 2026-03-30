@@ -53,7 +53,6 @@ func (h *SnapshotHandler) GetSnapshotStatus(ctx context.Context, req *snapshotsv
 	return &snapshotsv1.GetSnapshotStatusResponse{
 		Environment:    response.Environment,
 		Version:        response.Version,
-		LastUpdated:    response.LastUpdated,
 		ContractsCount: response.ContractsCount,
 		ClustersCount:  response.ClustersCount,
 		RoutesCount:    response.RoutesCount,

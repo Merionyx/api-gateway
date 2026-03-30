@@ -47,7 +47,6 @@ type GetSnapshotStatusRequest struct {
 type GetSnapshotStatusResponse struct {
 	Environment    string
 	Version        string
-	LastUpdated    int64
 	ContractsCount int32
 	ClustersCount  int32
 	RoutesCount    int32

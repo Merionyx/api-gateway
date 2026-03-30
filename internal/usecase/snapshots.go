@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
 
 	"merionyx/api-gateway/control-plane/internal/domain/interfaces"
 	"merionyx/api-gateway/control-plane/internal/domain/models"
@@ -15,7 +14,7 @@ import (
 )
 
 type snapshotsUseCase struct {
-	environmentUseCase    interfaces.EnvironmentsUseCase
+	environmentUseCase interfaces.EnvironmentsUseCase
 	xdsSnapshotManager *cache.SnapshotManager
 }
 
@@ -83,7 +82,6 @@ func (uc *snapshotsUseCase) GetSnapshotStatus(ctx context.Context, req *models.G
 	return &models.GetSnapshotStatusResponse{
 		Environment:    req.Environment,
 		Version:        xdsSnapshot.GetVersion(xdsResource.ClusterType),
-		LastUpdated:    time.Now().Unix(), // TODO: store real update time
 		ContractsCount: int32(len(env.Snapshots)),
 		ClustersCount:  int32(clustersCount),
 		RoutesCount:    int32(routesCount),

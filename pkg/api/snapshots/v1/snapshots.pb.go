@@ -169,7 +169,6 @@ type GetSnapshotStatusResponse struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Environment    string                 `protobuf:"bytes,1,opt,name=environment,proto3" json:"environment,omitempty"`
 	Version        string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
-	LastUpdated    int64                  `protobuf:"varint,3,opt,name=last_updated,json=lastUpdated,proto3" json:"last_updated,omitempty"` // Unix timestamp
 	ContractsCount int32                  `protobuf:"varint,4,opt,name=contracts_count,json=contractsCount,proto3" json:"contracts_count,omitempty"`
 	ClustersCount  int32                  `protobuf:"varint,5,opt,name=clusters_count,json=clustersCount,proto3" json:"clusters_count,omitempty"`
 	RoutesCount    int32                  `protobuf:"varint,6,opt,name=routes_count,json=routesCount,proto3" json:"routes_count,omitempty"`
@@ -221,13 +220,6 @@ func (x *GetSnapshotStatusResponse) GetVersion() string {
 	return ""
 }
 
-func (x *GetSnapshotStatusResponse) GetLastUpdated() int64 {
-	if x != nil {
-		return x.LastUpdated
-	}
-	return 0
-}
-
 func (x *GetSnapshotStatusResponse) GetContractsCount() int32 {
 	if x != nil {
 		return x.ContractsCount
@@ -260,11 +252,10 @@ const file_api_proto_v1_snapshots_proto_rawDesc = "" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x121\n" +
 	"\x14updated_environments\x18\x02 \x03(\tR\x13updatedEnvironments\"<\n" +
 	"\x18GetSnapshotStatusRequest\x12 \n" +
-	"\venvironment\x18\x01 \x01(\tR\venvironment\"\xed\x01\n" +
+	"\venvironment\x18\x01 \x01(\tR\venvironment\"\xca\x01\n" +
 	"\x19GetSnapshotStatusResponse\x12 \n" +
 	"\venvironment\x18\x01 \x01(\tR\venvironment\x12\x18\n" +
-	"\aversion\x18\x02 \x01(\tR\aversion\x12!\n" +
-	"\flast_updated\x18\x03 \x01(\x03R\vlastUpdated\x12'\n" +
+	"\aversion\x18\x02 \x01(\tR\aversion\x12'\n" +
 	"\x0fcontracts_count\x18\x04 \x01(\x05R\x0econtractsCount\x12%\n" +
 	"\x0eclusters_count\x18\x05 \x01(\x05R\rclustersCount\x12!\n" +
 	"\froutes_count\x18\x06 \x01(\x05R\vroutesCount2\xe5\x01\n" +

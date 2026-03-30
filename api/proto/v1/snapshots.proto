@@ -24,7 +24,6 @@ message GetSnapshotStatusRequest {
 message GetSnapshotStatusResponse {
   string environment = 1;
   string version = 2;
-  int64 last_updated = 3; // Unix timestamp
   int32 contracts_count = 4;
   int32 clusters_count = 5;
   int32 routes_count = 6;
