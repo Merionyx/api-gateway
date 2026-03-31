@@ -182,6 +182,17 @@ type XApiGatewaySchema struct {
 	Service struct {
 		Name string `mapstructure:"name" json:"name" yaml:"name"`
 	} `mapstructure:"service" json:"service" yaml:"service"`
+	Access struct {
+		Secure bool `mapstructure:"secure" json:"secure" yaml:"secure" validate:"required"`
+		Apps   []struct {
+			AppID        string   `mapstructure:"app_id" json:"app_id" yaml:"app_id"`
+			Environments []string `mapstructure:"environments" json:"environments" yaml:"environments"`
+		} `mapstructure:"apps" json:"apps" yaml:"apps"`
+	} `mapstructure:"access" json:"access" yaml:"access"`
+}
+
+func isXApiGatewayEmpty(x XApiGatewaySchema) bool {
+	return x.Prefix == "" && x.Contract.Name == "" && x.Service.Name == ""
 }
 
 func (rm *RepositoryManager) GetRepositorySnapshots(name string, ref string, path string) ([]ContractSnapshot, error) {
@@ -295,7 +306,7 @@ func (rm *RepositoryManager) getSnapshotsFromGit(managedRepo *ManagedRepo, ref s
 		}
 		log.Println("ContractSchema:", contractSchema)
 
-		if contractSchema.XApiGateway == (XApiGatewaySchema{}) {
+		if isXApiGatewayEmpty(contractSchema.XApiGateway) {
 			log.Println("ContractSchema is empty", file.Path)
 			continue
 		}
@@ -353,7 +364,7 @@ func (rm *RepositoryManager) getSnapshotsFromLocalDir(basePath, subPath string) 
 		}
 		log.Println("ContractSchema:", contractSchema)
 
-		if contractSchema.XApiGateway == (XApiGatewaySchema{}) {
+		if isXApiGatewayEmpty(contractSchema.XApiGateway) {
 			log.Println("ContractSchema is empty", file.Path)
 			continue
 		}
