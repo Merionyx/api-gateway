@@ -6,7 +6,8 @@ services:
         container_name: merionyx-api-gateway-controller
         build:
             context: ../..
-            dockerfile: Dockerfile.controller
+            dockerfile: Dockerfile.controller.dev
+        command: air -c .air.controller.toml
         environment:
             - CONFIG_PATH=./configs/controller/config.yaml
             - SSH_KNOWN_HOSTS=/app/secrets/known_hosts
@@ -43,7 +44,8 @@ services:
         container_name: merionyx-api-gateway-api-server
         build:
             context: ../..
-            dockerfile: Dockerfile.api-server
+            dockerfile: Dockerfile.api-server.dev
+        command: air -c .air.api-server.toml
         environment:
             - CONFIG_PATH=./configs/api-server/config.yaml
             - SSH_KNOWN_HOSTS=/app/secrets/known_hosts

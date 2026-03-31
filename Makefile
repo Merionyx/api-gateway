@@ -51,7 +51,7 @@ docker-run: ## Run Docker container
 docker-up:
 	docker-compose \
 		-p 'merionyx-api-gateway' \
-		-f ./deployments/docker/compose.app.yaml \
+		-f ./deployments/docker/compose.app.dev.yaml \
 		-f ./deployments/docker/compose.etcd.yaml \
 		-f ./deployments/docker/compose.envoy.yaml \
 		-f ./deployments/docker/compose.mock-service.yaml \
@@ -60,7 +60,7 @@ docker-up:
 docker-down:
 	docker-compose \
 		-p 'merionyx-api-gateway' \
-		-f ./deployments/docker/compose.app.yaml \
+		-f ./deployments/docker/compose.app.dev.yaml \
 		-f ./deployments/docker/compose.etcd.yaml \
 		-f ./deployments/docker/compose.envoy.yaml \
 		-f ./deployments/docker/compose.mock-service.yaml \

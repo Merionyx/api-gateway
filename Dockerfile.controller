@@ -37,7 +37,7 @@ COPY --from=builder /controller/main .
 
 # Copy configs and certs
 COPY --from=builder /controller/configs ./configs
-COPY --from=builder /controller/certs ./certs
+COPY --from=builder /controller/secrets ./secrets
 
 # Change ownership
 RUN chown -R app:app /controller
