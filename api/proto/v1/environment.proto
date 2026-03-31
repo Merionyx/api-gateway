@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package api.environments.v1;
 
-option go_package = "merionyx/api-gateway/control-plane/pkg/api/environments/v1;environmentsv1";
+option go_package = "merionyx/api-gateway/controller/pkg/api/environments/v1;environmentsv1";
 
 // Environment represents an environment
 message Environment {

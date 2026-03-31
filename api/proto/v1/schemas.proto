@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package api.schemas.v1;
 
-option go_package = "merionyx/api-gateway/control-plane/pkg/api/schemas/v1;schemasv1";
+option go_package = "merionyx/api-gateway/controller/pkg/api/schemas/v1;schemasv1";
 
 // ContractSnapshot represents a contract snapshot
 message ContractSnapshot {

@@ -8,11 +8,11 @@ DOCKER_TAG=latest
 
 # Main commands
 run: ## Run the server
-	go run cmd/control-plane/main.go
+	go run cmd/controller/main.go
 
 build: ## Build binary
 	mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o $(BUILD_DIR)/$(BINARY_NAME) cmd/control-plane/main.go
+	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o $(BUILD_DIR)/$(BINARY_NAME) cmd/controller/main.go
 
 test: ## Run all tests
 	go test -v ./...
@@ -50,7 +50,7 @@ docker-run: ## Run Docker container
 
 docker-up:
 	docker-compose \
-		-p 'merionyx-api-gateway-control-plane' \
+		-p 'merionyx-api-gateway' \
 		-f ./deployments/docker/compose.app.yaml \
 		-f ./deployments/docker/compose.etcd.yaml \
 		-f ./deployments/docker/compose.envoy.yaml \
@@ -59,7 +59,7 @@ docker-up:
 
 docker-down:
 	docker-compose \
-		-p 'merionyx-api-gateway-control-plane' \
+		-p 'merionyx-api-gateway' \
 		-f ./deployments/docker/compose.app.yaml \
 		-f ./deployments/docker/compose.etcd.yaml \
 		-f ./deployments/docker/compose.envoy.yaml \

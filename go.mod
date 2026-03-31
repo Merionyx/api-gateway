@@ -1,4 +1,4 @@
-module merionyx/api-gateway/control-plane
+module merionyx/api-gateway
 
 go 1.25.1
 

@@ -653,7 +653,7 @@ const file_api_proto_v1_schemas_proto_rawDesc = "" +
 	"\x12SyncContractBundle\x12).api.schemas.v1.SyncContractBundleRequest\x1a*.api.schemas.v1.SyncContractBundleResponse\x12n\n" +
 	"\x13GetContractSnapshot\x12*.api.schemas.v1.GetContractSnapshotRequest\x1a+.api.schemas.v1.GetContractSnapshotResponse\x12t\n" +
 	"\x15ListContractSnapshots\x12,.api.schemas.v1.ListContractSnapshotsRequest\x1a-.api.schemas.v1.ListContractSnapshotsResponse\x12e\n" +
-	"\x10SyncAllContracts\x12'.api.schemas.v1.SyncAllContractsRequest\x1a(.api.schemas.v1.SyncAllContractsResponseBAZ?merionyx/api-gateway/control-plane/pkg/api/schemas/v1;schemasv1b\x06proto3"
+	"\x10SyncAllContracts\x12'.api.schemas.v1.SyncAllContractsRequest\x1a(.api.schemas.v1.SyncAllContractsResponseB>Z<merionyx/api-gateway/controller/pkg/api/schemas/v1;schemasv1b\x06proto3"
 
 var (
 	file_api_proto_v1_schemas_proto_rawDescOnce sync.Once

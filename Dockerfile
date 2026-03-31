@@ -5,7 +5,7 @@ FROM golang:1.25.1-alpine AS builder
 RUN apk add --no-cache git ca-certificates tzdata
 
 # Set working directory
-WORKDIR /control-plane
+WORKDIR /controller
 
 # Copy go mod files
 COPY go.mod go.sum ./
@@ -17,7 +17,7 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main cmd/control-plane/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main cmd/controller/main.go
 
 # Final stage
 FROM alpine:3.19
@@ -30,17 +30,17 @@ RUN addgroup -g 1001 app && \
     adduser -u 1001 -G app -s /bin/sh -D app
 
 # Set working directory
-WORKDIR /control-plane
+WORKDIR /controller
 
 # Copy binary from builder stage
-COPY --from=builder /control-plane/main .
+COPY --from=builder /controller/main .
 
 # Copy configs and certs
-COPY --from=builder /control-plane/configs ./configs
-COPY --from=builder /control-plane/certs ./certs
+COPY --from=builder /controller/configs ./configs
+COPY --from=builder /controller/certs ./certs
 
 # Change ownership
-RUN chown -R app:app /control-plane
+RUN chown -R app:app /controller
 
 # Switch to app user
 USER app

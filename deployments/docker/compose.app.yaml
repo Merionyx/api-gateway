@@ -9,7 +9,7 @@ services:
             dockerfile: Dockerfile.dev
         command: air -c .air.toml
         environment:
-            - CONFIG_FILE=./configs/control-plane/config.yaml
+            - CONFIG_PATH=./configs/controller/config.yaml
             - SSH_KNOWN_HOSTS=/app/secrets/known_hosts
         env_file:
             - ../../secrets/.env

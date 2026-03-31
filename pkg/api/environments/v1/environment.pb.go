@@ -958,7 +958,7 @@ const file_api_proto_v1_environment_proto_rawDesc = "" +
 	"\x0eGetEnvironment\x12*.api.environments.v1.GetEnvironmentRequest\x1a+.api.environments.v1.GetEnvironmentResponse\x12o\n" +
 	"\x10ListEnvironments\x12,.api.environments.v1.ListEnvironmentsRequest\x1a-.api.environments.v1.ListEnvironmentsResponse\x12r\n" +
 	"\x11UpdateEnvironment\x12-.api.environments.v1.UpdateEnvironmentRequest\x1a..api.environments.v1.UpdateEnvironmentResponse\x12r\n" +
-	"\x11DeleteEnvironment\x12-.api.environments.v1.DeleteEnvironmentRequest\x1a..api.environments.v1.DeleteEnvironmentResponseBKZImerionyx/api-gateway/control-plane/pkg/api/environments/v1;environmentsv1b\x06proto3"
+	"\x11DeleteEnvironment\x12-.api.environments.v1.DeleteEnvironmentRequest\x1a..api.environments.v1.DeleteEnvironmentResponseBHZFmerionyx/api-gateway/controller/pkg/api/environments/v1;environmentsv1b\x06proto3"
 
 var (
 	file_api_proto_v1_environment_proto_rawDescOnce sync.Once

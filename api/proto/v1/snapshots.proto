@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package api.snapshots.v1;
 
-option go_package = "merionyx/api-gateway/control-plane/pkg/api/snapshots/v1;snapshotsv1";
+option go_package = "merionyx/api-gateway/controller/pkg/api/snapshots/v1;snapshotsv1";
 
 // UpdateSnapshotRequest request for updating xDS snapshot
 message UpdateSnapshotRequest {

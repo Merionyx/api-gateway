@@ -261,7 +261,7 @@ const file_api_proto_v1_snapshots_proto_rawDesc = "" +
 	"\froutes_count\x18\x06 \x01(\x05R\vroutesCount2\xe5\x01\n" +
 	"\x10SnapshotsService\x12c\n" +
 	"\x0eUpdateSnapshot\x12'.api.snapshots.v1.UpdateSnapshotRequest\x1a(.api.snapshots.v1.UpdateSnapshotResponse\x12l\n" +
-	"\x11GetSnapshotStatus\x12*.api.snapshots.v1.GetSnapshotStatusRequest\x1a+.api.snapshots.v1.GetSnapshotStatusResponseBEZCmerionyx/api-gateway/control-plane/pkg/api/snapshots/v1;snapshotsv1b\x06proto3"
+	"\x11GetSnapshotStatus\x12*.api.snapshots.v1.GetSnapshotStatusRequest\x1a+.api.snapshots.v1.GetSnapshotStatusResponseBBZ@merionyx/api-gateway/controller/pkg/api/snapshots/v1;snapshotsv1b\x06proto3"
 
 var (
 	file_api_proto_v1_snapshots_proto_rawDescOnce sync.Once
