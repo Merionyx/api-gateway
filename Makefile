@@ -69,14 +69,6 @@ docker-down:
 dev: ## Development mode with hot reload
 	air -c .air.toml
 
-pg-dump: ## Dump PostgreSQL schema
-	pg_dump --schema-only "postgresql://postgres:postgres@localhost:5432/postgres" > ./databases/postgres/schema.sql
-
-sqlc-generate: ## Generate SQLC code
-	sqlc generate
-
-sqlc-update: pg-dump sqlc-generate ## Update SQLC code
-
 proto-generate: ## Generate protobuf code
 	protoc --go_out=. --go_opt=paths=source_relative \
 		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
