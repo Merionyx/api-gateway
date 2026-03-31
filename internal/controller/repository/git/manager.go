@@ -157,6 +157,7 @@ type ContractSnapshot struct {
 	Prefix                string           `json:"prefix"`
 	Upstream              ContractUpstream `json:"upstream"`
 	AllowUndefinedMethods bool             `json:"allow_undefined_methods"`
+	Access                Access           `json:"access"`
 }
 
 type ContractRoute struct {
@@ -166,6 +167,16 @@ type ContractRoute struct {
 
 type ContractUpstream struct {
 	Name string `json:"name"`
+}
+
+type Access struct {
+	Secure bool  `json:"secure" yaml:"secure" mapstructure:"secure"`
+	Apps   []App `json:"apps" yaml:"apps" mapstructure:"apps"`
+}
+
+type App struct {
+	AppID        string   `json:"app_id" yaml:"app_id" mapstructure:"app_id"`
+	Environments []string `json:"environments,omitempty" yaml:"environments,omitempty" mapstructure:"environments,omitempty"`
 }
 
 type ContractSchema struct {
@@ -182,13 +193,7 @@ type XApiGatewaySchema struct {
 	Service struct {
 		Name string `mapstructure:"name" json:"name" yaml:"name"`
 	} `mapstructure:"service" json:"service" yaml:"service"`
-	Access struct {
-		Secure bool `mapstructure:"secure" json:"secure" yaml:"secure" validate:"required"`
-		Apps   []struct {
-			AppID        string   `mapstructure:"app_id" json:"app_id" yaml:"app_id"`
-			Environments []string `mapstructure:"environments" json:"environments" yaml:"environments"`
-		} `mapstructure:"apps" json:"apps" yaml:"apps"`
-	} `mapstructure:"access" json:"access" yaml:"access"`
+	Access Access `mapstructure:"access" json:"access" yaml:"access"`
 }
 
 func isXApiGatewayEmpty(x XApiGatewaySchema) bool {
@@ -320,6 +325,7 @@ func (rm *RepositoryManager) getSnapshotsFromGit(managedRepo *ManagedRepo, ref s
 			Prefix:                contractSchema.XApiGateway.Prefix,
 			Upstream:              upstream,
 			AllowUndefinedMethods: contractSchema.XApiGateway.AllowUndefinedMethods,
+			Access:                contractSchema.XApiGateway.Access,
 		})
 	}
 
@@ -378,6 +384,7 @@ func (rm *RepositoryManager) getSnapshotsFromLocalDir(basePath, subPath string) 
 			Prefix:                contractSchema.XApiGateway.Prefix,
 			Upstream:              upstream,
 			AllowUndefinedMethods: contractSchema.XApiGateway.AllowUndefinedMethods,
+			Access:                contractSchema.XApiGateway.Access,
 		})
 	}
 
