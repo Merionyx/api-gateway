@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
+	"merionyx/api-gateway/internal/controller/domain/models"
 	authv1 "merionyx/api-gateway/pkg/api/auth/v1"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -77,6 +78,7 @@ func (h *AuthHandler) SyncAccess(stream authv1.AuthService_SyncAccessServer) err
 	}()
 
 	initialConfig, err := h.buildAccessConfig(ctx, environment)
+	log.Printf("[AUTH-SYNC] Initial config: %v", initialConfig)
 	if err != nil {
 		log.Printf("[AUTH-SYNC] Environment %s not found, sending empty config: %v", environment, err)
 		initialConfig = &authv1.AccessConfig{
@@ -133,16 +135,53 @@ func (h *AuthHandler) GetAccessConfig(ctx context.Context, req *authv1.GetAccess
 
 // buildAccessConfig builds the access configuration for the environment
 func (h *AuthHandler) buildAccessConfig(ctx context.Context, environment string) (*authv1.AccessConfig, error) {
-	// Get the environment from etcd
-	env, err := h.environmentRepo.GetEnvironment(ctx, environment)
-	if err != nil {
-		return nil, fmt.Errorf("environment not found: %w", err)
-	}
+	var env *models.Environment
 
 	config := &authv1.AccessConfig{
 		Environment: environment,
 		Contracts:   make([]*authv1.ContractAccess, 0),
 		Version:     time.Now().Unix(),
+	}
+
+	// Get the environment from etcd
+	env, err := h.environmentRepo.GetEnvironment(ctx, environment)
+	if err != nil {
+		env, err = h.inMemoryEnvironmentsRepository.GetEnvironment(ctx, environment)
+
+		// For each snapshot get the contracts
+		for _, snapshot := range env.Snapshots {
+			contractAccess := &authv1.ContractAccess{
+				ContractName: snapshot.Name,
+				Secure:       snapshot.Access.Secure,
+				Apps:         make([]*authv1.AppAccess, 0),
+			}
+
+			// Filter applications by environment
+			for _, app := range snapshot.Access.Apps {
+				// Check if there is access for this environment
+				hasAccess := false
+				if len(app.Environments) == 0 {
+					// If environments are not specified - access everywhere
+					hasAccess = true
+				} else {
+					for _, env := range app.Environments {
+						if env == environment {
+							hasAccess = true
+							break
+						}
+					}
+				}
+
+				if hasAccess {
+					contractAccess.Apps = append(contractAccess.Apps, &authv1.AppAccess{
+						AppId:        app.AppID,
+						Environments: app.Environments,
+					})
+				}
+			}
+
+			config.Contracts = append(config.Contracts, contractAccess)
+		}
 	}
 
 	// For each bundle get the contracts
