@@ -41,11 +41,6 @@ repositories:
     # ssh_key_env: "SSH_PRIVATE_KEY"
 
 environments:
-- name: dev
-  bundles:
-    static: []
-  services:
-    static: []
 - name: prod
   bundles:
     static:
