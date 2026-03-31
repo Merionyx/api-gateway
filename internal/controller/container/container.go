@@ -174,7 +174,7 @@ func (c *Container) initHandlers() {
 	c.SnapshotGRPCHandler = handler.NewSnapshotHandler(c.SnapshotsUseCase)
 	c.EnvironmentsGRPCHandler = handler.NewEnvironmentsHandler(c.EnvironmentsUseCase)
 	c.SchemasGRPCHandler = handler.NewSchemasHandler(c.SchemasUseCase)
-	c.AuthGRPCHandler = handler.NewAuthHandler(c.EnvironmentRepository, c.SchemaRepository, c.EtcdClient)
+	c.AuthGRPCHandler = handler.NewAuthHandler(c.EnvironmentRepository, c.InMemoryEnvironmentsRepository, c.SchemaRepository, c.EtcdClient)
 
 	log.Println("Handlers initialized")
 }

@@ -15,9 +15,10 @@ import (
 
 type AuthHandler struct {
 	authv1.UnimplementedAuthServiceServer
-	environmentRepo interfaces.EnvironmentRepository
-	schemaRepo      interfaces.SchemaRepository
-	etcdClient      *clientv3.Client
+	environmentRepo                interfaces.EnvironmentRepository
+	inMemoryEnvironmentsRepository interfaces.InMemoryEnvironmentsRepository
+	schemaRepo                     interfaces.SchemaRepository
+	etcdClient                     *clientv3.Client
 
 	// Активные подключения
 	subscribers map[string]chan *authv1.SyncAccessResponse
@@ -26,14 +27,16 @@ type AuthHandler struct {
 
 func NewAuthHandler(
 	environmentRepo interfaces.EnvironmentRepository,
+	inMemoryEnvironmentsRepository interfaces.InMemoryEnvironmentsRepository,
 	schemaRepo interfaces.SchemaRepository,
 	etcdClient *clientv3.Client,
 ) *AuthHandler {
 	handler := &AuthHandler{
-		environmentRepo: environmentRepo,
-		schemaRepo:      schemaRepo,
-		etcdClient:      etcdClient,
-		subscribers:     make(map[string]chan *authv1.SyncAccessResponse),
+		environmentRepo:                environmentRepo,
+		inMemoryEnvironmentsRepository: inMemoryEnvironmentsRepository,
+		schemaRepo:                     schemaRepo,
+		etcdClient:                     etcdClient,
+		subscribers:                    make(map[string]chan *authv1.SyncAccessResponse),
 	}
 
 	// Запускаем watcher для etcd

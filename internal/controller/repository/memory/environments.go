@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"merionyx/api-gateway/internal/controller/config"
@@ -103,4 +104,22 @@ func (r *EnvironmentsRepository) Initialize(config *config.Config) error {
 	}
 
 	return nil
+}
+
+// GetEnvironment получает окружение по имени из in-memory хранилища
+func (r *EnvironmentsRepository) GetEnvironment(ctx context.Context, name string) (*models.Environment, error) {
+	env, exists := r.environments[name]
+	if !exists {
+		return nil, fmt.Errorf("environment %s not found in config", name)
+	}
+	return env, nil
+}
+
+// ListEnvironments возвращает все окружения из in-memory хранилища
+func (r *EnvironmentsRepository) ListEnvironments(ctx context.Context) (map[string]*models.Environment, error) {
+	result := make(map[string]*models.Environment)
+	for name, env := range r.environments {
+		result[name] = env
+	}
+	return result, nil
 }
