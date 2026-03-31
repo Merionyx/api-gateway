@@ -72,7 +72,7 @@ func buildAuthSidecarCluster() *clusterv3.Cluster {
 							Address: &corev3.Address{
 								Address: &corev3.Address_SocketAddress{
 									SocketAddress: &corev3.SocketAddress{
-										Address: "auth-sidecar-dev", // Hostname (will be resolved via DNS)
+										Address: "auth-sidecar", // Hostname (will be resolved via DNS)
 										PortSpecifier: &corev3.SocketAddress_PortValue{
 											PortValue: 9001,
 										},

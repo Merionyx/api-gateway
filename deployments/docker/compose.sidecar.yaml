@@ -1,3 +1,10 @@
+networks:
+  default:
+  dev-network:
+    external: true
+  prod-network:
+    external: true
+
 services:
   auth-sidecar-dev:
     build:
@@ -30,7 +37,7 @@ services:
       - AUTH_SIDECAR_JWT_JWKS_URL=http://api-server:8080/.well-known/jwks.json
     networks:
       default:
-      auth-sidecar-dev:
+      dev-network:
         aliases:
           - auth-sidecar
     depends_on:
@@ -68,17 +75,10 @@ services:
       - AUTH_SIDECAR_JWT_JWKS_URL=http://api-server:8080/.well-known/jwks.json
     networks:
       default:
-      auth-sidecar-prod:
+      prod-network:
         aliases:
           - auth-sidecar
     depends_on:
       - gateway-controller
       - gateway-api-server
     restart: unless-stopped
-
-networks:
-  default:
-  auth-sidecar-dev:
-    external: true
-  auth-sidecar-prod:
-    external: true
