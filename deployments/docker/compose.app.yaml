@@ -2,20 +2,20 @@ networks:
     default:
 
 services:
-    control-plane:
-        container_name: merionyx-api-gateway-control-plane
+    gateway-controller:
+        container_name: merionyx-api-gateway-controller
         build:
             context: ../..
-            dockerfile: Dockerfile.dev
-        command: air -c .air.toml
+            dockerfile: Dockerfile.controller.dev
+        command: air -c .air.controller.toml
         environment:
             - CONFIG_PATH=./configs/controller/config.yaml
             - SSH_KNOWN_HOSTS=/app/secrets/known_hosts
         env_file:
             - ../../secrets/.env
         ports:
-            - 9080:8080
-            - 9443:8443
+            - 10080:8080
+            - 10443:8443
             - 19090:19090
             - 19091:19091
         develop:
@@ -24,7 +24,7 @@ services:
                   target: /app
                   action: sync
                   ignore:
-                      - .air.toml
+                      - .air.controller.toml
                       - .gitignore
                       - .git
                       - .github
@@ -40,3 +40,39 @@ services:
             - etcd
         volumes:
           - ../../../api-gateway-schemas-local:/app/local-dir
+    gateway-api-server:
+        container_name: merionyx-api-gateway-api-server
+        build:
+            context: ../..
+            dockerfile: Dockerfile.api-server.dev
+        command: air -c .air.api-server.toml
+        environment:
+            - CONFIG_PATH=./configs/api-server/config.yaml
+            - SSH_KNOWN_HOSTS=/app/secrets/known_hosts
+        env_file:
+            - ../../secrets/.env
+        ports:
+            - 11080:8080
+            - 11443:8443
+        develop:
+            watch:
+                - path: ../..
+                  target: /app
+                  action: sync
+                  ignore:
+                      - .air.api-server.toml
+                      - .gitignore
+                      - .git
+                      - .github
+                      - .vscode
+                      - .env
+                      - .env.example
+                      - .env.local
+                      - .env.development
+                      - .env.production
+        networks:
+            - default
+        depends_on:
+            - etcd
+        volumes:
+          - ../../../api-gateway-api-server-local:/app/local-dir

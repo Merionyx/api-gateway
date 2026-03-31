@@ -1,0 +1,16 @@
+server:
+  http1_port: "8080"
+  http2_port: "8443"
+  grpc_port: "19090"
+  xds_port: "19091"
+  host: "localhost"
+
+etcd:
+  endpoints:
+  - "https://etcd:2379"
+  dial_timeout: "5s"
+  tls:
+    enabled: true
+    cert_file: "./secrets/certs/etcd/client.pem"
+    key_file: "./secrets/certs/etcd/client-key.pem"
+    ca_file: "./secrets/certs/etcd/ca.pem"
