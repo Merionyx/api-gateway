@@ -28,8 +28,8 @@ type ServerConfig struct {
 type RepositoryConfig struct {
 	Name   string     `mapstructure:"name" validate:"required" json:"name"`
 	Source string     `mapstructure:"source" validate:"required" json:"source"` // "git", "local-git", "local-dir"
-	URL    string     `mapstructure:"url" json:"url"`                           // для source: git
-	Path   string     `mapstructure:"path" json:"path"`                         // для source: local-git, local-dir
+	URL    string     `mapstructure:"url" json:"url"`                           // for source: git
+	Path   string     `mapstructure:"path" json:"path"`                         // for source: local-git, local-dir
 	Auth   AuthConfig `mapstructure:"auth" json:"auth"`
 }
 

@@ -62,6 +62,6 @@ func setupRoutes(app *fiber.App, c *container.Container) {
 	// JWT Tokens
 	api.Post("/tokens", c.JWTHandler.GenerateToken)
 
-	// Signing Keys (для администрирования)
+	// Signing Keys (for administration)
 	api.Get("/keys", c.JWTHandler.GetSigningKeys)
 }

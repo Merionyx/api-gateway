@@ -106,7 +106,7 @@ func (r *EnvironmentsRepository) Initialize(config *config.Config) error {
 	return nil
 }
 
-// GetEnvironment получает окружение по имени из in-memory хранилища
+// GetEnvironment gets the environment by name from the in-memory storage
 func (r *EnvironmentsRepository) GetEnvironment(ctx context.Context, name string) (*models.Environment, error) {
 	env, exists := r.environments[name]
 	if !exists {
@@ -115,7 +115,7 @@ func (r *EnvironmentsRepository) GetEnvironment(ctx context.Context, name string
 	return env, nil
 }
 
-// ListEnvironments возвращает все окружения из in-memory хранилища
+// ListEnvironments returns all environments from the in-memory storage
 func (r *EnvironmentsRepository) ListEnvironments(ctx context.Context) (map[string]*models.Environment, error) {
 	result := make(map[string]*models.Environment)
 	for name, env := range r.environments {

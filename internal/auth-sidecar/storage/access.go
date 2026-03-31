@@ -6,7 +6,7 @@ import (
 	authv1 "merionyx/api-gateway/pkg/api/auth/v1"
 )
 
-// AccessStorage хранит права доступа в памяти
+// AccessStorage stores access rights in memory
 type AccessStorage struct {
 	contracts map[string]*authv1.ContractAccess // key: contract_name
 	version   int64
@@ -19,7 +19,7 @@ func NewAccessStorage() *AccessStorage {
 	}
 }
 
-// SetAccessConfig устанавливает полную конфигурацию
+// SetAccessConfig sets the full configuration
 func (s *AccessStorage) SetAccessConfig(config *authv1.AccessConfig) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -31,22 +31,22 @@ func (s *AccessStorage) SetAccessConfig(config *authv1.AccessConfig) {
 	s.version = config.Version
 }
 
-// ApplyUpdate применяет инкрементальное обновление
+// ApplyUpdate applies an incremental update
 func (s *AccessStorage) ApplyUpdate(update *authv1.AccessUpdate) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Добавляем новые контракты
+	// Add new contracts
 	for _, contract := range update.AddedContracts {
 		s.contracts[contract.ContractName] = contract
 	}
 
-	// Обновляем существующие
+	// Update existing contracts
 	for _, contract := range update.UpdatedContracts {
 		s.contracts[contract.ContractName] = contract
 	}
 
-	// Удаляем
+	// Remove contracts
 	for _, contractName := range update.RemovedContracts {
 		delete(s.contracts, contractName)
 	}
@@ -54,7 +54,7 @@ func (s *AccessStorage) ApplyUpdate(update *authv1.AccessUpdate) {
 	s.version = update.Version
 }
 
-// CheckAccess проверяет, имеет ли приложение доступ к контракту
+// CheckAccess checks if the application has access to the contract
 func (s *AccessStorage) CheckAccess(contractName, appID, environment string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -64,12 +64,12 @@ func (s *AccessStorage) CheckAccess(contractName, appID, environment string) boo
 		return false
 	}
 
-	// Если контракт не secure - разрешаем всем
+	// If the contract is not secure - allow all
 	if !contract.Secure {
 		return true
 	}
 
-	// Проверяем, есть ли приложение в списке
+	// Check if the application is in the list
 	for _, app := range contract.Apps {
 		if app.AppId == appID {
 			return true
@@ -79,14 +79,14 @@ func (s *AccessStorage) CheckAccess(contractName, appID, environment string) boo
 	return false
 }
 
-// GetVersion возвращает текущую версию конфигурации
+// GetVersion returns the current configuration version
 func (s *AccessStorage) GetVersion() int64 {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.version
 }
 
-// GetContractsCount возвращает количество контрактов
+// GetContractsCount returns the number of contracts
 func (s *AccessStorage) GetContractsCount() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

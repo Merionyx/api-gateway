@@ -15,7 +15,7 @@ func NewEtcdClient(cfg EtcdConfig) (*clientv3.Client, error) {
 		DialTimeout: cfg.DialTimeout,
 	}
 
-	// Настройка TLS
+	// TLS settings
 	if cfg.TLS.Enabled {
 		tlsConfig, err := loadTLSConfig(cfg.TLS)
 		if err != nil {

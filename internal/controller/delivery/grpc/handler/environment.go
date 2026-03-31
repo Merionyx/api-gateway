@@ -105,7 +105,7 @@ func (h *EnvironmentsHandler) DeleteEnvironment(ctx context.Context, req *enviro
 	}, nil
 }
 
-// Helper functions для конвертации между proto и model
+// Helper functions for conversion between proto and model
 
 func modelToProtoEnvironment(env *models.Environment) *environmentsv1.Environment {
 	return &environmentsv1.Environment{

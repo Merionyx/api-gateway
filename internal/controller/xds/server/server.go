@@ -34,7 +34,7 @@ func NewXDSServer(snapshotCache cache.SnapshotCache, port int) *Server {
 	cb := &xds.Callbacks{}
 	xdsServer := server.NewServer(context.Background(), snapshotCache, cb)
 
-	// Регистрируем xDS services
+	// xDS services
 	discoverygrpc.RegisterAggregatedDiscoveryServiceServer(grpcServer, xdsServer)
 	endpointservice.RegisterEndpointDiscoveryServiceServer(grpcServer, xdsServer)
 	clusterservice.RegisterClusterDiscoveryServiceServer(grpcServer, xdsServer)

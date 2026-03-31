@@ -20,7 +20,7 @@ type AuthHandler struct {
 	schemaRepo                     interfaces.SchemaRepository
 	etcdClient                     *clientv3.Client
 
-	// Активные подключения
+	// Active connections
 	subscribers map[string]chan *authv1.SyncAccessResponse
 	mu          sync.RWMutex
 }
@@ -39,17 +39,17 @@ func NewAuthHandler(
 		subscribers:                    make(map[string]chan *authv1.SyncAccessResponse),
 	}
 
-	// Запускаем watcher для etcd
+	// Start the watcher for etcd
 	go handler.watchEtcdChanges()
 
 	return handler
 }
 
-// SyncAccess bidirectional streaming для синхронизации
+// SyncAccess bidirectional streaming for synchronization
 func (h *AuthHandler) SyncAccess(stream authv1.AuthService_SyncAccessServer) error {
 	ctx := stream.Context()
 
-	// Читаем первый запрос от sidecar
+	// Read the first request from the sidecar
 	req, err := stream.Recv()
 	if err != nil {
 		return err
@@ -60,7 +60,7 @@ func (h *AuthHandler) SyncAccess(stream authv1.AuthService_SyncAccessServer) err
 
 	log.Printf("[AUTH-SYNC] New connection from sidecar %s (env: %s)", sidecarID, environment)
 
-	// Создаем канал для этого sidecar
+	// Create a channel for this sidecar
 	updateChan := make(chan *authv1.SyncAccessResponse, 100)
 
 	h.mu.Lock()
@@ -76,12 +76,15 @@ func (h *AuthHandler) SyncAccess(stream authv1.AuthService_SyncAccessServer) err
 		log.Printf("[AUTH-SYNC] Disconnected sidecar %s", sidecarID)
 	}()
 
-	// Отправляем начальную конфигурацию
 	initialConfig, err := h.buildAccessConfig(ctx, environment)
 	if err != nil {
-		return fmt.Errorf("failed to build initial config: %w", err)
+		log.Printf("[AUTH-SYNC] Environment %s not found, sending empty config: %v", environment, err)
+		initialConfig = &authv1.AccessConfig{
+			Environment: environment,
+			Contracts:   make([]*authv1.ContractAccess, 0),
+			Version:     time.Now().Unix(),
+		}
 	}
-
 	if err := stream.Send(&authv1.SyncAccessResponse{
 		Message: &authv1.SyncAccessResponse_InitialConfig{
 			InitialConfig: initialConfig,
@@ -92,24 +95,24 @@ func (h *AuthHandler) SyncAccess(stream authv1.AuthService_SyncAccessServer) err
 
 	log.Printf("[AUTH-SYNC] Sent initial config to %s: %d contracts", sidecarID, len(initialConfig.Contracts))
 
-	// Запускаем heartbeat
+	// Start the heartbeat
 	heartbeatTicker := time.NewTicker(30 * time.Second)
 	defer heartbeatTicker.Stop()
 
-	// Слушаем обновления и heartbeats
+	// Listen for updates and heartbeats
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 
 		case update := <-updateChan:
-			// Отправляем обновление
+			// Send the update
 			if err := stream.Send(update); err != nil {
 				return err
 			}
 
 		case <-heartbeatTicker.C:
-			// Отправляем heartbeat
+			// Send the heartbeat
 			if err := stream.Send(&authv1.SyncAccessResponse{
 				Message: &authv1.SyncAccessResponse_Heartbeat{
 					Heartbeat: &authv1.Heartbeat{
@@ -123,14 +126,14 @@ func (h *AuthHandler) SyncAccess(stream authv1.AuthService_SyncAccessServer) err
 	}
 }
 
-// GetAccessConfig получить текущую конфигурацию (unary)
+// GetAccessConfig get the current configuration (unary)
 func (h *AuthHandler) GetAccessConfig(ctx context.Context, req *authv1.GetAccessConfigRequest) (*authv1.AccessConfig, error) {
 	return h.buildAccessConfig(ctx, req.Environment)
 }
 
-// buildAccessConfig строит конфигурацию доступа для окружения
+// buildAccessConfig builds the access configuration for the environment
 func (h *AuthHandler) buildAccessConfig(ctx context.Context, environment string) (*authv1.AccessConfig, error) {
-	// Получаем environment из etcd
+	// Get the environment from etcd
 	env, err := h.environmentRepo.GetEnvironment(ctx, environment)
 	if err != nil {
 		return nil, fmt.Errorf("environment not found: %w", err)
@@ -142,16 +145,16 @@ func (h *AuthHandler) buildAccessConfig(ctx context.Context, environment string)
 		Version:     time.Now().Unix(),
 	}
 
-	// Для каждого bundle получаем контракты
+	// For each bundle get the contracts
 	for _, bundle := range env.Bundles.Static {
-		// Получаем все контракты из bundle
+		// Get all contracts from the bundle
 		snapshots, err := h.schemaRepo.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref)
 		if err != nil {
 			log.Printf("Failed to get snapshots for bundle %s: %v", bundle.Name, err)
 			continue
 		}
 
-		// Конвертируем в ContractAccess
+		// Convert to ContractAccess
 		for _, snapshot := range snapshots {
 			contractAccess := &authv1.ContractAccess{
 				ContractName: snapshot.Name,
@@ -159,12 +162,12 @@ func (h *AuthHandler) buildAccessConfig(ctx context.Context, environment string)
 				Apps:         make([]*authv1.AppAccess, 0),
 			}
 
-			// Фильтруем приложения по environment
+			// Filter applications by environment
 			for _, app := range snapshot.Access.Apps {
-				// Проверяем, есть ли доступ для этого environment
+				// Check if there is access for this environment
 				hasAccess := false
 				if len(app.Environments) == 0 {
-					// Если environments не указаны - доступ везде
+					// If environments are not specified - access everywhere
 					hasAccess = true
 				} else {
 					for _, env := range app.Environments {
@@ -190,7 +193,7 @@ func (h *AuthHandler) buildAccessConfig(ctx context.Context, environment string)
 	return config, nil
 }
 
-// watchEtcdChanges следит за изменениями в etcd и уведомляет sidecars
+// watchEtcdChanges watches for changes in etcd and notifies sidecars
 func (h *AuthHandler) watchEtcdChanges() {
 	watchChan := h.etcdClient.Watch(context.Background(), "/api-gateway/schemas/", clientv3.WithPrefix())
 
@@ -203,38 +206,38 @@ func (h *AuthHandler) watchEtcdChanges() {
 		}
 
 		for _, event := range watchResp.Events {
-			// Парсим ключ для определения environment
+			// Parse the key to determine the environment
 			// /api-gateway/schemas/{repo}/{ref}/contracts/{contract}/snapshot
 
 			log.Printf("[AUTH-SYNC] Schema changed: %s", string(event.Kv.Key))
 
-			// Уведомляем всех подписчиков
-			// TODO: Определить какие environments затронуты
-			// Для упрощения - уведомляем всех
+			// Notify all subscribers
+			// TODO: Determine which environments are affected
+			// For simplicity - notify all
 			h.notifyAllSubscribers()
 		}
 	}
 }
 
-// notifyAllSubscribers уведомляет всех подключенных sidecars
+// notifyAllSubscribers notifies all connected sidecars
 func (h *AuthHandler) notifyAllSubscribers() {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
 	for subscriberKey, updateChan := range h.subscribers {
-		// Извлекаем environment из ключа
-		// subscriberKey формат: "dev:sidecar-123"
+		// Extract the environment from the key
+		// subscriberKey format: "dev:sidecar-123"
 		parts := splitSubscriberKey(subscriberKey)
 		environment := parts[0]
 
-		// Строим обновленную конфигурацию
+		// Build the updated configuration
 		config, err := h.buildAccessConfig(context.Background(), environment)
 		if err != nil {
 			log.Printf("[AUTH-SYNC] Failed to build config for %s: %v", subscriberKey, err)
 			continue
 		}
 
-		// Отправляем обновление (non-blocking)
+		// Send the update (non-blocking)
 		select {
 		case updateChan <- &authv1.SyncAccessResponse{
 			Message: &authv1.SyncAccessResponse_InitialConfig{

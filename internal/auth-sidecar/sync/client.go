@@ -26,7 +26,7 @@ type SyncClient struct {
 }
 
 func NewSyncClient(cfg *config.Config, storage *storage.AccessStorage) *SyncClient {
-	// Генерируем уникальный ID для sidecar
+	// Generate a unique ID for the sidecar
 	sidecarID := fmt.Sprintf("sidecar-%d", time.Now().UnixNano())
 
 	return &SyncClient{
@@ -36,9 +36,9 @@ func NewSyncClient(cfg *config.Config, storage *storage.AccessStorage) *SyncClie
 	}
 }
 
-// Start запускает синхронизацию с Controller
+// Start starts the synchronization with the Controller
 func (c *SyncClient) Start(ctx context.Context) error {
-	// Подключаемся к Controller
+	// Connect to the Controller
 	conn, err := grpc.NewClient(
 		c.config.Controller.Address,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -52,7 +52,7 @@ func (c *SyncClient) Start(ctx context.Context) error {
 
 	log.Printf("[SYNC] Connected to Controller at %s", c.config.Controller.Address)
 
-	// Запускаем sync loop с reconnect логикой
+	// Start the sync loop with reconnect logic
 	for {
 		select {
 		case <-ctx.Done():
@@ -67,13 +67,13 @@ func (c *SyncClient) Start(ctx context.Context) error {
 }
 
 func (c *SyncClient) syncLoop(ctx context.Context) error {
-	// Создаем bidirectional stream
+	// Create a bidirectional stream
 	stream, err := c.client.SyncAccess(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create stream: %w", err)
 	}
 
-	// Отправляем начальный запрос
+	// Send the initial request
 	if err := stream.Send(&authv1.SyncAccessRequest{
 		Environment: c.config.Controller.Environment,
 		SidecarId:   c.sidecarID,
@@ -84,7 +84,7 @@ func (c *SyncClient) syncLoop(ctx context.Context) error {
 	c.setConnected(true)
 	log.Printf("[SYNC] Started sync stream for environment: %s", c.config.Controller.Environment)
 
-	// Слушаем обновления от Controller
+	// Listen for updates from the Controller
 	for {
 		resp, err := stream.Recv()
 		if err != nil {
@@ -94,12 +94,12 @@ func (c *SyncClient) syncLoop(ctx context.Context) error {
 
 		switch msg := resp.Message.(type) {
 		case *authv1.SyncAccessResponse_InitialConfig:
-			// Начальная конфигурация
+			// Initial configuration
 			log.Printf("[SYNC] Received initial config: %d contracts", len(msg.InitialConfig.Contracts))
 			c.storage.SetAccessConfig(msg.InitialConfig)
 
 		case *authv1.SyncAccessResponse_Update:
-			// Инкрементальное обновление
+			// Incremental update
 			log.Printf("[SYNC] Received update: +%d =%d -%d contracts",
 				len(msg.Update.AddedContracts),
 				len(msg.Update.UpdatedContracts),
@@ -107,7 +107,7 @@ func (c *SyncClient) syncLoop(ctx context.Context) error {
 			c.storage.ApplyUpdate(msg.Update)
 
 		case *authv1.SyncAccessResponse_Heartbeat:
-			// Heartbeat
+			// Heartbeat for keep-alive
 			log.Printf("[SYNC] Heartbeat received")
 		}
 	}

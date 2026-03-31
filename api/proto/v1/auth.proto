@@ -4,65 +4,65 @@ package api.auth.v1;
 
 option go_package = "merionyx/api-gateway/pkg/api/auth/v1;authv1";
 
-// ContractAccess представляет права доступа к контракту
+// ContractAccess access to a contract
 message ContractAccess {
   string contract_name = 1;
   bool secure = 2;
   repeated AppAccess apps = 3;
 }
 
-// AppAccess представляет права доступа приложения
+// AppAccess access to an application
 message AppAccess {
   string app_id = 1;
   repeated string environments = 2;
 }
 
-// AccessConfig полная конфигурация доступа для окружения
+// AccessConfig full access configuration for an environment
 message AccessConfig {
   string environment = 1;
   repeated ContractAccess contracts = 2;
-  int64 version = 3; // Версия конфигурации
+  int64 version = 3; // Configuration version
 }
 
-// SyncAccessRequest запрос на синхронизацию
+// SyncAccessRequest request to synchronize
 message SyncAccessRequest {
   string environment = 1;
-  string sidecar_id = 2; // Уникальный ID sidecar'а
+  string sidecar_id = 2; // Unique sidecar ID
 }
 
-// SyncAccessResponse ответ с конфигурацией
+// SyncAccessResponse response with configuration
 message SyncAccessResponse {
   oneof message {
-    AccessConfig initial_config = 1;  // Начальная конфигурация
-    AccessUpdate update = 2;          // Инкрементальное обновление
-    Heartbeat heartbeat = 3;          // Heartbeat для keep-alive
+    AccessConfig initial_config = 1;  // Initial configuration
+    AccessUpdate update = 2;          // Incremental update
+    Heartbeat heartbeat = 3;          // Heartbeat for keep-alive
   }
 }
 
-// AccessUpdate инкрементальное обновление
+// AccessUpdate incremental update
 message AccessUpdate {
   string environment = 1;
   repeated ContractAccess added_contracts = 2;
   repeated ContractAccess updated_contracts = 3;
-  repeated string removed_contracts = 4; // Имена контрактов
+  repeated string removed_contracts = 4; // Contract names
   int64 version = 5;
 }
 
-// Heartbeat для поддержания соединения
+// Heartbeat for keeping the connection alive
 message Heartbeat {
   int64 timestamp = 1;
 }
 
-// AuthService сервис для синхронизации прав доступа
+// AuthService service for synchronizing access rights
 service AuthService {
-  // Bidirectional streaming для синхронизации
+  // Bidirectional streaming for synchronization
   rpc SyncAccess(stream SyncAccessRequest) returns (stream SyncAccessResponse);
   
-  // Получить текущую конфигурацию (unary)
+  // Get current configuration (unary)
   rpc GetAccessConfig(GetAccessConfigRequest) returns (AccessConfig);
 }
 
-// GetAccessConfigRequest запрос конфигурации
+// GetAccessConfigRequest request for configuration
 message GetAccessConfigRequest {
   string environment = 1;
 }

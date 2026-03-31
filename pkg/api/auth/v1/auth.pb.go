@@ -21,7 +21,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// ContractAccess представляет права доступа к контракту
+// ContractAccess access to a contract
 type ContractAccess struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ContractName  string                 `protobuf:"bytes,1,opt,name=contract_name,json=contractName,proto3" json:"contract_name,omitempty"`
@@ -82,7 +82,7 @@ func (x *ContractAccess) GetApps() []*AppAccess {
 	return nil
 }
 
-// AppAccess представляет права доступа приложения
+// AppAccess access to an application
 type AppAccess struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
@@ -135,12 +135,12 @@ func (x *AppAccess) GetEnvironments() []string {
 	return nil
 }
 
-// AccessConfig полная конфигурация доступа для окружения
+// AccessConfig full access configuration for an environment
 type AccessConfig struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Environment   string                 `protobuf:"bytes,1,opt,name=environment,proto3" json:"environment,omitempty"`
 	Contracts     []*ContractAccess      `protobuf:"bytes,2,rep,name=contracts,proto3" json:"contracts,omitempty"`
-	Version       int64                  `protobuf:"varint,3,opt,name=version,proto3" json:"version,omitempty"` // Версия конфигурации
+	Version       int64                  `protobuf:"varint,3,opt,name=version,proto3" json:"version,omitempty"` // Configuration version
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -196,11 +196,11 @@ func (x *AccessConfig) GetVersion() int64 {
 	return 0
 }
 
-// SyncAccessRequest запрос на синхронизацию
+// SyncAccessRequest request to synchronize
 type SyncAccessRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Environment   string                 `protobuf:"bytes,1,opt,name=environment,proto3" json:"environment,omitempty"`
-	SidecarId     string                 `protobuf:"bytes,2,opt,name=sidecar_id,json=sidecarId,proto3" json:"sidecar_id,omitempty"` // Уникальный ID sidecar'а
+	SidecarId     string                 `protobuf:"bytes,2,opt,name=sidecar_id,json=sidecarId,proto3" json:"sidecar_id,omitempty"` // Unique sidecar ID
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -249,7 +249,7 @@ func (x *SyncAccessRequest) GetSidecarId() string {
 	return ""
 }
 
-// SyncAccessResponse ответ с конфигурацией
+// SyncAccessResponse response with configuration
 type SyncAccessResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Message:
@@ -331,15 +331,15 @@ type isSyncAccessResponse_Message interface {
 }
 
 type SyncAccessResponse_InitialConfig struct {
-	InitialConfig *AccessConfig `protobuf:"bytes,1,opt,name=initial_config,json=initialConfig,proto3,oneof"` // Начальная конфигурация
+	InitialConfig *AccessConfig `protobuf:"bytes,1,opt,name=initial_config,json=initialConfig,proto3,oneof"` // Initial configuration
 }
 
 type SyncAccessResponse_Update struct {
-	Update *AccessUpdate `protobuf:"bytes,2,opt,name=update,proto3,oneof"` // Инкрементальное обновление
+	Update *AccessUpdate `protobuf:"bytes,2,opt,name=update,proto3,oneof"` // Incremental update
 }
 
 type SyncAccessResponse_Heartbeat struct {
-	Heartbeat *Heartbeat `protobuf:"bytes,3,opt,name=heartbeat,proto3,oneof"` // Heartbeat для keep-alive
+	Heartbeat *Heartbeat `protobuf:"bytes,3,opt,name=heartbeat,proto3,oneof"` // Heartbeat for keep-alive
 }
 
 func (*SyncAccessResponse_InitialConfig) isSyncAccessResponse_Message() {}
@@ -348,13 +348,13 @@ func (*SyncAccessResponse_Update) isSyncAccessResponse_Message() {}
 
 func (*SyncAccessResponse_Heartbeat) isSyncAccessResponse_Message() {}
 
-// AccessUpdate инкрементальное обновление
+// AccessUpdate incremental update
 type AccessUpdate struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Environment      string                 `protobuf:"bytes,1,opt,name=environment,proto3" json:"environment,omitempty"`
 	AddedContracts   []*ContractAccess      `protobuf:"bytes,2,rep,name=added_contracts,json=addedContracts,proto3" json:"added_contracts,omitempty"`
 	UpdatedContracts []*ContractAccess      `protobuf:"bytes,3,rep,name=updated_contracts,json=updatedContracts,proto3" json:"updated_contracts,omitempty"`
-	RemovedContracts []string               `protobuf:"bytes,4,rep,name=removed_contracts,json=removedContracts,proto3" json:"removed_contracts,omitempty"` // Имена контрактов
+	RemovedContracts []string               `protobuf:"bytes,4,rep,name=removed_contracts,json=removedContracts,proto3" json:"removed_contracts,omitempty"` // Contract names
 	Version          int64                  `protobuf:"varint,5,opt,name=version,proto3" json:"version,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
@@ -425,7 +425,7 @@ func (x *AccessUpdate) GetVersion() int64 {
 	return 0
 }
 
-// Heartbeat для поддержания соединения
+// Heartbeat for keeping the connection alive
 type Heartbeat struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Timestamp     int64                  `protobuf:"varint,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
@@ -470,7 +470,7 @@ func (x *Heartbeat) GetTimestamp() int64 {
 	return 0
 }
 
-// GetAccessConfigRequest запрос конфигурации
+// GetAccessConfigRequest request for configuration
 type GetAccessConfigRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Environment   string                 `protobuf:"bytes,1,opt,name=environment,proto3" json:"environment,omitempty"`

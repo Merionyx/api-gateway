@@ -50,13 +50,13 @@ func StartExtAuthzServer(cnt *container.Container) error {
 	return nil
 }
 
-// Check реализует ext_authz Check метод
+// Check implements the ext_authz Check method
 func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*authv3.CheckResponse, error) {
 	startTime := time.Now()
 
 	log.Printf("Request received: %+v", req)
 
-	// 1. Извлекаем целевой контракт из пути
+	// 1. Extract the target contract from the path
 	path := req.Attributes.Request.Http.Path
 	contractName := extractContractFromPath(path)
 	if contractName == "" {
@@ -64,21 +64,21 @@ func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*
 		return denyResponse("Invalid path", 400), nil
 	}
 
-	// 3. Извлекаем JWT из заголовка X-App-Token: Bearer <token>
+	// 3. Extract the JWT from the X-App-Token: Bearer <token> header
 	token := req.Attributes.Request.Http.Headers["x-app-token"]
 	if token == "" {
 		log.Printf("[AUTH] Missing x-app-token header")
 		return denyResponse("Missing x-app-token header", 401), nil
 	}
 
-	// 4. Валидируем JWT
+	// 4. Validate the JWT
 	claims, err := s.container.JWTValidator.ValidateToken(token)
 	if err != nil {
 		log.Printf("[AUTH] Invalid JWT: %v", err)
 		return denyResponse("Invalid token", 401), nil
 	}
 
-	// 5. Извлекаем app_id и environment из JWT
+	// 5. Extract the app_id and environment from the JWT
 	appID, ok := claims["app_id"].(string)
 	if !ok {
 		return denyResponse("Invalid token: missing app_id", 401), nil
@@ -89,13 +89,13 @@ func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*
 		return denyResponse("Invalid token: missing environment", 401), nil
 	}
 
-	// 6. Проверяем, что environment совпадает
+	// 6. Check that the environment matches
 	if tokenEnv != s.container.Config.Controller.Environment {
 		return denyResponse(fmt.Sprintf("Token for %s, but current env is %s",
 			tokenEnv, s.container.Config.Controller.Environment), 403), nil
 	}
 
-	// 7. Проверяем права доступа из in-memory storage
+	// 7. Check access rights from in-memory storage
 	allowed := s.container.AccessStorage.CheckAccess(contractName, appID, tokenEnv)
 	if !allowed {
 		log.Printf("[AUTH] Access denied: app=%s contract=%s env=%s", appID, contractName, tokenEnv)

@@ -23,7 +23,7 @@ func (b *xdsBuilder) BuildListeners(env *models.Environment) []*listenerv3.Liste
 }
 
 func buildHTTPListener(env *models.Environment) *listenerv3.Listener {
-	// Создаем HTTP фильтры
+	// Create HTTP filters
 	httpFilters := buildHTTPFilters()
 	manager := &hcmv3.HttpConnectionManager{
 		CodecType:  hcmv3.HttpConnectionManager_AUTO,
@@ -41,7 +41,7 @@ func buildHTTPListener(env *models.Environment) *listenerv3.Listener {
 		},
 		HttpFilters: httpFilters,
 
-		// Настройки таймаутов
+		// Timeout settings
 		RequestTimeout: durationpb.New(30 * time.Second),
 	}
 	pbst, err := anypb.New(manager)
@@ -71,7 +71,7 @@ func buildHTTPListener(env *models.Environment) *listenerv3.Listener {
 	}
 }
 
-// buildHTTPFilters создает цепочку HTTP фильтров
+// buildHTTPFilters creates a chain of HTTP filters
 func buildHTTPFilters() []*hcmv3.HttpFilter {
 	return []*hcmv3.HttpFilter{
 		buildExtAuthzFilter(),
@@ -92,16 +92,16 @@ func buildExtAuthzFilter() *hcmv3.HttpFilter {
 			},
 		},
 
-		// Поведение при ошибке
-		FailureModeAllow: false, // Deny on failure (безопаснее)
+		// Behavior on failure
+		FailureModeAllow: false,
 
-		// Передаем заголовки в Auth Sidecar
+		// Pass headers to the Auth Sidecar
 		WithRequestBody: &extauthzv3.BufferSettings{
 			MaxRequestBytes:     8192,
 			AllowPartialMessage: true,
 		},
 
-		// Очищаем заголовки для безопасности
+		// Clear headers for security
 		ClearRouteCache: true,
 	}
 	return &hcmv3.HttpFilter{
@@ -112,13 +112,13 @@ func buildExtAuthzFilter() *hcmv3.HttpFilter {
 	}
 }
 
-// buildRouterFilter создает router фильтр (обязательно последний!)
+// buildRouterFilter creates a router filter (must be last!)
 func buildRouterFilter() *hcmv3.HttpFilter {
 	return &hcmv3.HttpFilter{
 		Name: "envoy.filters.http.router",
 		ConfigType: &hcmv3.HttpFilter_TypedConfig{
 			TypedConfig: mustMarshalAny(&routerv3.Router{
-				// Настройки роутера
+				// Router settings
 				SuppressEnvoyHeaders: false,
 			}),
 		},

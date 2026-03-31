@@ -8,6 +8,7 @@ package authv1
 
 import (
 	context "context"
+
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -27,11 +28,11 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// AuthService сервис для синхронизации прав доступа
+// AuthService service for synchronizing access rights
 type AuthServiceClient interface {
-	// Bidirectional streaming для синхронизации
+	// Bidirectional streaming for synchronization
 	SyncAccess(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[SyncAccessRequest, SyncAccessResponse], error)
-	// Получить текущую конфигурацию (unary)
+	// Get current configuration (unary)
 	GetAccessConfig(ctx context.Context, in *GetAccessConfigRequest, opts ...grpc.CallOption) (*AccessConfig, error)
 }
 
@@ -70,11 +71,11 @@ func (c *authServiceClient) GetAccessConfig(ctx context.Context, in *GetAccessCo
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
 //
-// AuthService сервис для синхронизации прав доступа
+// AuthService service for synchronizing access rights
 type AuthServiceServer interface {
-	// Bidirectional streaming для синхронизации
+	// Bidirectional streaming for synchronization
 	SyncAccess(grpc.BidiStreamingServer[SyncAccessRequest, SyncAccessResponse]) error
-	// Получить текущую конфигурацию (unary)
+	// Get current configuration (unary)
 	GetAccessConfig(context.Context, *GetAccessConfigRequest) (*AccessConfig, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }

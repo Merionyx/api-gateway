@@ -19,16 +19,16 @@ func (b *xdsBuilder) BuildClusters(env *models.Environment) []*clusterv3.Cluster
 	clusters := make([]*clusterv3.Cluster, 0)
 	uniqueServices := make(map[string]string)
 
-	// 1. Добавляем Auth Sidecar кластер
+	// 1. Add Auth Sidecar cluster
 	authSidecarCluster := buildAuthSidecarCluster()
 	clusters = append(clusters, authSidecarCluster)
 
-	// 2. Добавляем сервисы из environment
+	// 2. Add services from environment
 	for _, service := range env.Services.Static {
 		uniqueServices[service.Name] = service.Upstream
 	}
 
-	// 3. Добавляем глобальные сервисы
+	// 3. Add global services
 	if b.inMemoryServiceRepository != nil {
 		globalServices, err := b.inMemoryServiceRepository.ListServices()
 		if err == nil {
@@ -40,7 +40,7 @@ func (b *xdsBuilder) BuildClusters(env *models.Environment) []*clusterv3.Cluster
 		}
 	}
 
-	// 4. Создаем кластеры для сервисов
+	// 4. Create clusters for services
 	for serviceName, upstream := range uniqueServices {
 		cluster := buildCluster(serviceName, upstream)
 		clusters = append(clusters, cluster)
@@ -49,18 +49,18 @@ func (b *xdsBuilder) BuildClusters(env *models.Environment) []*clusterv3.Cluster
 	return clusters
 }
 
-// buildAuthSidecarCluster создает кластер для Auth Sidecar
+// buildAuthSidecarCluster creates a cluster for the Auth Sidecar
 func buildAuthSidecarCluster() *clusterv3.Cluster {
 	return &clusterv3.Cluster{
 		Name:           "auth_sidecar",
 		ConnectTimeout: durationpb.New(1 * time.Second),
 
-		// Используем LOGICAL_DNS для резолва hostname
+		// Use LOGICAL_DNS for hostname resolution
 		ClusterDiscoveryType: &clusterv3.Cluster_Type{
 			Type: clusterv3.Cluster_LOGICAL_DNS,
 		},
 
-		// DNS lookup только для IPv4
+		// DNS lookup only for IPv4
 		DnsLookupFamily: clusterv3.Cluster_V4_ONLY,
 
 		LoadAssignment: &endpointv3.ClusterLoadAssignment{
@@ -72,7 +72,7 @@ func buildAuthSidecarCluster() *clusterv3.Cluster {
 							Address: &corev3.Address{
 								Address: &corev3.Address_SocketAddress{
 									SocketAddress: &corev3.SocketAddress{
-										Address: "auth-sidecar-dev", // Hostname (будет резолвиться через DNS)
+										Address: "auth-sidecar-dev", // Hostname (will be resolved via DNS)
 										PortSpecifier: &corev3.SocketAddress_PortValue{
 											PortValue: 9001,
 										},
@@ -85,7 +85,7 @@ func buildAuthSidecarCluster() *clusterv3.Cluster {
 			}},
 		},
 
-		// HTTP/2 для gRPC (новый способ)
+		// HTTP/2 for gRPC (new way)
 		TypedExtensionProtocolOptions: map[string]*anypb.Any{
 			"envoy.extensions.upstreams.http.v3.HttpProtocolOptions": mustMarshalAny(
 				&upstreamhttpv3.HttpProtocolOptions{

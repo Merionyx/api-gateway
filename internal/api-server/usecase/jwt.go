@@ -49,12 +49,12 @@ func NewJWTUseCase(keysDir, issuer string) (*JWTUseCase, error) {
 		signingKeys: make(map[string]*KeyPair),
 	}
 
-	// Загружаем все ключи из директории
+	// Load all keys from the directory
 	if err := uc.loadKeys(); err != nil {
 		return nil, fmt.Errorf("failed to load keys: %w", err)
 	}
 
-	// Если нет ключей - создаем дефолтный EdDSA ключ
+	// If there are no keys - create a default EdDSA key
 	if len(uc.signingKeys) == 0 {
 		if err := uc.generateDefaultKey(); err != nil {
 			return nil, fmt.Errorf("failed to generate default key: %w", err)
@@ -83,13 +83,13 @@ func (uc *JWTUseCase) GenerateToken(req *models.GenerateTokenRequest) (*models.G
 		claims["environment"] = req.Environment
 	}
 
-	// Get active key
+	// Get the active key
 	keyPair := uc.signingKeys[uc.activeKeyID]
 	if keyPair == nil {
 		return nil, fmt.Errorf("no active signing key found")
 	}
 
-	// Create token with the correct algorithm
+	// Create a token with the correct algorithm
 	var token *jwt.Token
 	switch keyPair.Algorithm {
 	case AlgorithmEdDSA:
@@ -100,7 +100,7 @@ func (uc *JWTUseCase) GenerateToken(req *models.GenerateTokenRequest) (*models.G
 		return nil, fmt.Errorf("unsupported algorithm: %s", keyPair.Algorithm)
 	}
 
-	// Add kid to header
+	// Add the kid to the header
 	token.Header["kid"] = keyPair.Kid
 
 	// Sign the token

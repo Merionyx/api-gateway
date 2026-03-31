@@ -44,7 +44,7 @@ func NewJWTValidator(jwksURL string) *JWTValidator {
 		publicKeys: make(map[string]crypto.PublicKey),
 		httpClient: &http.Client{Timeout: 10 * time.Second},
 	}
-	// Загружаем ключи при старте с retry
+	// Load keys on startup with retry
 	maxRetries := 5
 	backoff := time.Second
 
@@ -53,21 +53,21 @@ func NewJWTValidator(jwksURL string) *JWTValidator {
 			fmt.Printf("Attempt %d/%d: failed to load keys: %v\n", i+1, maxRetries, err)
 			if i < maxRetries-1 {
 				time.Sleep(backoff)
-				backoff *= 2 // Экспоненциальная задержка: 1s, 2s, 4s, 8s, 16s
+				backoff *= 2 // Exponential delay: 1s, 2s, 4s, 8s, 16s
 			}
 		} else {
 			fmt.Printf("Successfully loaded keys on attempt %d\n", i+1)
 			break
 		}
 	}
-	// Периодически обновляем ключи
+	// Periodically refresh keys
 	go validator.periodicRefresh()
 	return validator
 }
 
-// ValidateToken валидирует JWT токен
+// ValidateToken validates a JWT token
 func (v *JWTValidator) ValidateToken(tokenString string) (jwt.MapClaims, error) {
-	// Парсим токен для получения kid
+	// Parse the token to get the kid
 	token, _, err := new(jwt.Parser).ParseUnverified(tokenString, jwt.MapClaims{})
 	if err != nil {
 		return nil, err
@@ -78,10 +78,10 @@ func (v *JWTValidator) ValidateToken(tokenString string) (jwt.MapClaims, error) 
 		return nil, fmt.Errorf("missing kid in token header")
 	}
 
-	// Получаем публичный ключ
+	// Get the public key
 	publicKey := v.getPublicKey(kid)
 	if publicKey == nil {
-		// Пытаемся обновить ключи
+		// Try to update the keys
 		if err := v.RefreshKeys(); err != nil {
 			return nil, fmt.Errorf("failed to refresh keys: %w", err)
 		}
@@ -92,9 +92,9 @@ func (v *JWTValidator) ValidateToken(tokenString string) (jwt.MapClaims, error) 
 		}
 	}
 
-	// Валидируем токен
+	// Validate the token
 	parsedToken, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		// Проверяем алгоритм
+		// Check the algorithm
 		switch token.Method.(type) {
 		case *jwt.SigningMethodEd25519:
 			// EdDSA
@@ -117,7 +117,7 @@ func (v *JWTValidator) ValidateToken(tokenString string) (jwt.MapClaims, error) 
 	return nil, fmt.Errorf("invalid token")
 }
 
-// RefreshKeys обновляет публичные ключи из JWKS endpoint
+// RefreshKeys updates the public keys from the JWKS endpoint
 func (v *JWTValidator) RefreshKeys() error {
 	resp, err := v.httpClient.Get(v.jwksURL)
 	if err != nil {
@@ -142,10 +142,10 @@ func (v *JWTValidator) RefreshKeys() error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 
-	// Очищаем старые ключи
+	// Clear the old keys
 	v.publicKeys = make(map[string]crypto.PublicKey)
 
-	// Загружаем новые ключи
+	// Load the new keys
 	for _, jwk := range jwks.Keys {
 		publicKey, err := v.jwkToPublicKey(&jwk)
 		if err != nil {
@@ -178,7 +178,7 @@ func (v *JWTValidator) periodicRefresh() {
 	}
 }
 
-// jwkToPublicKey конвертирует JWK в crypto.PublicKey
+// jwkToPublicKey converts a JWK to crypto.PublicKey
 func (v *JWTValidator) jwkToPublicKey(jwk *JWK) (crypto.PublicKey, error) {
 	switch jwk.Kty {
 	case "OKP":

@@ -29,7 +29,7 @@ func (uc *schemasUseCase) SetDependencies(schemaRepo interfaces.SchemaRepository
 }
 
 func (uc *schemasUseCase) SyncContractBundle(ctx context.Context, req *models.SyncContractBundleRequest) (*models.SyncContractBundleResponse, error) {
-	// Выкачиваем из Git
+	// Download from Git
 	log.Printf("Syncing contract %s/%s/%s from Git", req.Repository, req.Ref, req.Bundle)
 	snapshots, err := uc.gitManager.GetRepositorySnapshots(req.Repository, req.Ref, req.Path)
 	if err != nil {
@@ -63,14 +63,14 @@ func (uc *schemasUseCase) SyncAllContracts(ctx context.Context, req *models.Sync
 	var err error
 
 	if req.Environment != "" {
-		// Синхронизируем контракты для одного окружения
+		// Sync contracts for one environment
 		env, err := uc.environmentRepo.GetEnvironment(ctx, req.Environment)
 		if err != nil {
 			return nil, fmt.Errorf("environment %s not found: %w", req.Environment, err)
 		}
 		environments = map[string]*models.Environment{req.Environment: env}
 	} else {
-		// Синхронизируем контракты для всех окружений
+		// Sync contracts for all environments
 		environments, err = uc.environmentRepo.ListEnvironments(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list environments: %w", err)
