@@ -1,9 +1,6 @@
 server:
-  http1_port: "8080"
-  http2_port: "8443"
-  grpc_port: "19090"
-  xds_port: "19091"
-  host: "localhost"
+  http_port: "8080"
+  host: "0.0.0.0"
 
 etcd:
   endpoints:
@@ -14,3 +11,7 @@ etcd:
     cert_file: "./secrets/certs/etcd/client.pem"
     key_file: "./secrets/certs/etcd/client-key.pem"
     ca_file: "./secrets/certs/etcd/ca.pem"
+
+jwt:
+  keys_dir: "./secrets/api-server/keys/jwt"
+  issuer: "gateway-api-server"

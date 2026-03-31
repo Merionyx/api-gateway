@@ -160,6 +160,23 @@ generate-etcd-certs: ## Generate etcd certificates
 	@echo "\033[0;90m  • Peer: peer.pem, peer-key.pem\033[0m"
 	@echo "\033[0;90m  • Client: client.pem, client-key.pem\033[0m"
 
+# JWT Keys Management
+.PHONY: jwt-generate-ed25519
+generate-ed25519-key:
+	@echo "Generating Ed25519 key..."
+	@mkdir -p secrets/api-server/keys/jwt
+	@openssl genpkey -algorithm ED25519 -out secrets/api-server/keys/jwt/api-server-key-$(shell date +%Y-%m-%d).key
+	@chmod 600 secrets/api-server/keys/jwt/api-server-key-$(shell date +%Y-%m-%d).key
+	@echo "✓ Generated: secrets/api-server/keys/jwt/api-server-key-$(shell date +%Y-%m-%d).key"
+	
+.PHONY: jwt-generate-rsa
+generate-rsa-key:
+	@echo "Generating RSA 2048 key..."
+	@mkdir -p secrets/api-server/keys/jwt
+	@openssl genrsa -out secrets/api-server/keys/jwt/api-server-rsa-$(shell date +%Y-%m-%d).key 2048
+	@chmod 600 secrets/api-server/keys/jwt/api-server-rsa-$(shell date +%Y-%m-%d).key
+	@echo "✓ Generated: secrets/api-server/keys/jwt/api-server-rsa-$(shell date +%Y-%m-%d).key"
+
 # Help
 help: ## Show help
 	@echo "Available commands:"

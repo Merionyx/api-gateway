@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"merionyx/api-gateway/internal/api-server/config"
-	"merionyx/api-gateway/internal/shared/etcd"
+	"merionyx/api-gateway/internal/api-server/delivery/http/handler"
+	"merionyx/api-gateway/internal/api-server/usecase"
+	sharedetcd "merionyx/api-gateway/internal/shared/etcd"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
@@ -18,6 +20,12 @@ type Container struct {
 
 	// etcd
 	EtcdClient *clientv3.Client
+
+	// Use Cases
+	JWTUseCase *usecase.JWTUseCase
+
+	// Handlers
+	JWTHandler *handler.JWTHandler
 }
 
 // NewContainer creates and initializes a new DI container
@@ -27,12 +35,14 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 	}
 
 	container.initEtcd()
+	container.initUseCases()
+	container.initHandlers()
 
 	return container, nil
 }
 
 func (c *Container) initEtcd() {
-	etcdClient, err := etcd.NewEtcdClient(c.Config.Etcd)
+	etcdClient, err := sharedetcd.NewEtcdClient(c.Config.Etcd)
 	if err != nil {
 		log.Fatalf("Failed to initialize etcd client: %v", err)
 	}
@@ -46,6 +56,26 @@ func (c *Container) initEtcd() {
 
 	c.EtcdClient = etcdClient
 	log.Println("etcd client initialized and connected successfully")
+}
+
+func (c *Container) initUseCases() {
+	var err error
+
+	c.JWTUseCase, err = usecase.NewJWTUseCase(
+		c.Config.JWT.KeysDir,
+		c.Config.JWT.Issuer,
+	)
+	if err != nil {
+		log.Fatalf("Failed to initialize JWT use case: %v", err)
+	}
+
+	log.Println("Use cases initialized")
+}
+
+func (c *Container) initHandlers() {
+	c.JWTHandler = handler.NewJWTHandler(c.JWTUseCase)
+
+	log.Println("Handlers initialized")
 }
 
 // Close closes all resources in the container

@@ -1,15 +1,16 @@
-package controller
+package app
 
 import (
 	"context"
 	"fmt"
 	"log/slog"
-	"merionyx/api-gateway/internal/api-server/config"
-	"merionyx/api-gateway/internal/api-server/container"
-	"merionyx/api-gateway/internal/api-server/server"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"merionyx/api-gateway/internal/api-server/config"
+	"merionyx/api-gateway/internal/api-server/container"
+	"merionyx/api-gateway/internal/api-server/server"
 )
 
 func Run() error {
@@ -25,15 +26,15 @@ func Run() error {
 		logger.Error(fmt.Sprintf("Failed to load config: %v", err))
 		os.Exit(1)
 	}
-	logger.Info("Config loade", "config", cfg)
+	logger.Info("Config loaded", "config", cfg)
 
 	// Initialize DI container
-	container, err := container.NewContainer(cfg)
+	cnt, err := container.NewContainer(cfg)
 	if err != nil {
 		logger.Error(fmt.Sprintf("Failed to initialize container: %v", err))
 		os.Exit(1)
 	}
-	defer container.Close()
+	defer cnt.Close()
 
 	// Setup graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
@@ -41,16 +42,8 @@ func Run() error {
 
 	// Start HTTP server
 	go func() {
-		if err := server.StartHTTPServer(container); err != nil {
+		if err := server.StartHTTPServer(cnt); err != nil {
 			logger.Error(fmt.Sprintf("HTTP server error: %v", err))
-			cancel()
-		}
-	}()
-
-	// Start gRPC server
-	go func() {
-		if err := server.StartGRPCServer(container); err != nil {
-			logger.Error(fmt.Sprintf("gRPC server error: %v", err))
 			cancel()
 		}
 	}()
