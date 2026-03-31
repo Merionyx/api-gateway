@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"strings"
 	"time"
 
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
@@ -56,29 +55,37 @@ func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*
 
 	log.Printf("Request received: %+v", req)
 
-	// 1. Extract the target contract from the path
+	// 1. Find the contract by path (longest prefix match)
 	path := req.Attributes.Request.Http.Path
-	contractName := extractContractFromPath(path)
-	if contractName == "" {
-		log.Printf("[AUTH] Unable to determine contract from path: %s", path)
-		return denyResponse("Invalid path", 400), nil
+	accessConfig := s.container.AccessStorage.FindContractByPath(path)
+
+	if accessConfig == nil {
+		log.Printf("[AUTH] Unable to find contract for path: %s", path)
+		return denyResponse("Contract not found", 404), nil
 	}
 
-	// 3. Extract the JWT from the X-App-Token: Bearer <token> header
+	contractName := accessConfig.ContractName
+
+	// 3. Check if the contract is secure
+	if accessConfig.Secure == false {
+		return allowResponse(contractName, contractName), nil
+	}
+
+	// 4. Extract the JWT from the X-App-Token: Bearer <token> header
 	token := req.Attributes.Request.Http.Headers["x-app-token"]
 	if token == "" {
 		log.Printf("[AUTH] Missing x-app-token header")
 		return denyResponse("Missing x-app-token header", 401), nil
 	}
 
-	// 4. Validate the JWT
+	// 5. Validate the JWT
 	claims, err := s.container.JWTValidator.ValidateToken(token)
 	if err != nil {
 		log.Printf("[AUTH] Invalid JWT: %v", err)
 		return denyResponse("Invalid token", 401), nil
 	}
 
-	// 5. Extract the app_id and environment from the JWT
+	// 6. Extract the app_id and environment from the JWT
 	appID, ok := claims["app_id"].(string)
 	if !ok {
 		return denyResponse("Invalid token: missing app_id", 401), nil
@@ -89,13 +96,13 @@ func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*
 		return denyResponse("Invalid token: missing environment", 401), nil
 	}
 
-	// 6. Check that the environment matches
+	// 7. Check that the environment matches
 	if tokenEnv != s.container.Config.Controller.Environment {
 		return denyResponse(fmt.Sprintf("Token for %s, but current env is %s",
 			tokenEnv, s.container.Config.Controller.Environment), 403), nil
 	}
 
-	// 7. Check access rights from in-memory storage
+	// 8. Check access rights from in-memory storage
 	allowed := s.container.AccessStorage.CheckAccess(contractName, appID, tokenEnv)
 	if !allowed {
 		log.Printf("[AUTH] Access denied: app=%s contract=%s env=%s", appID, contractName, tokenEnv)
@@ -109,11 +116,17 @@ func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*
 	return allowResponse(appID, contractName), nil
 }
 
-func extractContractFromPath(path string) string {
-	// /api/services/proxy-list-01/v1/users → proxy-list-01
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	if len(parts) >= 3 && parts[0] == "api" && parts[1] == "services" {
-		return parts[2]
+func extractPrefixFromPath(path string) string {
+	// /api/services/proxy-list-04/v1/health → /api/services/proxy-list-04/
+	// Find the position after the third slash
+	slashCount := 0
+	for i, c := range path {
+		if c == '/' {
+			slashCount++
+			if slashCount == 4 {
+				return path[:i+1]
+			}
+		}
 	}
 	return ""
 }

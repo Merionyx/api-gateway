@@ -148,10 +148,15 @@ func (h *AuthHandler) buildAccessConfig(ctx context.Context, environment string)
 	if err != nil {
 		env, err = h.inMemoryEnvironmentsRepository.GetEnvironment(ctx, environment)
 
+		if err != nil {
+			return config, fmt.Errorf("environment not found: %w", err)
+		}
+
 		// For each snapshot get the contracts
 		for _, snapshot := range env.Snapshots {
 			contractAccess := &authv1.ContractAccess{
 				ContractName: snapshot.Name,
+				Prefix:       snapshot.Prefix,
 				Secure:       snapshot.Access.Secure,
 				Apps:         make([]*authv1.AppAccess, 0),
 			}
@@ -197,6 +202,7 @@ func (h *AuthHandler) buildAccessConfig(ctx context.Context, environment string)
 		for _, snapshot := range snapshots {
 			contractAccess := &authv1.ContractAccess{
 				ContractName: snapshot.Name,
+				Prefix:       snapshot.Prefix,
 				Secure:       snapshot.Access.Secure,
 				Apps:         make([]*authv1.AppAccess, 0),
 			}

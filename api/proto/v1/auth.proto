@@ -8,7 +8,8 @@ option go_package = "merionyx/api-gateway/pkg/api/auth/v1;authv1";
 message ContractAccess {
   string contract_name = 1;
   bool secure = 2;
-  repeated AppAccess apps = 3;
+  string prefix = 3;
+  repeated AppAccess apps = 4;
 }
 
 // AppAccess access to an application

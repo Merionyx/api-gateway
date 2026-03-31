@@ -26,7 +26,8 @@ type ContractAccess struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ContractName  string                 `protobuf:"bytes,1,opt,name=contract_name,json=contractName,proto3" json:"contract_name,omitempty"`
 	Secure        bool                   `protobuf:"varint,2,opt,name=secure,proto3" json:"secure,omitempty"`
-	Apps          []*AppAccess           `protobuf:"bytes,3,rep,name=apps,proto3" json:"apps,omitempty"`
+	Prefix        string                 `protobuf:"bytes,3,opt,name=prefix,proto3" json:"prefix,omitempty"`
+	Apps          []*AppAccess           `protobuf:"bytes,4,rep,name=apps,proto3" json:"apps,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -73,6 +74,13 @@ func (x *ContractAccess) GetSecure() bool {
 		return x.Secure
 	}
 	return false
+}
+
+func (x *ContractAccess) GetPrefix() string {
+	if x != nil {
+		return x.Prefix
+	}
+	return ""
 }
 
 func (x *ContractAccess) GetApps() []*AppAccess {
@@ -519,11 +527,12 @@ var File_api_proto_v1_auth_proto protoreflect.FileDescriptor
 
 const file_api_proto_v1_auth_proto_rawDesc = "" +
 	"\n" +
-	"\x17api/proto/v1/auth.proto\x12\vapi.auth.v1\"y\n" +
+	"\x17api/proto/v1/auth.proto\x12\vapi.auth.v1\"\x91\x01\n" +
 	"\x0eContractAccess\x12#\n" +
 	"\rcontract_name\x18\x01 \x01(\tR\fcontractName\x12\x16\n" +
-	"\x06secure\x18\x02 \x01(\bR\x06secure\x12*\n" +
-	"\x04apps\x18\x03 \x03(\v2\x16.api.auth.v1.AppAccessR\x04apps\"F\n" +
+	"\x06secure\x18\x02 \x01(\bR\x06secure\x12\x16\n" +
+	"\x06prefix\x18\x03 \x01(\tR\x06prefix\x12*\n" +
+	"\x04apps\x18\x04 \x03(\v2\x16.api.auth.v1.AppAccessR\x04apps\"F\n" +
 	"\tAppAccess\x12\x15\n" +
 	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\"\n" +
 	"\fenvironments\x18\x02 \x03(\tR\fenvironments\"\x85\x01\n" +
