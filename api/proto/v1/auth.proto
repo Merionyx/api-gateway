@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package api.auth.v1;
+
+option go_package = "merionyx/api-gateway/pkg/api/auth/v1;authv1";
+
+// ContractAccess представляет права доступа к контракту
+message ContractAccess {
+  string contract_name = 1;
+  bool secure = 2;
+  repeated AppAccess apps = 3;
+}
+
+// AppAccess представляет права доступа приложения
+message AppAccess {
+  string app_id = 1;
+  repeated string environments = 2;
+}
+
+// AccessConfig полная конфигурация доступа для окружения
+message AccessConfig {
+  string environment = 1;
+  repeated ContractAccess contracts = 2;
+  int64 version = 3; // Версия конфигурации
+}
+
+// SyncAccessRequest запрос на синхронизацию
+message SyncAccessRequest {
+  string environment = 1;
+  string sidecar_id = 2; // Уникальный ID sidecar'а
+}
+
+// SyncAccessResponse ответ с конфигурацией
+message SyncAccessResponse {
+  oneof message {
+    AccessConfig initial_config = 1;  // Начальная конфигурация
+    AccessUpdate update = 2;          // Инкрементальное обновление
+    Heartbeat heartbeat = 3;          // Heartbeat для keep-alive
+  }
+}
+
+// AccessUpdate инкрементальное обновление
+message AccessUpdate {
+  string environment = 1;
+  repeated ContractAccess added_contracts = 2;
+  repeated ContractAccess updated_contracts = 3;
+  repeated string removed_contracts = 4; // Имена контрактов
+  int64 version = 5;
+}
+
+// Heartbeat для поддержания соединения
+message Heartbeat {
+  int64 timestamp = 1;
+}
+
+// AuthService сервис для синхронизации прав доступа
+service AuthService {
+  // Bidirectional streaming для синхронизации
+  rpc SyncAccess(stream SyncAccessRequest) returns (stream SyncAccessResponse);
+  
+  // Получить текущую конфигурацию (unary)
+  rpc GetAccessConfig(GetAccessConfigRequest) returns (AccessConfig);
+}
+
+// GetAccessConfigRequest запрос конфигурации
+message GetAccessConfigRequest {
+  string environment = 1;
+}

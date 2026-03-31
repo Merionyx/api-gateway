@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"merionyx/api-gateway/internal/controller/container"
+	authv1 "merionyx/api-gateway/pkg/api/auth/v1"
 	environmentsv1 "merionyx/api-gateway/pkg/api/environments/v1"
 	schemasv1 "merionyx/api-gateway/pkg/api/schemas/v1"
 	snapshotsv1 "merionyx/api-gateway/pkg/api/snapshots/v1"
@@ -25,6 +26,7 @@ func StartGRPCServer(container *container.Container) error {
 	snapshotsv1.RegisterSnapshotsServiceServer(server, container.SnapshotGRPCHandler)
 	environmentsv1.RegisterEnvironmentsServiceServer(server, container.EnvironmentsGRPCHandler)
 	schemasv1.RegisterSchemasServiceServer(server, container.SchemasGRPCHandler)
+	authv1.RegisterAuthServiceServer(server, container.AuthGRPCHandler)
 
 	reflection.Register(server)
 

@@ -1,0 +1,10 @@
+server:
+  grpc_port: "9001"
+  host: "0.0.0.0"
+
+controller:
+  address: "gateway-controller:19090"
+  environment: "dev"
+
+jwt:
+  jwks_url: "http://gateway-api-server:8080/.well-known/jwks.json"

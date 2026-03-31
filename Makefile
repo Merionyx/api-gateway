@@ -52,6 +52,7 @@ docker-up:
 	docker-compose \
 		-p 'merionyx-api-gateway' \
 		-f ./deployments/docker/compose.app.dev.yaml \
+		-f ./deployments/docker/compose.sidecar.yaml \
 		-f ./deployments/docker/compose.etcd.yaml \
 		-f ./deployments/docker/compose.envoy.yaml \
 		-f ./deployments/docker/compose.mock-service.yaml \
@@ -61,6 +62,7 @@ docker-down:
 	docker-compose \
 		-p 'merionyx-api-gateway' \
 		-f ./deployments/docker/compose.app.dev.yaml \
+		-f ./deployments/docker/compose.sidecar.yaml \
 		-f ./deployments/docker/compose.etcd.yaml \
 		-f ./deployments/docker/compose.envoy.yaml \
 		-f ./deployments/docker/compose.mock-service.yaml \
@@ -79,6 +81,8 @@ proto-generate: ## Generate protobuf code
 	cp ./api/proto/v1/schemas.pb.go ./pkg/api/schemas/v1/schemas.pb.go && \
 	cp ./api/proto/v1/environment_grpc.pb.go ./pkg/api/environments/v1/environment_grpc.pb.go && \
 	cp ./api/proto/v1/environment.pb.go ./pkg/api/environments/v1/environment.pb.go && \
+	cp ./api/proto/v1/auth_grpc.pb.go ./pkg/api/auth/v1/auth_grpc.pb.go && \
+	cp ./api/proto/v1/auth.pb.go ./pkg/api/auth/v1/auth.pb.go && \
 	rm -rf ./api/proto/v1/*.pb.go
 
 proto-install: ## Install protobuf tools
@@ -168,7 +172,7 @@ generate-ed25519-key:
 	@openssl genpkey -algorithm ED25519 -out secrets/api-server/keys/jwt/api-server-key-$(shell date +%Y-%m-%d).key
 	@chmod 600 secrets/api-server/keys/jwt/api-server-key-$(shell date +%Y-%m-%d).key
 	@echo "✓ Generated: secrets/api-server/keys/jwt/api-server-key-$(shell date +%Y-%m-%d).key"
-	
+
 .PHONY: jwt-generate-rsa
 generate-rsa-key:
 	@echo "Generating RSA 2048 key..."

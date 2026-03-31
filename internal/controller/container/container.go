@@ -56,6 +56,7 @@ type Container struct {
 	SnapshotGRPCHandler     *handler.SnapshotHandler
 	EnvironmentsGRPCHandler *handler.EnvironmentsHandler
 	SchemasGRPCHandler      *handler.SchemasHandler
+	AuthGRPCHandler         *handler.AuthHandler
 
 	// Router
 	Router *router.Router
@@ -173,6 +174,7 @@ func (c *Container) initHandlers() {
 	c.SnapshotGRPCHandler = handler.NewSnapshotHandler(c.SnapshotsUseCase)
 	c.EnvironmentsGRPCHandler = handler.NewEnvironmentsHandler(c.EnvironmentsUseCase)
 	c.SchemasGRPCHandler = handler.NewSchemasHandler(c.SchemasUseCase)
+	c.AuthGRPCHandler = handler.NewAuthHandler(c.EnvironmentRepository, c.SchemaRepository, c.EtcdClient)
 
 	log.Println("Handlers initialized")
 }

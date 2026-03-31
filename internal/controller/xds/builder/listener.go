@@ -3,13 +3,16 @@ package builder
 
 import (
 	"fmt"
+	"time"
 
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	listenerv3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
+	extauthzv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ext_authz/v3"
 	routerv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/router/v3"
 	hcmv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	"merionyx/api-gateway/internal/controller/domain/models"
 )
@@ -20,6 +23,8 @@ func (b *xdsBuilder) BuildListeners(env *models.Environment) []*listenerv3.Liste
 }
 
 func buildHTTPListener(env *models.Environment) *listenerv3.Listener {
+	// Создаем HTTP фильтры
+	httpFilters := buildHTTPFilters()
 	manager := &hcmv3.HttpConnectionManager{
 		CodecType:  hcmv3.HttpConnectionManager_AUTO,
 		StatPrefix: fmt.Sprintf("ingress_http_%s", env.Name),
@@ -34,19 +39,15 @@ func buildHTTPListener(env *models.Environment) *listenerv3.Listener {
 				RouteConfigName: env.Name + "_routes",
 			},
 		},
-		HttpFilters: []*hcmv3.HttpFilter{{
-			Name: "envoy.filters.http.router",
-			ConfigType: &hcmv3.HttpFilter_TypedConfig{
-				TypedConfig: mustMarshalAny(&routerv3.Router{}),
-			},
-		}},
-	}
+		HttpFilters: httpFilters,
 
+		// Настройки таймаутов
+		RequestTimeout: durationpb.New(30 * time.Second),
+	}
 	pbst, err := anypb.New(manager)
 	if err != nil {
 		panic(err)
 	}
-
 	return &listenerv3.Listener{
 		Name: fmt.Sprintf("listener_%s", env.Name),
 		Address: &corev3.Address{
@@ -67,6 +68,60 @@ func buildHTTPListener(env *models.Environment) *listenerv3.Listener {
 				},
 			}},
 		}},
+	}
+}
+
+// buildHTTPFilters создает цепочку HTTP фильтров
+func buildHTTPFilters() []*hcmv3.HttpFilter {
+	return []*hcmv3.HttpFilter{
+		buildExtAuthzFilter(),
+		buildRouterFilter(),
+	}
+}
+
+func buildExtAuthzFilter() *hcmv3.HttpFilter {
+	extAuthz := &extauthzv3.ExtAuthz{
+		Services: &extauthzv3.ExtAuthz_GrpcService{
+			GrpcService: &corev3.GrpcService{
+				TargetSpecifier: &corev3.GrpcService_EnvoyGrpc_{
+					EnvoyGrpc: &corev3.GrpcService_EnvoyGrpc{
+						ClusterName: "auth_sidecar",
+					},
+				},
+				Timeout: durationpb.New(1 * time.Second),
+			},
+		},
+
+		// Поведение при ошибке
+		FailureModeAllow: false, // Deny on failure (безопаснее)
+
+		// Передаем заголовки в Auth Sidecar
+		WithRequestBody: &extauthzv3.BufferSettings{
+			MaxRequestBytes:     8192,
+			AllowPartialMessage: true,
+		},
+
+		// Очищаем заголовки для безопасности
+		ClearRouteCache: true,
+	}
+	return &hcmv3.HttpFilter{
+		Name: "envoy.filters.http.ext_authz",
+		ConfigType: &hcmv3.HttpFilter_TypedConfig{
+			TypedConfig: mustMarshalAny(extAuthz),
+		},
+	}
+}
+
+// buildRouterFilter создает router фильтр (обязательно последний!)
+func buildRouterFilter() *hcmv3.HttpFilter {
+	return &hcmv3.HttpFilter{
+		Name: "envoy.filters.http.router",
+		ConfigType: &hcmv3.HttpFilter_TypedConfig{
+			TypedConfig: mustMarshalAny(&routerv3.Router{
+				// Настройки роутера
+				SuppressEnvoyHeaders: false,
+			}),
+		},
 	}
 }
 

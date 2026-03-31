@@ -1,0 +1,84 @@
+services:
+  auth-sidecar-dev:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.auth-sidecar.dev
+    container_name: auth-sidecar-dev
+    develop:
+      watch:
+        - path: ../../internal/auth-sidecar
+          target: /app/internal/auth-sidecar
+          action: sync
+        - path: ../../internal/shared
+          target: /app/internal/shared
+          action: sync
+        - path: ../../cmd/auth-sidecar
+          target: /app/cmd/auth-sidecar
+          action: sync
+        - path: ../../configs/auth-sidecar
+          target: /app/configs/auth-sidecar
+          action: sync
+        - path: ../../pkg
+          target: /app/pkg
+          action: sync
+    ports:
+      - "9101:9001"
+    environment:
+      - CONFIG_PATH=./configs/auth-sidecar/config.dev.yaml
+      - AUTH_SIDECAR_CONTROLLER_ADDRESS=gateway-controller:19090
+      - AUTH_SIDECAR_CONTROLLER_ENVIRONMENT=dev
+      - AUTH_SIDECAR_JWT_JWKS_URL=http://api-server:8080/.well-known/jwks.json
+    networks:
+      default:
+      auth-sidecar-dev:
+        aliases:
+          - auth-sidecar
+    depends_on:
+      - gateway-controller
+      - gateway-api-server
+    restart: unless-stopped
+  auth-sidecar-prod:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.auth-sidecar.dev
+    container_name: auth-sidecar-prod
+    develop:
+      watch:
+        - path: ../../internal/auth-sidecar
+          target: /app/internal/auth-sidecar
+          action: sync
+        - path: ../../internal/shared
+          target: /app/internal/shared
+          action: sync
+        - path: ../../cmd/auth-sidecar
+          target: /app/cmd/auth-sidecar
+          action: sync
+        - path: ../../configs/auth-sidecar
+          target: /app/configs/auth-sidecar
+          action: sync
+        - path: ../../pkg
+          target: /app/pkg
+          action: sync
+    ports:
+      - "9102:9001"
+    environment:
+      - CONFIG_PATH=./configs/auth-sidecar/config.prod.yaml
+      - AUTH_SIDECAR_CONTROLLER_ADDRESS=gateway-controller:19090
+      - AUTH_SIDECAR_CONTROLLER_ENVIRONMENT=dev
+      - AUTH_SIDECAR_JWT_JWKS_URL=http://api-server:8080/.well-known/jwks.json
+    networks:
+      default:
+      auth-sidecar-prod:
+        aliases:
+          - auth-sidecar
+    depends_on:
+      - gateway-controller
+      - gateway-api-server
+    restart: unless-stopped
+
+networks:
+  default:
+  auth-sidecar-dev:
+    external: true
+  auth-sidecar-prod:
+    external: true
