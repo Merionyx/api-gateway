@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -9,12 +10,17 @@ import (
 	"merionyx/api-gateway/internal/api-server/domain/interfaces"
 	"merionyx/api-gateway/internal/api-server/domain/models"
 	"merionyx/api-gateway/internal/shared/bundlekey"
+	"merionyx/api-gateway/internal/shared/grpcutil"
 	sharedgit "merionyx/api-gateway/internal/shared/git"
 	pb "merionyx/api-gateway/pkg/api/contract_syncer/v1"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/keepalive"
 )
+
+// errContractSyncerRejected marks a non-transient failure from the syncer (invalid bundle, etc.); do not gRPC-retry.
+var errContractSyncerRejected = errors.New("contract syncer rejected sync")
 
 type BundleSyncUseCase struct {
 	snapshotRepo       interfaces.SnapshotRepository
@@ -39,28 +45,68 @@ func (uc *BundleSyncUseCase) SetRegistryUseCase(registryUseCase *ControllerRegis
 	uc.registryUseCase = registryUseCase
 }
 
+func (uc *BundleSyncUseCase) grpcDialOptions() []grpc.DialOption {
+	return []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithKeepaliveParams(keepalive.ClientParameters{
+			Time:                20 * time.Second,
+			Timeout:             10 * time.Second,
+			PermitWithoutStream: true,
+		}),
+	}
+}
+
+// SyncBundle pulls schemas from Contract Syncer (with transient gRPC retries), writes API Server etcd, notifies controllers.
 func (uc *BundleSyncUseCase) SyncBundle(ctx context.Context, bundle models.BundleInfo) ([]sharedgit.ContractSnapshot, error) {
 	slog.Info("Syncing bundle", "repository", bundle.Repository, "ref", bundle.Ref, "path", bundle.Path)
 
-	conn, err := grpc.NewClient(uc.contractSyncerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	const maxAttempts = 5
+	backoff := time.Duration(0)
+	var lastErr error
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		if backoff > 0 {
+			if err := grpcutil.SleepOrDone(ctx, backoff); err != nil {
+				return nil, err
+			}
+		}
+
+		snapshots, err := uc.syncBundleOnce(ctx, bundle)
+		if err == nil {
+			return snapshots, nil
+		}
+		if errors.Is(err, errContractSyncerRejected) {
+			return nil, err
+		}
+		lastErr = err
+		slog.Warn("Contract Syncer sync attempt failed", "attempt", attempt, "max", maxAttempts, "error", err)
+		backoff = grpcutil.NextReconnectBackoff(backoff, 400*time.Millisecond, 10*time.Second)
+	}
+
+	return nil, fmt.Errorf("contract syncer after %d attempts: %w", maxAttempts, lastErr)
+}
+
+func (uc *BundleSyncUseCase) syncBundleOnce(ctx context.Context, bundle models.BundleInfo) ([]sharedgit.ContractSnapshot, error) {
+	conn, err := grpc.NewClient(uc.contractSyncerAddr, uc.grpcDialOptions()...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to contract syncer: %w", err)
+		return nil, fmt.Errorf("dial contract syncer: %w", err)
 	}
 	defer conn.Close()
 
 	client := pb.NewContractSyncerServiceClient(conn)
-
 	resp, err := client.Sync(ctx, &pb.SyncRequest{
 		Repository: bundle.Repository,
 		Ref:        bundle.Ref,
 		Path:       bundle.Path,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to sync bundle: %w", err)
+		return nil, fmt.Errorf("sync rpc: %w", err)
 	}
-
 	if resp.Error != "" {
-		return nil, fmt.Errorf("contract syncer error: %s", resp.Error)
+		return nil, fmt.Errorf("%w: %s", errContractSyncerRejected, resp.Error)
 	}
 
 	var snapshots []sharedgit.ContractSnapshot
@@ -89,7 +135,7 @@ func (uc *BundleSyncUseCase) SyncBundle(ctx context.Context, bundle models.Bundl
 
 	bundleKey := bundlekey.Build(bundle.Repository, bundle.Ref, bundle.Path)
 	if err := uc.snapshotRepo.SaveSnapshots(ctx, bundleKey, snapshots); err != nil {
-		return nil, fmt.Errorf("failed to save snapshots: %w", err)
+		return nil, fmt.Errorf("save snapshots: %w", err)
 	}
 
 	if uc.registryUseCase != nil {

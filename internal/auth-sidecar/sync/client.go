@@ -9,9 +9,11 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/keepalive"
 
 	"merionyx/api-gateway/internal/auth-sidecar/config"
 	"merionyx/api-gateway/internal/auth-sidecar/storage"
+	"merionyx/api-gateway/internal/shared/grpcutil"
 	authv1 "merionyx/api-gateway/pkg/api/auth/v1"
 )
 
@@ -38,10 +40,14 @@ func NewSyncClient(cfg *config.Config, storage *storage.AccessStorage) *SyncClie
 
 // Start starts the synchronization with the Controller
 func (c *SyncClient) Start(ctx context.Context) error {
-	// Connect to the Controller
 	conn, err := grpc.NewClient(
 		c.config.Controller.Address,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithKeepaliveParams(keepalive.ClientParameters{
+			Time:                20 * time.Second,
+			Timeout:             10 * time.Second,
+			PermitWithoutStream: true,
+		}),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to connect to controller: %w", err)
@@ -52,16 +58,32 @@ func (c *SyncClient) Start(ctx context.Context) error {
 
 	log.Printf("[SYNC] Connected to Controller at %s", c.config.Controller.Address)
 
-	// Start the sync loop with reconnect logic
+	const (
+		initialBackoff = 5 * time.Second
+		maxBackoff     = 60 * time.Second
+	)
+	backoff := time.Duration(0)
+
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			if err := c.syncLoop(ctx); err != nil {
-				log.Printf("[SYNC] Sync error: %v, reconnecting in 5s...", err)
-				time.Sleep(5 * time.Second)
+		}
+
+		if backoff > 0 {
+			log.Printf("[SYNC] Reconnecting after backoff %v", backoff)
+			if err := grpcutil.SleepOrDone(ctx, backoff); err != nil {
+				return err
 			}
+		}
+
+		if err := c.syncLoop(ctx); err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			log.Printf("[SYNC] Sync error: %v", err)
+			backoff = grpcutil.NextReconnectBackoff(backoff, initialBackoff, maxBackoff)
 		}
 	}
 }

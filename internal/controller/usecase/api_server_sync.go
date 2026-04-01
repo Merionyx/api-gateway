@@ -2,7 +2,9 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"time"
 
@@ -12,11 +14,15 @@ import (
 	xdscache "merionyx/api-gateway/internal/controller/xds/cache"
 	xdssnapshot "merionyx/api-gateway/internal/controller/xds/snapshot"
 	"merionyx/api-gateway/internal/shared/bundlekey"
+	"merionyx/api-gateway/internal/shared/grpcutil"
 	sharedgit "merionyx/api-gateway/internal/shared/git"
 	pb "merionyx/api-gateway/pkg/api/controller_registry/v1"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/status"
 )
 
 type APIServerSyncUseCase struct {
@@ -50,28 +56,83 @@ func NewAPIServerSyncUseCase(
 	}
 }
 
-func (uc *APIServerSyncUseCase) RegisterAndStream(ctx context.Context) error {
-	slog.Info("Connecting to API Server", "address", uc.apiServerAddress)
-
-	conn, err := grpc.NewClient(uc.apiServerAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return fmt.Errorf("failed to connect to API Server: %w", err)
+func (uc *APIServerSyncUseCase) grpcDialOptions() []grpc.DialOption {
+	return []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithKeepaliveParams(keepalive.ClientParameters{
+			Time:                20 * time.Second,
+			Timeout:             10 * time.Second,
+			PermitWithoutStream: true,
+		}),
 	}
-	defer conn.Close()
+}
+
+// RegisterAndStream keeps a long-lived connection to API Server: register, heartbeat, snapshot stream.
+// On any failure it backs off and reconnects without restarting the process.
+func (uc *APIServerSyncUseCase) RegisterAndStream(ctx context.Context) error {
+	const (
+		initialBackoff = time.Second
+		maxBackoff     = 60 * time.Second
+	)
+	backoff := time.Duration(0)
+
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		if backoff > 0 {
+			slog.Warn("Reconnecting to API Server after backoff", "address", uc.apiServerAddress, "backoff", backoff)
+			if err := grpcutil.SleepOrDone(ctx, backoff); err != nil {
+				return err
+			}
+		}
+
+		slog.Info("Connecting to API Server", "address", uc.apiServerAddress)
+		sessErr := uc.runAPIServerSession(ctx)
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if sessErr == nil {
+			return nil
+		}
+		if errors.Is(sessErr, context.Canceled) {
+			return sessErr
+		}
+
+		slog.Warn("API Server sync session ended", "error", sessErr)
+		backoff = grpcutil.NextReconnectBackoff(backoff, initialBackoff, maxBackoff)
+	}
+}
+
+// runAPIServerSession uses one connection: register, heartbeat goroutine, block on snapshot stream.
+func (uc *APIServerSyncUseCase) runAPIServerSession(parentCtx context.Context) error {
+	conn, err := grpc.NewClient(uc.apiServerAddress, uc.grpcDialOptions()...)
+	if err != nil {
+		return fmt.Errorf("dial API Server: %w", err)
+	}
+	defer func() {
+		if cerr := conn.Close(); cerr != nil {
+			slog.Debug("API Server conn close", "error", cerr)
+		}
+	}()
 
 	client := pb.NewControllerRegistryServiceClient(conn)
-
-	if err := uc.registerController(ctx, client); err != nil {
-		return fmt.Errorf("failed to register controller: %w", err)
+	if err := uc.registerController(parentCtx, client); err != nil {
+		return fmt.Errorf("register controller: %w", err)
 	}
 
-	go uc.startHeartbeat(ctx, client)
+	sessionCtx, cancelSession := context.WithCancel(parentCtx)
+	defer cancelSession()
 
-	if err := uc.streamSnapshots(ctx, client); err != nil {
-		return fmt.Errorf("failed to stream snapshots: %w", err)
+	go uc.startHeartbeat(sessionCtx, client)
+
+	streamErr := uc.streamSnapshots(sessionCtx, client)
+	cancelSession()
+	if err := parentCtx.Err(); err != nil {
+		return err
 	}
-
-	return nil
+	return streamErr
 }
 
 func (uc *APIServerSyncUseCase) registerController(ctx context.Context, client pb.ControllerRegistryServiceClient) error {
@@ -223,15 +284,30 @@ func (uc *APIServerSyncUseCase) streamSnapshots(ctx context.Context, client pb.C
 		ControllerId: uc.controllerID,
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("open StreamSnapshots: %w", err)
 	}
 
 	slog.Info("Started receiving snapshot stream")
 
 	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
 		resp, err := stream.Recv()
 		if err != nil {
-			return fmt.Errorf("stream error: %w", err)
+			if errors.Is(err, io.EOF) {
+				return fmt.Errorf("snapshot stream closed by server: %w", err)
+			}
+			if st, ok := status.FromError(err); ok {
+				switch st.Code() {
+				case codes.Canceled, codes.DeadlineExceeded:
+					if ctx.Err() != nil {
+						return ctx.Err()
+					}
+				}
+			}
+			return fmt.Errorf("snapshot stream recv: %w", err)
 		}
 
 		slog.Info("Received snapshots", "environment", resp.Environment, "bundle_key", resp.BundleKey, "count", len(resp.Snapshots))
