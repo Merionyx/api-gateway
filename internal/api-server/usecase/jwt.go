@@ -71,16 +71,13 @@ func (uc *JWTUseCase) GenerateToken(req *models.GenerateTokenRequest) (*models.G
 
 	// Create claims
 	claims := jwt.MapClaims{
-		"iss":    uc.issuer,
-		"sub":    req.AppID,
-		"app_id": req.AppID,
-		"iat":    now.Unix(),
-		"exp":    req.ExpiresAt.Unix(),
-		"jti":    tokenID,
-	}
-
-	if req.Environment != "" {
-		claims["environment"] = req.Environment
+		"iss":          uc.issuer,
+		"sub":          req.AppID,
+		"app_id":       req.AppID,
+		"environments": req.Environments,
+		"iat":          now.Unix(),
+		"exp":          req.ExpiresAt.Unix(),
+		"jti":          tokenID,
 	}
 
 	// Get the active key
@@ -110,16 +107,12 @@ func (uc *JWTUseCase) GenerateToken(req *models.GenerateTokenRequest) (*models.G
 	}
 
 	response := &models.GenerateTokenResponse{
-		ID:          tokenID,
-		Token:       tokenString,
-		AppID:       req.AppID,
-		Environment: req.Environment,
-		ExpiresAt:   req.ExpiresAt,
-		CreatedAt:   now,
-	}
-
-	if req.Environment != "" {
-		response.Environment = req.Environment
+		ID:           tokenID,
+		Token:        tokenString,
+		AppID:        req.AppID,
+		Environments: req.Environments,
+		ExpiresAt:    req.ExpiresAt,
+		CreatedAt:    now,
 	}
 
 	return response, nil

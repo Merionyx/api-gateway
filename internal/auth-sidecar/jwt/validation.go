@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math/big"
 	"net/http"
 	"sync"
@@ -16,9 +17,15 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+type CachedToken struct {
+	claims    jwt.MapClaims
+	expiresAt time.Time
+}
+
 type JWTValidator struct {
 	jwksURL    string
 	publicKeys map[string]crypto.PublicKey // kid -> public key
+	tokenCache sync.Map                    // map[string]CachedToken - cache of validated tokens
 	mu         sync.RWMutex
 	httpClient *http.Client
 }
@@ -44,6 +51,7 @@ func NewJWTValidator(jwksURL string) *JWTValidator {
 		publicKeys: make(map[string]crypto.PublicKey),
 		httpClient: &http.Client{Timeout: 10 * time.Second},
 	}
+
 	// Load keys on startup with retry
 	maxRetries := 5
 	backoff := time.Second
@@ -60,13 +68,49 @@ func NewJWTValidator(jwksURL string) *JWTValidator {
 			break
 		}
 	}
+
 	// Periodically refresh keys
 	go validator.periodicRefresh()
+
+	// Periodically clean up expired tokens from cache
+	go validator.periodicCacheCleanup()
+
 	return validator
 }
 
-// ValidateToken validates a JWT token
+// ValidateToken validates a JWT token with caching
 func (v *JWTValidator) ValidateToken(tokenString string) (jwt.MapClaims, error) {
+	// Check cache first
+	if cached, ok := v.tokenCache.Load(tokenString); ok {
+		cachedToken := cached.(CachedToken)
+		// Check if token is still valid (not expired)
+		if time.Now().Before(cachedToken.expiresAt) {
+			return cachedToken.claims, nil
+		}
+		// Token expired, remove from cache
+		v.tokenCache.Delete(tokenString)
+	}
+
+	// Cache miss or expired - validate the token
+	claims, err := v.validateTokenInternal(tokenString)
+	if err != nil {
+		return nil, err
+	}
+
+	// Cache the validated token
+	if exp, ok := claims["exp"].(float64); ok {
+		expiresAt := time.Unix(int64(exp), 0)
+		v.tokenCache.Store(tokenString, CachedToken{
+			claims:    claims,
+			expiresAt: expiresAt,
+		})
+	}
+
+	return claims, nil
+}
+
+// validateTokenInternal performs the actual JWT validation (without caching)
+func (v *JWTValidator) validateTokenInternal(tokenString string) (jwt.MapClaims, error) {
 	// Parse the token to get the kid
 	token, _, err := new(jwt.Parser).ParseUnverified(tokenString, jwt.MapClaims{})
 	if err != nil {
@@ -174,6 +218,30 @@ func (v *JWTValidator) periodicRefresh() {
 	for range ticker.C {
 		if err := v.RefreshKeys(); err != nil {
 			fmt.Printf("Failed to refresh keys: %v\n", err)
+		}
+	}
+}
+
+// periodicCacheCleanup removes expired tokens from cache
+func (v *JWTValidator) periodicCacheCleanup() {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		now := time.Now()
+		expiredCount := 0
+
+		v.tokenCache.Range(func(key, value interface{}) bool {
+			cached := value.(CachedToken)
+			if now.After(cached.expiresAt) {
+				v.tokenCache.Delete(key)
+				expiredCount++
+			}
+			return true
+		})
+
+		if expiredCount > 0 {
+			log.Printf("[JWT-CACHE] Cleaned up %d expired tokens from cache", expiredCount)
 		}
 	}
 }

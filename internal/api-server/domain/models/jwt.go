@@ -4,28 +4,28 @@ import "time"
 
 // JWTToken represents a issued JWT token
 type JWTToken struct {
-	ID          string    `json:"id"`
-	Token       string    `json:"token,omitempty"` // Shown only when creating
-	Environment string    `json:"environment"`
-	ExpiresAt   time.Time `json:"expires_at"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID           string    `json:"id"`
+	Token        string    `json:"token,omitempty"` // Shown only when creating
+	Environments []string  `json:"environments"`
+	ExpiresAt    time.Time `json:"expires_at"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 // GenerateTokenRequest request to generate a JWT token
 type GenerateTokenRequest struct {
-	AppID       string    `json:"app_id" validate:"required"`
-	Environment string    `json:"environment" validate:"omitempty"`
-	ExpiresAt   time.Time `json:"expires_at" validate:"required"`
+	AppID        string    `json:"app_id" validate:"required"`
+	Environments []string  `json:"environments" validate:"required"`
+	ExpiresAt    time.Time `json:"expires_at" validate:"required"`
 }
 
 // GenerateTokenResponse response with a JWT token
 type GenerateTokenResponse struct {
-	ID          string    `json:"id"`
-	Token       string    `json:"token"` // Full JWT (shown only once!)
-	AppID       string    `json:"app_id"`
-	Environment string    `json:"environment,omitempty"`
-	ExpiresAt   time.Time `json:"expires_at"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID           string    `json:"id"`
+	Token        string    `json:"token"` // Full JWT (shown only once!)
+	AppID        string    `json:"app_id"`
+	Environments []string  `json:"environments"`
+	ExpiresAt    time.Time `json:"expires_at"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 // JWK represents a JSON Web Key

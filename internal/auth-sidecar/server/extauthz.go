@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"merionyx/api-gateway/internal/auth-sidecar/container"
+	"merionyx/api-gateway/internal/shared/utils"
 )
 
 type ExtAuthzServer struct {
@@ -53,8 +54,6 @@ func StartExtAuthzServer(cnt *container.Container) error {
 func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*authv3.CheckResponse, error) {
 	startTime := time.Now()
 
-	log.Printf("Request received: %+v", req)
-
 	// 1. Find the contract by path (longest prefix match)
 	path := req.Attributes.Request.Http.Path
 	accessConfig := s.container.AccessStorage.FindContractByPath(path)
@@ -85,33 +84,50 @@ func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*
 		return denyResponse("Invalid token", 401), nil
 	}
 
-	// 6. Extract the app_id and environment from the JWT
+	// 6. Extract the app_id and environments from the JWT
 	appID, ok := claims["app_id"].(string)
 	if !ok {
 		return denyResponse("Invalid token: missing app_id", 401), nil
 	}
 
-	tokenEnv, ok := claims["environment"].(string)
+	// Extract environments array from JWT
+	environmentsRaw, ok := claims["environments"]
 	if !ok {
-		return denyResponse("Invalid token: missing environment", 401), nil
+		return denyResponse("Invalid token: missing environments", 401), nil
 	}
 
-	// 7. Check that the environment matches
-	if tokenEnv != s.container.Config.Controller.Environment {
-		return denyResponse(fmt.Sprintf("Token for %s, but current env is %s",
-			tokenEnv, s.container.Config.Controller.Environment), 403), nil
+	// Convert to string slice
+	environmentsInterface, ok := environmentsRaw.([]interface{})
+	if !ok {
+		return denyResponse("Invalid token: environments must be an array", 401), nil
+	}
+
+	var tokenEnvironments []string
+	for _, env := range environmentsInterface {
+		envStr, ok := env.(string)
+		if !ok {
+			return denyResponse("Invalid token: environment must be a string", 401), nil
+		}
+		tokenEnvironments = append(tokenEnvironments, envStr)
+	}
+
+	// 7. Check that the current environment matches any of the patterns in the token
+	currentEnv := s.container.Config.Controller.Environment
+	if !utils.MatchesAnyEnvironment(currentEnv, tokenEnvironments) {
+		return denyResponse(fmt.Sprintf("Token environments %v don't match current env %s",
+			tokenEnvironments, currentEnv), 403), nil
 	}
 
 	// 8. Check access rights from in-memory storage
-	allowed := s.container.AccessStorage.CheckAccess(contractName, appID, tokenEnv)
+	allowed := s.container.AccessStorage.CheckAccess(contractName, appID, currentEnv)
 	if !allowed {
-		log.Printf("[AUTH] Access denied: app=%s contract=%s env=%s", appID, contractName, tokenEnv)
+		log.Printf("[AUTH] Access denied: app=%s contract=%s env=%s", appID, contractName, currentEnv)
 		return denyResponse(fmt.Sprintf("Access denied to contract %s", contractName), 403), nil
 	}
 
 	duration := time.Since(startTime)
-	log.Printf("[AUTH] ✓ Allowed: app=%s contract=%s env=%s duration=%v",
-		appID, contractName, tokenEnv, duration)
+	log.Printf("[AUTH] ✓ Allowed: app=%s contract=%s env=%s envPatterns=%v duration=%v",
+		appID, contractName, currentEnv, tokenEnvironments, duration)
 
 	return allowResponse(appID, contractName), nil
 }

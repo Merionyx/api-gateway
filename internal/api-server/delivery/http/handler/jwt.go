@@ -34,6 +34,20 @@ func (h *JWTHandler) GenerateToken(c fiber.Ctx) error {
 		})
 	}
 
+	if len(req.Environments) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "environments are required",
+		})
+	}
+
+	for _, environment := range req.Environments {
+		if environment == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "environment is required",
+			})
+		}
+	}
+
 	if req.ExpiresAt.Before(time.Now()) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "expires_at must be in the future",

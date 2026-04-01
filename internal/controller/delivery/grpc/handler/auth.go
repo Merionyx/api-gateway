@@ -9,6 +9,7 @@ import (
 
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
 	"merionyx/api-gateway/internal/controller/domain/models"
+	"merionyx/api-gateway/internal/shared/utils"
 	authv1 "merionyx/api-gateway/pkg/api/auth/v1"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -215,8 +216,8 @@ func (h *AuthHandler) buildAccessConfig(ctx context.Context, environment string)
 					// If environments are not specified - access everywhere
 					hasAccess = true
 				} else {
-					for _, env := range app.Environments {
-						if env == environment {
+					for _, envPattern := range app.Environments {
+						if utils.MatchesEnvironmentPattern(environment, envPattern) {
 							hasAccess = true
 							break
 						}
