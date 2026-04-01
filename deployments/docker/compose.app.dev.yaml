@@ -112,8 +112,6 @@ services:
             - default
         depends_on:
             - etcd-api-server
-        volumes:
-          - ../../../api-gateway-api-server-local:/app/local-dir
     gateway-contract-syncer:
         container_name: merionyx-api-gateway-contract-syncer
         build:

@@ -63,5 +63,21 @@ services:
             - default
         depends_on:
             - etcd-api-server
+    gateway-contract-syncer:
+        container_name: merionyx-api-gateway-contract-syncer
+        build:
+            context: ../..
+            dockerfile: Dockerfile.contract-syncer
+        environment:
+            - CONFIG_PATH=./configs/contract-syncer/config.yaml
+            - SSH_KNOWN_HOSTS=/app/secrets/known_hosts
+        env_file:
+            - ../../secrets/.env
+        ports:
+            - 19092:19092
+        networks:
+            - default
+        depends_on:
+            - etcd-api-server
         volumes:
-          - ../../../api-gateway-api-server-local:/app/local-dir
+          - ../../../api-gateway-schemas-local:/app/local-dir

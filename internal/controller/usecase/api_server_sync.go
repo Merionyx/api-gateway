@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"time"
 
 	"merionyx/api-gateway/internal/controller/config"
@@ -14,8 +15,8 @@ import (
 	xdscache "merionyx/api-gateway/internal/controller/xds/cache"
 	xdssnapshot "merionyx/api-gateway/internal/controller/xds/snapshot"
 	"merionyx/api-gateway/internal/shared/bundlekey"
-	"merionyx/api-gateway/internal/shared/grpcutil"
 	sharedgit "merionyx/api-gateway/internal/shared/git"
+	"merionyx/api-gateway/internal/shared/grpcutil"
 	pb "merionyx/api-gateway/pkg/api/controller_registry/v1"
 
 	"google.golang.org/grpc"
@@ -44,6 +45,12 @@ func NewAPIServerSyncUseCase(
 	xdsSnapshotManager *xdscache.SnapshotManager,
 	xdsBuilder interfaces.XDSBuilder,
 ) *APIServerSyncUseCase {
+	controllerID, err := os.Hostname()
+	if err != nil {
+		slog.Error("Failed to get hostname", "error", err)
+		controllerID = "unknown"
+	}
+
 	return &APIServerSyncUseCase{
 		config:                   cfg,
 		schemaRepo:               schemaRepo,
@@ -51,8 +58,8 @@ func NewAPIServerSyncUseCase(
 		environmentsUseCase:      environmentsUseCase,
 		xdsSnapshotManager:       xdsSnapshotManager,
 		apiServerAddress:         cfg.APIServer.Address,
-		controllerID:             fmt.Sprintf("controller-%d", time.Now().Unix()),
 		xdsBuilder:               xdsBuilder,
+		controllerID:             controllerID,
 	}
 }
 

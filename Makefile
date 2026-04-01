@@ -51,6 +51,26 @@ docker-run: ## Run Docker container
 docker-up:
 	docker-compose \
 		-p 'merionyx-api-gateway' \
+		-f ./deployments/docker/compose.app.yaml \
+		-f ./deployments/docker/compose.sidecar.yaml \
+		-f ./deployments/docker/compose.etcd.yaml \
+		-f ./deployments/docker/compose.envoy.yaml \
+		-f ./deployments/docker/compose.mock-service.yaml \
+		up --build
+
+docker-down:
+	docker-compose \
+		-p 'merionyx-api-gateway' \
+		-f ./deployments/docker/compose.app.yaml \
+		-f ./deployments/docker/compose.sidecar.yaml \
+		-f ./deployments/docker/compose.etcd.yaml \
+		-f ./deployments/docker/compose.envoy.yaml \
+		-f ./deployments/docker/compose.mock-service.yaml \
+		down
+
+docker-up-dev:
+	docker-compose \
+		-p 'merionyx-api-gateway' \
 		-f ./deployments/docker/compose.app.dev.yaml \
 		-f ./deployments/docker/compose.sidecar.dev.yaml \
 		-f ./deployments/docker/compose.etcd.yaml \
@@ -58,7 +78,7 @@ docker-up:
 		-f ./deployments/docker/compose.mock-service.yaml \
 		up --build --watch
 
-docker-down:
+docker-down-dev:
 	docker-compose \
 		-p 'merionyx-api-gateway' \
 		-f ./deployments/docker/compose.app.dev.yaml \
