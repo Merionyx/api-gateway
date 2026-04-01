@@ -35,12 +35,12 @@ func (uc *schemasUseCase) SyncContractBundle(ctx context.Context, req *models.Sy
 	return nil, fmt.Errorf("%w", ErrContractsManagedByAPIServer)
 }
 
-func (uc *schemasUseCase) GetContractSnapshot(ctx context.Context, repository, ref, contract string) (*models.ContractSnapshot, error) {
-	return uc.schemaRepo.GetContractSnapshot(ctx, repository, ref, contract)
+func (uc *schemasUseCase) GetContractSnapshot(ctx context.Context, repository, ref, bundlePath, contract string) (*models.ContractSnapshot, error) {
+	return uc.schemaRepo.GetContractSnapshot(ctx, repository, ref, bundlePath, contract)
 }
 
-func (uc *schemasUseCase) ListContractSnapshots(ctx context.Context, repository, ref string) ([]models.ContractSnapshot, error) {
-	return uc.schemaRepo.ListContractSnapshots(ctx, repository, ref)
+func (uc *schemasUseCase) ListContractSnapshots(ctx context.Context, repository, ref, bundlePath string) ([]models.ContractSnapshot, error) {
+	return uc.schemaRepo.ListContractSnapshots(ctx, repository, ref, bundlePath)
 }
 
 func (uc *schemasUseCase) SyncAllContracts(ctx context.Context, req *models.SyncAllContractsRequest) (*models.SyncAllContractsResponse, error) {

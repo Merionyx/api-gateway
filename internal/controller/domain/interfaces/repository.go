@@ -12,16 +12,16 @@ import (
 
 type SchemaRepository interface {
 	// Save contract snapshot
-	SaveContractSnapshot(ctx context.Context, repo, ref, contract string, snapshot *models.ContractSnapshot) error
+	SaveContractSnapshot(ctx context.Context, repo, ref, bundlePath, contract string, snapshot *models.ContractSnapshot) error
 
 	// Get contract snapshot
-	GetContractSnapshot(ctx context.Context, repo, ref, contract string) (*models.ContractSnapshot, error)
+	GetContractSnapshot(ctx context.Context, repo, ref, bundlePath, contract string) (*models.ContractSnapshot, error)
 
 	// Get all snapshots for environment
 	GetEnvironmentSnapshots(ctx context.Context, envName string) ([]models.ContractSnapshot, error)
 
 	// List contract snapshots
-	ListContractSnapshots(ctx context.Context, repository, ref string) ([]models.ContractSnapshot, error)
+	ListContractSnapshots(ctx context.Context, repository, ref, bundlePath string) ([]models.ContractSnapshot, error)
 
 	// Watch contract snapshots
 	WatchContractBundlesSnapshots(ctx context.Context) clientv3.WatchChan

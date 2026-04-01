@@ -193,7 +193,7 @@ func (h *AuthHandler) buildAccessConfig(ctx context.Context, environment string)
 	// For each bundle get the contracts
 	for _, bundle := range env.Bundles.Static {
 		// Get all contracts from the bundle
-		snapshots, err := h.schemaRepo.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref)
+		snapshots, err := h.schemaRepo.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref, bundle.Path)
 		if err != nil {
 			log.Printf("Failed to get snapshots for bundle %s: %v", bundle.Name, err)
 			continue

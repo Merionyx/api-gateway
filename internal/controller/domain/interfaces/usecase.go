@@ -34,8 +34,8 @@ type SchemasUseCase interface {
 	SetDependencies(schemaRepo SchemaRepository, environmentRepo EnvironmentRepository)
 
 	SyncContractBundle(ctx context.Context, req *models.SyncContractBundleRequest) (*models.SyncContractBundleResponse, error)
-	GetContractSnapshot(ctx context.Context, repository, ref, contract string) (*models.ContractSnapshot, error)
-	ListContractSnapshots(ctx context.Context, repository, ref string) ([]models.ContractSnapshot, error)
+	GetContractSnapshot(ctx context.Context, repository, ref, bundlePath, contract string) (*models.ContractSnapshot, error)
+	ListContractSnapshots(ctx context.Context, repository, ref, bundlePath string) ([]models.ContractSnapshot, error)
 	SyncAllContracts(ctx context.Context, req *models.SyncAllContractsRequest) (*models.SyncAllContractsResponse, error)
 
 	WatchContractBundlesSnapshots(ctx context.Context) clientv3.WatchChan

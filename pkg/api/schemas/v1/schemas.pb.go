@@ -304,10 +304,12 @@ func (x *GetContractRequest) GetContract() string {
 
 // GetContractSnapshotRequest represents a request to get a contract snapshot
 type GetContractSnapshotRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Repository    string                 `protobuf:"bytes,1,opt,name=repository,proto3" json:"repository,omitempty"`
-	Ref           string                 `protobuf:"bytes,2,opt,name=ref,proto3" json:"ref,omitempty"`
-	Contract      string                 `protobuf:"bytes,3,opt,name=contract,proto3" json:"contract,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Repository string                 `protobuf:"bytes,1,opt,name=repository,proto3" json:"repository,omitempty"`
+	Ref        string                 `protobuf:"bytes,2,opt,name=ref,proto3" json:"ref,omitempty"`
+	Contract   string                 `protobuf:"bytes,3,opt,name=contract,proto3" json:"contract,omitempty"`
+	// Bundle root path within the repo (same as environment config); empty means "." in etcd keys
+	Path          string `protobuf:"bytes,4,opt,name=path,proto3" json:"path,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -363,6 +365,13 @@ func (x *GetContractSnapshotRequest) GetContract() string {
 	return ""
 }
 
+func (x *GetContractSnapshotRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
 // GetContractSnapshotResponse represents a response to get a contract snapshot
 type GetContractSnapshotResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -413,6 +422,7 @@ type ListContractSnapshotsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Repository    string                 `protobuf:"bytes,1,opt,name=repository,proto3" json:"repository,omitempty"`
 	Ref           string                 `protobuf:"bytes,2,opt,name=ref,proto3" json:"ref,omitempty"`
+	Path          string                 `protobuf:"bytes,3,opt,name=path,proto3" json:"path,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -457,6 +467,13 @@ func (x *ListContractSnapshotsRequest) GetRepository() string {
 func (x *ListContractSnapshotsRequest) GetRef() string {
 	if x != nil {
 		return x.Ref
+	}
+	return ""
+}
+
+func (x *ListContractSnapshotsRequest) GetPath() string {
+	if x != nil {
+		return x.Path
 	}
 	return ""
 }
@@ -628,20 +645,22 @@ const file_api_proto_v1_schemas_proto_rawDesc = "" +
 	"\n" +
 	"from_cache\x18\x02 \x01(\bR\tfromCache\"0\n" +
 	"\x12GetContractRequest\x12\x1a\n" +
-	"\bcontract\x18\x01 \x01(\tR\bcontract\"j\n" +
+	"\bcontract\x18\x01 \x01(\tR\bcontract\"~\n" +
 	"\x1aGetContractSnapshotRequest\x12\x1e\n" +
 	"\n" +
 	"repository\x18\x01 \x01(\tR\n" +
 	"repository\x12\x10\n" +
 	"\x03ref\x18\x02 \x01(\tR\x03ref\x12\x1a\n" +
-	"\bcontract\x18\x03 \x01(\tR\bcontract\"[\n" +
+	"\bcontract\x18\x03 \x01(\tR\bcontract\x12\x12\n" +
+	"\x04path\x18\x04 \x01(\tR\x04path\"[\n" +
 	"\x1bGetContractSnapshotResponse\x12<\n" +
-	"\bsnapshot\x18\x01 \x01(\v2 .api.schemas.v1.ContractSnapshotR\bsnapshot\"P\n" +
+	"\bsnapshot\x18\x01 \x01(\v2 .api.schemas.v1.ContractSnapshotR\bsnapshot\"d\n" +
 	"\x1cListContractSnapshotsRequest\x12\x1e\n" +
 	"\n" +
 	"repository\x18\x01 \x01(\tR\n" +
 	"repository\x12\x10\n" +
-	"\x03ref\x18\x02 \x01(\tR\x03ref\"_\n" +
+	"\x03ref\x18\x02 \x01(\tR\x03ref\x12\x12\n" +
+	"\x04path\x18\x03 \x01(\tR\x04path\"_\n" +
 	"\x1dListContractSnapshotsResponse\x12>\n" +
 	"\tsnapshots\x18\x01 \x03(\v2 .api.schemas.v1.ContractSnapshotR\tsnapshots\";\n" +
 	"\x17SyncAllContractsRequest\x12 \n" +

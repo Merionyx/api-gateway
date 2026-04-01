@@ -51,7 +51,7 @@ func (h *SchemasHandler) GetContractSnapshot(ctx context.Context, req *schemasv1
 		return nil, status.Error(codes.InvalidArgument, "repository, ref, and contract are required")
 	}
 
-	snapshot, err := h.schemasUseCase.GetContractSnapshot(ctx, req.Repository, req.Ref, req.Contract)
+	snapshot, err := h.schemasUseCase.GetContractSnapshot(ctx, req.Repository, req.Ref, req.Path, req.Contract)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
@@ -66,7 +66,7 @@ func (h *SchemasHandler) ListContractSnapshots(ctx context.Context, req *schemas
 		return nil, status.Error(codes.InvalidArgument, "repository and ref are required")
 	}
 
-	snapshots, err := h.schemasUseCase.ListContractSnapshots(ctx, req.Repository, req.Ref)
+	snapshots, err := h.schemasUseCase.ListContractSnapshots(ctx, req.Repository, req.Ref, req.Path)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

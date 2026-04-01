@@ -66,7 +66,7 @@ func (uc *environmentsUseCase) GetEnvironment(ctx context.Context, name string) 
 	}
 
 	for _, bundle := range env.Bundles.Static {
-		snapshots, err := uc.schamasUseCase.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref)
+		snapshots, err := uc.schamasUseCase.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref, bundle.Path)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get environment snapshots: %w", err)
 		}
@@ -83,7 +83,7 @@ func (uc *environmentsUseCase) ListEnvironments(ctx context.Context) (map[string
 	}
 	for _, environment := range environments {
 		for _, bundle := range environment.Bundles.Static {
-			snapshots, err := uc.schamasUseCase.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref)
+			snapshots, err := uc.schamasUseCase.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref, bundle.Path)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get environment snapshots: %w", err)
 			}

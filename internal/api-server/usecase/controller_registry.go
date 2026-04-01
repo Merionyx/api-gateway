@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 	"sync"
 
 	"merionyx/api-gateway/internal/api-server/domain/interfaces"
 	"merionyx/api-gateway/internal/api-server/domain/models"
+	"merionyx/api-gateway/internal/shared/bundlekey"
 	sharedgit "merionyx/api-gateway/internal/shared/git"
 )
 
@@ -64,14 +64,7 @@ func (uc *ControllerRegistryUseCase) StreamSnapshots(ctx context.Context, contro
 	for _, env := range controller.Environments {
 		slog.Info("Processing environment", "name", env.Name, "bundles_count", len(env.Bundles))
 		for _, bundle := range env.Bundles {
-			safeRef := strings.ReplaceAll(bundle.Ref, "/", "%2F")
-			safePath := ""
-			if bundle.Path == "" {
-				safePath = "."
-			} else {
-				safePath = strings.ReplaceAll(bundle.Path, "/", "%2F")
-			}
-			bundleKey := fmt.Sprintf("%s/%s/%s", bundle.Repository, safeRef, safePath)
+			bundleKey := bundlekey.Build(bundle.Repository, bundle.Ref, bundle.Path)
 
 			slog.Info("Getting snapshots for bundle", "environment", env.Name, "bundle_key", bundleKey)
 
@@ -138,14 +131,7 @@ func (uc *ControllerRegistryUseCase) Heartbeat(ctx context.Context, controllerID
 			// Send snapshots for all environments (including new ones)
 			for _, env := range environments {
 				for _, bundle := range env.Bundles {
-					safeRef := strings.ReplaceAll(bundle.Ref, "/", "%2F")
-					safePath := ""
-					if bundle.Path == "" {
-						safePath = "."
-					} else {
-						safePath = strings.ReplaceAll(bundle.Path, "/", "%2F")
-					}
-					bundleKey := fmt.Sprintf("%s/%s/%s", bundle.Repository, safeRef, safePath)
+					bundleKey := bundlekey.Build(bundle.Repository, bundle.Ref, bundle.Path)
 
 					slog.Info("Getting snapshots for new environment", "environment", env.Name, "bundle_key", bundleKey)
 
@@ -182,15 +168,7 @@ func (uc *ControllerRegistryUseCase) NotifySnapshotUpdate(ctx context.Context, b
 	for _, controller := range controllers {
 		for _, env := range controller.Environments {
 			for _, bundle := range env.Bundles {
-				// Create bundleKey with the same formatting as in StreamSnapshots
-				safeRef := strings.ReplaceAll(bundle.Ref, "/", "%2F")
-				safePath := ""
-				if bundle.Path == "" {
-					safePath = "."
-				} else {
-					safePath = strings.ReplaceAll(bundle.Path, "/", "%2F")
-				}
-				currentBundleKey := fmt.Sprintf("%s/%s/%s", bundle.Repository, safeRef, safePath)
+				currentBundleKey := bundlekey.Build(bundle.Repository, bundle.Ref, bundle.Path)
 
 				if currentBundleKey == bundleKey {
 					slog.Info("Found matching bundle for controller", "controller_id", controller.ControllerID, "environment", env.Name, "bundle_key", bundleKey)

@@ -9,6 +9,7 @@ import (
 
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
 	"merionyx/api-gateway/internal/controller/domain/models"
+	"merionyx/api-gateway/internal/shared/bundlekey"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
@@ -29,8 +30,8 @@ func NewSchemaRepository(client *clientv3.Client) interfaces.SchemaRepository {
 }
 
 // SaveContractSnapshot saves contract snapshot to etcd
-func (r *schemaRepository) SaveContractSnapshot(ctx context.Context, repo, ref, contract string, snapshot *models.ContractSnapshot) error {
-	key := r.buildContractKey(repo, ref, contract)
+func (r *schemaRepository) SaveContractSnapshot(ctx context.Context, repo, ref, bundlePath, contract string, snapshot *models.ContractSnapshot) error {
+	key := r.buildContractKey(repo, ref, bundlePath, contract)
 
 	data, err := json.Marshal(snapshot)
 	if err != nil {
@@ -47,8 +48,8 @@ func (r *schemaRepository) SaveContractSnapshot(ctx context.Context, repo, ref, 
 }
 
 // GetContractSnapshot gets contract snapshot from etcd
-func (r *schemaRepository) GetContractSnapshot(ctx context.Context, repo, ref, contract string) (*models.ContractSnapshot, error) {
-	key := r.buildContractKey(repo, ref, contract)
+func (r *schemaRepository) GetContractSnapshot(ctx context.Context, repo, ref, bundlePath, contract string) (*models.ContractSnapshot, error) {
+	key := r.buildContractKey(repo, ref, bundlePath, contract)
 
 	resp, err := r.client.Get(ctx, key)
 	if err != nil {
@@ -56,7 +57,7 @@ func (r *schemaRepository) GetContractSnapshot(ctx context.Context, repo, ref, c
 	}
 
 	if len(resp.Kvs) == 0 {
-		return nil, fmt.Errorf("contract snapshot not found: %s/%s/%s", repo, ref, contract)
+		return nil, fmt.Errorf("contract snapshot not found: %s/%s/%s/%s", repo, ref, bundlePath, contract)
 	}
 
 	var snapshot models.ContractSnapshot
@@ -94,10 +95,9 @@ func (r *schemaRepository) GetEnvironmentSnapshots(ctx context.Context, envName 
 	return snapshots, nil
 }
 
-// ListContractSnapshots lists all contract snapshots for repository/ref
-func (r *schemaRepository) ListContractSnapshots(ctx context.Context, repo, ref string) ([]models.ContractSnapshot, error) {
-	safeRef := strings.ReplaceAll(ref, "/", "%2F")
-	prefix := fmt.Sprintf("%s%s/%s/contracts/", schemaPrefix, repo, safeRef)
+// ListContractSnapshots lists all contract snapshots for repository/ref/path
+func (r *schemaRepository) ListContractSnapshots(ctx context.Context, repo, ref, bundlePath string) ([]models.ContractSnapshot, error) {
+	prefix := r.contractsPrefix(repo, ref, bundlePath)
 	resp, err := r.client.Get(ctx, prefix, clientv3.WithPrefix())
 	if err != nil {
 		return nil, fmt.Errorf("failed to list contract snapshots from etcd: %w", err)
@@ -116,10 +116,12 @@ func (r *schemaRepository) ListContractSnapshots(ctx context.Context, repo, ref 
 	return snapshots, nil
 }
 
-// buildContractKey builds key for contract in etcd
-func (r *schemaRepository) buildContractKey(repo, ref, contract string) string {
-	safeRef := strings.ReplaceAll(ref, "/", "%2F")
-	return fmt.Sprintf("%s%s/%s/contracts/%s/snapshot", schemaPrefix, repo, safeRef, contract)
+func (r *schemaRepository) contractsPrefix(repo, ref, bundlePath string) string {
+	return fmt.Sprintf("%s%s/%s/%s/contracts/", schemaPrefix, repo, bundlekey.EscapeRef(ref), bundlekey.EscapePath(bundlePath))
+}
+
+func (r *schemaRepository) buildContractKey(repo, ref, bundlePath, contract string) string {
+	return fmt.Sprintf("%s%s/snapshot", r.contractsPrefix(repo, ref, bundlePath), contract)
 }
 
 // WatchContractBundlesSnapshots watches contract bundles snapshots for repository/ref

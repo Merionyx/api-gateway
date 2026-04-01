@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"merionyx/api-gateway/internal/api-server/domain/interfaces"
 	"merionyx/api-gateway/internal/api-server/domain/models"
+	"merionyx/api-gateway/internal/shared/bundlekey"
 	sharedgit "merionyx/api-gateway/internal/shared/git"
 	pb "merionyx/api-gateway/pkg/api/contract_syncer/v1"
 
@@ -87,14 +87,7 @@ func (uc *BundleSyncUseCase) SyncBundle(ctx context.Context, bundle models.Bundl
 		})
 	}
 
-	safeRef := strings.ReplaceAll(bundle.Ref, "/", "%2F")
-	safePath := ""
-	if bundle.Path == "" {
-		safePath = "."
-	} else {
-		safePath = strings.ReplaceAll(bundle.Path, "/", "%2F")
-	}
-	bundleKey := fmt.Sprintf("%s/%s/%s", bundle.Repository, safeRef, safePath)
+	bundleKey := bundlekey.Build(bundle.Repository, bundle.Ref, bundle.Path)
 	if err := uc.snapshotRepo.SaveSnapshots(ctx, bundleKey, snapshots); err != nil {
 		return nil, fmt.Errorf("failed to save snapshots: %w", err)
 	}
@@ -144,8 +137,8 @@ func (uc *BundleSyncUseCase) syncAllBundles(ctx context.Context) {
 	for _, controller := range controllers {
 		for _, env := range controller.Environments {
 			for _, bundle := range env.Bundles {
-				bundleKey := fmt.Sprintf("%s/%s/%s", bundle.Repository, bundle.Ref, bundle.Path)
-				bundlesMap[bundleKey] = bundle
+				key := bundlekey.Build(bundle.Repository, bundle.Ref, bundle.Path)
+				bundlesMap[key] = bundle
 			}
 		}
 	}

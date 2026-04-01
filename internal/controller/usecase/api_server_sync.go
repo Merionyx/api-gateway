@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net/url"
-	"strings"
 	"time"
 
 	"merionyx/api-gateway/internal/controller/config"
@@ -13,6 +11,7 @@ import (
 	"merionyx/api-gateway/internal/controller/domain/models"
 	xdscache "merionyx/api-gateway/internal/controller/xds/cache"
 	xdssnapshot "merionyx/api-gateway/internal/controller/xds/snapshot"
+	"merionyx/api-gateway/internal/shared/bundlekey"
 	sharedgit "merionyx/api-gateway/internal/shared/git"
 	pb "merionyx/api-gateway/pkg/api/controller_registry/v1"
 
@@ -278,22 +277,15 @@ func (uc *APIServerSyncUseCase) streamSnapshots(ctx context.Context, client pb.C
 }
 
 func (uc *APIServerSyncUseCase) saveSnapshotsToEtcd(ctx context.Context, bundleKey string, snapshots []sharedgit.ContractSnapshot) error {
-	parts := strings.Split(bundleKey, "/")
-	if len(parts) < 2 {
-		return fmt.Errorf("invalid bundle key format: %s", bundleKey)
-	}
-
-	repository := parts[0]
-	refEscaped := parts[1]
-	ref, err := url.PathUnescape(refEscaped)
+	repository, ref, bundlePath, err := bundlekey.Parse(bundleKey)
 	if err != nil {
-		ref = refEscaped
+		return err
 	}
 
 	for _, s := range snapshots {
 		cs := sharedToControllerSnapshot(s)
-		slog.Info("Saving snapshot to etcd", "repository", repository, "ref", ref, "contract", s.Name)
-		if err := uc.schemaRepo.SaveContractSnapshot(ctx, repository, ref, s.Name, cs); err != nil {
+		slog.Info("Saving snapshot to etcd", "repository", repository, "ref", ref, "path", bundlePath, "contract", s.Name)
+		if err := uc.schemaRepo.SaveContractSnapshot(ctx, repository, ref, bundlePath, s.Name, cs); err != nil {
 			return fmt.Errorf("save snapshot %s: %w", s.Name, err)
 		}
 	}
@@ -339,9 +331,9 @@ func (uc *APIServerSyncUseCase) environmentWithSnapshotsFromSchema(ctx context.C
 		Snapshots: nil,
 	}
 	for _, bundle := range src.Bundles.Static {
-		snaps, err := uc.schemaRepo.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref)
+		snaps, err := uc.schemaRepo.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref, bundle.Path)
 		if err != nil {
-			slog.Warn("ListContractSnapshots failed", "environment", src.Name, "repository", bundle.Repository, "ref", bundle.Ref, "error", err)
+			slog.Warn("ListContractSnapshots failed", "environment", src.Name, "repository", bundle.Repository, "ref", bundle.Ref, "path", bundle.Path, "error", err)
 			continue
 		}
 		out.Snapshots = append(out.Snapshots, snaps...)
