@@ -1,11 +1,9 @@
 package models
 
-import "merionyx/api-gateway/internal/controller/repository/git"
-
 type Environment struct {
 	Name      string
 	Type      string
-	Snapshots []git.ContractSnapshot
+	Snapshots []ContractSnapshot
 	Services  *EnvironmentServiceConfig
 	Bundles   *EnvironmentBundleConfig
 }
@@ -76,7 +74,7 @@ type SyncContractBundleRequest struct {
 }
 
 type SyncContractBundleResponse struct {
-	Snapshots []git.ContractSnapshot
+	Snapshots []ContractSnapshot
 	FromCache bool
 }
 

@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
-	"merionyx/api-gateway/internal/controller/repository/git"
+	"merionyx/api-gateway/internal/controller/domain/models"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
@@ -29,7 +29,7 @@ func NewSchemaRepository(client *clientv3.Client) interfaces.SchemaRepository {
 }
 
 // SaveContractSnapshot saves contract snapshot to etcd
-func (r *schemaRepository) SaveContractSnapshot(ctx context.Context, repo, ref, contract string, snapshot *git.ContractSnapshot) error {
+func (r *schemaRepository) SaveContractSnapshot(ctx context.Context, repo, ref, contract string, snapshot *models.ContractSnapshot) error {
 	key := r.buildContractKey(repo, ref, contract)
 
 	data, err := json.Marshal(snapshot)
@@ -47,7 +47,7 @@ func (r *schemaRepository) SaveContractSnapshot(ctx context.Context, repo, ref, 
 }
 
 // GetContractSnapshot gets contract snapshot from etcd
-func (r *schemaRepository) GetContractSnapshot(ctx context.Context, repo, ref, contract string) (*git.ContractSnapshot, error) {
+func (r *schemaRepository) GetContractSnapshot(ctx context.Context, repo, ref, contract string) (*models.ContractSnapshot, error) {
 	key := r.buildContractKey(repo, ref, contract)
 
 	resp, err := r.client.Get(ctx, key)
@@ -59,7 +59,7 @@ func (r *schemaRepository) GetContractSnapshot(ctx context.Context, repo, ref, c
 		return nil, fmt.Errorf("contract snapshot not found: %s/%s/%s", repo, ref, contract)
 	}
 
-	var snapshot git.ContractSnapshot
+	var snapshot models.ContractSnapshot
 	if err := json.Unmarshal(resp.Kvs[0].Value, &snapshot); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal contract snapshot: %w", err)
 	}
@@ -68,7 +68,7 @@ func (r *schemaRepository) GetContractSnapshot(ctx context.Context, repo, ref, c
 }
 
 // GetEnvironmentSnapshots gets all snapshots for environment
-func (r *schemaRepository) GetEnvironmentSnapshots(ctx context.Context, envName string) ([]git.ContractSnapshot, error) {
+func (r *schemaRepository) GetEnvironmentSnapshots(ctx context.Context, envName string) ([]models.ContractSnapshot, error) {
 	prefix := schemaPrefix
 
 	resp, err := r.client.Get(ctx, prefix, clientv3.WithPrefix())
@@ -76,14 +76,14 @@ func (r *schemaRepository) GetEnvironmentSnapshots(ctx context.Context, envName 
 		return nil, fmt.Errorf("failed to get snapshots from etcd: %w", err)
 	}
 
-	var snapshots []git.ContractSnapshot
+	var snapshots []models.ContractSnapshot
 
 	for _, kv := range resp.Kvs {
 		if !strings.HasSuffix(string(kv.Key), "/snapshot") {
 			continue
 		}
 
-		var snapshot git.ContractSnapshot
+		var snapshot models.ContractSnapshot
 		if err := json.Unmarshal(kv.Value, &snapshot); err != nil {
 			continue
 		}
@@ -95,19 +95,19 @@ func (r *schemaRepository) GetEnvironmentSnapshots(ctx context.Context, envName 
 }
 
 // ListContractSnapshots lists all contract snapshots for repository/ref
-func (r *schemaRepository) ListContractSnapshots(ctx context.Context, repo, ref string) ([]git.ContractSnapshot, error) {
+func (r *schemaRepository) ListContractSnapshots(ctx context.Context, repo, ref string) ([]models.ContractSnapshot, error) {
 	safeRef := strings.ReplaceAll(ref, "/", "%2F")
 	prefix := fmt.Sprintf("%s%s/%s/contracts/", schemaPrefix, repo, safeRef)
 	resp, err := r.client.Get(ctx, prefix, clientv3.WithPrefix())
 	if err != nil {
 		return nil, fmt.Errorf("failed to list contract snapshots from etcd: %w", err)
 	}
-	var snapshots []git.ContractSnapshot
+	var snapshots []models.ContractSnapshot
 	for _, kv := range resp.Kvs {
 		if !strings.HasSuffix(string(kv.Key), "/snapshot") {
 			continue
 		}
-		var snapshot git.ContractSnapshot
+		var snapshot models.ContractSnapshot
 		if err := json.Unmarshal(kv.Value, &snapshot); err != nil {
 			continue
 		}

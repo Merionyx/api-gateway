@@ -2,10 +2,11 @@ package handler
 
 import (
 	"context"
+	"errors"
 
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
 	"merionyx/api-gateway/internal/controller/domain/models"
-	"merionyx/api-gateway/internal/controller/repository/git"
+	"merionyx/api-gateway/internal/controller/usecase"
 	schemasv1 "merionyx/api-gateway/pkg/api/schemas/v1"
 
 	"google.golang.org/grpc/codes"
@@ -33,6 +34,9 @@ func (h *SchemasHandler) SyncContractBundle(ctx context.Context, req *schemasv1.
 		Force:      req.Force,
 	})
 	if err != nil {
+		if errors.Is(err, usecase.ErrContractsManagedByAPIServer) {
+			return nil, status.Error(codes.Unimplemented, err.Error())
+		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -82,6 +86,9 @@ func (h *SchemasHandler) SyncAllContracts(ctx context.Context, req *schemasv1.Sy
 		Environment: req.Environment,
 	})
 	if err != nil {
+		if errors.Is(err, usecase.ErrContractsManagedByAPIServer) {
+			return nil, status.Error(codes.Unimplemented, err.Error())
+		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -91,7 +98,7 @@ func (h *SchemasHandler) SyncAllContracts(ctx context.Context, req *schemasv1.Sy
 	}, nil
 }
 
-func modelToProtoContractSnapshot(snapshot *git.ContractSnapshot) *schemasv1.ContractSnapshot {
+func modelToProtoContractSnapshot(snapshot *models.ContractSnapshot) *schemasv1.ContractSnapshot {
 	if snapshot == nil {
 		return nil
 	}
@@ -104,7 +111,7 @@ func modelToProtoContractSnapshot(snapshot *git.ContractSnapshot) *schemasv1.Con
 	}
 }
 
-func modelToProtoContractSnapshots(snapshots []git.ContractSnapshot) []*schemasv1.ContractSnapshot {
+func modelToProtoContractSnapshots(snapshots []models.ContractSnapshot) []*schemasv1.ContractSnapshot {
 	if snapshots == nil {
 		return nil
 	}

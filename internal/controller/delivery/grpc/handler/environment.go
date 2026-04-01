@@ -5,7 +5,6 @@ import (
 
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
 	"merionyx/api-gateway/internal/controller/domain/models"
-	"merionyx/api-gateway/internal/controller/repository/git"
 	environmentsv1 "merionyx/api-gateway/pkg/api/environments/v1"
 
 	"google.golang.org/grpc/codes"
@@ -155,7 +154,7 @@ func modelToProtoServicesConfig(services *models.EnvironmentServiceConfig) *envi
 	}
 }
 
-func modelToProtoSnapshots(snapshots []git.ContractSnapshot) []*environmentsv1.ContractSnapshot {
+func modelToProtoSnapshots(snapshots []models.ContractSnapshot) []*environmentsv1.ContractSnapshot {
 	var result []*environmentsv1.ContractSnapshot
 	for _, s := range snapshots {
 		result = append(result, &environmentsv1.ContractSnapshot{

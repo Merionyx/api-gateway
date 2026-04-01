@@ -5,7 +5,6 @@ import (
 
 	"merionyx/api-gateway/internal/controller/config"
 	"merionyx/api-gateway/internal/controller/domain/models"
-	"merionyx/api-gateway/internal/controller/repository/git"
 	xdscache "merionyx/api-gateway/internal/controller/xds/cache"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -13,16 +12,16 @@ import (
 
 type SchemaRepository interface {
 	// Save contract snapshot
-	SaveContractSnapshot(ctx context.Context, repo, ref, contract string, snapshot *git.ContractSnapshot) error
+	SaveContractSnapshot(ctx context.Context, repo, ref, contract string, snapshot *models.ContractSnapshot) error
 
 	// Get contract snapshot
-	GetContractSnapshot(ctx context.Context, repo, ref, contract string) (*git.ContractSnapshot, error)
+	GetContractSnapshot(ctx context.Context, repo, ref, contract string) (*models.ContractSnapshot, error)
 
 	// Get all snapshots for environment
-	GetEnvironmentSnapshots(ctx context.Context, envName string) ([]git.ContractSnapshot, error)
+	GetEnvironmentSnapshots(ctx context.Context, envName string) ([]models.ContractSnapshot, error)
 
 	// List contract snapshots
-	ListContractSnapshots(ctx context.Context, repository, ref string) ([]git.ContractSnapshot, error)
+	ListContractSnapshots(ctx context.Context, repository, ref string) ([]models.ContractSnapshot, error)
 
 	// Watch contract snapshots
 	WatchContractBundlesSnapshots(ctx context.Context) clientv3.WatchChan
@@ -51,7 +50,7 @@ type InMemoryServiceRepository interface {
 }
 
 type InMemoryEnvironmentsRepository interface {
-	SetDependencies(xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder XDSBuilder, gitRepositoryManager *git.RepositoryManager)
+	SetDependencies(xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder XDSBuilder)
 	Initialize(config *config.Config) error
 	GetEnvironment(ctx context.Context, name string) (*models.Environment, error)
 	ListEnvironments(ctx context.Context) (map[string]*models.Environment, error)

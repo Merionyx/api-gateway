@@ -10,9 +10,7 @@ import (
 	"merionyx/api-gateway/internal/controller/delivery/grpc/handler"
 	"merionyx/api-gateway/internal/controller/delivery/http/router"
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
-	"merionyx/api-gateway/internal/controller/domain/models"
 	etcd_repository "merionyx/api-gateway/internal/controller/repository/etcd"
-	"merionyx/api-gateway/internal/controller/repository/git"
 	"merionyx/api-gateway/internal/controller/repository/memory"
 	"merionyx/api-gateway/internal/controller/usecase"
 	"merionyx/api-gateway/internal/shared/etcd"
@@ -26,44 +24,30 @@ import (
 
 // Container DI for all dependencies
 type Container struct {
-	// Config
 	Config *config.Config
 
-	// etcd
 	EtcdClient *clientv3.Client
 
-	// Repository Manager
-	GitRepositoryManager *git.RepositoryManager
-
-	// Repositories
 	SchemaRepository      interfaces.SchemaRepository
 	EnvironmentRepository interfaces.EnvironmentRepository
 
-	// In-memory repositories
 	InMemoryServiceRepository      interfaces.InMemoryServiceRepository
 	InMemoryEnvironmentsRepository interfaces.InMemoryEnvironmentsRepository
 
-	// xDS Builder
 	XDSBuilder interfaces.XDSBuilder
 
-	// Use Cases
 	SnapshotsUseCase     interfaces.SnapshotsUseCase
 	EnvironmentsUseCase  interfaces.EnvironmentsUseCase
 	SchemasUseCase       interfaces.SchemasUseCase
 	APIServerSyncUseCase *usecase.APIServerSyncUseCase
 
-	// HTTP Handlers
-
-	// gRPC Handlers
 	SnapshotGRPCHandler     *handler.SnapshotHandler
 	EnvironmentsGRPCHandler *handler.EnvironmentsHandler
 	SchemasGRPCHandler      *handler.SchemasHandler
 	AuthGRPCHandler         *handler.AuthHandler
 
-	// Router
 	Router *router.Router
 
-	// xDS Components
 	XDSSnapshotManager *xdscache.SnapshotManager
 	XDSServer          *xdsserver.Server
 }
@@ -79,7 +63,6 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 
 	container.createInMemoryServiceRepository()
 	container.initRepositories()
-	container.initGitRepositoryManager()
 
 	container.initXDSBuilder()
 
@@ -87,47 +70,9 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 	container.initHandlers()
 	container.initRouter()
 	container.initInMemoryRepositories()
-	container.persistStaticContractBundlesToEtcd()
 	container.startWatchers()
 
-	// container.startEtcdWatcher()
-
 	return container, nil
-}
-
-// persistStaticContractBundlesToEtcd writes contracts from configuration environments to controller etcd
-// (/api-gateway/controller/schemas/...), so that when the API Server is not available, there is a local copy.
-func (c *Container) persistStaticContractBundlesToEtcd() {
-	if !c.Config.APIServer.Enabled {
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-	defer cancel()
-
-	envs, err := c.InMemoryEnvironmentsRepository.ListEnvironments(ctx)
-	if err != nil {
-		log.Printf("persistStaticContractBundlesToEtcd: list in-memory environments: %v", err)
-		return
-	}
-
-	for _, env := range envs {
-		for _, bundle := range env.Bundles.Static {
-			req := &models.SyncContractBundleRequest{
-				Repository: bundle.Repository,
-				Ref:        bundle.Ref,
-				Bundle:     bundle.Name,
-				Path:       bundle.Path,
-				Force:      true,
-			}
-			if _, err := c.SchemasUseCase.SyncContractBundle(ctx, req); err != nil {
-				log.Printf("persistStaticContractBundlesToEtcd: sync %s/%s (%s): %v", bundle.Repository, bundle.Ref, env.Name, err)
-				continue
-			}
-		}
-	}
-
-	log.Println("Static contract bundles persisted to controller etcd (/api-gateway/controller/schemas/)")
 }
 
 func (c *Container) initEtcd() {
@@ -153,7 +98,7 @@ func (c *Container) createInMemoryServiceRepository() {
 }
 
 func (c *Container) initInMemoryRepositories() {
-	c.InMemoryEnvironmentsRepository.SetDependencies(c.XDSSnapshotManager, c.XDSBuilder, c.GitRepositoryManager)
+	c.InMemoryEnvironmentsRepository.SetDependencies(c.XDSSnapshotManager, c.XDSBuilder)
 
 	if err := c.InMemoryServiceRepository.Initialize(c.Config); err != nil {
 		log.Fatalf("Failed to initialize service repository: %v", err)
@@ -179,16 +124,6 @@ func (c *Container) initRepositories() {
 	log.Println("etcd repositories initialized")
 }
 
-// initGitRepositoryManager initializes the git repository manager
-func (c *Container) initGitRepositoryManager() {
-	c.GitRepositoryManager = git.NewRepositoryManager()
-
-	if err := c.GitRepositoryManager.InitializeRepositories(c.Config.Repositories); err != nil {
-		log.Fatalf("Failed to initialize repositories: %v", err)
-	}
-}
-
-// initUseCases initializes the use cases
 func (c *Container) initUseCases() {
 	c.SnapshotsUseCase = usecase.NewSnapshotsUseCase()
 	c.EnvironmentsUseCase = usecase.NewEnvironmentsUseCase()
@@ -196,7 +131,7 @@ func (c *Container) initUseCases() {
 
 	c.EnvironmentsUseCase.SetDependencies(c.EnvironmentRepository, c.SchemasUseCase, c.XDSSnapshotManager, c.XDSBuilder)
 	c.SnapshotsUseCase.SetDependencies(c.EnvironmentsUseCase, c.XDSSnapshotManager, c.XDSBuilder)
-	c.SchemasUseCase.SetDependencies(c.SchemaRepository, c.EnvironmentRepository, c.GitRepositoryManager)
+	c.SchemasUseCase.SetDependencies(c.SchemaRepository, c.EnvironmentRepository)
 
 	c.APIServerSyncUseCase = usecase.NewAPIServerSyncUseCase(
 		c.Config,
@@ -212,11 +147,7 @@ func (c *Container) initUseCases() {
 	log.Println("Use cases initialized")
 }
 
-// initHandlers initializes the handlers
 func (c *Container) initHandlers() {
-	// HTTP handlers
-
-	// gRPC handlers
 	c.SnapshotGRPCHandler = handler.NewSnapshotHandler(c.SnapshotsUseCase)
 	c.EnvironmentsGRPCHandler = handler.NewEnvironmentsHandler(c.EnvironmentsUseCase)
 	c.SchemasGRPCHandler = handler.NewSchemasHandler(c.SchemasUseCase)
@@ -225,7 +156,6 @@ func (c *Container) initHandlers() {
 	log.Println("Handlers initialized")
 }
 
-// initRouter initializes the router
 func (c *Container) initRouter() {
 	c.Router = router.NewRouter(
 	// c.TenantUseCase,
@@ -247,17 +177,12 @@ func (c *Container) initXDS() {
 	log.Println("xDS server initialized")
 }
 
-// startWatchers starts watchers for watching changes of environments and schemas
 func (c *Container) startWatchers() {
-	if c.Config.APIServer.Enabled {
-		go func() {
-			if err := c.APIServerSyncUseCase.RegisterAndStream(context.Background()); err != nil {
-				log.Printf("API Server sync error: %v", err)
-			}
-		}()
-	} else {
-		go c.EnvironmentsUseCase.WatchSnapshotsUpdates(context.Background())
-	}
+	go func() {
+		if err := c.APIServerSyncUseCase.RegisterAndStream(context.Background()); err != nil {
+			log.Printf("API Server sync error: %v", err)
+		}
+	}()
 }
 
 // Close closes all resources in the container

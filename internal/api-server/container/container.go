@@ -102,7 +102,7 @@ func (c *Container) initUseCases() {
 	)
 
 	bundleSyncUseCase.SetRegistryUseCase(c.ControllerRegistryUseCase.(*usecase.ControllerRegistryUseCase))
-	
+
 	c.BundleSyncUseCase = bundleSyncUseCase
 
 	log.Println("Use cases initialized")

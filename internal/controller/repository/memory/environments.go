@@ -7,31 +7,27 @@ import (
 	"merionyx/api-gateway/internal/controller/config"
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
 	"merionyx/api-gateway/internal/controller/domain/models"
-	"merionyx/api-gateway/internal/controller/repository/git"
 	xdscache "merionyx/api-gateway/internal/controller/xds/cache"
 	"merionyx/api-gateway/internal/controller/xds/snapshot"
 )
 
 type EnvironmentsRepository struct {
-	environments         map[string]*models.Environment
-	xdsSnapshotManager   *xdscache.SnapshotManager
-	xdsBuilder           interfaces.XDSBuilder
-	gitRepositoryManager *git.RepositoryManager
+	environments       map[string]*models.Environment
+	xdsSnapshotManager *xdscache.SnapshotManager
+	xdsBuilder         interfaces.XDSBuilder
 }
 
 func NewEnvironmentsRepository() interfaces.InMemoryEnvironmentsRepository {
 	return &EnvironmentsRepository{
-		environments:         make(map[string]*models.Environment),
-		xdsSnapshotManager:   nil,
-		xdsBuilder:           nil,
-		gitRepositoryManager: nil,
+		environments:       make(map[string]*models.Environment),
+		xdsSnapshotManager: nil,
+		xdsBuilder:         nil,
 	}
 }
 
-func (r *EnvironmentsRepository) SetDependencies(xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder interfaces.XDSBuilder, gitRepositoryManager *git.RepositoryManager) {
+func (r *EnvironmentsRepository) SetDependencies(xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder interfaces.XDSBuilder) {
 	r.xdsSnapshotManager = xdsSnapshotManager
 	r.xdsBuilder = xdsBuilder
-	r.gitRepositoryManager = gitRepositoryManager
 }
 
 func (r *EnvironmentsRepository) Initialize(config *config.Config) error {
@@ -46,7 +42,7 @@ func (r *EnvironmentsRepository) Initialize(config *config.Config) error {
 			Services: &models.EnvironmentServiceConfig{
 				Static: make([]models.StaticServiceConfig, 0),
 			},
-			Snapshots: make([]git.ContractSnapshot, 0),
+			Snapshots: make([]models.ContractSnapshot, 0),
 		}
 		r.environments[configEnv.Name] = env
 	}
@@ -70,18 +66,6 @@ func (r *EnvironmentsRepository) Initialize(config *config.Config) error {
 				Name:     service.Name,
 				Upstream: service.Upstream,
 			})
-		}
-	}
-
-	for _, environment := range r.environments {
-		for _, bundle := range environment.Bundles.Static {
-			snapshots, err := r.gitRepositoryManager.GetRepositorySnapshots(bundle.Repository, bundle.Ref, bundle.Path)
-			if err != nil {
-				log.Fatalf("Failed to get repository snapshots: %v", err)
-			}
-			for _, snapshot := range snapshots {
-				environment.Snapshots = append(environment.Snapshots, snapshot)
-			}
 		}
 	}
 

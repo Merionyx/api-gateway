@@ -39,8 +39,6 @@ services:
             - default
         depends_on:
             - etcd
-        volumes:
-          - ../../../api-gateway-schemas-local:/app/local-dir
     gateway-api-server:
         container_name: merionyx-api-gateway-api-server
         build:

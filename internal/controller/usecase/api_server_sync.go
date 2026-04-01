@@ -11,7 +11,6 @@ import (
 	"merionyx/api-gateway/internal/controller/config"
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
 	"merionyx/api-gateway/internal/controller/domain/models"
-	cgit "merionyx/api-gateway/internal/controller/repository/git"
 	xdscache "merionyx/api-gateway/internal/controller/xds/cache"
 	xdssnapshot "merionyx/api-gateway/internal/controller/xds/snapshot"
 	sharedgit "merionyx/api-gateway/internal/shared/git"
@@ -53,11 +52,6 @@ func NewAPIServerSyncUseCase(
 }
 
 func (uc *APIServerSyncUseCase) RegisterAndStream(ctx context.Context) error {
-	if !uc.config.APIServer.Enabled {
-		slog.Info("API Server sync is disabled")
-		return nil
-	}
-
 	slog.Info("Connecting to API Server", "address", uc.apiServerAddress)
 
 	conn, err := grpc.NewClient(uc.apiServerAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -355,17 +349,17 @@ func (uc *APIServerSyncUseCase) environmentWithSnapshotsFromSchema(ctx context.C
 	return out
 }
 
-func sharedToControllerSnapshot(s sharedgit.ContractSnapshot) *cgit.ContractSnapshot {
-	apps := make([]cgit.App, len(s.Access.Apps))
+func sharedToControllerSnapshot(s sharedgit.ContractSnapshot) *models.ContractSnapshot {
+	apps := make([]models.App, len(s.Access.Apps))
 	for i, a := range s.Access.Apps {
-		apps[i] = cgit.App{AppID: a.AppID, Environments: a.Environments}
+		apps[i] = models.App{AppID: a.AppID, Environments: a.Environments}
 	}
-	return &cgit.ContractSnapshot{
+	return &models.ContractSnapshot{
 		Name:                  s.Name,
 		Prefix:                s.Prefix,
-		Upstream:              cgit.ContractUpstream{Name: s.Upstream.Name},
+		Upstream:              models.ContractUpstream{Name: s.Upstream.Name},
 		AllowUndefinedMethods: s.AllowUndefinedMethods,
-		Access: cgit.Access{
+		Access: models.Access{
 			Secure: s.Access.Secure,
 			Apps:   apps,
 		},
