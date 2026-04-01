@@ -51,41 +51,41 @@ docker-run: ## Run Docker container
 docker-up:
 	docker-compose \
 		-p 'merionyx-api-gateway' \
-		-f ./deployments/docker/compose.app.yaml \
-		-f ./deployments/docker/compose.sidecar.yaml \
-		-f ./deployments/docker/compose.etcd.yaml \
-		-f ./deployments/docker/compose.envoy.yaml \
-		-f ./deployments/docker/compose.mock-service.yaml \
+		-f ./deployments/dev/docker/compose.app.yaml \
+		-f ./deployments/dev/docker/compose.sidecar.yaml \
+		-f ./deployments/dev/docker/compose.etcd.yaml \
+		-f ./deployments/dev/docker/compose.envoy.yaml \
+		-f ./deployments/dev/docker/compose.mock-service.yaml \
 		up --build
 
 docker-down:
 	docker-compose \
 		-p 'merionyx-api-gateway' \
-		-f ./deployments/docker/compose.app.yaml \
-		-f ./deployments/docker/compose.sidecar.yaml \
-		-f ./deployments/docker/compose.etcd.yaml \
-		-f ./deployments/docker/compose.envoy.yaml \
-		-f ./deployments/docker/compose.mock-service.yaml \
+		-f ./deployments/dev/docker/compose.app.yaml \
+		-f ./deployments/dev/docker/compose.sidecar.yaml \
+		-f ./deployments/dev/docker/compose.etcd.yaml \
+		-f ./deployments/dev/docker/compose.envoy.yaml \
+		-f ./deployments/dev/docker/compose.mock-service.yaml \
 		down
 
 docker-up-dev:
 	docker-compose \
 		-p 'merionyx-api-gateway' \
-		-f ./deployments/docker/compose.app.dev.yaml \
-		-f ./deployments/docker/compose.sidecar.dev.yaml \
-		-f ./deployments/docker/compose.etcd.yaml \
-		-f ./deployments/docker/compose.envoy.yaml \
-		-f ./deployments/docker/compose.mock-service.yaml \
+		-f ./deployments/dev/docker/compose.app.dev.yaml \
+		-f ./deployments/dev/docker/compose.sidecar.dev.yaml \
+		-f ./deployments/dev/docker/compose.etcd.yaml \
+		-f ./deployments/dev/docker/compose.envoy.yaml \
+		-f ./deployments/dev/docker/compose.mock-service.yaml \
 		up --build --watch
 
 docker-down-dev:
 	docker-compose \
 		-p 'merionyx-api-gateway' \
-		-f ./deployments/docker/compose.app.dev.yaml \
-		-f ./deployments/docker/compose.sidecar.dev.yaml \
-		-f ./deployments/docker/compose.etcd.yaml \
-		-f ./deployments/docker/compose.envoy.yaml \
-		-f ./deployments/docker/compose.mock-service.yaml \
+		-f ./deployments/dev/docker/compose.app.dev.yaml \
+		-f ./deployments/dev/docker/compose.sidecar.dev.yaml \
+		-f ./deployments/dev/docker/compose.etcd.yaml \
+		-f ./deployments/dev/docker/compose.envoy.yaml \
+		-f ./deployments/dev/docker/compose.mock-service.yaml \
 		down
 
 dev: ## Development mode with hot reload

@@ -5,13 +5,13 @@ services:
     gateway-controller-dev:
         container_name: merionyx-api-gateway-controller-dev
         build:
-            context: ../..
+            context: ../../..
             dockerfile: Dockerfile.controller
         environment:
             - CONFIG_PATH=./configs/controller/config.dev.yaml
             - SSH_KNOWN_HOSTS=/app/secrets/known_hosts
         env_file:
-            - ../../secrets/.env
+            - ../../../secrets/.env
         ports:
             - 10080:8080
             - 10443:8443
@@ -24,13 +24,13 @@ services:
     gateway-controller-prod:
         container_name: merionyx-api-gateway-controller-prod
         build:
-            context: ../..
+            context: ../../..
             dockerfile: Dockerfile.controller
         environment:
             - CONFIG_PATH=./configs/controller/config.prod.yaml
             - SSH_KNOWN_HOSTS=/app/secrets/known_hosts
         env_file:
-            - ../../secrets/.env
+            - ../../../secrets/.env
         ports:
             - 11080:8080
             - 11443:8443
@@ -43,13 +43,13 @@ services:
     gateway-api-server:
         container_name: merionyx-api-gateway-api-server
         build:
-            context: ../..
+            context: ../../..
             dockerfile: Dockerfile.api-server
         environment:
             - CONFIG_PATH=./configs/api-server/config.yaml
             - SSH_KNOWN_HOSTS=/app/secrets/known_hosts
         env_file:
-            - ../../secrets/.env
+            - ../../../secrets/.env
         ports:
             - 12080:8080
             - 12443:8443
@@ -66,13 +66,13 @@ services:
     gateway-contract-syncer:
         container_name: merionyx-api-gateway-contract-syncer
         build:
-            context: ../..
+            context: ../../..
             dockerfile: Dockerfile.contract-syncer
         environment:
             - CONFIG_PATH=./configs/contract-syncer/config.yaml
             - SSH_KNOWN_HOSTS=/app/secrets/known_hosts
         env_file:
-            - ../../secrets/.env
+            - ../../../secrets/.env
         ports:
             - 19092:19092
         networks:
