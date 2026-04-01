@@ -241,7 +241,7 @@ func (h *AuthHandler) buildAccessConfig(ctx context.Context, environment string)
 
 // watchEtcdChanges watches for changes in etcd and notifies sidecars
 func (h *AuthHandler) watchEtcdChanges() {
-	watchChan := h.etcdClient.Watch(context.Background(), "/api-gateway/schemas/", clientv3.WithPrefix())
+	watchChan := h.etcdClient.Watch(context.Background(), "/api-gateway/controller/schemas/", clientv3.WithPrefix())
 
 	log.Println("[AUTH-SYNC] Started watching etcd for schema changes")
 

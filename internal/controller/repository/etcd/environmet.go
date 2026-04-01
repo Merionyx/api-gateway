@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	environmentPrefix = "/api-gateway/environments/"
+	environmentPrefix = "/api-gateway/controller/environments/"
 )
 
 type environmentRepository struct {

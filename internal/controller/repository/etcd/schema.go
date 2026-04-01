@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	schemaPrefix = "/api-gateway/schemas/"
+	schemaPrefix = "/api-gateway/controller/schemas/"
 )
 
 type schemaRepository struct {
