@@ -120,7 +120,7 @@ generate-etcd-certs: ## Generate etcd certificates
 		-subj "/CN=etcd-server"
 	
 	@echo "\033[0;36m→ Creating OpenSSL config for SAN...\033[0m"
-	@echo "subjectAltName=DNS:etcd,DNS:localhost,IP:127.0.0.1" > secrets/certs/etcd/san.cnf
+	@echo "subjectAltName=DNS:etcd-api-server,DNS:etcd-controller-dev,DNS:etcd-controller-prod,DNS:localhost,IP:127.0.0.1" > secrets/certs/etcd/san.cnf
 	
 	@echo "\033[0;36m→ Signing server certificate...\033[0m"
 	@openssl x509 -req -in secrets/certs/etcd/server.csr \

@@ -18,7 +18,7 @@ services:
       - default
       - dev-network
     depends_on:
-      - gateway-controller
+      - gateway-controller-dev
   envoy-dev-02:
     image: envoyproxy/envoy:v1.33-latest
     container_name: envoy-dev-02
@@ -33,7 +33,7 @@ services:
       - default
       - dev-network
     depends_on:
-      - gateway-controller
+      - gateway-controller-dev
   envoy-prod-01:
     image: envoyproxy/envoy:v1.33-latest
     container_name: envoy-prod-01
@@ -48,7 +48,7 @@ services:
       - default
       - prod-network
     depends_on:
-      - gateway-controller
+      - gateway-controller-prod
   envoy-prod-02:
     image: envoyproxy/envoy:v1.33-latest
     container_name: envoy-prod-02
@@ -63,4 +63,4 @@ services:
       - default
       - prod-network
     depends_on:
-      - gateway-controller
+      - gateway-controller-prod

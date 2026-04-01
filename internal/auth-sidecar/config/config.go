@@ -31,8 +31,6 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	// Set default values
 	viper.SetDefault("server.http_port", "8080")
 	viper.SetDefault("server.host", "localhost")
-	viper.SetDefault("controller.address", "gateway-controller:19090")
-	viper.SetDefault("controller.environment", "dev")
 	viper.SetDefault("jwt.jwks_url", "http://api-server:8080/.well-known/jwks.json")
 
 	// Support environment variables

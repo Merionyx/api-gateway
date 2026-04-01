@@ -15,7 +15,7 @@ services:
       - "9101:9001"
     environment:
       - CONFIG_PATH=./configs/auth-sidecar/config.dev.yaml
-      - AUTH_SIDECAR_CONTROLLER_ADDRESS=gateway-controller:19090
+      - AUTH_SIDECAR_CONTROLLER_ADDRESS=gateway-controller-dev:19090
       - AUTH_SIDECAR_CONTROLLER_ENVIRONMENT=dev
       - AUTH_SIDECAR_JWT_JWKS_URL=http://api-server:8080/.well-known/jwks.json
     networks:
@@ -24,7 +24,7 @@ services:
         aliases:
           - auth-sidecar
     depends_on:
-      - gateway-controller
+      - gateway-controller-dev
       - gateway-api-server
     restart: unless-stopped
   auth-sidecar-prod:
@@ -36,7 +36,7 @@ services:
       - "9102:9001"
     environment:
       - CONFIG_PATH=./configs/auth-sidecar/config.prod.yaml
-      - AUTH_SIDECAR_CONTROLLER_ADDRESS=gateway-controller:19090
+      - AUTH_SIDECAR_CONTROLLER_ADDRESS=gateway-controller-prod:19090
       - AUTH_SIDECAR_CONTROLLER_ENVIRONMENT=dev
       - AUTH_SIDECAR_JWT_JWKS_URL=http://api-server:8080/.well-known/jwks.json
     networks:
@@ -45,6 +45,6 @@ services:
         aliases:
           - auth-sidecar
     depends_on:
-      - gateway-controller
+      - gateway-controller-prod
       - gateway-api-server
     restart: unless-stopped

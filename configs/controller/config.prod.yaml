@@ -7,7 +7,7 @@ server:
 
 etcd:
   endpoints:
-  - "https://etcd:2379"
+  - "https://etcd-controller-prod:2379"
   dial_timeout: "5s"
   tls:
     enabled: true
@@ -15,7 +15,7 @@ etcd:
     key_file: "./secrets/certs/etcd/client-key.pem"
     ca_file: "./secrets/certs/etcd/ca.pem"
 
-tenant: "dev-cluster"
+tenant: "prod-cluster"
 
 # gRPC address of API Server (ControllerRegistry / snapshot stream)
 api_server:

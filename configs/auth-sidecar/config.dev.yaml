@@ -3,7 +3,7 @@ server:
   host: "0.0.0.0"
 
 controller:
-  address: "gateway-controller:19090"
+  address: "gateway-controller-dev:19090"
   environment: "dev"
 
 jwt:

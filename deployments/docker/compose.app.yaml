@@ -2,13 +2,13 @@ networks:
     default:
 
 services:
-    gateway-controller:
-        container_name: merionyx-api-gateway-controller
+    gateway-controller-dev:
+        container_name: merionyx-api-gateway-controller-dev
         build:
             context: ../..
             dockerfile: Dockerfile.controller
         environment:
-            - CONFIG_PATH=./configs/controller/config.yaml
+            - CONFIG_PATH=./configs/controller/config.dev.yaml
             - SSH_KNOWN_HOSTS=/app/secrets/known_hosts
         env_file:
             - ../../secrets/.env
@@ -20,9 +20,26 @@ services:
         networks:
             - default
         depends_on:
-            - etcd
-        volumes:
-          - ../../../api-gateway-schemas-local:/app/local-dir
+            - etcd-controller-dev
+    gateway-controller-prod:
+        container_name: merionyx-api-gateway-controller-prod
+        build:
+            context: ../..
+            dockerfile: Dockerfile.controller
+        environment:
+            - CONFIG_PATH=./configs/controller/config.prod.yaml
+            - SSH_KNOWN_HOSTS=/app/secrets/known_hosts
+        env_file:
+            - ../../secrets/.env
+        ports:
+            - 11080:8080
+            - 11443:8443
+            - 19190:19090
+            - 19191:19091
+        networks:
+            - default
+        depends_on:
+            - etcd-controller-prod
     gateway-api-server:
         container_name: merionyx-api-gateway-api-server
         build:
@@ -34,8 +51,8 @@ services:
         env_file:
             - ../../secrets/.env
         ports:
-            - 11080:8080
-            - 11443:8443
+            - 12080:8080
+            - 12443:8443
         healthcheck:
           test: ["CMD", "curl", "-f", "http://localhost:8080/.well-known/jwks.json"]
           interval: 30s
@@ -45,6 +62,6 @@ services:
         networks:
             - default
         depends_on:
-            - etcd
+            - etcd-api-server
         volumes:
           - ../../../api-gateway-api-server-local:/app/local-dir
