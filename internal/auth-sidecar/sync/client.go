@@ -108,7 +108,7 @@ func (c *SyncClient) syncLoop(ctx context.Context) error {
 
 		case *authv1.SyncAccessResponse_Heartbeat:
 			// Heartbeat for keep-alive
-			log.Printf("[SYNC] Heartbeat received")
+			// log.Printf("[SYNC] Heartbeat received")
 		}
 	}
 }
