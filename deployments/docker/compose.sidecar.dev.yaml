@@ -9,8 +9,25 @@ services:
   auth-sidecar-dev:
     build:
       context: ../..
-      dockerfile: Dockerfile.auth-sidecar
+      dockerfile: Dockerfile.auth-sidecar.dev
     container_name: auth-sidecar-dev
+    develop:
+      watch:
+        - path: ../../internal/auth-sidecar
+          target: /app/internal/auth-sidecar
+          action: sync
+        - path: ../../internal/shared
+          target: /app/internal/shared
+          action: sync
+        - path: ../../cmd/auth-sidecar
+          target: /app/cmd/auth-sidecar
+          action: sync
+        - path: ../../configs/auth-sidecar
+          target: /app/configs/auth-sidecar
+          action: sync
+        - path: ../../pkg
+          target: /app/pkg
+          action: sync
     ports:
       - "9101:9001"
     environment:
@@ -30,8 +47,25 @@ services:
   auth-sidecar-prod:
     build:
       context: ../..
-      dockerfile: Dockerfile.auth-sidecar
+      dockerfile: Dockerfile.auth-sidecar.dev
     container_name: auth-sidecar-prod
+    develop:
+      watch:
+        - path: ../../internal/auth-sidecar
+          target: /app/internal/auth-sidecar
+          action: sync
+        - path: ../../internal/shared
+          target: /app/internal/shared
+          action: sync
+        - path: ../../cmd/auth-sidecar
+          target: /app/cmd/auth-sidecar
+          action: sync
+        - path: ../../configs/auth-sidecar
+          target: /app/configs/auth-sidecar
+          action: sync
+        - path: ../../pkg
+          target: /app/pkg
+          action: sync
     ports:
       - "9102:9001"
     environment:

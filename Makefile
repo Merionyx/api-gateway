@@ -52,7 +52,7 @@ docker-up:
 	docker-compose \
 		-p 'merionyx-api-gateway' \
 		-f ./deployments/docker/compose.app.dev.yaml \
-		-f ./deployments/docker/compose.sidecar.yaml \
+		-f ./deployments/docker/compose.sidecar.dev.yaml \
 		-f ./deployments/docker/compose.etcd.yaml \
 		-f ./deployments/docker/compose.envoy.yaml \
 		-f ./deployments/docker/compose.mock-service.yaml \
@@ -62,7 +62,7 @@ docker-down:
 	docker-compose \
 		-p 'merionyx-api-gateway' \
 		-f ./deployments/docker/compose.app.dev.yaml \
-		-f ./deployments/docker/compose.sidecar.yaml \
+		-f ./deployments/docker/compose.sidecar.dev.yaml \
 		-f ./deployments/docker/compose.etcd.yaml \
 		-f ./deployments/docker/compose.envoy.yaml \
 		-f ./deployments/docker/compose.mock-service.yaml \

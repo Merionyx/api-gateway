@@ -19,21 +19,22 @@ services:
             - 19090:19090
             - 19091:19091
         develop:
-            watch:
-                - path: ../..
-                  target: /app
-                  action: sync
-                  ignore:
-                      - .air.controller.toml
-                      - .gitignore
-                      - .git
-                      - .github
-                      - .vscode
-                      - .env
-                      - .env.example
-                      - .env.local
-                      - .env.development
-                      - .env.production
+          watch:
+            - path: ../../internal/controller
+              target: /app/internal/controller
+              action: sync
+            - path: ../../internal/shared
+              target: /app/internal/shared
+              action: sync
+            - path: ../../cmd/controller
+              target: /app/cmd/controller
+              action: sync
+            - path: ../../configs/controller
+              target: /app/configs/controller
+              action: sync
+            - path: ../../pkg
+              target: /app/pkg
+              action: sync
         networks:
             - default
         depends_on:
@@ -55,21 +56,22 @@ services:
             - 11080:8080
             - 11443:8443
         develop:
-            watch:
-                - path: ../..
-                  target: /app
-                  action: sync
-                  ignore:
-                      - .air.api-server.toml
-                      - .gitignore
-                      - .git
-                      - .github
-                      - .vscode
-                      - .env
-                      - .env.example
-                      - .env.local
-                      - .env.development
-                      - .env.production
+          watch:
+            - path: ../../internal/api-server
+              target: /app/internal/api-server
+              action: sync
+            - path: ../../internal/shared
+              target: /app/internal/shared
+              action: sync
+            - path: ../../cmd/api-server
+              target: /app/cmd/api-server
+              action: sync
+            - path: ../../configs/api-server
+              target: /app/configs/api-server
+              action: sync
+            - path: ../../pkg
+              target: /app/pkg
+              action: sync
         networks:
             - default
         depends_on:
