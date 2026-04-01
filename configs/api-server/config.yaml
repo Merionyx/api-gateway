@@ -1,5 +1,6 @@
 server:
   http_port: "8080"
+  grpc_port: "19093"
   host: "0.0.0.0"
 
 etcd:
@@ -14,4 +15,7 @@ etcd:
 
 jwt:
   keys_dir: "./secrets/api-server/keys/jwt"
-  issuer: "gateway-api-server"
+  issuer: "api-gateway-api-server"
+
+contract_syncer:
+  address: "gateway-contract-syncer:19092"

@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+package api.controller_registry.v1;
+
+option go_package = "merionyx/api-gateway/controller/pkg/api/controller_registry/v1;controllerregistryv1";
+
+// RegisterControllerRequest request to register Gateway Controller
+message RegisterControllerRequest {
+  string controller_id = 1;
+  string tenant = 2;
+  repeated EnvironmentInfo environments = 3;
+}
+
+// EnvironmentInfo information about environment
+message EnvironmentInfo {
+  string name = 1;
+  repeated BundleInfo bundles = 2;
+}
+
+// BundleInfo information about bundle
+message BundleInfo {
+  string name = 1;
+  string repository = 2;
+  string ref = 3;
+  string path = 4;
+}
+
+// RegisterControllerResponse response to registration
+message RegisterControllerResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// StreamSnapshotsRequest request to stream snapshots
+message StreamSnapshotsRequest {
+  string controller_id = 1;
+}
+
+// StreamSnapshotsResponse stream snapshots for controller
+message StreamSnapshotsResponse {
+  string environment = 1;
+  string bundle_key = 2;
+  repeated ContractSnapshot snapshots = 3;
+}
+
+// ContractSnapshot represents a contract snapshot
+message ContractSnapshot {
+  string name = 1;
+  string prefix = 2;
+  ContractUpstream upstream = 3;
+  bool allow_undefined_methods = 4;
+  Access access = 5;
+}
+
+// ContractUpstream represents an upstream for a contract
+message ContractUpstream {
+  string name = 1;
+}
+
+// Access represents access settings
+message Access {
+  bool secure = 1;
+  repeated App apps = 2;
+}
+
+// App represents an application with access
+message App {
+  string app_id = 1;
+  repeated string environments = 2;
+}
+
+// HeartbeatRequest request to heartbeat from controller
+message HeartbeatRequest {
+  string controller_id = 1;
+  repeated EnvironmentInfo environments = 2;
+}
+
+// HeartbeatResponse response to heartbeat
+message HeartbeatResponse {
+  bool success = 1;
+}
+
+// ControllerRegistryService service for registration and managing controllers
+service ControllerRegistryService {
+  rpc RegisterController(RegisterControllerRequest) returns (RegisterControllerResponse);
+  rpc StreamSnapshots(StreamSnapshotsRequest) returns (stream StreamSnapshotsResponse);
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+}

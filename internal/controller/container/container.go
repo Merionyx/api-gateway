@@ -10,6 +10,7 @@ import (
 	"merionyx/api-gateway/internal/controller/delivery/grpc/handler"
 	"merionyx/api-gateway/internal/controller/delivery/http/router"
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
+	"merionyx/api-gateway/internal/controller/domain/models"
 	etcd_repository "merionyx/api-gateway/internal/controller/repository/etcd"
 	"merionyx/api-gateway/internal/controller/repository/git"
 	"merionyx/api-gateway/internal/controller/repository/memory"
@@ -46,9 +47,10 @@ type Container struct {
 	XDSBuilder interfaces.XDSBuilder
 
 	// Use Cases
-	SnapshotsUseCase    interfaces.SnapshotsUseCase
-	EnvironmentsUseCase interfaces.EnvironmentsUseCase
-	SchemasUseCase      interfaces.SchemasUseCase
+	SnapshotsUseCase     interfaces.SnapshotsUseCase
+	EnvironmentsUseCase  interfaces.EnvironmentsUseCase
+	SchemasUseCase       interfaces.SchemasUseCase
+	APIServerSyncUseCase *usecase.APIServerSyncUseCase
 
 	// HTTP Handlers
 
@@ -84,13 +86,48 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 	container.initUseCases()
 	container.initHandlers()
 	container.initRouter()
-	container.startWatchers()
-
 	container.initInMemoryRepositories()
+	container.persistStaticContractBundlesToEtcd()
+	container.startWatchers()
 
 	// container.startEtcdWatcher()
 
 	return container, nil
+}
+
+// persistStaticContractBundlesToEtcd writes contracts from configuration environments to controller etcd
+// (/api-gateway/controller/schemas/...), so that when the API Server is not available, there is a local copy.
+func (c *Container) persistStaticContractBundlesToEtcd() {
+	if !c.Config.APIServer.Enabled {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	envs, err := c.InMemoryEnvironmentsRepository.ListEnvironments(ctx)
+	if err != nil {
+		log.Printf("persistStaticContractBundlesToEtcd: list in-memory environments: %v", err)
+		return
+	}
+
+	for _, env := range envs {
+		for _, bundle := range env.Bundles.Static {
+			req := &models.SyncContractBundleRequest{
+				Repository: bundle.Repository,
+				Ref:        bundle.Ref,
+				Bundle:     bundle.Name,
+				Path:       bundle.Path,
+				Force:      true,
+			}
+			if _, err := c.SchemasUseCase.SyncContractBundle(ctx, req); err != nil {
+				log.Printf("persistStaticContractBundlesToEtcd: sync %s/%s (%s): %v", bundle.Repository, bundle.Ref, env.Name, err)
+				continue
+			}
+		}
+	}
+
+	log.Println("Static contract bundles persisted to controller etcd (/api-gateway/controller/schemas/)")
 }
 
 func (c *Container) initEtcd() {
@@ -161,6 +198,15 @@ func (c *Container) initUseCases() {
 	c.SnapshotsUseCase.SetDependencies(c.EnvironmentsUseCase, c.XDSSnapshotManager, c.XDSBuilder)
 	c.SchemasUseCase.SetDependencies(c.SchemaRepository, c.EnvironmentRepository, c.GitRepositoryManager)
 
+	c.APIServerSyncUseCase = usecase.NewAPIServerSyncUseCase(
+		c.Config,
+		c.SchemaRepository,
+		c.InMemoryEnvironmentsRepository,
+		c.EnvironmentsUseCase,
+		c.XDSSnapshotManager,
+		c.XDSBuilder,
+	)
+
 	log.Println("SnapshotsUseCase:", c.SnapshotsUseCase)
 
 	log.Println("Use cases initialized")
@@ -203,7 +249,15 @@ func (c *Container) initXDS() {
 
 // startWatchers starts watchers for watching changes of environments and schemas
 func (c *Container) startWatchers() {
-	go c.EnvironmentsUseCase.WatchSnapshotsUpdates(context.Background())
+	if c.Config.APIServer.Enabled {
+		go func() {
+			if err := c.APIServerSyncUseCase.RegisterAndStream(context.Background()); err != nil {
+				log.Printf("API Server sync error: %v", err)
+			}
+		}()
+	} else {
+		go c.EnvironmentsUseCase.WatchSnapshotsUpdates(context.Background())
+	}
 }
 
 // Close closes all resources in the container

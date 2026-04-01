@@ -10,9 +10,14 @@ import (
 )
 
 type Config struct {
-	Server ServerConfig          `mapstructure:"server" validate:"required" json:"server"`
-	Etcd   sharedetcd.EtcdConfig `mapstructure:"etcd" validate:"required" json:"etcd"`
-	JWT    JWTConfig             `mapstructure:"jwt" validate:"required" json:"jwt"`
+	Server         ServerConfig          `mapstructure:"server" validate:"required" json:"server"`
+	Etcd           sharedetcd.EtcdConfig `mapstructure:"etcd" validate:"required" json:"etcd"`
+	JWT            JWTConfig             `mapstructure:"jwt" validate:"required" json:"jwt"`
+	ContractSyncer ContractSyncerConfig  `mapstructure:"contract_syncer" validate:"required" json:"contract_syncer"`
+}
+
+type ContractSyncerConfig struct {
+	Address string `mapstructure:"address" validate:"required" json:"address"`
 }
 
 type ServerConfig struct {

@@ -55,6 +55,7 @@ services:
         ports:
             - 11080:8080
             - 11443:8443
+            - 19093:19093
         develop:
           watch:
             - path: ../../internal/api-server
@@ -78,3 +79,39 @@ services:
             - etcd
         volumes:
           - ../../../api-gateway-api-server-local:/app/local-dir
+    gateway-contract-syncer:
+        container_name: merionyx-api-gateway-contract-syncer
+        build:
+            context: ../..
+            dockerfile: Dockerfile.contract-syncer.dev
+        command: air -c .air.contract-syncer.toml
+        environment:
+            - CONFIG_PATH=./configs/contract-syncer/config.yaml
+            - SSH_KNOWN_HOSTS=/app/secrets/known_hosts
+        env_file:
+            - ../../secrets/.env
+        ports:
+            - 19092:19092
+        develop:
+          watch:
+            - path: ../../internal/contract-syncer
+              target: /app/internal/contract-syncer
+              action: sync
+            - path: ../../internal/shared
+              target: /app/internal/shared
+              action: sync
+            - path: ../../cmd/contract-syncer
+              target: /app/cmd/contract-syncer
+              action: sync
+            - path: ../../configs/api-server
+              target: /app/configs/contract-syncer
+              action: sync
+            - path: ../../pkg
+              target: /app/pkg
+              action: sync
+        networks:
+            - default
+        depends_on:
+            - etcd
+        volumes:
+          - ../../../api-gateway-schemas-local:/app/local-dir

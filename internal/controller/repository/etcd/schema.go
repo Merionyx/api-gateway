@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
@@ -41,6 +42,7 @@ func (r *schemaRepository) SaveContractSnapshot(ctx context.Context, repo, ref, 
 		return fmt.Errorf("failed to save contract snapshot to etcd: %w", err)
 	}
 
+	slog.Info("Controller etcd: contract snapshot saved", "key", key, "contract", contract)
 	return nil
 }
 

@@ -6,7 +6,10 @@ import (
 	"time"
 
 	"merionyx/api-gateway/internal/api-server/config"
-	"merionyx/api-gateway/internal/api-server/delivery/http/handler"
+	grpchandler "merionyx/api-gateway/internal/api-server/delivery/grpc/handler"
+	httphandler "merionyx/api-gateway/internal/api-server/delivery/http/handler"
+	"merionyx/api-gateway/internal/api-server/domain/interfaces"
+	"merionyx/api-gateway/internal/api-server/repository/etcd"
 	"merionyx/api-gateway/internal/api-server/usecase"
 	sharedetcd "merionyx/api-gateway/internal/shared/etcd"
 
@@ -21,11 +24,20 @@ type Container struct {
 	// etcd
 	EtcdClient *clientv3.Client
 
-	// Use Cases
-	JWTUseCase *usecase.JWTUseCase
+	// Repositories
+	SnapshotRepository   interfaces.SnapshotRepository
+	ControllerRepository interfaces.ControllerRepository
 
-	// Handlers
-	JWTHandler *handler.JWTHandler
+	// Use Cases
+	JWTUseCase                *usecase.JWTUseCase
+	ControllerRegistryUseCase interfaces.ControllerRegistryUseCase
+	BundleSyncUseCase         interfaces.BundleSyncUseCase
+
+	// HTTP Handlers
+	JWTHandler *httphandler.JWTHandler
+
+	// gRPC Handlers
+	ControllerRegistryHandler *grpchandler.ControllerRegistryHandler
 }
 
 // NewContainer creates and initializes a new DI container
@@ -35,8 +47,10 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 	}
 
 	container.initEtcd()
+	container.initRepositories()
 	container.initUseCases()
 	container.initHandlers()
+	container.startWatchers()
 
 	return container, nil
 }
@@ -58,6 +72,13 @@ func (c *Container) initEtcd() {
 	log.Println("etcd client initialized and connected successfully")
 }
 
+func (c *Container) initRepositories() {
+	c.SnapshotRepository = etcd.NewSnapshotRepository(c.EtcdClient)
+	c.ControllerRepository = etcd.NewControllerRepository(c.EtcdClient)
+
+	log.Println("Repositories initialized")
+}
+
 func (c *Container) initUseCases() {
 	var err error
 
@@ -69,13 +90,34 @@ func (c *Container) initUseCases() {
 		log.Fatalf("Failed to initialize JWT use case: %v", err)
 	}
 
+	c.ControllerRegistryUseCase = usecase.NewControllerRegistryUseCase(
+		c.ControllerRepository,
+		c.SnapshotRepository,
+	)
+
+	bundleSyncUseCase := usecase.NewBundleSyncUseCase(
+		c.SnapshotRepository,
+		c.ControllerRepository,
+		c.Config.ContractSyncer.Address,
+	)
+
+	bundleSyncUseCase.SetRegistryUseCase(c.ControllerRegistryUseCase.(*usecase.ControllerRegistryUseCase))
+	
+	c.BundleSyncUseCase = bundleSyncUseCase
+
 	log.Println("Use cases initialized")
 }
 
 func (c *Container) initHandlers() {
-	c.JWTHandler = handler.NewJWTHandler(c.JWTUseCase)
+	c.JWTHandler = httphandler.NewJWTHandler(c.JWTUseCase)
+	c.ControllerRegistryHandler = grpchandler.NewControllerRegistryHandler(c.ControllerRegistryUseCase)
 
 	log.Println("Handlers initialized")
+}
+
+func (c *Container) startWatchers() {
+	go c.BundleSyncUseCase.StartBundleWatcher(context.Background())
+	log.Println("Bundle watcher started")
 }
 
 // Close closes all resources in the container

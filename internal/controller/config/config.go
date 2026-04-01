@@ -15,6 +15,13 @@ type Config struct {
 	Repositories []RepositoryConfig  `mapstructure:"repositories" validate:"required" json:"repositories"`
 	Environments []EnvironmentConfig `mapstructure:"environments" validate:"required" json:"environments"`
 	Services     ServicesConfig      `mapstructure:"services" validate:"required" json:"services"`
+	APIServer    APIServerConfig     `mapstructure:"api_server" json:"api_server"`
+	Tenant       string              `mapstructure:"tenant" json:"tenant"`
+}
+
+type APIServerConfig struct {
+	Enabled bool   `mapstructure:"enabled" json:"enabled"`
+	Address string `mapstructure:"address" json:"address"`
 }
 
 type ServerConfig struct {

@@ -15,6 +15,16 @@ etcd:
     key_file: "./secrets/certs/etcd/client-key.pem"
     ca_file: "./secrets/certs/etcd/ca.pem"
 
+# Tenant identifier for this controller
+tenant: "dev-cluster"
+
+# API Server configuration (optional)
+# If enabled, controller will register with API Server and receive snapshots via stream
+# If disabled, controller will use local Git repositories
+api_server:
+  enabled: true
+  address: "gateway-api-server:19093"
+
 repositories:
 # Remote Git repository
 - name: api-gateway-schemas-https

@@ -8,9 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"merionyx/api-gateway/internal/api-server/config"
-	"merionyx/api-gateway/internal/api-server/container"
-	"merionyx/api-gateway/internal/api-server/server"
+	"merionyx/api-gateway/internal/contract-syncer/config"
+	"merionyx/api-gateway/internal/contract-syncer/container"
+	"merionyx/api-gateway/internal/contract-syncer/server"
 )
 
 func Run() error {
@@ -39,14 +39,6 @@ func Run() error {
 	// Setup graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	// Start HTTP server
-	go func() {
-		if err := server.StartHTTPServer(cnt); err != nil {
-			logger.Error(fmt.Sprintf("HTTP server error: %v", err))
-			cancel()
-		}
-	}()
 
 	// Start gRPC server
 	go func() {

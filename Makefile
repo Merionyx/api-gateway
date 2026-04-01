@@ -75,6 +75,12 @@ proto-generate: ## Generate protobuf code
 	protoc --go_out=. --go_opt=paths=source_relative \
 		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
 		api/proto/v1/*.proto && \
+	mkdir -p ./pkg/api/snapshots/v1 && \
+	mkdir -p ./pkg/api/schemas/v1 && \
+	mkdir -p ./pkg/api/environments/v1 && \
+	mkdir -p ./pkg/api/auth/v1 && \
+	mkdir -p ./pkg/api/contract_syncer/v1 && \
+	mkdir -p ./pkg/api/controller_registry/v1 && \
 	cp ./api/proto/v1/snapshots_grpc.pb.go ./pkg/api/snapshots/v1/snapshots_grpc.pb.go && \
 	cp ./api/proto/v1/snapshots.pb.go ./pkg/api/snapshots/v1/snapshots.pb.go && \
 	cp ./api/proto/v1/schemas_grpc.pb.go ./pkg/api/schemas/v1/schemas_grpc.pb.go && \
@@ -83,6 +89,10 @@ proto-generate: ## Generate protobuf code
 	cp ./api/proto/v1/environment.pb.go ./pkg/api/environments/v1/environment.pb.go && \
 	cp ./api/proto/v1/auth_grpc.pb.go ./pkg/api/auth/v1/auth_grpc.pb.go && \
 	cp ./api/proto/v1/auth.pb.go ./pkg/api/auth/v1/auth.pb.go && \
+	cp ./api/proto/v1/contract_syncer_grpc.pb.go ./pkg/api/contract_syncer/v1/contract_syncer_grpc.pb.go && \
+	cp ./api/proto/v1/contract_syncer.pb.go ./pkg/api/contract_syncer/v1/contract_syncer.pb.go && \
+	cp ./api/proto/v1/controller_registry_grpc.pb.go ./pkg/api/controller_registry/v1/controller_registry_grpc.pb.go && \
+	cp ./api/proto/v1/controller_registry.pb.go ./pkg/api/controller_registry/v1/controller_registry.pb.go && \
 	rm -rf ./api/proto/v1/*.pb.go
 
 proto-install: ## Install protobuf tools
