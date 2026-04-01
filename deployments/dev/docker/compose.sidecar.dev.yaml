@@ -9,7 +9,7 @@ services:
   auth-sidecar-dev:
     build:
       context: ../../..
-      dockerfile: Dockerfile.auth-sidecar.dev
+      dockerfile: build/dev/Dockerfile.auth-sidecar
     container_name: auth-sidecar-dev
     develop:
       watch:
@@ -47,7 +47,7 @@ services:
   auth-sidecar-prod:
     build:
       context: ../../..
-      dockerfile: Dockerfile.auth-sidecar.dev
+      dockerfile: build/dev/Dockerfile.auth-sidecar
     container_name: auth-sidecar-prod
     develop:
       watch:

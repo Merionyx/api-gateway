@@ -14,4 +14,4 @@ COPY . .
 
 EXPOSE 8080 8443 8444
 
-CMD ["air", "-c", ".air.controller.toml"]
+CMD ["air", "-c", "deployments/dev/air/contract-syncer.toml"]

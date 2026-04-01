@@ -9,7 +9,7 @@ services:
   auth-sidecar-dev:
     build:
       context: ../../..
-      dockerfile: Dockerfile.auth-sidecar
+      dockerfile: build/release/Dockerfile.auth-sidecar
     container_name: auth-sidecar-dev
     ports:
       - "9101:9001"
@@ -30,7 +30,7 @@ services:
   auth-sidecar-prod:
     build:
       context: ../../..
-      dockerfile: Dockerfile.auth-sidecar
+      dockerfile: build/release/Dockerfile.auth-sidecar
     container_name: auth-sidecar-prod
     ports:
       - "9102:9001"

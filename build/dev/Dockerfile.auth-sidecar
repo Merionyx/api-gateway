@@ -1,3 +1,4 @@
+
 FROM golang:1.25.1-alpine
 
 RUN apk add --no-cache git ca-certificates tzdata curl
@@ -14,4 +15,4 @@ COPY . .
 
 EXPOSE 8080 8443 8444
 
-CMD ["air", "-c", ".air.api-server.toml"]
+CMD ["air", "-c", "deployments/dev/air/auth-sidecar.toml"]

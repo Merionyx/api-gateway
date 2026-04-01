@@ -6,7 +6,7 @@ services:
       - "2379:2379"
       - "2380:2380"
     volumes:
-      - ../../secrets/certs/etcd:/etcd-certs:ro
+      - ../../../secrets/certs/etcd:/etcd-certs:ro
     command:
       - /usr/local/bin/etcd
       - --name=etcd-api-server
@@ -43,7 +43,7 @@ services:
       - "2479:2379"
       - "2480:2380"
     volumes:
-      - ../../secrets/certs/etcd:/etcd-certs:ro
+      - ../../../secrets/certs/etcd:/etcd-certs:ro
     command:
       - /usr/local/bin/etcd
       - --name=etcd-controller-dev
@@ -80,7 +80,7 @@ services:
       - "2579:2379"
       - "2580:2380"
     volumes:
-      - ../../secrets/certs/etcd:/etcd-certs:ro
+      - ../../../secrets/certs/etcd:/etcd-certs:ro
     command:
       - /usr/local/bin/etcd
       - --name=etcd-controller-prod
