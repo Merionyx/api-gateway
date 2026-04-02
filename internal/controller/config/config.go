@@ -85,33 +85,37 @@ type StaticServiceConfig struct {
 }
 
 func LoadConfig(configFile ...string) (*Config, error) {
-	viper.SetDefault("server.http1_port", "8080")
-	viper.SetDefault("server.http2_port", "8443")
-	viper.SetDefault("server.grpc_port", "19090")
-	viper.SetDefault("server.xds_port", "19091")
-	viper.SetDefault("server.host", "localhost")
-	viper.SetDefault("logging.enabled", false)
-	viper.SetDefault("logging.level", "info")
-	viper.SetDefault("logging.format", "[${time}] ${status} - ${method} ${path}")
-	viper.SetDefault("leader_election.enabled", true)
-	viper.SetDefault("leader_election.key_prefix", "/api-gateway/controller/election/leader")
-	viper.SetDefault("leader_election.session_ttl_seconds", 5)
+	// Isolated instance: global viper can be mutated by other imports; Unmarshal must see the same tree as Set after patch.
+	v := viper.New()
+	v.SetDefault("server.http1_port", "8080")
+	v.SetDefault("server.http2_port", "8443")
+	v.SetDefault("server.grpc_port", "19090")
+	v.SetDefault("server.xds_port", "19091")
+	v.SetDefault("server.host", "localhost")
+	v.SetDefault("logging.enabled", false)
+	v.SetDefault("logging.level", "info")
+	v.SetDefault("logging.format", "[${time}] ${status} - ${method} ${path}")
+	v.SetDefault("leader_election.enabled", true)
+	v.SetDefault("leader_election.key_prefix", "/api-gateway/controller/election/leader")
+	v.SetDefault("leader_election.session_ttl_seconds", 5)
 
-	viper.AutomaticEnv()
-	viper.SetEnvPrefix("CP_")
+	v.AutomaticEnv()
+	v.SetEnvPrefix("CP_")
 
+	var explicitPath string
 	if len(configFile) > 0 && configFile[0] != "" {
-		slog.Info(fmt.Sprintf("Loading config from %s", configFile[0]))
-		viper.SetConfigFile(configFile[0])
+		explicitPath = configFile[0]
+		slog.Info(fmt.Sprintf("Loading config from %s", explicitPath))
+		v.SetConfigFile(explicitPath)
 	} else {
-		viper.SetConfigName("config")
-		viper.SetConfigType("yaml")
-		viper.AddConfigPath(".")
-		viper.AddConfigPath("./config")
-		viper.AddConfigPath("./configs/control-plane")
+		v.SetConfigName("config")
+		v.SetConfigType("yaml")
+		v.AddConfigPath(".")
+		v.AddConfigPath("./config")
+		v.AddConfigPath("./configs/control-plane")
 	}
 
-	if err := viper.ReadInConfig(); err != nil {
+	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			slog.Info("Config file not found, using defaults and environment variables")
 		} else {
@@ -119,16 +123,20 @@ func LoadConfig(configFile ...string) (*Config, error) {
 			return nil, err
 		}
 	} else {
-		slog.Info(fmt.Sprintf("Using config file %s", viper.ConfigFileUsed()))
-		if p := viper.ConfigFileUsed(); p != "" {
-			if err := patchViperKubernetesDiscoverySelectors(p); err != nil {
+		slog.Info(fmt.Sprintf("Using config file %s", v.ConfigFileUsed()))
+		patchPath := explicitPath
+		if patchPath == "" {
+			patchPath = v.ConfigFileUsed()
+		}
+		if patchPath != "" {
+			if err := patchViperKubernetesDiscoverySelectors(v, patchPath); err != nil {
 				slog.Warn("kubernetes_discovery label selectors: normalize skipped", "err", err)
 			}
 		}
 	}
 
 	var config Config
-	if err := viper.Unmarshal(&config); err != nil {
+	if err := v.Unmarshal(&config); err != nil {
 		return nil, err
 	}
 
@@ -159,7 +167,7 @@ func LoadConfig(configFile ...string) (*Config, error) {
 
 // patchViperKubernetesDiscoverySelectors fixes YAML where dotted label keys (e.g. gateway.merionyx.io/team)
 // were parsed as nested maps; viper/mapstructure then cannot decode into map[string]string.
-func patchViperKubernetesDiscoverySelectors(configPath string) error {
+func patchViperKubernetesDiscoverySelectors(v *viper.Viper, configPath string) error {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return err
@@ -172,16 +180,16 @@ func patchViperKubernetesDiscoverySelectors(configPath string) error {
 	if kd == nil {
 		return nil
 	}
-	// Use viper.Set (replace), not MergeConfigMap: deep-merge would keep stale nested keys
-	// like resource_label_selector.gateway alongside the flattened map.
-	if v, ok := kd["resource_label_selector"]; ok {
-		if flat := flattenYAMLStringMap(v); len(flat) > 0 {
-			viper.Set("kubernetes_discovery.resource_label_selector", flat)
+	// Use Set on the same Viper instance as ReadInConfig/Unmarshal (not global viper).
+	// Replace, not merge, so stale nested keys like resource_label_selector.gateway are dropped.
+	if raw, ok := kd["resource_label_selector"]; ok {
+		if flat := flattenYAMLStringMap(raw); len(flat) > 0 {
+			v.Set("kubernetes_discovery.resource_label_selector", flat)
 		}
 	}
-	if v, ok := kd["namespace_label_selector"]; ok {
-		if flat := flattenYAMLStringMap(v); len(flat) > 0 {
-			viper.Set("kubernetes_discovery.namespace_label_selector", flat)
+	if raw, ok := kd["namespace_label_selector"]; ok {
+		if flat := flattenYAMLStringMap(raw); len(flat) > 0 {
+			v.Set("kubernetes_discovery.namespace_label_selector", flat)
 		}
 	}
 	return nil
