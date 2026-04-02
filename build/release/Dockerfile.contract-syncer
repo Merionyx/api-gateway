@@ -24,7 +24,6 @@ WORKDIR /contract-syncer
 COPY --from=builder /contract-syncer/main .
 
 COPY --from=builder /contract-syncer/configs ./configs
-COPY --from=builder /contract-syncer/secrets ./secrets
 
 RUN chown -R app:app /contract-syncer
 

@@ -24,7 +24,6 @@ WORKDIR /auth-sidecar
 COPY --from=builder /auth-sidecar/main .
 
 COPY --from=builder /auth-sidecar/configs ./configs
-COPY --from=builder /auth-sidecar/secrets ./secrets
 
 RUN chown -R app:app /auth-sidecar
 

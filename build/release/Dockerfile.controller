@@ -24,7 +24,6 @@ WORKDIR /controller
 COPY --from=builder /controller/main .
 
 COPY --from=builder /controller/configs ./configs
-COPY --from=builder /controller/secrets ./secrets
 
 RUN chown -R app:app /controller
 

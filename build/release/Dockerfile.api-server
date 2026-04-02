@@ -24,7 +24,6 @@ WORKDIR /api-server
 COPY --from=builder /api-server/main .
 
 COPY --from=builder /api-server/configs ./configs
-COPY --from=builder /api-server/secrets ./secrets
 
 RUN chown -R app:app /api-server
 
