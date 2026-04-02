@@ -13,23 +13,23 @@ import (
 )
 
 type Config struct {
-	Server               ServerConfig                 `mapstructure:"server" validate:"required" json:"server"`
-	Etcd                 etcd.EtcdConfig              `mapstructure:"etcd"`
-	Environments         []EnvironmentConfig          `mapstructure:"environments" json:"environments"`
-	Services             ServicesConfig               `mapstructure:"services" json:"services"`
-	APIServer            APIServerConfig              `mapstructure:"api_server" json:"api_server"`
-	Tenant               string                       `mapstructure:"tenant" json:"tenant"`
-	HA                   HAConfig                     `mapstructure:"ha" json:"ha"`
-	LeaderElection       LeaderElectionConfig         `mapstructure:"leader_election" json:"leader_election"`
-	KubernetesDiscovery  *KubernetesDiscoveryConfig  `mapstructure:"kubernetes_discovery" json:"kubernetes_discovery"`
+	Server              ServerConfig               `mapstructure:"server" validate:"required" json:"server"`
+	Etcd                etcd.EtcdConfig            `mapstructure:"etcd"`
+	Environments        []EnvironmentConfig        `mapstructure:"environments" json:"environments"`
+	Services            ServicesConfig             `mapstructure:"services" json:"services"`
+	APIServer           APIServerConfig            `mapstructure:"api_server" json:"api_server"`
+	Tenant              string                     `mapstructure:"tenant" json:"tenant"`
+	HA                  HAConfig                   `mapstructure:"ha" json:"ha"`
+	LeaderElection      LeaderElectionConfig       `mapstructure:"leader_election" json:"leader_election"`
+	KubernetesDiscovery *KubernetesDiscoveryConfig `mapstructure:"kubernetes_discovery" json:"kubernetes_discovery"`
 }
 
 // KubernetesDiscoveryConfig enables building environments from gateway.merionyx.io CRs and annotated Services.
 type KubernetesDiscoveryConfig struct {
-	Enabled                 bool              `mapstructure:"enabled" json:"enabled"`
-	NamespaceLabelSelector  map[string]string `mapstructure:"namespace_label_selector" json:"namespace_label_selector"`
-	ResourceLabelSelector   map[string]string `mapstructure:"resource_label_selector" json:"resource_label_selector"`
-	WatchNamespaces         []string          `mapstructure:"watch_namespaces" json:"watch_namespaces"`
+	Enabled                bool              `mapstructure:"enabled" json:"enabled"`
+	NamespaceLabelSelector map[string]string `mapstructure:"namespace_label_selector" json:"namespace_label_selector"`
+	ResourceLabelSelector  map[string]string `mapstructure:"resource_label_selector" json:"resource_label_selector"`
+	WatchNamespaces        []string          `mapstructure:"watch_namespaces" json:"watch_namespaces"`
 }
 
 // HAConfig groups settings shared by all replicas of one logical Gateway Controller pool.
@@ -172,22 +172,16 @@ func patchViperKubernetesDiscoverySelectors(configPath string) error {
 	if kd == nil {
 		return nil
 	}
+	// Use viper.Set (replace), not MergeConfigMap: deep-merge would keep stale nested keys
+	// like resource_label_selector.gateway alongside the flattened map.
 	if v, ok := kd["resource_label_selector"]; ok {
 		if flat := flattenYAMLStringMap(v); len(flat) > 0 {
-			_ = viper.MergeConfigMap(map[string]interface{}{
-				"kubernetes_discovery": map[string]interface{}{
-					"resource_label_selector": flat,
-				},
-			})
+			viper.Set("kubernetes_discovery.resource_label_selector", flat)
 		}
 	}
 	if v, ok := kd["namespace_label_selector"]; ok {
 		if flat := flattenYAMLStringMap(v); len(flat) > 0 {
-			_ = viper.MergeConfigMap(map[string]interface{}{
-				"kubernetes_discovery": map[string]interface{}{
-					"namespace_label_selector": flat,
-				},
-			})
+			viper.Set("kubernetes_discovery.namespace_label_selector", flat)
 		}
 	}
 	return nil
