@@ -14,6 +14,15 @@ type Config struct {
 	Etcd           sharedetcd.EtcdConfig `mapstructure:"etcd" validate:"required" json:"etcd"`
 	JWT            JWTConfig             `mapstructure:"jwt" validate:"required" json:"jwt"`
 	ContractSyncer ContractSyncerConfig  `mapstructure:"contract_syncer" validate:"required" json:"contract_syncer"`
+	LeaderElection LeaderElectionConfig  `mapstructure:"leader_election" json:"leader_election"`
+}
+
+// LeaderElectionConfig gates single-writer work (bundle pull from Contract Syncer) to one API Server replica.
+type LeaderElectionConfig struct {
+	Enabled           bool   `mapstructure:"enabled" json:"enabled"`
+	KeyPrefix         string `mapstructure:"key_prefix" json:"key_prefix"`
+	Identity          string `mapstructure:"identity" json:"identity"`
+	SessionTTLSeconds int    `mapstructure:"session_ttl_seconds" json:"session_ttl_seconds"`
 }
 
 type ContractSyncerConfig struct {
@@ -38,6 +47,9 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	viper.SetDefault("etcd.dial_timeout", "5s")
 	viper.SetDefault("jwt.keys_dir", "./secrets/keys/jwt")
 	viper.SetDefault("jwt.issuer", "api-gateway-api-server")
+	viper.SetDefault("leader_election.enabled", true)
+	viper.SetDefault("leader_election.key_prefix", "/api-gateway/api-server/election/leader")
+	viper.SetDefault("leader_election.session_ttl_seconds", 5)
 
 	// Support environment variables
 	viper.AutomaticEnv()

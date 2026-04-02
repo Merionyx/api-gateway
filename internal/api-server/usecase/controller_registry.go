@@ -4,17 +4,24 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
+	"time"
 
 	"merionyx/api-gateway/internal/api-server/domain/interfaces"
 	"merionyx/api-gateway/internal/api-server/domain/models"
 	"merionyx/api-gateway/internal/shared/bundlekey"
 	sharedgit "merionyx/api-gateway/internal/shared/git"
+
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
+
+const apiServerEtcdPrefix = "/api-gateway/api-server/"
 
 type ControllerRegistryUseCase struct {
 	controllerRepo interfaces.ControllerRepository
 	snapshotRepo   interfaces.SnapshotRepository
+	etcdClient     *clientv3.Client
 
 	mu                sync.RWMutex
 	controllerStreams map[string]interfaces.SnapshotStream
@@ -23,10 +30,12 @@ type ControllerRegistryUseCase struct {
 func NewControllerRegistryUseCase(
 	controllerRepo interfaces.ControllerRepository,
 	snapshotRepo interfaces.SnapshotRepository,
+	etcdClient *clientv3.Client,
 ) *ControllerRegistryUseCase {
 	return &ControllerRegistryUseCase{
 		controllerRepo:    controllerRepo,
 		snapshotRepo:      snapshotRepo,
+		etcdClient:        etcdClient,
 		controllerStreams: make(map[string]interfaces.SnapshotStream),
 	}
 }
@@ -38,6 +47,36 @@ func (uc *ControllerRegistryUseCase) RegisterController(ctx context.Context, inf
 		return fmt.Errorf("failed to register controller: %w", err)
 	}
 
+	return nil
+}
+
+func (uc *ControllerRegistryUseCase) sendAllSnapshotsForControllerStream(
+	ctx context.Context,
+	controllerID string,
+	stream interfaces.SnapshotStream,
+) error {
+	controller, err := uc.controllerRepo.GetController(ctx, controllerID)
+	if err != nil {
+		return fmt.Errorf("failed to get controller: %w", err)
+	}
+
+	slog.Info("Sending snapshots to controller stream", "controller_id", controllerID, "environments_count", len(controller.Environments))
+
+	for _, env := range controller.Environments {
+		for _, bundle := range env.Bundles {
+			bundleKey := bundlekey.Build(bundle.Repository, bundle.Ref, bundle.Path)
+
+			snapshots, err := uc.snapshotRepo.GetSnapshots(ctx, bundleKey)
+			if err != nil {
+				slog.Error("Failed to get snapshots", "bundle_key", bundleKey, "error", err)
+				continue
+			}
+
+			if err := stream.Send(env.Name, bundleKey, snapshots); err != nil {
+				return fmt.Errorf("failed to send snapshots: %w", err)
+			}
+		}
+	}
 	return nil
 }
 
@@ -54,32 +93,8 @@ func (uc *ControllerRegistryUseCase) StreamSnapshots(ctx context.Context, contro
 		uc.mu.Unlock()
 	}()
 
-	controller, err := uc.controllerRepo.GetController(ctx, controllerID)
-	if err != nil {
-		return fmt.Errorf("failed to get controller: %w", err)
-	}
-
-	slog.Info("Controller info", "controller_id", controllerID, "environments_count", len(controller.Environments))
-
-	for _, env := range controller.Environments {
-		slog.Info("Processing environment", "name", env.Name, "bundles_count", len(env.Bundles))
-		for _, bundle := range env.Bundles {
-			bundleKey := bundlekey.Build(bundle.Repository, bundle.Ref, bundle.Path)
-
-			slog.Info("Getting snapshots for bundle", "environment", env.Name, "bundle_key", bundleKey)
-
-			snapshots, err := uc.snapshotRepo.GetSnapshots(ctx, bundleKey)
-			if err != nil {
-				slog.Error("Failed to get snapshots", "bundle_key", bundleKey, "error", err)
-				continue
-			}
-
-			slog.Info("Sending snapshots to controller", "environment", env.Name, "bundle_key", bundleKey, "count", len(snapshots))
-
-			if err := stream.Send(env.Name, bundleKey, snapshots); err != nil {
-				return fmt.Errorf("failed to send snapshots: %w", err)
-			}
-		}
+	if err := uc.sendAllSnapshotsForControllerStream(ctx, controllerID, stream); err != nil {
+		return err
 	}
 
 	<-ctx.Done()
@@ -89,23 +104,19 @@ func (uc *ControllerRegistryUseCase) StreamSnapshots(ctx context.Context, contro
 func (uc *ControllerRegistryUseCase) Heartbeat(ctx context.Context, controllerID string, environments []models.EnvironmentInfo) error {
 	slog.Debug("Received heartbeat", "controller_id", controllerID)
 
-	// Get current controller information
 	controller, err := uc.controllerRepo.GetController(ctx, controllerID)
 	if err != nil {
 		return fmt.Errorf("failed to get controller: %w", err)
 	}
 
-	// Check if the list of environments has changed
 	hasChanges := false
 	if len(controller.Environments) != len(environments) {
 		hasChanges = true
 	} else {
-		// Create a map for fast search
 		existingEnvs := make(map[string]bool)
 		for _, env := range controller.Environments {
 			existingEnvs[env.Name] = true
 		}
-
 		for _, env := range environments {
 			if !existingEnvs[env.Name] {
 				hasChanges = true
@@ -114,12 +125,10 @@ func (uc *ControllerRegistryUseCase) Heartbeat(ctx context.Context, controllerID
 		}
 	}
 
-	// Update heartbeat
 	if err := uc.controllerRepo.UpdateControllerHeartbeat(ctx, controllerID, environments); err != nil {
 		return fmt.Errorf("failed to update heartbeat: %w", err)
 	}
 
-	// If there are changes, send snapshots for new environments to active stream
 	if hasChanges {
 		slog.Info("Detected environment changes, sending snapshots to stream", "controller_id", controllerID)
 
@@ -128,25 +137,8 @@ func (uc *ControllerRegistryUseCase) Heartbeat(ctx context.Context, controllerID
 		uc.mu.RUnlock()
 
 		if exists {
-			// Send snapshots for all environments (including new ones)
-			for _, env := range environments {
-				for _, bundle := range env.Bundles {
-					bundleKey := bundlekey.Build(bundle.Repository, bundle.Ref, bundle.Path)
-
-					slog.Info("Getting snapshots for new environment", "environment", env.Name, "bundle_key", bundleKey)
-
-					snapshots, err := uc.snapshotRepo.GetSnapshots(ctx, bundleKey)
-					if err != nil {
-						slog.Error("Failed to get snapshots for new environment", "error", err, "bundle_key", bundleKey)
-						continue
-					}
-
-					slog.Info("Sending snapshots for new environment", "environment", env.Name, "bundle_key", bundleKey, "count", len(snapshots))
-
-					if err := stream.Send(env.Name, bundleKey, snapshots); err != nil {
-						slog.Error("Failed to send snapshots for new environment", "error", err)
-					}
-				}
+			if err := uc.sendAllSnapshotsForControllerStream(ctx, controllerID, stream); err != nil {
+				slog.Error("Failed to send snapshots after env change", "error", err)
 			}
 		}
 	}
@@ -169,22 +161,126 @@ func (uc *ControllerRegistryUseCase) NotifySnapshotUpdate(ctx context.Context, b
 		for _, env := range controller.Environments {
 			for _, bundle := range env.Bundles {
 				currentBundleKey := bundlekey.Build(bundle.Repository, bundle.Ref, bundle.Path)
-
-				if currentBundleKey == bundleKey {
-					slog.Info("Found matching bundle for controller", "controller_id", controller.ControllerID, "environment", env.Name, "bundle_key", bundleKey)
-					stream, ok := uc.controllerStreams[controller.ControllerID]
-					if ok {
-						slog.Info("Sending snapshot update to controller", "controller_id", controller.ControllerID, "environment", env.Name, "snapshots_count", len(snapshots))
-						if err := stream.Send(env.Name, bundleKey, snapshots); err != nil {
-							slog.Error("Failed to send snapshot update", "controller_id", controller.ControllerID, "error", err)
-						}
-					} else {
-						slog.Warn("No active stream for controller", "controller_id", controller.ControllerID)
-					}
+				if currentBundleKey != bundleKey {
+					continue
+				}
+				stream, ok := uc.controllerStreams[controller.ControllerID]
+				if !ok {
+					slog.Warn("No active stream for controller", "controller_id", controller.ControllerID)
+					continue
+				}
+				slog.Info("Sending snapshot update to controller", "controller_id", controller.ControllerID, "environment", env.Name, "snapshots_count", len(snapshots))
+				if err := stream.Send(env.Name, bundleKey, snapshots); err != nil {
+					slog.Error("Failed to send snapshot update", "controller_id", controller.ControllerID, "error", err)
 				}
 			}
 		}
 	}
 
 	return nil
+}
+
+// StartEtcdWatch watches API Server etcd and pushes updates to gRPC streams on this instance
+// (so any replica receives the same etcd events and notifies only its connected controllers).
+func (uc *ControllerRegistryUseCase) StartEtcdWatch(ctx context.Context) {
+	if uc.etcdClient == nil {
+		slog.Warn("StartEtcdWatch: etcd client is nil, skipping")
+		return
+	}
+
+	ch := uc.etcdClient.Watch(ctx, apiServerEtcdPrefix, clientv3.WithPrefix())
+
+	pendingBundles := make(map[string]struct{})
+	pendingControllers := make(map[string]struct{})
+
+	var mu sync.Mutex
+	var debounce *time.Timer
+
+	flush := func() {
+		mu.Lock()
+		bundles := pendingBundles
+		controllers := pendingControllers
+		pendingBundles = make(map[string]struct{})
+		pendingControllers = make(map[string]struct{})
+		mu.Unlock()
+
+		flushCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+
+		for bk := range bundles {
+			snapshots, err := uc.snapshotRepo.GetSnapshots(flushCtx, bk)
+			if err != nil {
+				slog.Error("etcd watch: reload snapshots", "bundle_key", bk, "error", err)
+				continue
+			}
+			if err := uc.NotifySnapshotUpdate(flushCtx, bk, snapshots); err != nil {
+				slog.Error("etcd watch: notify snapshot", "bundle_key", bk, "error", err)
+			}
+		}
+		for cid := range controllers {
+			if err := uc.resyncConnectedController(flushCtx, cid); err != nil {
+				slog.Error("etcd watch: resync controller", "controller_id", cid, "error", err)
+			}
+		}
+	}
+
+	for wresp := range ch {
+		if err := wresp.Err(); err != nil {
+			slog.Warn("API Server etcd watch error", "error", err)
+			continue
+		}
+		for _, ev := range wresp.Events {
+			if ev.Kv == nil {
+				continue
+			}
+			key := string(ev.Kv.Key)
+			mu.Lock()
+			if bk, ok := parseBundleKeyFromSnapshotKey(key); ok {
+				pendingBundles[bk] = struct{}{}
+			} else if cid, ok := parseControllerIDKey(key); ok {
+				pendingControllers[cid] = struct{}{}
+			}
+			if debounce != nil {
+				debounce.Stop()
+			}
+			debounce = time.AfterFunc(300*time.Millisecond, flush)
+			mu.Unlock()
+		}
+	}
+	slog.Info("API Server etcd watch channel closed")
+}
+
+func parseBundleKeyFromSnapshotKey(key string) (bundleKey string, ok bool) {
+	const p = "/api-gateway/api-server/snapshots/"
+	if !strings.HasPrefix(key, p) {
+		return "", false
+	}
+	rest := strings.TrimPrefix(key, p)
+	idx := strings.Index(rest, "/contracts/")
+	if idx < 0 {
+		return "", false
+	}
+	return rest[:idx], true
+}
+
+func parseControllerIDKey(key string) (controllerID string, ok bool) {
+	const p = "/api-gateway/api-server/controllers/"
+	if !strings.HasPrefix(key, p) {
+		return "", false
+	}
+	rest := strings.TrimPrefix(key, p)
+	if rest == "" || strings.Contains(rest, "/") {
+		return "", false
+	}
+	return rest, true
+}
+
+func (uc *ControllerRegistryUseCase) resyncConnectedController(ctx context.Context, controllerID string) error {
+	uc.mu.RLock()
+	stream, ok := uc.controllerStreams[controllerID]
+	uc.mu.RUnlock()
+	if !ok {
+		return nil
+	}
+	return uc.sendAllSnapshotsForControllerStream(ctx, controllerID, stream)
 }

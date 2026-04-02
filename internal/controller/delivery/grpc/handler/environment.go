@@ -5,6 +5,7 @@ import (
 
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
 	"merionyx/api-gateway/internal/controller/domain/models"
+	"merionyx/api-gateway/internal/shared/election"
 	environmentsv1 "merionyx/api-gateway/pkg/api/environments/v1"
 
 	"google.golang.org/grpc/codes"
@@ -14,15 +15,22 @@ import (
 type EnvironmentsHandler struct {
 	environmentsv1.UnimplementedEnvironmentsServiceServer
 	environmentsUseCase interfaces.EnvironmentsUseCase
+	leader              election.LeaderGate
 }
 
-func NewEnvironmentsHandler(environmentsUseCase interfaces.EnvironmentsUseCase) *EnvironmentsHandler {
-	return &EnvironmentsHandler{environmentsUseCase: environmentsUseCase}
+func NewEnvironmentsHandler(environmentsUseCase interfaces.EnvironmentsUseCase, leader election.LeaderGate) *EnvironmentsHandler {
+	if leader == nil {
+		leader = election.NoopGate{}
+	}
+	return &EnvironmentsHandler{environmentsUseCase: environmentsUseCase, leader: leader}
 }
 
 func (h *EnvironmentsHandler) CreateEnvironment(ctx context.Context, req *environmentsv1.CreateEnvironmentRequest) (*environmentsv1.CreateEnvironmentResponse, error) {
 	if req == nil || req.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "name is required")
+	}
+	if !h.leader.IsLeader() {
+		return nil, status.Error(codes.FailedPrecondition, "not the etcd write leader; retry another Gateway Controller replica or wait for leadership")
 	}
 
 	env, err := h.environmentsUseCase.CreateEnvironment(ctx, &models.CreateEnvironmentRequest{
@@ -75,6 +83,9 @@ func (h *EnvironmentsHandler) UpdateEnvironment(ctx context.Context, req *enviro
 	if req == nil || req.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "name is required")
 	}
+	if !h.leader.IsLeader() {
+		return nil, status.Error(codes.FailedPrecondition, "not the etcd write leader; retry another Gateway Controller replica or wait for leadership")
+	}
 
 	env, err := h.environmentsUseCase.UpdateEnvironment(ctx, &models.UpdateEnvironmentRequest{
 		Name:     req.Name,
@@ -93,6 +104,9 @@ func (h *EnvironmentsHandler) UpdateEnvironment(ctx context.Context, req *enviro
 func (h *EnvironmentsHandler) DeleteEnvironment(ctx context.Context, req *environmentsv1.DeleteEnvironmentRequest) (*environmentsv1.DeleteEnvironmentResponse, error) {
 	if req == nil || req.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "name is required")
+	}
+	if !h.leader.IsLeader() {
+		return nil, status.Error(codes.FailedPrecondition, "not the etcd write leader; retry another Gateway Controller replica or wait for leadership")
 	}
 
 	if err := h.environmentsUseCase.DeleteEnvironment(ctx, req.Name); err != nil {

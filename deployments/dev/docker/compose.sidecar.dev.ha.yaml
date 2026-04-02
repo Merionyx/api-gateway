@@ -1,0 +1,51 @@
+# Sidecars for compose.app.ha.dev.yaml: JWKS and gRPC to controllers through HAProxy (sticky).
+
+networks:
+    default:
+    dev-network:
+    prod-network:
+
+services:
+    auth-sidecar-dev:
+        build:
+            context: ../../..
+            dockerfile: build/release/Dockerfile.auth-sidecar
+        container_name: auth-sidecar-dev
+        ports:
+            - "9101:9001"
+        environment:
+            - CONFIG_PATH=./configs/auth-sidecar/config.dev.yaml
+            - AUTH_SIDECAR_CONTROLLER_ADDRESS=gateway-ha-lb:39090
+            - AUTH_SIDECAR_CONTROLLER_ENVIRONMENT=dev
+            - AUTH_SIDECAR_JWT_JWKS_URL=http://gateway-ha-lb:8080/.well-known/jwks.json
+        networks:
+            default:
+            dev-network:
+                aliases:
+                    - auth-sidecar
+        depends_on:
+            - gateway-ha-lb
+            - gateway-controller-dev-1
+        restart: unless-stopped
+
+    auth-sidecar-prod:
+        build:
+            context: ../../..
+            dockerfile: build/release/Dockerfile.auth-sidecar
+        container_name: auth-sidecar-prod
+        ports:
+            - "9102:9001"
+        environment:
+            - CONFIG_PATH=./configs/auth-sidecar/config.prod.yaml
+            - AUTH_SIDECAR_CONTROLLER_ADDRESS=gateway-ha-lb:49090
+            - AUTH_SIDECAR_CONTROLLER_ENVIRONMENT=prod
+            - AUTH_SIDECAR_JWT_JWKS_URL=http://gateway-ha-lb:8080/.well-known/jwks.json
+        networks:
+            default:
+            prod-network:
+                aliases:
+                    - auth-sidecar
+        depends_on:
+            - gateway-ha-lb
+            - gateway-controller-prod-1
+        restart: unless-stopped

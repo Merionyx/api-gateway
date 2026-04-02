@@ -1,0 +1,171 @@
+# HA dev: 3× API Server, 3× Gateway Controller (dev) + 3× (prod), HAProxy, contract-syncer.
+# Run: make docker-up-dev-ha (with compose.etcd.yaml, compose.envoy.ha.dev.yaml, compose.sidecar.dev.ha.yaml).
+
+networks:
+    default:
+
+x-api-server: &api_server
+    build:
+        context: ../../..
+        dockerfile: build/release/Dockerfile.api-server
+    environment:
+        - CONFIG_PATH=./configs/api-server/config.yaml
+        - SSH_KNOWN_HOSTS=/app/secrets/known_hosts
+    env_file:
+        - ../../../secrets/.env
+    networks:
+        - default
+    depends_on:
+        - etcd-api-server-1
+        - etcd-api-server-2
+        - etcd-api-server-3
+
+x-controller-dev: &controller_dev
+    build:
+        context: ../../..
+        dockerfile: build/release/Dockerfile.controller
+    environment:
+        - CONFIG_PATH=./configs/controller/config.ha.dev.yaml
+        - SSH_KNOWN_HOSTS=/app/secrets/known_hosts
+    env_file:
+        - ../../../secrets/.env
+    networks:
+        - default
+
+x-controller-prod: &controller_prod
+    build:
+        context: ../../..
+        dockerfile: build/release/Dockerfile.controller
+    environment:
+        - CONFIG_PATH=./configs/controller/config.ha.prod.yaml
+        - SSH_KNOWN_HOSTS=/app/secrets/known_hosts
+    env_file:
+        - ../../../secrets/.env
+    networks:
+        - default
+
+services:
+    gateway-ha-lb:
+        image: haproxy:3.0-alpine
+        container_name: merionyx-gateway-ha-lb
+        volumes:
+            - ./configs/haproxy/haproxy.dev.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+        ports:
+            - "13080:8080"
+            - "13093:19093"
+        depends_on:
+            - gateway-api-server-1
+            - gateway-api-server-2
+            - gateway-api-server-3
+        networks:
+            - default
+        restart: unless-stopped
+
+    gateway-api-server-1:
+        <<: *api_server
+        container_name: merionyx-api-gateway-api-server-1
+        ports:
+            - "12080:8080"
+            - "12093:19093"
+
+    gateway-api-server-2:
+        <<: *api_server
+        container_name: merionyx-api-gateway-api-server-2
+
+    gateway-api-server-3:
+        <<: *api_server
+        container_name: merionyx-api-gateway-api-server-3
+
+    gateway-controller-dev-1:
+        <<: *controller_dev
+        container_name: merionyx-api-gateway-controller-dev-1
+        ports:
+            - "10080:8080"
+            - "10190:19090"
+            - "10191:19091"
+        depends_on:
+            - etcd-controller-dev-1
+            - etcd-controller-dev-2
+            - etcd-controller-dev-3
+
+    gateway-controller-dev-2:
+        <<: *controller_dev
+        container_name: merionyx-api-gateway-controller-dev-2
+        ports:
+            - "10081:8080"
+            - "10290:19090"
+            - "10291:19091"
+        depends_on:
+            - etcd-controller-dev-1
+            - etcd-controller-dev-2
+            - etcd-controller-dev-3
+
+    gateway-controller-dev-3:
+        <<: *controller_dev
+        container_name: merionyx-api-gateway-controller-dev-3
+        ports:
+            - "10082:8080"
+            - "10390:19090"
+            - "10391:19091"
+        depends_on:
+            - etcd-controller-dev-1
+            - etcd-controller-dev-2
+            - etcd-controller-dev-3
+
+    gateway-controller-prod-1:
+        <<: *controller_prod
+        container_name: merionyx-api-gateway-controller-prod-1
+        ports:
+            - "11080:8080"
+            - "11190:19090"
+            - "11191:19091"
+        depends_on:
+            - etcd-controller-prod-1
+            - etcd-controller-prod-2
+            - etcd-controller-prod-3
+
+    gateway-controller-prod-2:
+        <<: *controller_prod
+        container_name: merionyx-api-gateway-controller-prod-2
+        ports:
+            - "11081:8080"
+            - "11290:19090"
+            - "11291:19091"
+        depends_on:
+            - etcd-controller-prod-1
+            - etcd-controller-prod-2
+            - etcd-controller-prod-3
+
+    gateway-controller-prod-3:
+        <<: *controller_prod
+        container_name: merionyx-api-gateway-controller-prod-3
+        ports:
+            - "11082:8080"
+            - "11390:19090"
+            - "11391:19091"
+        depends_on:
+            - etcd-controller-prod-1
+            - etcd-controller-prod-2
+            - etcd-controller-prod-3
+
+    gateway-contract-syncer:
+        container_name: merionyx-api-gateway-contract-syncer
+        build:
+            context: ../../..
+            dockerfile: build/release/Dockerfile.contract-syncer
+        environment:
+            - CONFIG_PATH=./configs/contract-syncer/config.ha.yaml
+            - SSH_KNOWN_HOSTS=/app/secrets/known_hosts
+        env_file:
+            - ../../../secrets/.env
+        ports:
+            - "19092:19092"
+        networks:
+            - default
+        depends_on:
+            - gateway-ha-lb
+            - etcd-api-server-1
+            - etcd-api-server-2
+            - etcd-api-server-3
+        volumes:
+            - ../../../../api-gateway-schemas-local:/app/local-dir

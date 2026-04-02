@@ -20,7 +20,7 @@ etcd:
 tenant: "prod-cluster"
 
 ha:
-  controller_id: ""
+  controller_id: "gateway-controller-prod-pool"
 
 leader_election:
   enabled: true
@@ -28,9 +28,8 @@ leader_election:
   identity: ""
   session_ttl_seconds: 5
 
-# gRPC address of API Server (ControllerRegistry / snapshot stream)
 api_server:
-  address: "gateway-api-server:19093"
+  address: "gateway-ha-lb:19093"
 
 environments:
 - name: prod

@@ -10,8 +10,9 @@ import (
 	"merionyx/api-gateway/internal/api-server/domain/interfaces"
 	"merionyx/api-gateway/internal/api-server/domain/models"
 	"merionyx/api-gateway/internal/shared/bundlekey"
-	"merionyx/api-gateway/internal/shared/grpcutil"
+	"merionyx/api-gateway/internal/shared/election"
 	sharedgit "merionyx/api-gateway/internal/shared/git"
+	"merionyx/api-gateway/internal/shared/grpcutil"
 	pb "merionyx/api-gateway/pkg/api/contract_syncer/v1"
 
 	"google.golang.org/grpc"
@@ -27,17 +28,23 @@ type BundleSyncUseCase struct {
 	controllerRepo     interfaces.ControllerRepository
 	contractSyncerAddr string
 	registryUseCase    *ControllerRegistryUseCase
+	leader             election.LeaderGate
 }
 
 func NewBundleSyncUseCase(
 	snapshotRepo interfaces.SnapshotRepository,
 	controllerRepo interfaces.ControllerRepository,
 	contractSyncerAddr string,
+	leader election.LeaderGate,
 ) *BundleSyncUseCase {
+	if leader == nil {
+		leader = election.NoopGate{}
+	}
 	return &BundleSyncUseCase{
 		snapshotRepo:       snapshotRepo,
 		controllerRepo:     controllerRepo,
 		contractSyncerAddr: contractSyncerAddr,
+		leader:             leader,
 	}
 }
 
@@ -138,11 +145,7 @@ func (uc *BundleSyncUseCase) syncBundleOnce(ctx context.Context, bundle models.B
 		return nil, fmt.Errorf("save snapshots: %w", err)
 	}
 
-	if uc.registryUseCase != nil {
-		if err := uc.registryUseCase.NotifySnapshotUpdate(ctx, bundleKey, snapshots); err != nil {
-			slog.Error("Failed to notify snapshot update", "error", err)
-		}
-	}
+	// Controllers are notified via etcd watch (StartEtcdWatch) on every API Server replica.
 
 	return snapshots, nil
 }
@@ -150,10 +153,8 @@ func (uc *BundleSyncUseCase) syncBundleOnce(ctx context.Context, bundle models.B
 func (uc *BundleSyncUseCase) StartBundleWatcher(ctx context.Context) {
 	slog.Info("Starting bundle watcher")
 
-	// First run through a few seconds to allow the Gateway Controller to register
-	// (otherwise /api-gateway/api-server/snapshots/ is empty until the first 30s tick).
-	firstSync := time.NewTimer(5 * time.Second)
-	defer firstSync.Stop()
+	// Initial sync runs once this replica becomes leader (avoids missing the first tick when election is slow).
+	go uc.runInitialSyncWhenLeader(ctx)
 
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
@@ -163,11 +164,28 @@ func (uc *BundleSyncUseCase) StartBundleWatcher(ctx context.Context) {
 		case <-ctx.Done():
 			slog.Info("Bundle watcher stopped")
 			return
-		case <-firstSync.C:
-			slog.Info("Running initial bundle sync to api-server etcd")
-			uc.syncAllBundles(ctx)
 		case <-ticker.C:
+			if !uc.leader.IsLeader() {
+				slog.Debug("Skipping bundle sync tick: not leader")
+				continue
+			}
 			uc.syncAllBundles(ctx)
+		}
+	}
+}
+
+func (uc *BundleSyncUseCase) runInitialSyncWhenLeader(ctx context.Context) {
+	for {
+		if err := ctx.Err(); err != nil {
+			return
+		}
+		if uc.leader.IsLeader() {
+			slog.Info("Running initial bundle sync to api-server etcd (leader)")
+			uc.syncAllBundles(ctx)
+			return
+		}
+		if err := grpcutil.SleepOrDone(ctx, time.Second); err != nil {
+			return
 		}
 	}
 }

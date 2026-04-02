@@ -2,8 +2,11 @@ package container
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"merionyx/api-gateway/internal/controller/config"
@@ -13,6 +16,7 @@ import (
 	etcd_repository "merionyx/api-gateway/internal/controller/repository/etcd"
 	"merionyx/api-gateway/internal/controller/repository/memory"
 	"merionyx/api-gateway/internal/controller/usecase"
+	"merionyx/api-gateway/internal/shared/election"
 	"merionyx/api-gateway/internal/shared/etcd"
 
 	"merionyx/api-gateway/internal/controller/xds/builder"
@@ -27,6 +31,7 @@ type Container struct {
 	Config *config.Config
 
 	EtcdClient *clientv3.Client
+	LeaderGate election.LeaderGate
 
 	SchemaRepository      interfaces.SchemaRepository
 	EnvironmentRepository interfaces.EnvironmentRepository
@@ -59,6 +64,7 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 	}
 
 	container.initEtcd()
+	container.initLeaderGate()
 	container.initXDS()
 
 	container.createInMemoryServiceRepository()
@@ -90,6 +96,33 @@ func (c *Container) initEtcd() {
 
 	c.EtcdClient = etcdClient
 	log.Println("etcd client initialized and connected successfully")
+}
+
+func (c *Container) initLeaderGate() {
+	if !c.Config.LeaderElection.Enabled {
+		c.LeaderGate = election.NoopGate{}
+		log.Println("Gateway Controller leader election disabled (noop gate)")
+		return
+	}
+
+	id := strings.TrimSpace(c.Config.LeaderElection.Identity)
+	if id == "" {
+		var err error
+		id, err = os.Hostname()
+		if err != nil || id == "" {
+			id = fmt.Sprintf("controller-%d", time.Now().UnixNano())
+		}
+	}
+
+	prefix := strings.TrimSpace(c.Config.LeaderElection.KeyPrefix)
+	if prefix == "" {
+		prefix = "/api-gateway/controller/election/leader"
+	}
+
+	g := election.NewEtcdGate(c.EtcdClient, prefix, id, c.Config.LeaderElection.SessionTTLSeconds)
+	c.LeaderGate = g
+	go g.Run(context.Background())
+	log.Printf("Gateway Controller leader election started (prefix=%s identity=%s)", prefix, id)
 }
 
 func (c *Container) createInMemoryServiceRepository() {
@@ -140,6 +173,7 @@ func (c *Container) initUseCases() {
 		c.EnvironmentsUseCase,
 		c.XDSSnapshotManager,
 		c.XDSBuilder,
+		c.EtcdClient,
 	)
 
 	log.Println("SnapshotsUseCase:", c.SnapshotsUseCase)
@@ -149,7 +183,7 @@ func (c *Container) initUseCases() {
 
 func (c *Container) initHandlers() {
 	c.SnapshotGRPCHandler = handler.NewSnapshotHandler(c.SnapshotsUseCase)
-	c.EnvironmentsGRPCHandler = handler.NewEnvironmentsHandler(c.EnvironmentsUseCase)
+	c.EnvironmentsGRPCHandler = handler.NewEnvironmentsHandler(c.EnvironmentsUseCase, c.LeaderGate)
 	c.SchemasGRPCHandler = handler.NewSchemasHandler(c.SchemasUseCase)
 	c.AuthGRPCHandler = handler.NewAuthHandler(c.EnvironmentRepository, c.InMemoryEnvironmentsRepository, c.SchemaRepository, c.EtcdClient)
 
@@ -178,9 +212,29 @@ func (c *Container) initXDS() {
 }
 
 func (c *Container) startWatchers() {
+	go c.APIServerSyncUseCase.StartEtcdFollowerWatch(context.Background())
+
 	go func() {
-		if err := c.APIServerSyncUseCase.RegisterAndStream(context.Background()); err != nil {
-			log.Printf("API Server sync error: %v", err)
+		tick := time.NewTicker(500 * time.Millisecond)
+		defer tick.Stop()
+		var syncCancel context.CancelFunc
+		for range tick.C {
+			if c.LeaderGate.IsLeader() {
+				if syncCancel == nil {
+					var sctx context.Context
+					sctx, syncCancel = context.WithCancel(context.Background())
+					go func() {
+						if err := c.APIServerSyncUseCase.RegisterAndStream(sctx); err != nil {
+							log.Printf("API Server sync ended: %v", err)
+						}
+					}()
+				}
+			} else {
+				if syncCancel != nil {
+					syncCancel()
+					syncCancel = nil
+				}
+			}
 		}
 	}()
 }

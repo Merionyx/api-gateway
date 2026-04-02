@@ -1,0 +1,22 @@
+server:
+  grpc_port: "19092"
+  host: "0.0.0.0"
+
+repositories:
+- name: api-gateway-schemas-https
+  source: git
+  url: "https://github.com/MikhailMinaev/api-gateway-schemas.git"
+  auth:
+    type: "token"
+    token_env: "GITHUB_ACCESS_TOKEN"
+
+- name: api-gateway-schemas-local-git-repo
+  source: local-git
+  path: "/app/local-dir"
+
+- name: api-gateway-schemas-local-dir
+  source: local-dir
+  path: "/app/local-dir"
+
+api_server:
+  address: "gateway-ha-lb:19093"

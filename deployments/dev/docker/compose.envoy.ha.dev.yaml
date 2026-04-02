@@ -1,0 +1,113 @@
+networks:
+    default:
+    dev-network:
+    prod-network:
+
+services:
+    envoy-dev-ha-1:
+        image: envoyproxy/envoy:v1.33-latest
+        container_name: envoy-dev-ha-1
+        volumes:
+            - ./configs/envoy/dev.ha.zone-a.yaml:/etc/envoy/envoy.yaml:ro
+        ports:
+            - "10000:10000"
+            - "9901:9901"
+        command: ["-c", "/etc/envoy/envoy.yaml"]
+        restart: unless-stopped
+        networks:
+            - default
+            - dev-network
+        depends_on:
+            - gateway-controller-dev-1
+            - gateway-controller-dev-2
+            - gateway-controller-dev-3
+
+    envoy-dev-ha-2:
+        image: envoyproxy/envoy:v1.33-latest
+        container_name: envoy-dev-ha-2
+        volumes:
+            - ./configs/envoy/dev.ha.zone-b.yaml:/etc/envoy/envoy.yaml:ro
+        ports:
+            - "10001:10000"
+            - "9904:9901"
+        command: ["-c", "/etc/envoy/envoy.yaml"]
+        restart: unless-stopped
+        networks:
+            - default
+            - dev-network
+        depends_on:
+            - gateway-controller-dev-1
+            - gateway-controller-dev-2
+            - gateway-controller-dev-3
+
+    envoy-dev-ha-3:
+        image: envoyproxy/envoy:v1.33-latest
+        container_name: envoy-dev-ha-3
+        volumes:
+            - ./configs/envoy/dev.ha.zone-c.yaml:/etc/envoy/envoy.yaml:ro
+        ports:
+            - "10004:10000"
+            - "9905:9901"
+        command: ["-c", "/etc/envoy/envoy.yaml"]
+        restart: unless-stopped
+        networks:
+            - default
+            - dev-network
+        depends_on:
+            - gateway-controller-dev-1
+            - gateway-controller-dev-2
+            - gateway-controller-dev-3
+
+    envoy-prod-ha-1:
+        image: envoyproxy/envoy:v1.33-latest
+        container_name: envoy-prod-ha-1
+        volumes:
+            - ./configs/envoy/prod.ha.zone-a.yaml:/etc/envoy/envoy.yaml:ro
+        ports:
+            - "10002:10000"
+            - "9906:9902"
+        command: ["-c", "/etc/envoy/envoy.yaml"]
+        restart: unless-stopped
+        networks:
+            - default
+            - prod-network
+        depends_on:
+            - gateway-controller-prod-1
+            - gateway-controller-prod-2
+            - gateway-controller-prod-3
+
+    envoy-prod-ha-2:
+        image: envoyproxy/envoy:v1.33-latest
+        container_name: envoy-prod-ha-2
+        volumes:
+            - ./configs/envoy/prod.ha.zone-b.yaml:/etc/envoy/envoy.yaml:ro
+        ports:
+            - "10003:10000"
+            - "9907:9902"
+        command: ["-c", "/etc/envoy/envoy.yaml"]
+        restart: unless-stopped
+        networks:
+            - default
+            - prod-network
+        depends_on:
+            - gateway-controller-prod-1
+            - gateway-controller-prod-2
+            - gateway-controller-prod-3
+
+    envoy-prod-ha-3:
+        image: envoyproxy/envoy:v1.33-latest
+        container_name: envoy-prod-ha-3
+        volumes:
+            - ./configs/envoy/prod.ha.zone-c.yaml:/etc/envoy/envoy.yaml:ro
+        ports:
+            - "10005:10000"
+            - "9908:9902"
+        command: ["-c", "/etc/envoy/envoy.yaml"]
+        restart: unless-stopped
+        networks:
+            - default
+            - prod-network
+        depends_on:
+            - gateway-controller-prod-1
+            - gateway-controller-prod-2
+            - gateway-controller-prod-3

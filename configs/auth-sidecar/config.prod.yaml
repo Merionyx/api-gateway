@@ -3,8 +3,8 @@ server:
   host: "0.0.0.0"
 
 controller:
-  address: "gateway-controller-prod:19090"
+  address: "gateway-controller-prod-1:19090"
   environment: "prod"
 
 jwt:
-  jwks_url: "http://gateway-api-server:8080/.well-known/jwks.json"
+  jwks_url: "http://gateway-ha-lb:8080/.well-known/jwks.json"

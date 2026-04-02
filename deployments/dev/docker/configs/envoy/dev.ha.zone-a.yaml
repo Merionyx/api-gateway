@@ -1,6 +1,6 @@
 node:
-  id: envoy-prod
-  cluster: prod-cluster
+  id: envoy-dev
+  cluster: dev-cluster
   locality:
     zone: zone-a
 
@@ -8,7 +8,7 @@ admin:
   address:
     socket_address:
       address: 0.0.0.0
-      port_value: 9902
+      port_value: 9901
 
 dynamic_resources:
   ads_config:
@@ -17,11 +17,9 @@ dynamic_resources:
     grpc_services:
     - envoy_grpc:
         cluster_name: xds_cluster
-
   cds_config:
     resource_api_version: V3
     ads: {}
-
   lds_config:
     resource_api_version: V3
     ads: {}
@@ -49,7 +47,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: gateway-controller-prod
+                address: gateway-controller-dev-1
                 port_value: 19091
       - locality:
           zone: zone-b
@@ -58,7 +56,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: gateway-controller-prod
+                address: gateway-controller-dev-2
                 port_value: 19091
       - locality:
           zone: zone-c
@@ -67,5 +65,5 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: gateway-controller-prod
+                address: gateway-controller-dev-3
                 port_value: 19091

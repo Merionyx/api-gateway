@@ -1,14 +1,16 @@
+# Bootstrap: set node.locality.zone to the AZ/zone where this Envoy runs (zone-a / zone-b / zone-c).
+# xDS upstreams list the same logical controllers per zone; locality_weighted_lb_config prefers the matching zone.
 node:
   id: envoy-dev
   cluster: dev-cluster
   locality:
-    zone: dev
+    zone: zone-a
 
 admin:
   address:
     socket_address:
       address: 0.0.0.0
-      port_value: 9901 # Admin API for dev
+      port_value: 9901
 
 dynamic_resources:
   ads_config:
@@ -30,6 +32,10 @@ static_resources:
   clusters:
   - name: xds_cluster
     type: STRICT_DNS
+    connect_timeout: 1s
+    lb_policy: ROUND_ROBIN
+    common_lb_config:
+      locality_weighted_lb_config: {}
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
@@ -38,10 +44,30 @@ static_resources:
     load_assignment:
       cluster_name: xds_cluster
       endpoints:
-      - lb_endpoints:
+      - locality:
+          zone: zone-a
+        load_balancing_weight: 1
+        lb_endpoints:
         - endpoint:
             address:
               socket_address:
                 address: gateway-controller-dev
                 port_value: 19091
-    connect_timeout: 1s
+      - locality:
+          zone: zone-b
+        load_balancing_weight: 1
+        lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: gateway-controller-dev
+                port_value: 19091
+      - locality:
+          zone: zone-c
+        load_balancing_weight: 1
+        lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: gateway-controller-dev
+                port_value: 19091

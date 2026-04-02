@@ -11,12 +11,28 @@ import (
 )
 
 type Config struct {
-	Server       ServerConfig        `mapstructure:"server" validate:"required" json:"server"`
-	Etcd         etcd.EtcdConfig     `mapstructure:"etcd"`
-	Environments []EnvironmentConfig `mapstructure:"environments" validate:"required" json:"environments"`
-	Services     ServicesConfig      `mapstructure:"services" validate:"required" json:"services"`
-	APIServer    APIServerConfig     `mapstructure:"api_server" json:"api_server"`
-	Tenant       string              `mapstructure:"tenant" json:"tenant"`
+	Server         ServerConfig         `mapstructure:"server" validate:"required" json:"server"`
+	Etcd           etcd.EtcdConfig      `mapstructure:"etcd"`
+	Environments   []EnvironmentConfig  `mapstructure:"environments" validate:"required" json:"environments"`
+	Services       ServicesConfig       `mapstructure:"services" validate:"required" json:"services"`
+	APIServer      APIServerConfig      `mapstructure:"api_server" json:"api_server"`
+	Tenant         string               `mapstructure:"tenant" json:"tenant"`
+	HA             HAConfig             `mapstructure:"ha" json:"ha"`
+	LeaderElection LeaderElectionConfig `mapstructure:"leader_election" json:"leader_election"`
+}
+
+// HAConfig groups settings shared by all replicas of one logical Gateway Controller pool.
+type HAConfig struct {
+	// ControllerID is the id registered with API Server. Set the same value on every replica (default: hostname).
+	ControllerID string `mapstructure:"controller_id" json:"controller_id"`
+}
+
+// LeaderElectionConfig elects a single replica to stream from API Server and write contract snapshots to etcd.
+type LeaderElectionConfig struct {
+	Enabled           bool   `mapstructure:"enabled" json:"enabled"`
+	KeyPrefix         string `mapstructure:"key_prefix" json:"key_prefix"`
+	Identity          string `mapstructure:"identity" json:"identity"`
+	SessionTTLSeconds int    `mapstructure:"session_ttl_seconds" json:"session_ttl_seconds"`
 }
 
 type APIServerConfig struct {
@@ -66,6 +82,9 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	viper.SetDefault("logging.enabled", false)
 	viper.SetDefault("logging.level", "info")
 	viper.SetDefault("logging.format", "[${time}] ${status} - ${method} ${path}")
+	viper.SetDefault("leader_election.enabled", true)
+	viper.SetDefault("leader_election.key_prefix", "/api-gateway/controller/election/leader")
+	viper.SetDefault("leader_election.session_ttl_seconds", 5)
 
 	viper.AutomaticEnv()
 	viper.SetEnvPrefix("CP_")

@@ -2,7 +2,10 @@ package container
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"os"
+	"strings"
 	"time"
 
 	"merionyx/api-gateway/internal/api-server/config"
@@ -11,6 +14,7 @@ import (
 	"merionyx/api-gateway/internal/api-server/domain/interfaces"
 	"merionyx/api-gateway/internal/api-server/repository/etcd"
 	"merionyx/api-gateway/internal/api-server/usecase"
+	"merionyx/api-gateway/internal/shared/election"
 	sharedetcd "merionyx/api-gateway/internal/shared/etcd"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -18,25 +22,20 @@ import (
 
 // Container DI for all dependencies
 type Container struct {
-	// Config
 	Config *config.Config
 
-	// etcd
 	EtcdClient *clientv3.Client
+	LeaderGate election.LeaderGate
 
-	// Repositories
 	SnapshotRepository   interfaces.SnapshotRepository
 	ControllerRepository interfaces.ControllerRepository
 
-	// Use Cases
 	JWTUseCase                *usecase.JWTUseCase
 	ControllerRegistryUseCase interfaces.ControllerRegistryUseCase
 	BundleSyncUseCase         interfaces.BundleSyncUseCase
 
-	// HTTP Handlers
 	JWTHandler *httphandler.JWTHandler
 
-	// gRPC Handlers
 	ControllerRegistryHandler *grpchandler.ControllerRegistryHandler
 }
 
@@ -47,10 +46,11 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 	}
 
 	container.initEtcd()
+	container.initLeaderGate()
 	container.initRepositories()
 	container.initUseCases()
 	container.initHandlers()
-	container.startWatchers()
+	container.startBackgroundWork()
 
 	return container, nil
 }
@@ -70,6 +70,34 @@ func (c *Container) initEtcd() {
 
 	c.EtcdClient = etcdClient
 	log.Println("etcd client initialized and connected successfully")
+}
+
+func (c *Container) initLeaderGate() {
+	if !c.Config.LeaderElection.Enabled {
+		c.LeaderGate = election.NoopGate{}
+		log.Println("API Server leader election disabled (noop gate)")
+		return
+	}
+
+	id := strings.TrimSpace(c.Config.LeaderElection.Identity)
+	if id == "" {
+		var err error
+		id, err = os.Hostname()
+		if err != nil || id == "" {
+			id = fmt.Sprintf("api-server-%d", time.Now().UnixNano())
+		}
+	}
+
+	prefix := strings.TrimSpace(c.Config.LeaderElection.KeyPrefix)
+	if prefix == "" {
+		prefix = "/api-gateway/api-server/election/leader"
+	}
+
+	ttl := c.Config.LeaderElection.SessionTTLSeconds
+	g := election.NewEtcdGate(c.EtcdClient, prefix, id, ttl)
+	c.LeaderGate = g
+	go g.Run(context.Background())
+	log.Printf("API Server leader election started (prefix=%s identity=%s)", prefix, id)
 }
 
 func (c *Container) initRepositories() {
@@ -93,12 +121,14 @@ func (c *Container) initUseCases() {
 	c.ControllerRegistryUseCase = usecase.NewControllerRegistryUseCase(
 		c.ControllerRepository,
 		c.SnapshotRepository,
+		c.EtcdClient,
 	)
 
 	bundleSyncUseCase := usecase.NewBundleSyncUseCase(
 		c.SnapshotRepository,
 		c.ControllerRepository,
 		c.Config.ContractSyncer.Address,
+		c.LeaderGate,
 	)
 
 	bundleSyncUseCase.SetRegistryUseCase(c.ControllerRegistryUseCase.(*usecase.ControllerRegistryUseCase))
@@ -115,9 +145,11 @@ func (c *Container) initHandlers() {
 	log.Println("Handlers initialized")
 }
 
-func (c *Container) startWatchers() {
+func (c *Container) startBackgroundWork() {
+	reg := c.ControllerRegistryUseCase.(*usecase.ControllerRegistryUseCase)
+	go reg.StartEtcdWatch(context.Background())
 	go c.BundleSyncUseCase.StartBundleWatcher(context.Background())
-	log.Println("Bundle watcher started")
+	log.Println("API Server etcd watch and bundle watcher started")
 }
 
 // Close closes all resources in the container

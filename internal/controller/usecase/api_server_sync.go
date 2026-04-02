@@ -7,6 +7,8 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strings"
+	"sync"
 	"time"
 
 	"merionyx/api-gateway/internal/controller/config"
@@ -24,7 +26,11 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
+
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
+
+const controllerEtcdWatchPrefix = "/api-gateway/controller/"
 
 type APIServerSyncUseCase struct {
 	config                   *config.Config
@@ -35,6 +41,7 @@ type APIServerSyncUseCase struct {
 	apiServerAddress         string
 	controllerID             string
 	xdsBuilder               interfaces.XDSBuilder
+	etcdClient               *clientv3.Client
 }
 
 func NewAPIServerSyncUseCase(
@@ -44,11 +51,16 @@ func NewAPIServerSyncUseCase(
 	environmentsUseCase interfaces.EnvironmentsUseCase,
 	xdsSnapshotManager *xdscache.SnapshotManager,
 	xdsBuilder interfaces.XDSBuilder,
+	etcdClient *clientv3.Client,
 ) *APIServerSyncUseCase {
-	controllerID, err := os.Hostname()
-	if err != nil {
-		slog.Error("Failed to get hostname", "error", err)
-		controllerID = "unknown"
+	controllerID := strings.TrimSpace(cfg.HA.ControllerID)
+	if controllerID == "" {
+		var err error
+		controllerID, err = os.Hostname()
+		if err != nil {
+			slog.Error("Failed to get hostname", "error", err)
+			controllerID = "unknown"
+		}
 	}
 
 	return &APIServerSyncUseCase{
@@ -60,6 +72,7 @@ func NewAPIServerSyncUseCase(
 		apiServerAddress:         cfg.APIServer.Address,
 		xdsBuilder:               xdsBuilder,
 		controllerID:             controllerID,
+		etcdClient:               etcdClient,
 	}
 }
 
@@ -422,6 +435,73 @@ func (uc *APIServerSyncUseCase) environmentWithSnapshotsFromSchema(ctx context.C
 		out.Snapshots = append(out.Snapshots, snaps...)
 	}
 	return out
+}
+
+// StartEtcdFollowerWatch rebuilds xDS from controller etcd when the leader (or another writer) changes data.
+// Every replica runs this so snapshots stay aligned without each one streaming from API Server.
+func (uc *APIServerSyncUseCase) StartEtcdFollowerWatch(ctx context.Context) {
+	if uc.etcdClient == nil {
+		slog.Warn("StartEtcdFollowerWatch: etcd client is nil")
+		return
+	}
+
+	ch := uc.etcdClient.Watch(ctx, controllerEtcdWatchPrefix, clientv3.WithPrefix())
+
+	var mu sync.Mutex
+	var debounce *time.Timer
+
+	flush := func() {
+		flushCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		if err := uc.rebuildAllXDS(flushCtx); err != nil {
+			slog.Error("etcd follower watch: rebuild xDS", "error", err)
+		}
+	}
+
+	for wresp := range ch {
+		if err := wresp.Err(); err != nil {
+			slog.Warn("controller etcd watch error", "error", err)
+			continue
+		}
+		if len(wresp.Events) == 0 {
+			continue
+		}
+
+		mu.Lock()
+		if debounce != nil {
+			debounce.Stop()
+		}
+		debounce = time.AfterFunc(400*time.Millisecond, flush)
+		mu.Unlock()
+	}
+	slog.Info("controller etcd watch channel closed")
+}
+
+func (uc *APIServerSyncUseCase) rebuildAllXDS(ctx context.Context) error {
+	names := make(map[string]struct{})
+
+	if m, err := uc.inMemoryEnvironmentsRepo.ListEnvironments(ctx); err == nil {
+		for k := range m {
+			names[k] = struct{}{}
+		}
+	} else {
+		slog.Warn("rebuildAllXDS: list in-memory environments", "error", err)
+	}
+
+	if m, err := uc.environmentsUseCase.ListEnvironments(ctx); err == nil {
+		for k := range m {
+			names[k] = struct{}{}
+		}
+	} else {
+		slog.Warn("rebuildAllXDS: list etcd environments", "error", err)
+	}
+
+	for name := range names {
+		if err := uc.updateXDSSnapshot(ctx, name); err != nil {
+			slog.Warn("rebuildAllXDS: environment", "name", name, "error", err)
+		}
+	}
+	return nil
 }
 
 func sharedToControllerSnapshot(s sharedgit.ContractSnapshot) *models.ContractSnapshot {

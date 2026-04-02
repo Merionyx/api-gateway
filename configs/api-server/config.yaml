@@ -21,3 +21,10 @@ jwt:
 
 contract_syncer:
   address: "gateway-contract-syncer:19092"
+
+# Single leader pulls bundles from Contract Syncer; all replicas watch etcd and notify controllers.
+leader_election:
+  enabled: true
+  key_prefix: "/api-gateway/api-server/election/leader"
+  identity: ""
+  session_ttl_seconds: 5

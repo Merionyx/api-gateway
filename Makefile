@@ -1,4 +1,4 @@
-.PHONY: run build test clean certs deps start lint fmt docker-build docker-run test-coverage help
+.PHONY: run build test clean certs deps start lint fmt docker-build docker-run test-coverage help docker-up-dev-ha docker-down-dev-ha
 
 # Variables
 BINARY_NAME=universal-server
@@ -68,7 +68,7 @@ docker-down:
 		-f ./deployments/dev/docker/compose.mock-service.yaml \
 		down
 
-docker-up-dev:
+docker-up-dev: ## Docker dev stack (single replicas) + watch
 	docker-compose \
 		-p 'merionyx-api-gateway' \
 		-f ./deployments/dev/docker/compose.app.dev.yaml \
@@ -78,13 +78,33 @@ docker-up-dev:
 		-f ./deployments/dev/docker/compose.mock-service.yaml \
 		up --build --watch
 
-docker-down-dev:
+docker-down-dev: ## Stop docker dev stack
 	docker-compose \
 		-p 'merionyx-api-gateway' \
 		-f ./deployments/dev/docker/compose.app.dev.yaml \
 		-f ./deployments/dev/docker/compose.sidecar.dev.yaml \
 		-f ./deployments/dev/docker/compose.etcd.yaml \
 		-f ./deployments/dev/docker/compose.envoy.yaml \
+		-f ./deployments/dev/docker/compose.mock-service.yaml \
+		down
+
+docker-up-dev-ha: ## HA dev: 3 API Server, 6 controllers, 6 Envoy, HAProxy (project merionyx-api-gateway-ha)
+	docker compose \
+		-p 'merionyx-api-gateway-ha' \
+		-f ./deployments/dev/docker/compose.app.ha.dev.yaml \
+		-f ./deployments/dev/docker/compose.sidecar.dev.ha.yaml \
+		-f ./deployments/dev/docker/compose.etcd.yaml \
+		-f ./deployments/dev/docker/compose.envoy.ha.dev.yaml \
+		-f ./deployments/dev/docker/compose.mock-service.yaml \
+		up --build
+
+docker-down-dev-ha: ## Stop HA dev stack
+	docker compose \
+		-p 'merionyx-api-gateway-ha' \
+		-f ./deployments/dev/docker/compose.app.ha.dev.yaml \
+		-f ./deployments/dev/docker/compose.sidecar.dev.ha.yaml \
+		-f ./deployments/dev/docker/compose.etcd.yaml \
+		-f ./deployments/dev/docker/compose.envoy.ha.dev.yaml \
 		-f ./deployments/dev/docker/compose.mock-service.yaml \
 		down
 

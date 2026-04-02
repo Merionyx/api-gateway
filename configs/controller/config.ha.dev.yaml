@@ -21,7 +21,7 @@ tenant: "dev-cluster"
 
 # Same logical id on every replica so API Server keeps one snapshot stream per pool (default: hostname).
 ha:
-  controller_id: ""
+  controller_id: "gateway-controller-dev-pool"
 
 leader_election:
   enabled: true
@@ -29,9 +29,9 @@ leader_election:
   identity: ""
   session_ttl_seconds: 5
 
-# gRPC address of API Server (ControllerRegistry / snapshot stream)
+# Through HAProxy (compose HA): balancing + sticky gRPC.
 api_server:
-  address: "gateway-api-server:19093"
+  address: "gateway-ha-lb:19093"
 
 environments:
 
