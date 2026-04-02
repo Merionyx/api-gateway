@@ -5,7 +5,9 @@ server:
 
 etcd:
   endpoints:
-  - "https://etcd-api-server:2379"
+  - "https://etcd-api-server-1:2379"
+  - "https://etcd-api-server-2:2379"
+  - "https://etcd-api-server-3:2379"
   dial_timeout: "5s"
   tls:
     enabled: true

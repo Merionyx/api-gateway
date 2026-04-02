@@ -1,7 +1,7 @@
 services:
-  etcd-api-server:
+  etcd-api-server-1:
     image: quay.io/coreos/etcd:v3.6.0
-    container_name: etcd-api-server
+    container_name: etcd-api-server-1
     ports:
       - "2379:2379"
       - "2380:2380"
@@ -9,36 +9,101 @@ services:
       - ../../../secrets/certs/etcd:/etcd-certs:ro
     command:
       - /usr/local/bin/etcd
-      - --name=etcd-api-server
-      
+      - --data-dir=/etcd-data
+      - --name=etcd-api-server-1
+
       # Client TLS Configuration
       - --cert-file=/etcd-certs/server.pem
       - --key-file=/etcd-certs/server-key.pem
       - --trusted-ca-file=/etcd-certs/ca.pem
       - --client-cert-auth=true
-      
+
       # Peer TLS Configuration
       - --peer-cert-file=/etcd-certs/peer.pem
       - --peer-key-file=/etcd-certs/peer-key.pem
       - --peer-trusted-ca-file=/etcd-certs/ca.pem
       - --peer-client-cert-auth=true
-      
+
       # Peer URLs (HTTPS)
-      - --initial-advertise-peer-urls=https://etcd-api-server:2380
+      - --initial-advertise-peer-urls=https://etcd-api-server-1:2380
       - --listen-peer-urls=https://0.0.0.0:2380
-      
-      # Client URLs (HTTPS)
-      - --advertise-client-urls=https://etcd-api-server:2379
+      - --advertise-client-urls=https://etcd-api-server-1:2379
       - --listen-client-urls=https://0.0.0.0:2379
-      
-      # Cluster Configuration
-      - --initial-cluster=etcd-api-server=https://etcd-api-server:2380
+      - --initial-cluster=etcd-api-server-1=https://etcd-api-server-1:2380,etcd-api-server-2=https://etcd-api-server-2:2380,etcd-api-server-3=https://etcd-api-server-3:2380
       - --initial-cluster-state=new
       - --initial-cluster-token=etcd-api-server-cluster-1
 
-  etcd-controller-dev:
+  etcd-api-server-2:
     image: quay.io/coreos/etcd:v3.6.0
-    container_name: etcd-controller-dev
+    container_name: etcd-api-server-2
+    ports:
+      - "3379:2379"
+      - "3380:2380"
+    volumes:
+      - ../../../secrets/certs/etcd:/etcd-certs:ro
+    command:
+      - /usr/local/bin/etcd
+      - --data-dir=/etcd-data
+      - --name=etcd-api-server-2
+
+      # Client TLS Configuration
+      - --cert-file=/etcd-certs/server.pem
+      - --key-file=/etcd-certs/server-key.pem
+      - --trusted-ca-file=/etcd-certs/ca.pem
+      - --client-cert-auth=true
+
+      # Peer TLS Configuration
+      - --peer-cert-file=/etcd-certs/peer.pem
+      - --peer-key-file=/etcd-certs/peer-key.pem
+      - --peer-trusted-ca-file=/etcd-certs/ca.pem
+      - --peer-client-cert-auth=true
+
+      # Peer URLs (HTTPS)
+      - --initial-advertise-peer-urls=https://etcd-api-server-2:2380
+      - --listen-peer-urls=https://0.0.0.0:2380
+      - --advertise-client-urls=https://etcd-api-server-2:2379
+      - --listen-client-urls=https://0.0.0.0:2379
+      - --initial-cluster=etcd-api-server-1=https://etcd-api-server-1:2380,etcd-api-server-2=https://etcd-api-server-2:2380,etcd-api-server-3=https://etcd-api-server-3:2380
+      - --initial-cluster-state=new
+      - --initial-cluster-token=etcd-api-server-cluster-1
+
+  etcd-api-server-3:
+    image: quay.io/coreos/etcd:v3.6.0
+    container_name: etcd-api-server-3
+    ports:
+      - "4379:2379"
+      - "4380:2380"
+    volumes:
+      - ../../../secrets/certs/etcd:/etcd-certs:ro
+    command:
+      - /usr/local/bin/etcd
+      - --data-dir=/etcd-data
+      - --name=etcd-api-server-3
+
+      # Client TLS Configuration
+      - --cert-file=/etcd-certs/server.pem
+      - --key-file=/etcd-certs/server-key.pem
+      - --trusted-ca-file=/etcd-certs/ca.pem
+      - --client-cert-auth=true
+
+      # Peer TLS Configuration
+      - --peer-cert-file=/etcd-certs/peer.pem
+      - --peer-key-file=/etcd-certs/peer-key.pem
+      - --peer-trusted-ca-file=/etcd-certs/ca.pem
+      - --peer-client-cert-auth=true
+
+      # Peer URLs (HTTPS)
+      - --initial-advertise-peer-urls=https://etcd-api-server-3:2380
+      - --listen-peer-urls=https://0.0.0.0:2380
+      - --advertise-client-urls=https://etcd-api-server-3:2379
+      - --listen-client-urls=https://0.0.0.0:2379
+      - --initial-cluster=etcd-api-server-1=https://etcd-api-server-1:2380,etcd-api-server-2=https://etcd-api-server-2:2380,etcd-api-server-3=https://etcd-api-server-3:2380
+      - --initial-cluster-state=new
+      - --initial-cluster-token=etcd-api-server-cluster-1
+
+  etcd-controller-dev-1:
+    image: quay.io/coreos/etcd:v3.6.0
+    container_name: etcd-controller-dev-1
     ports:
       - "2479:2379"
       - "2480:2380"
@@ -46,36 +111,101 @@ services:
       - ../../../secrets/certs/etcd:/etcd-certs:ro
     command:
       - /usr/local/bin/etcd
-      - --name=etcd-controller-dev
-      
+      - --data-dir=/etcd-data
+      - --name=etcd-controller-dev-1
+
       # Client TLS Configuration
       - --cert-file=/etcd-certs/server.pem
       - --key-file=/etcd-certs/server-key.pem
       - --trusted-ca-file=/etcd-certs/ca.pem
       - --client-cert-auth=true
-      
+
       # Peer TLS Configuration
       - --peer-cert-file=/etcd-certs/peer.pem
       - --peer-key-file=/etcd-certs/peer-key.pem
       - --peer-trusted-ca-file=/etcd-certs/ca.pem
       - --peer-client-cert-auth=true
-      
-      # Peer URLs (HTTPS)
-      - --initial-advertise-peer-urls=https://etcd-controller-dev:2380
-      - --listen-peer-urls=https://0.0.0.0:2380
-      
-      # Client URLs (HTTPS)
-      - --advertise-client-urls=https://etcd-controller-dev:2379
-      - --listen-client-urls=https://0.0.0.0:2379
-      
-      # Cluster Configuration
-      - --initial-cluster=etcd-controller-dev=https://etcd-controller-dev:2380
-      - --initial-cluster-state=new
-      - --initial-cluster-token=etcd-cluster-1
 
-  etcd-controller-prod:
+      # Peer URLs (HTTPS)
+      - --initial-advertise-peer-urls=https://etcd-controller-dev-1:2380
+      - --listen-peer-urls=https://0.0.0.0:2380
+      - --advertise-client-urls=https://etcd-controller-dev-1:2379
+      - --listen-client-urls=https://0.0.0.0:2379
+      - --initial-cluster=etcd-controller-dev-1=https://etcd-controller-dev-1:2380,etcd-controller-dev-2=https://etcd-controller-dev-2:2380,etcd-controller-dev-3=https://etcd-controller-dev-3:2380
+      - --initial-cluster-state=new
+      - --initial-cluster-token=etcd-controller-dev-cluster-1
+
+  etcd-controller-dev-2:
     image: quay.io/coreos/etcd:v3.6.0
-    container_name: etcd-controller-prod
+    container_name: etcd-controller-dev-2
+    ports:
+      - "3479:2379"
+      - "3480:2380"
+    volumes:
+      - ../../../secrets/certs/etcd:/etcd-certs:ro
+    command:
+      - /usr/local/bin/etcd
+      - --data-dir=/etcd-data
+      - --name=etcd-controller-dev-2
+
+      # Client TLS Configuration
+      - --cert-file=/etcd-certs/server.pem
+      - --key-file=/etcd-certs/server-key.pem
+      - --trusted-ca-file=/etcd-certs/ca.pem
+      - --client-cert-auth=true
+
+      # Peer TLS Configuration
+      - --peer-cert-file=/etcd-certs/peer.pem
+      - --peer-key-file=/etcd-certs/peer-key.pem
+      - --peer-trusted-ca-file=/etcd-certs/ca.pem
+      - --peer-client-cert-auth=true
+
+      # Peer URLs (HTTPS)
+      - --initial-advertise-peer-urls=https://etcd-controller-dev-2:2380
+      - --listen-peer-urls=https://0.0.0.0:2380
+      - --advertise-client-urls=https://etcd-controller-dev-2:2379
+      - --listen-client-urls=https://0.0.0.0:2379
+      - --initial-cluster=etcd-controller-dev-1=https://etcd-controller-dev-1:2380,etcd-controller-dev-2=https://etcd-controller-dev-2:2380,etcd-controller-dev-3=https://etcd-controller-dev-3:2380
+      - --initial-cluster-state=new
+      - --initial-cluster-token=etcd-controller-dev-cluster-1
+
+  etcd-controller-dev-3:
+    image: quay.io/coreos/etcd:v3.6.0
+    container_name: etcd-controller-dev-3
+    ports:
+      - "4479:2379"
+      - "4480:2380"
+    volumes:
+      - ../../../secrets/certs/etcd:/etcd-certs:ro
+    command:
+      - /usr/local/bin/etcd
+      - --data-dir=/etcd-data
+      - --name=etcd-controller-dev-3
+
+      # Client TLS Configuration
+      - --cert-file=/etcd-certs/server.pem
+      - --key-file=/etcd-certs/server-key.pem
+      - --trusted-ca-file=/etcd-certs/ca.pem
+      - --client-cert-auth=true
+
+      # Peer TLS Configuration
+      - --peer-cert-file=/etcd-certs/peer.pem
+      - --peer-key-file=/etcd-certs/peer-key.pem
+      - --peer-trusted-ca-file=/etcd-certs/ca.pem
+      - --peer-client-cert-auth=true
+
+      # Peer URLs (HTTPS)
+      - --initial-advertise-peer-urls=https://etcd-controller-dev-3:2380
+      - --listen-peer-urls=https://0.0.0.0:2380
+      - --advertise-client-urls=https://etcd-controller-dev-3:2379
+      - --listen-client-urls=https://0.0.0.0:2379
+      - --initial-cluster=etcd-controller-dev-1=https://etcd-controller-dev-1:2380,etcd-controller-dev-2=https://etcd-controller-dev-2:2380,etcd-controller-dev-3=https://etcd-controller-dev-3:2380
+      - --initial-cluster-state=new
+      - --initial-cluster-token=etcd-controller-dev-cluster-1
+
+  etcd-controller-prod-1:
+    image: quay.io/coreos/etcd:v3.6.0
+    container_name: etcd-controller-prod-1
     ports:
       - "2579:2379"
       - "2580:2380"
@@ -83,29 +213,94 @@ services:
       - ../../../secrets/certs/etcd:/etcd-certs:ro
     command:
       - /usr/local/bin/etcd
-      - --name=etcd-controller-prod
-      
+      - --data-dir=/etcd-data
+      - --name=etcd-controller-prod-1
+
       # Client TLS Configuration
       - --cert-file=/etcd-certs/server.pem
       - --key-file=/etcd-certs/server-key.pem
       - --trusted-ca-file=/etcd-certs/ca.pem
       - --client-cert-auth=true
-      
+
       # Peer TLS Configuration
       - --peer-cert-file=/etcd-certs/peer.pem
       - --peer-key-file=/etcd-certs/peer-key.pem
       - --peer-trusted-ca-file=/etcd-certs/ca.pem
       - --peer-client-cert-auth=true
-      
+
       # Peer URLs (HTTPS)
-      - --initial-advertise-peer-urls=https://etcd-controller-prod:2380
+      - --initial-advertise-peer-urls=https://etcd-controller-prod-1:2380
       - --listen-peer-urls=https://0.0.0.0:2380
-      
-      # Client URLs (HTTPS)
-      - --advertise-client-urls=https://etcd-controller-prod:2379
+      - --advertise-client-urls=https://etcd-controller-prod-1:2379
       - --listen-client-urls=https://0.0.0.0:2379
-      
-      # Cluster Configuration
-      - --initial-cluster=etcd-controller-prod=https://etcd-controller-prod:2380
+      - --initial-cluster=etcd-controller-prod-1=https://etcd-controller-prod-1:2380,etcd-controller-prod-2=https://etcd-controller-prod-2:2380,etcd-controller-prod-3=https://etcd-controller-prod-3:2380
       - --initial-cluster-state=new
-      - --initial-cluster-token=etcd-cluster-1
+      - --initial-cluster-token=etcd-controller-prod-cluster-1
+
+  etcd-controller-prod-2:
+    image: quay.io/coreos/etcd:v3.6.0
+    container_name: etcd-controller-prod-2
+    ports:
+      - "3579:2379"
+      - "3580:2380"
+    volumes:
+      - ../../../secrets/certs/etcd:/etcd-certs:ro
+    command:
+      - /usr/local/bin/etcd
+      - --data-dir=/etcd-data
+      - --name=etcd-controller-prod-2
+
+      # Client TLS Configuration
+      - --cert-file=/etcd-certs/server.pem
+      - --key-file=/etcd-certs/server-key.pem
+      - --trusted-ca-file=/etcd-certs/ca.pem
+      - --client-cert-auth=true
+
+      # Peer TLS Configuration
+      - --peer-cert-file=/etcd-certs/peer.pem
+      - --peer-key-file=/etcd-certs/peer-key.pem
+      - --peer-trusted-ca-file=/etcd-certs/ca.pem
+      - --peer-client-cert-auth=true
+
+      # Peer URLs (HTTPS)
+      - --initial-advertise-peer-urls=https://etcd-controller-prod-2:2380
+      - --listen-peer-urls=https://0.0.0.0:2380
+      - --advertise-client-urls=https://etcd-controller-prod-2:2379
+      - --listen-client-urls=https://0.0.0.0:2379
+      - --initial-cluster=etcd-controller-prod-1=https://etcd-controller-prod-1:2380,etcd-controller-prod-2=https://etcd-controller-prod-2:2380,etcd-controller-prod-3=https://etcd-controller-prod-3:2380
+      - --initial-cluster-state=new
+      - --initial-cluster-token=etcd-controller-prod-cluster-1
+
+  etcd-controller-prod-3:
+    image: quay.io/coreos/etcd:v3.6.0
+    container_name: etcd-controller-prod-3
+    ports:
+      - "4579:2379"
+      - "4580:2380"
+    volumes:
+      - ../../../secrets/certs/etcd:/etcd-certs:ro
+    command:
+      - /usr/local/bin/etcd
+      - --data-dir=/etcd-data
+      - --name=etcd-controller-prod-3
+
+      # Client TLS Configuration
+      - --cert-file=/etcd-certs/server.pem
+      - --key-file=/etcd-certs/server-key.pem
+      - --trusted-ca-file=/etcd-certs/ca.pem
+      - --client-cert-auth=true
+
+      # Peer TLS Configuration
+      - --peer-cert-file=/etcd-certs/peer.pem
+      - --peer-key-file=/etcd-certs/peer-key.pem
+      - --peer-trusted-ca-file=/etcd-certs/ca.pem
+      - --peer-client-cert-auth=true
+
+      # Peer URLs (HTTPS)
+      - --initial-advertise-peer-urls=https://etcd-controller-prod-3:2380
+      - --listen-peer-urls=https://0.0.0.0:2380
+      - --advertise-client-urls=https://etcd-controller-prod-3:2379
+      - --listen-client-urls=https://0.0.0.0:2379
+      - --initial-cluster=etcd-controller-prod-1=https://etcd-controller-prod-1:2380,etcd-controller-prod-2=https://etcd-controller-prod-2:2380,etcd-controller-prod-3=https://etcd-controller-prod-3:2380
+      - --initial-cluster-state=new
+      - --initial-cluster-token=etcd-controller-prod-cluster-1

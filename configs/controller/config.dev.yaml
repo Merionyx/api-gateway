@@ -7,7 +7,9 @@ server:
 
 etcd:
   endpoints:
-  - "https://etcd-controller-dev:2379"
+  - "https://etcd-controller-dev-1:2379"
+  - "https://etcd-controller-dev-2:2379"
+  - "https://etcd-controller-dev-3:2379"
   dial_timeout: "5s"
   tls:
     enabled: true

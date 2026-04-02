@@ -37,7 +37,9 @@ services:
         networks:
             - default
         depends_on:
-            - etcd-controller-dev
+            - etcd-controller-dev-1
+            - etcd-controller-dev-2
+            - etcd-controller-dev-3
     gateway-controller-prod:
         container_name: merionyx-api-gateway-controller-prod
         build:
@@ -73,7 +75,9 @@ services:
         networks:
             - default
         depends_on:
-            - etcd-controller-prod
+            - etcd-controller-prod-1
+            - etcd-controller-prod-2
+            - etcd-controller-prod-3
     gateway-api-server:
         container_name: merionyx-api-gateway-api-server
         build:
@@ -108,7 +112,9 @@ services:
         networks:
             - default
         depends_on:
-            - etcd-api-server
+            - etcd-api-server-1
+            - etcd-api-server-2
+            - etcd-api-server-3
     gateway-contract-syncer:
         container_name: merionyx-api-gateway-contract-syncer
         build:
@@ -141,6 +147,8 @@ services:
         networks:
             - default
         depends_on:
-            - etcd-api-server
+            - etcd-api-server-1
+            - etcd-api-server-2
+            - etcd-api-server-3
         volumes:
           - ../../../../api-gateway-schemas-local:/app/local-dir
