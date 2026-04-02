@@ -231,6 +231,22 @@ generate-rsa-key:
 	@chmod 600 secrets/api-server/keys/jwt/api-server-rsa-$(shell date +%Y-%m-%d).key
 	@echo "✓ Generated: secrets/api-server/keys/jwt/api-server-rsa-$(shell date +%Y-%m-%d).key"
 
+LOCALBIN ?= $(shell pwd)/bin
+CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
+CONTROLLER_TOOLS_VERSION ?= v0.18.0
+
+.PHONY: controller-gen-bin
+controller-gen-bin: $(CONTROLLER_GEN)
+$(CONTROLLER_GEN):
+	@mkdir -p $(LOCALBIN)
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
+
+.PHONY: apis-generate
+apis-generate: controller-gen-bin ## DeepCopy + CRD YAML into ../api-gateway-operator/config/crd/bases
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./pkg/apis/gateway/v1alpha1/..."
+	@mkdir -p ../api-gateway-operator/config/crd/bases
+	$(CONTROLLER_GEN) crd paths="./pkg/apis/gateway/v1alpha1/..." output:crd:artifacts:config=../api-gateway-operator/config/crd/bases
+
 # Help
 help: ## Show help
 	@echo "Available commands:"

@@ -3,7 +3,9 @@ package memory
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
+	"sync"
+
 	"merionyx/api-gateway/internal/controller/config"
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
 	"merionyx/api-gateway/internal/controller/domain/models"
@@ -12,16 +14,19 @@ import (
 )
 
 type EnvironmentsRepository struct {
-	environments       map[string]*models.Environment
+	mu sync.RWMutex
+
+	fromFile map[string]*models.Environment
+	fromK8s  map[string]*models.Environment
+
 	xdsSnapshotManager *xdscache.SnapshotManager
 	xdsBuilder         interfaces.XDSBuilder
 }
 
 func NewEnvironmentsRepository() interfaces.InMemoryEnvironmentsRepository {
 	return &EnvironmentsRepository{
-		environments:       make(map[string]*models.Environment),
-		xdsSnapshotManager: nil,
-		xdsBuilder:         nil,
+		fromFile: make(map[string]*models.Environment),
+		fromK8s:  make(map[string]*models.Environment),
 	}
 }
 
@@ -31,7 +36,12 @@ func (r *EnvironmentsRepository) SetDependencies(xdsSnapshotManager *xdscache.Sn
 }
 
 func (r *EnvironmentsRepository) Initialize(config *config.Config) error {
-	// Initialize environments from config
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.fromFile = make(map[string]*models.Environment)
+	r.fromK8s = make(map[string]*models.Environment)
+
 	for _, configEnv := range config.Environments {
 		env := &models.Environment{
 			Name: configEnv.Name,
@@ -44,13 +54,12 @@ func (r *EnvironmentsRepository) Initialize(config *config.Config) error {
 			},
 			Snapshots: make([]models.ContractSnapshot, 0),
 		}
-		r.environments[configEnv.Name] = env
+		r.fromFile[configEnv.Name] = env
 	}
 
-	// Initialize contracts from config
 	for _, environment := range config.Environments {
 		for _, bundle := range environment.Bundles.Static {
-			r.environments[environment.Name].Bundles.Static = append(r.environments[environment.Name].Bundles.Static, models.StaticContractBundleConfig{
+			r.fromFile[environment.Name].Bundles.Static = append(r.fromFile[environment.Name].Bundles.Static, models.StaticContractBundleConfig{
 				Name:       bundle.Name,
 				Repository: bundle.Repository,
 				Ref:        bundle.Ref,
@@ -59,51 +68,75 @@ func (r *EnvironmentsRepository) Initialize(config *config.Config) error {
 		}
 	}
 
-	// Initialize services from config
 	for _, environment := range config.Environments {
 		for _, service := range environment.Services.Static {
-			r.environments[environment.Name].Services.Static = append(r.environments[environment.Name].Services.Static, models.StaticServiceConfig{
+			r.fromFile[environment.Name].Services.Static = append(r.fromFile[environment.Name].Services.Static, models.StaticServiceConfig{
 				Name:     service.Name,
 				Upstream: service.Upstream,
 			})
 		}
 	}
 
-	for _, environment := range r.environments {
-		log.Println("Environment:", environment.Name)
-		log.Println("Bundles:", environment.Bundles.Static)
-		log.Println("Services:", environment.Services.Static)
-		log.Println("Snapshots:", environment.Snapshots)
+	for _, environment := range r.mergedLocked() {
+		slog.Info("environment from config", "name", environment.Name, "bundles", len(environment.Bundles.Static), "services", len(environment.Services.Static))
 	}
 
-	for envName, env := range r.environments {
-		snapshot := snapshot.BuildEnvoySnapshot(r.xdsBuilder, env)
+	return r.rebuildMergedXDSSnapshotsLocked()
+}
+
+func (r *EnvironmentsRepository) mergedLocked() map[string]*models.Environment {
+	out := make(map[string]*models.Environment)
+	for k, v := range r.fromFile {
+		out[k] = v
+	}
+	for k, v := range r.fromK8s {
+		out[k] = v
+	}
+	return out
+}
+
+func (r *EnvironmentsRepository) rebuildMergedXDSSnapshotsLocked() error {
+	if r.xdsSnapshotManager == nil || r.xdsBuilder == nil {
+		return nil
+	}
+	for envName, env := range r.mergedLocked() {
+		snap := snapshot.BuildEnvoySnapshot(r.xdsBuilder, env)
 		nodeID := fmt.Sprintf("envoy-%s", envName)
-
-		if err := r.xdsSnapshotManager.UpdateSnapshot(nodeID, snapshot); err != nil {
-			log.Fatalf("Failed to update snapshot for %s: %v", nodeID, err)
+		if err := r.xdsSnapshotManager.UpdateSnapshot(nodeID, snap); err != nil {
+			slog.Error("xDS snapshot update failed", "node_id", nodeID, "error", err)
+			return err
 		}
-
-		log.Printf("Created xDS snapshot for environment: %s (nodeID: %s)", envName, nodeID)
+		slog.Info("updated xDS snapshot", "environment", envName, "node_id", nodeID)
 	}
-
 	return nil
 }
 
-// GetEnvironment gets the environment by name from the in-memory storage
-func (r *EnvironmentsRepository) GetEnvironment(ctx context.Context, name string) (*models.Environment, error) {
-	env, exists := r.environments[name]
-	if !exists {
-		return nil, fmt.Errorf("environment %s not found in config", name)
-	}
-	return env, nil
+// ApplyKubernetesEnvironments replaces the Kubernetes-sourced environment map and rebuilds xDS.
+func (r *EnvironmentsRepository) ApplyKubernetesEnvironments(_ context.Context, envs map[string]*models.Environment) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.fromK8s = envs
+	return r.rebuildMergedXDSSnapshotsLocked()
 }
 
-// ListEnvironments returns all environments from the in-memory storage
-func (r *EnvironmentsRepository) ListEnvironments(ctx context.Context) (map[string]*models.Environment, error) {
-	result := make(map[string]*models.Environment)
-	for name, env := range r.environments {
-		result[name] = env
+// GetEnvironment returns kubernetes overlay first, then static config.
+func (r *EnvironmentsRepository) GetEnvironment(ctx context.Context, name string) (*models.Environment, error) {
+	_ = ctx
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if env, ok := r.fromK8s[name]; ok {
+		return env, nil
 	}
-	return result, nil
+	if env, ok := r.fromFile[name]; ok {
+		return env, nil
+	}
+	return nil, fmt.Errorf("environment %s not found in config", name)
+}
+
+// ListEnvironments merges static config with Kubernetes sources (Kubernetes wins on name conflict).
+func (r *EnvironmentsRepository) ListEnvironments(ctx context.Context) (map[string]*models.Environment, error) {
+	_ = ctx
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.mergedLocked(), nil
 }

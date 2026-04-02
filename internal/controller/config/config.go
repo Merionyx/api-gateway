@@ -11,14 +11,23 @@ import (
 )
 
 type Config struct {
-	Server         ServerConfig         `mapstructure:"server" validate:"required" json:"server"`
-	Etcd           etcd.EtcdConfig      `mapstructure:"etcd"`
-	Environments   []EnvironmentConfig  `mapstructure:"environments" validate:"required" json:"environments"`
-	Services       ServicesConfig       `mapstructure:"services" validate:"required" json:"services"`
-	APIServer      APIServerConfig      `mapstructure:"api_server" json:"api_server"`
-	Tenant         string               `mapstructure:"tenant" json:"tenant"`
-	HA             HAConfig             `mapstructure:"ha" json:"ha"`
-	LeaderElection LeaderElectionConfig `mapstructure:"leader_election" json:"leader_election"`
+	Server               ServerConfig                 `mapstructure:"server" validate:"required" json:"server"`
+	Etcd                 etcd.EtcdConfig              `mapstructure:"etcd"`
+	Environments         []EnvironmentConfig          `mapstructure:"environments" json:"environments"`
+	Services             ServicesConfig               `mapstructure:"services" json:"services"`
+	APIServer            APIServerConfig              `mapstructure:"api_server" json:"api_server"`
+	Tenant               string                       `mapstructure:"tenant" json:"tenant"`
+	HA                   HAConfig                     `mapstructure:"ha" json:"ha"`
+	LeaderElection       LeaderElectionConfig         `mapstructure:"leader_election" json:"leader_election"`
+	KubernetesDiscovery  *KubernetesDiscoveryConfig  `mapstructure:"kubernetes_discovery" json:"kubernetes_discovery"`
+}
+
+// KubernetesDiscoveryConfig enables building environments from gateway.merionyx.io CRs and annotated Services.
+type KubernetesDiscoveryConfig struct {
+	Enabled                 bool              `mapstructure:"enabled" json:"enabled"`
+	NamespaceLabelSelector  map[string]string `mapstructure:"namespace_label_selector" json:"namespace_label_selector"`
+	ResourceLabelSelector   map[string]string `mapstructure:"resource_label_selector" json:"resource_label_selector"`
+	WatchNamespaces         []string          `mapstructure:"watch_namespaces" json:"watch_namespaces"`
 }
 
 // HAConfig groups settings shared by all replicas of one logical Gateway Controller pool.
@@ -118,6 +127,24 @@ func LoadConfig(configFile ...string) (*Config, error) {
 
 	if strings.TrimSpace(config.APIServer.Address) == "" {
 		return nil, fmt.Errorf("api_server.address is required (gRPC address of API Server)")
+	}
+
+	k8sOn := config.KubernetesDiscovery != nil && config.KubernetesDiscovery.Enabled
+	if !k8sOn {
+		if len(config.Environments) == 0 {
+			return nil, fmt.Errorf("environments are required when kubernetes_discovery.enabled is false")
+		}
+		if len(config.Services.Static) == 0 {
+			return nil, fmt.Errorf("services.static is required when kubernetes_discovery.enabled is false")
+		}
+		for _, e := range config.Environments {
+			if e.Name == "" {
+				return nil, fmt.Errorf("environment name is required")
+			}
+			if len(e.Services.Static) == 0 {
+				return nil, fmt.Errorf("environment %q: services.static is required when kubernetes_discovery is off", e.Name)
+			}
+		}
 	}
 
 	return &config, nil

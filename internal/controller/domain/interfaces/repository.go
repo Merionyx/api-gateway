@@ -47,6 +47,7 @@ type InMemoryServiceRepository interface {
 	Initialize(config *config.Config) error
 	GetService(name string) (*models.StaticServiceConfig, error)
 	ListServices() ([]models.StaticServiceConfig, error)
+	SetKubernetesGlobalServices(services []models.StaticServiceConfig)
 }
 
 type InMemoryEnvironmentsRepository interface {
@@ -54,4 +55,5 @@ type InMemoryEnvironmentsRepository interface {
 	Initialize(config *config.Config) error
 	GetEnvironment(ctx context.Context, name string) (*models.Environment, error)
 	ListEnvironments(ctx context.Context) (map[string]*models.Environment, error)
+	ApplyKubernetesEnvironments(ctx context.Context, envs map[string]*models.Environment) error
 }

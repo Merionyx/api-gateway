@@ -40,6 +40,8 @@ func Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	container.StartKubernetesDiscovery(ctx)
+
 	// Start HTTP server
 	go func() {
 		if err := server.StartHTTPServer(container); err != nil {

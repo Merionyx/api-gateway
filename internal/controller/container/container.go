@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"merionyx/api-gateway/internal/controller/config"
+	"merionyx/api-gateway/internal/controller/discovery/kubernetes"
 	"merionyx/api-gateway/internal/controller/delivery/grpc/handler"
 	"merionyx/api-gateway/internal/controller/delivery/http/router"
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
@@ -237,6 +239,26 @@ func (c *Container) startWatchers() {
 			}
 		}
 	}()
+}
+
+// StartKubernetesDiscovery runs a background sync from gateway.merionyx.io CRs (cluster-wide).
+func (c *Container) StartKubernetesDiscovery(ctx context.Context) {
+	if c.Config.KubernetesDiscovery == nil || !c.Config.KubernetesDiscovery.Enabled {
+		return
+	}
+	envRepo, ok1 := c.InMemoryEnvironmentsRepository.(*memory.EnvironmentsRepository)
+	svcRepo, ok2 := c.InMemoryServiceRepository.(*memory.ServiceRepository)
+	if !ok1 || !ok2 {
+		slog.Error("kubernetes discovery: unexpected in-memory repository implementation")
+		return
+	}
+	runner, err := kubernetes.NewRunner(c.Config.KubernetesDiscovery, envRepo, svcRepo)
+	if err != nil {
+		slog.Error("kubernetes discovery: init client", "error", err)
+		return
+	}
+	go runner.Run(ctx, 15*time.Second)
+	slog.Info("kubernetes discovery started")
 }
 
 // Close closes all resources in the container
