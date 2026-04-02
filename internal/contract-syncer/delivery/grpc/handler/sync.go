@@ -19,6 +19,7 @@ func NewSyncHandler(syncUseCase interfaces.SyncUseCase) *SyncHandler {
 	}
 }
 
+// Sync is stateless: safe behind TCP load balancing; callers (API Server leader) retry on failure.
 func (h *SyncHandler) Sync(ctx context.Context, req *pb.SyncRequest) (*pb.SyncResponse, error) {
 	slog.Info("Received sync request", "repository", req.Repository, "ref", req.Ref, "path", req.Path)
 

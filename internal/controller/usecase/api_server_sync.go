@@ -439,11 +439,24 @@ func (uc *APIServerSyncUseCase) environmentWithSnapshotsFromSchema(ctx context.C
 
 // StartEtcdFollowerWatch rebuilds xDS from controller etcd when the leader (or another writer) changes data.
 // Every replica runs this so snapshots stay aligned without each one streaming from API Server.
+//
+// etcd Watch does not replay existing keys: without an initial rebuild, followers (and configs with
+// environments only in etcd) would serve an empty xDS cache until the next write.
 func (uc *APIServerSyncUseCase) StartEtcdFollowerWatch(ctx context.Context) {
 	if uc.etcdClient == nil {
 		slog.Warn("StartEtcdFollowerWatch: etcd client is nil")
 		return
 	}
+
+	go func() {
+		flushCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		if err := uc.rebuildAllXDS(flushCtx); err != nil {
+			slog.Error("initial xDS rebuild from etcd (HA / cold start)", "error", err)
+		} else {
+			slog.Info("initial xDS rebuild from etcd completed")
+		}
+	}()
 
 	ch := uc.etcdClient.Watch(ctx, controllerEtcdWatchPrefix, clientv3.WithPrefix())
 

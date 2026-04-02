@@ -1,5 +1,11 @@
 # HA dev: 3× API Server, 3× Gateway Controller (dev) + 3× (prod), HAProxy, contract-syncer.
 # Run: make docker-up-dev-ha (with compose.etcd.yaml, compose.envoy.ha.dev.yaml, compose.sidecar.dev.ha.yaml).
+#
+# Resilience notes:
+# - Envoy xDS (19091) hits controllers directly (STRICT_DNS to gateway-controller-*); HAProxy is for
+#   API Server gRPC (19093), HTTP/JWKS (8080), and sidecar→controller gRPC (39090/49090).
+# - Single-replica stack (compose.app.yaml) uses the same images/config shape; leader election with
+#   one replica still elects itself; set leader_election.enabled: false only if etcd is unavailable.
 
 networks:
     default:

@@ -18,6 +18,11 @@ import (
 
 const apiServerEtcdPrefix = "/api-gateway/api-server/"
 
+// ControllerRegistryUseCase registers controllers in etcd and serves StreamSnapshots.
+//
+// HA: one gRPC stream lives on whichever API Server replica accepted the connection (sticky LB per
+// controller source IP). Every replica watches etcd; NotifySnapshotUpdate only delivers to streams
+// registered on that process. Bundle writes to etcd come from the API Server leader only.
 type ControllerRegistryUseCase struct {
 	controllerRepo interfaces.ControllerRepository
 	snapshotRepo   interfaces.SnapshotRepository
@@ -109,21 +114,7 @@ func (uc *ControllerRegistryUseCase) Heartbeat(ctx context.Context, controllerID
 		return fmt.Errorf("failed to get controller: %w", err)
 	}
 
-	hasChanges := false
-	if len(controller.Environments) != len(environments) {
-		hasChanges = true
-	} else {
-		existingEnvs := make(map[string]bool)
-		for _, env := range controller.Environments {
-			existingEnvs[env.Name] = true
-		}
-		for _, env := range environments {
-			if !existingEnvs[env.Name] {
-				hasChanges = true
-				break
-			}
-		}
-	}
+	hasChanges := controllerEnvironmentsChanged(controller.Environments, environments)
 
 	if err := uc.controllerRepo.UpdateControllerHeartbeat(ctx, controllerID, environments); err != nil {
 		return fmt.Errorf("failed to update heartbeat: %w", err)
@@ -166,7 +157,8 @@ func (uc *ControllerRegistryUseCase) NotifySnapshotUpdate(ctx context.Context, b
 				}
 				stream, ok := uc.controllerStreams[controller.ControllerID]
 				if !ok {
-					slog.Warn("No active stream for controller", "controller_id", controller.ControllerID)
+					// Expected on API Server replicas that do not hold this controller's gRPC stream (HA).
+					slog.Debug("No active stream for controller on this replica", "controller_id", controller.ControllerID)
 					continue
 				}
 				slog.Info("Sending snapshot update to controller", "controller_id", controller.ControllerID, "environment", env.Name, "snapshots_count", len(snapshots))
@@ -273,6 +265,47 @@ func parseControllerIDKey(key string) (controllerID string, ok bool) {
 		return "", false
 	}
 	return rest, true
+}
+
+// controllerEnvironmentsChanged is true when env names or bundle sets (repository/ref/path) differ.
+func controllerEnvironmentsChanged(stored, incoming []models.EnvironmentInfo) bool {
+	incomingByName := make(map[string][]models.BundleInfo, len(incoming))
+	for _, e := range incoming {
+		incomingByName[e.Name] = e.Bundles
+	}
+	if len(stored) != len(incomingByName) {
+		return true
+	}
+	for _, e := range stored {
+		bundlesIn, ok := incomingByName[e.Name]
+		if !ok || !bundleMultisetsEqual(e.Bundles, bundlesIn) {
+			return true
+		}
+	}
+	return false
+}
+
+func bundleMultisetsEqual(a, b []models.BundleInfo) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	counts := make(map[string]int, len(a))
+	for _, x := range a {
+		counts[bundlekey.Build(x.Repository, x.Ref, x.Path)]++
+	}
+	for _, x := range b {
+		k := bundlekey.Build(x.Repository, x.Ref, x.Path)
+		counts[k]--
+		if counts[k] < 0 {
+			return false
+		}
+	}
+	for _, c := range counts {
+		if c != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func (uc *ControllerRegistryUseCase) resyncConnectedController(ctx context.Context, controllerID string) error {

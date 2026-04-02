@@ -22,7 +22,8 @@ jwt:
 contract_syncer:
   address: "gateway-contract-syncer:19092"
 
-# Single leader pulls bundles from Contract Syncer; all replicas watch etcd and notify controllers.
+# Single leader runs bundle sync (Contract Syncer gRPC); all replicas watch etcd and push updates
+# to controllers that hold StreamSnapshots on that replica (HAProxy sticky to one API Server per source).
 leader_election:
   enabled: true
   key_prefix: "/api-gateway/api-server/election/leader"
