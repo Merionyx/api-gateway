@@ -3,11 +3,13 @@ package config
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 
 	"merionyx/api-gateway/internal/shared/etcd"
 
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
@@ -118,6 +120,11 @@ func LoadConfig(configFile ...string) (*Config, error) {
 		}
 	} else {
 		slog.Info(fmt.Sprintf("Using config file %s", viper.ConfigFileUsed()))
+		if p := viper.ConfigFileUsed(); p != "" {
+			if err := patchViperKubernetesDiscoverySelectors(p); err != nil {
+				slog.Warn("kubernetes_discovery label selectors: normalize skipped", "err", err)
+			}
+		}
 	}
 
 	var config Config
@@ -148,4 +155,84 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+// patchViperKubernetesDiscoverySelectors fixes YAML where dotted label keys (e.g. gateway.merionyx.io/team)
+// were parsed as nested maps; viper/mapstructure then cannot decode into map[string]string.
+func patchViperKubernetesDiscoverySelectors(configPath string) error {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return err
+	}
+	var root map[string]interface{}
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		return err
+	}
+	kd, _ := root["kubernetes_discovery"].(map[string]interface{})
+	if kd == nil {
+		return nil
+	}
+	if v, ok := kd["resource_label_selector"]; ok {
+		if flat := flattenYAMLStringMap(v); len(flat) > 0 {
+			_ = viper.MergeConfigMap(map[string]interface{}{
+				"kubernetes_discovery": map[string]interface{}{
+					"resource_label_selector": flat,
+				},
+			})
+		}
+	}
+	if v, ok := kd["namespace_label_selector"]; ok {
+		if flat := flattenYAMLStringMap(v); len(flat) > 0 {
+			_ = viper.MergeConfigMap(map[string]interface{}{
+				"kubernetes_discovery": map[string]interface{}{
+					"namespace_label_selector": flat,
+				},
+			})
+		}
+	}
+	return nil
+}
+
+func flattenYAMLStringMap(v interface{}) map[string]string {
+	out := make(map[string]string)
+	switch t := v.(type) {
+	case map[string]string:
+		for k, s := range t {
+			if strings.TrimSpace(s) != "" {
+				out[k] = s
+			}
+		}
+	case map[string]interface{}:
+		flattenYAMLStringMapMerge("", t, out)
+	case map[interface{}]interface{}:
+		m2 := make(map[string]interface{}, len(t))
+		for k, val := range t {
+			m2[fmt.Sprint(k)] = val
+		}
+		flattenYAMLStringMapMerge("", m2, out)
+	}
+	return out
+}
+
+func flattenYAMLStringMapMerge(prefix string, m map[string]interface{}, out map[string]string) {
+	for k, v := range m {
+		key := k
+		if prefix != "" {
+			key = prefix + "." + k
+		}
+		switch t := v.(type) {
+		case string:
+			out[key] = t
+		case map[string]interface{}:
+			flattenYAMLStringMapMerge(key, t, out)
+		case map[interface{}]interface{}:
+			m2 := make(map[string]interface{}, len(t))
+			for kk, vv := range t {
+				m2[fmt.Sprint(kk)] = vv
+			}
+			flattenYAMLStringMapMerge(key, m2, out)
+		default:
+			// skip non-scalar leaves
+		}
+	}
 }
