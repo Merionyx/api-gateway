@@ -3,6 +3,7 @@
 # Variables
 BINARY_NAME=universal-server
 BUILD_DIR=./bin
+DOCKER_REPO=merionyx
 DOCKER_IMAGE=merionyx-universal-server
 DOCKER_TAG=latest
 
@@ -43,7 +44,18 @@ lint: ## Lint code
 
 # Docker commands
 docker-build: ## Build Docker image
-	docker build -t $(DOCKER_IMAGE):$(DOCKER_TAG) .
+	@docker build -t $(DOCKER_REPO)/api-gateway-controller:$(DOCKER_TAG) -f build/release/Dockerfile.controller .
+	@docker build -t $(DOCKER_REPO)/api-gateway-api-server:$(DOCKER_TAG) -f build/release/Dockerfile.api-server .
+	@docker build -t $(DOCKER_REPO)/api-gateway-contract-syncer:$(DOCKER_TAG) -f build/release/Dockerfile.contract-syncer .
+	@docker build -t $(DOCKER_REPO)/api-gateway-auth-sidecar:$(DOCKER_TAG) -f build/release/Dockerfile.auth-sidecar .
+	@docker build -t $(DOCKER_REPO)/api-gateway-mock-service:$(DOCKER_TAG) -f build/dev/Dockerfile.mock-service .
+
+docker-push: ## Push Docker image
+	@docker push $(DOCKER_REPO)/api-gateway-controller:$(DOCKER_TAG)
+	@docker push $(DOCKER_REPO)/api-gateway-api-server:$(DOCKER_TAG)
+	@docker push $(DOCKER_REPO)/api-gateway-contract-syncer:$(DOCKER_TAG)
+	@docker push $(DOCKER_REPO)/api-gateway-auth-sidecar:$(DOCKER_TAG)
+	@docker push $(DOCKER_REPO)/api-gateway-mock-service:$(DOCKER_TAG)
 
 docker-run: ## Run Docker container
 	docker run -p 8080:8080 -p 8443:8443 -p 8444:8444 $(DOCKER_IMAGE):$(DOCKER_TAG)
