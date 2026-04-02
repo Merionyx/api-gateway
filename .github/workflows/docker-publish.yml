@@ -135,8 +135,12 @@ jobs:
 
     - name: Multi-arch manifest (latest)
       run: |
+        AMD=$(tr -d '\n' < "digests/${COMPONENT}-amd64.txt")
+        ARM=$(tr -d '\n' < "digests/${COMPONENT}-arm64.txt")
         docker buildx imagetools create \
-          -t "${IMAGE_PREFIX}-${COMPONENT}:latest"
+          -t "${IMAGE_PREFIX}-${COMPONENT}:latest" \
+          "${IMAGE_PREFIX}-${COMPONENT}@${AMD}" \
+          "${IMAGE_PREFIX}-${COMPONENT}@${ARM}"
       env:
         IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
         COMPONENT: ${{ matrix.component }}
