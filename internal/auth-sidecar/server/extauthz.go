@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -169,6 +170,11 @@ func denyResponse(reason string, statusCode int) *authv3.CheckResponse {
 		envoyStatus = typev3.StatusCode_Unauthorized
 	}
 
+	bodyBytes, err := json.Marshal(map[string]string{"error": reason})
+	if err != nil {
+		bodyBytes = []byte(`{"error":"internal error"}`)
+	}
+
 	return &authv3.CheckResponse{
 		Status: &status.Status{
 			Code:    int32(codes.PermissionDenied),
@@ -179,7 +185,7 @@ func denyResponse(reason string, statusCode int) *authv3.CheckResponse {
 				Status: &typev3.HttpStatus{
 					Code: envoyStatus,
 				},
-				Body: fmt.Sprintf(`{"error": "%s"}`, reason),
+				Body: string(bodyBytes),
 				Headers: []*corev3.HeaderValueOption{
 					{
 						Header: &corev3.HeaderValue{
