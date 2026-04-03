@@ -39,7 +39,7 @@ spec:
           readOnly: true
       - name: auth-sidecar
         image: merionyx/api-gateway-auth-sidecar:latest
-        imagePullPolicy: Always
+        imagePullPolicy: Never
         env:
         - name: CONFIG_PATH
           value: /auth-sidecar/config/k8s.yaml
