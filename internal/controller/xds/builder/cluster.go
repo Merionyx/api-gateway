@@ -57,7 +57,7 @@ func buildAuthSidecarCluster() *clusterv3.Cluster {
 
 		// Use LOGICAL_DNS for hostname resolution
 		ClusterDiscoveryType: &clusterv3.Cluster_Type{
-			Type: clusterv3.Cluster_LOGICAL_DNS,
+			Type: clusterv3.Cluster_STRICT_DNS,
 		},
 
 		// DNS lookup only for IPv4

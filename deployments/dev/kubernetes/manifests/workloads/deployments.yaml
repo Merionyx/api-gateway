@@ -275,7 +275,7 @@ spec:
       containers:
       - name: controller
         image: merionyx/api-gateway-controller:latest
-        imagePullPolicy: Always
+        imagePullPolicy: Never
         env:
         - name: CONFIG_PATH
           value: /controller/config/k8s.yaml
