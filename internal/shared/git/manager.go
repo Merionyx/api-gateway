@@ -382,15 +382,14 @@ func (rm *RepositoryManager) getSnapshotsFromGit(managedRepo *ManagedRepo, ref s
 		}
 
 		if !info.IsDir() {
-			file, err := w.Filesystem.Open(path)
-			if err != nil {
-				return fmt.Errorf("failed to open file %s: %w", path, err)
+			f, oerr := w.Filesystem.Open(path)
+			if oerr != nil {
+				return fmt.Errorf("failed to open file %s: %w", path, oerr)
 			}
-			defer file.Close()
-
-			content, err := io.ReadAll(file)
-			if err != nil {
-				return fmt.Errorf("failed to read file %s: %w", path, err)
+			content, rerr := io.ReadAll(f)
+			_ = f.Close()
+			if rerr != nil {
+				return fmt.Errorf("failed to read file %s: %w", path, rerr)
 			}
 
 			files = append(files, RepositoryFile{
@@ -401,12 +400,18 @@ func (rm *RepositoryManager) getSnapshotsFromGit(managedRepo *ManagedRepo, ref s
 		return nil
 	})
 
+	if err != nil {
+		return nil, fmt.Errorf("failed to walk directory for repository %s: %w", managedRepo.Name, err)
+	}
+
+	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
+
 	var snapshots []ContractSnapshot
 
 	for _, file := range files {
-		contractSchema, err := parseContractSchema(file.Path, file.Content)
-		if err != nil {
-			log.Fatalf("Failed to parse x-api-gateway: %v", err)
+		contractSchema, perr := parseContractSchema(file.Path, file.Content)
+		if perr != nil {
+			return nil, fmt.Errorf("parse schema %s: %w", file.Path, perr)
 		}
 		log.Println("ContractSchema:", contractSchema)
 
@@ -426,10 +431,6 @@ func (rm *RepositoryManager) getSnapshotsFromGit(managedRepo *ManagedRepo, ref s
 			AllowUndefinedMethods: contractSchema.XApiGateway.AllowUndefinedMethods,
 			Access:                contractSchema.XApiGateway.Access,
 		})
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to walk directory for repository %s: %w", managedRepo.Name, err)
 	}
 
 	snapshots = dedupeContractSnapshotsByName(snapshots)
@@ -472,12 +473,14 @@ func (rm *RepositoryManager) getSnapshotsFromLocalDir(basePath, subPath string) 
 		return nil, fmt.Errorf("failed to walk directory for repository %s: %w", basePath, err)
 	}
 
+	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
+
 	var snapshots []ContractSnapshot
 
 	for _, file := range files {
-		contractSchema, err := parseContractSchema(file.Path, file.Content)
-		if err != nil {
-			log.Fatalf("Failed to parse x-api-gateway: %v", err)
+		contractSchema, perr := parseContractSchema(file.Path, file.Content)
+		if perr != nil {
+			return nil, fmt.Errorf("parse schema %s: %w", file.Path, perr)
 		}
 		log.Println("ContractSchema:", contractSchema)
 
