@@ -13,7 +13,7 @@ import (
 
 type environmentsUseCase struct {
 	environmentRepo    interfaces.EnvironmentRepository
-	schamasUseCase     interfaces.SchemasUseCase
+	schemasUseCase     interfaces.SchemasUseCase
 	xdsSnapshotManager *xdscache.SnapshotManager
 	xdsBuilder         interfaces.XDSBuilder
 }
@@ -22,9 +22,9 @@ func NewEnvironmentsUseCase() interfaces.EnvironmentsUseCase {
 	return &environmentsUseCase{}
 }
 
-func (uc *environmentsUseCase) SetDependencies(environmentRepo interfaces.EnvironmentRepository, schamasUseCase interfaces.SchemasUseCase, xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder interfaces.XDSBuilder) {
+func (uc *environmentsUseCase) SetDependencies(environmentRepo interfaces.EnvironmentRepository, schemasUseCase interfaces.SchemasUseCase, xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder interfaces.XDSBuilder) {
 	uc.environmentRepo = environmentRepo
-	uc.schamasUseCase = schamasUseCase
+	uc.schemasUseCase = schemasUseCase
 	uc.xdsSnapshotManager = xdsSnapshotManager
 	uc.xdsBuilder = xdsBuilder
 }
@@ -66,7 +66,7 @@ func (uc *environmentsUseCase) GetEnvironment(ctx context.Context, name string) 
 	}
 
 	for _, bundle := range env.Bundles.Static {
-		snapshots, err := uc.schamasUseCase.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref, bundle.Path)
+		snapshots, err := uc.schemasUseCase.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref, bundle.Path)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get environment snapshots: %w", err)
 		}
@@ -83,7 +83,7 @@ func (uc *environmentsUseCase) ListEnvironments(ctx context.Context) (map[string
 	}
 	for _, environment := range environments {
 		for _, bundle := range environment.Bundles.Static {
-			snapshots, err := uc.schamasUseCase.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref, bundle.Path)
+			snapshots, err := uc.schemasUseCase.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref, bundle.Path)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get environment snapshots: %w", err)
 			}

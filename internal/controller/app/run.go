@@ -26,7 +26,7 @@ func Run() error {
 		logger.Error(fmt.Sprintf("Failed to load config: %v", err))
 		os.Exit(1)
 	}
-	logger.Info("Config loade", "config", cfg)
+	logger.Info("Config loaded", "config", cfg)
 
 	// Initialize DI container
 	container, err := container.NewContainer(cfg)

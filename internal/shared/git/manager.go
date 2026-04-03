@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -276,7 +275,7 @@ func (rm *RepositoryManager) GetRepositorySnapshots(name string, ref string, pat
 		return nil, fmt.Errorf("repository %s not found", name)
 	}
 
-	log.Println("Getting repository snapshots for", name, ref, path)
+	slog.Debug("getting repository snapshots", "repository", name, "ref", ref, "path", path)
 
 	switch managedRepo.Source {
 	case "local-dir":
@@ -342,7 +341,7 @@ func (rm *RepositoryManager) getSnapshotsFromGit(managedRepo *ManagedRepo, ref s
 			if err = w.Pull(&git.PullOptions{Force: true, Auth: auth}); err != nil && err != git.NoErrAlreadyUpToDate {
 				return nil, fmt.Errorf("failed to pull repository %s: %w", managedRepo.Name, err)
 			}
-			log.Println("Pulled repository", managedRepo.Name)
+			slog.Debug("pulled repository", "repository", managedRepo.Name)
 		}
 	default:
 		err = w.Pull(&git.PullOptions{
@@ -353,9 +352,9 @@ func (rm *RepositoryManager) getSnapshotsFromGit(managedRepo *ManagedRepo, ref s
 			if err != git.NoErrAlreadyUpToDate {
 				return nil, fmt.Errorf("failed to pull repository %s: %w", managedRepo.Name, err)
 			}
-			log.Println("Repository", managedRepo.Name, "is already up to date")
+			slog.Debug("repository already up to date", "repository", managedRepo.Name)
 		}
-		log.Println("Pulled repository", managedRepo.Name)
+		slog.Debug("pulled repository", "repository", managedRepo.Name)
 	}
 
 	headRef, headErr := repo.Head()
@@ -413,10 +412,10 @@ func (rm *RepositoryManager) getSnapshotsFromGit(managedRepo *ManagedRepo, ref s
 		if perr != nil {
 			return nil, fmt.Errorf("parse schema %s: %w", file.Path, perr)
 		}
-		log.Println("ContractSchema:", contractSchema)
+		slog.Debug("parsed contract schema", "path", file.Path)
 
 		if isXApiGatewayEmpty(contractSchema.XApiGateway) {
-			log.Println("ContractSchema is empty", file.Path)
+			slog.Debug("contract schema empty x-api-gateway block", "path", file.Path)
 			continue
 		}
 
@@ -482,10 +481,10 @@ func (rm *RepositoryManager) getSnapshotsFromLocalDir(basePath, subPath string) 
 		if perr != nil {
 			return nil, fmt.Errorf("parse schema %s: %w", file.Path, perr)
 		}
-		log.Println("ContractSchema:", contractSchema)
+		slog.Debug("parsed contract schema", "path", file.Path)
 
 		if isXApiGatewayEmpty(contractSchema.XApiGateway) {
-			log.Println("ContractSchema is empty", file.Path)
+			slog.Debug("contract schema empty x-api-gateway block", "path", file.Path)
 			continue
 		}
 
@@ -510,10 +509,10 @@ func parseContractSchema(filename string, content []byte) (*ContractSchema, erro
 
 	switch ext {
 	case ".json":
-		log.Println("Parsing JSON file:", filename)
+		slog.Debug("parsing contract schema file", "path", filename, "format", "json")
 		return parseJSON(content)
 	case ".yaml", ".yml":
-		log.Println("Parsing YAML file:", filename)
+		slog.Debug("parsing contract schema file", "path", filename, "format", "yaml")
 		return parseYAML(content)
 	default:
 		return nil, fmt.Errorf("unsupported file format: %s", ext)

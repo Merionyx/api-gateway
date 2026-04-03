@@ -59,7 +59,7 @@ func LoadConfig(configFile ...string) (*Config, error) {
 			return nil, err
 		}
 	} else {
-		slog.Info(fmt.Sprintf("UUUUUUsing config file %s", viper.ConfigFileUsed()))
+		slog.Info("Using config file", "path", viper.ConfigFileUsed())
 	}
 
 	var config Config

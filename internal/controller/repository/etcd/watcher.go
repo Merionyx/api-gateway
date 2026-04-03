@@ -1,4 +1,4 @@
-package etcd_repository
+package etcd
 
 import (
 	"context"

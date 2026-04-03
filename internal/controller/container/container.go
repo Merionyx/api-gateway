@@ -15,7 +15,7 @@ import (
 	"merionyx/api-gateway/internal/controller/delivery/grpc/handler"
 	"merionyx/api-gateway/internal/controller/delivery/http/router"
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
-	etcd_repository "merionyx/api-gateway/internal/controller/repository/etcd"
+	ctrlrepoetcd "merionyx/api-gateway/internal/controller/repository/etcd"
 	"merionyx/api-gateway/internal/controller/repository/memory"
 	"merionyx/api-gateway/internal/controller/usecase"
 	"merionyx/api-gateway/internal/shared/election"
@@ -153,8 +153,8 @@ func (c *Container) initXDSBuilder() {
 }
 
 func (c *Container) initRepositories() {
-	c.SchemaRepository = etcd_repository.NewSchemaRepository(c.EtcdClient)
-	c.EnvironmentRepository = etcd_repository.NewEnvironmentRepository(c.EtcdClient)
+	c.SchemaRepository = ctrlrepoetcd.NewSchemaRepository(c.EtcdClient)
+	c.EnvironmentRepository = ctrlrepoetcd.NewEnvironmentRepository(c.EtcdClient)
 
 	log.Println("etcd repositories initialized")
 }
@@ -177,8 +177,6 @@ func (c *Container) initUseCases() {
 		c.XDSBuilder,
 		c.EtcdClient,
 	)
-
-	log.Println("SnapshotsUseCase:", c.SnapshotsUseCase)
 
 	log.Println("Use cases initialized")
 }
