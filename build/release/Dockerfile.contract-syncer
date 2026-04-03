@@ -8,7 +8,10 @@ COPY go.mod go.sum ./
 
 RUN go mod download
 
-COPY . .
+COPY pkg/ pkg/
+COPY cmd/contract-syncer/ cmd/contract-syncer/
+COPY internal/shared/ internal/shared/
+COPY internal/contract-syncer/ internal/contract-syncer/
 
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main cmd/contract-syncer/main.go
 
@@ -22,8 +25,6 @@ RUN addgroup -g 1001 app && \
 WORKDIR /contract-syncer
 
 COPY --from=builder /contract-syncer/main .
-
-COPY --from=builder /contract-syncer/configs ./configs
 
 RUN chown -R app:app /contract-syncer
 

@@ -10,7 +10,15 @@ COPY go.mod go.sum ./
 
 RUN go mod download
 
-COPY . .
+COPY pkg/ pkg/
+COPY internal/shared/bundlekey/ internal/shared/bundlekey/
+COPY internal/shared/election/ internal/shared/election/
+COPY internal/shared/etcd/ internal/shared/etcd/
+COPY internal/shared/git/ internal/shared/git/
+COPY internal/shared/grpcutil/ internal/shared/grpcutil/
+COPY internal/api-server/ internal/api-server/
+COPY cmd/api-server/ cmd/api-server/
+COPY deployments/dev/air/api-server.toml deployments/dev/air/api-server.toml
 
 EXPOSE 8080 8443 8444
 
