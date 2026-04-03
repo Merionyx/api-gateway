@@ -5,141 +5,38 @@ on:
     branches:
     - main
 
-env:
-  IMAGE_PREFIX: merionyx/api-gateway
-
 jobs:
-  build:
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-        - component: api-server
-          dockerfile: build/release/Dockerfile.api-server
-          platform: linux/amd64
-          runner: ubuntu-latest
-          arch_short: amd64
-        - component: api-server
-          dockerfile: build/release/Dockerfile.api-server
-          platform: linux/arm64
-          runner: ubuntu-24.04-arm
-          arch_short: arm64
-        - component: auth-sidecar
-          dockerfile: build/release/Dockerfile.auth-sidecar
-          platform: linux/amd64
-          runner: ubuntu-latest
-          arch_short: amd64
-        - component: auth-sidecar
-          dockerfile: build/release/Dockerfile.auth-sidecar
-          platform: linux/arm64
-          runner: ubuntu-24.04-arm
-          arch_short: arm64
-        - component: contract-syncer
-          dockerfile: build/release/Dockerfile.contract-syncer
-          platform: linux/amd64
-          runner: ubuntu-latest
-          arch_short: amd64
-        - component: contract-syncer
-          dockerfile: build/release/Dockerfile.contract-syncer
-          platform: linux/arm64
-          runner: ubuntu-24.04-arm
-          arch_short: arm64
-        - component: controller
-          dockerfile: build/release/Dockerfile.controller
-          platform: linux/amd64
-          runner: ubuntu-latest
-          arch_short: amd64
-        - component: controller
-          dockerfile: build/release/Dockerfile.controller
-          platform: linux/arm64
-          runner: ubuntu-24.04-arm
-          arch_short: arm64
-        - component: mock-service
-          dockerfile: build/dev/Dockerfile.mock-service
-          platform: linux/amd64
-          runner: ubuntu-latest
-          arch_short: amd64
-        - component: mock-service
-          dockerfile: build/dev/Dockerfile.mock-service
-          platform: linux/arm64
-          runner: ubuntu-24.04-arm
-          arch_short: arm64
+  api-server:
+    uses: ./.github/workflows/docker-publish-component.yml
+    with:
+      component: api-server
+      dockerfile: build/release/Dockerfile.api-server
+    secrets: inherit
 
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+  auth-sidecar:
+    uses: ./.github/workflows/docker-publish-component.yml
+    with:
+      component: auth-sidecar
+      dockerfile: build/release/Dockerfile.auth-sidecar
+    secrets: inherit
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+  contract-syncer:
+    uses: ./.github/workflows/docker-publish-component.yml
+    with:
+      component: contract-syncer
+      dockerfile: build/release/Dockerfile.contract-syncer
+    secrets: inherit
 
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+  controller:
+    uses: ./.github/workflows/docker-publish-component.yml
+    with:
+      component: controller
+      dockerfile: build/release/Dockerfile.controller
+    secrets: inherit
 
-    - name: Build and push (by digest)
-      id: build
-      uses: docker/build-push-action@v6
-      with:
-        context: .
-        file: ${{ matrix.dockerfile }}
-        platforms: ${{ matrix.platform }}
-        provenance: false
-        sbom: false
-        outputs: type=image,name=${{ env.IMAGE_PREFIX }}-${{ matrix.component }},push-by-digest=true,push=true
-        cache-from: type=gha,scope=build-${{ matrix.component }}-${{ matrix.arch_short }}
-        cache-to: type=gha,scope=build-${{ matrix.component }}-${{ matrix.arch_short }},mode=max
-
-    - name: Write digest file
-      run: echo "${{ steps.build.outputs.digest }}" > "${{ matrix.component }}-${{ matrix.arch_short }}.txt"
-
-    - name: Upload digest
-      uses: actions/upload-artifact@v4
-      with:
-        name: digest-${{ matrix.component }}-${{ matrix.arch_short }}
-        path: ${{ matrix.component }}-${{ matrix.arch_short }}.txt
-        if-no-files-found: error
-
-  merge-manifests:
-    needs: build
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        component:
-        - api-server
-        - auth-sidecar
-        - contract-syncer
-        - controller
-        - mock-service
-
-    steps:
-    - name: Download digests
-      uses: actions/download-artifact@v4
-      with:
-        pattern: digest-*
-        path: digests
-        merge-multiple: true
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-    - name: Multi-arch manifest (latest)
-      run: |
-        AMD=$(tr -d '\n' < "digests/${COMPONENT}-amd64.txt")
-        ARM=$(tr -d '\n' < "digests/${COMPONENT}-arm64.txt")
-        docker buildx imagetools create \
-          -t "${IMAGE_PREFIX}-${COMPONENT}:latest" \
-          "${IMAGE_PREFIX}-${COMPONENT}@${AMD}" \
-          "${IMAGE_PREFIX}-${COMPONENT}@${ARM}"
-      env:
-        IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
-        COMPONENT: ${{ matrix.component }}
+  mock-service:
+    uses: ./.github/workflows/docker-publish-component.yml
+    with:
+      component: mock-service
+      dockerfile: build/dev/Dockerfile.mock-service
+    secrets: inherit
