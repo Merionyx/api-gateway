@@ -9,7 +9,6 @@ import (
 
 var (
 	patternCache sync.Map
-	cacheMu      sync.RWMutex
 )
 
 // matchesAnyEnvironment checks if the current environment matches any pattern in the list

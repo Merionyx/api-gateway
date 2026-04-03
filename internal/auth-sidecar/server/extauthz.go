@@ -66,7 +66,7 @@ func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*
 	contractName := accessConfig.ContractName
 
 	// 3. Check if the contract is secure
-	if accessConfig.Secure == false {
+	if !accessConfig.Secure {
 		return allowResponse(contractName, contractName), nil
 	}
 
@@ -130,21 +130,6 @@ func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*
 		appID, contractName, currentEnv, tokenEnvironments, duration)
 
 	return allowResponse(appID, contractName), nil
-}
-
-func extractPrefixFromPath(path string) string {
-	// /api/services/proxy-list-04/v1/health → /api/services/proxy-list-04/
-	// Find the position after the third slash
-	slashCount := 0
-	for i, c := range path {
-		if c == '/' {
-			slashCount++
-			if slashCount == 4 {
-				return path[:i+1]
-			}
-		}
-	}
-	return ""
 }
 
 func allowResponse(appID, contractName string) *authv3.CheckResponse {

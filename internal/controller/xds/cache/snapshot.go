@@ -3,14 +3,12 @@ package cache
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 )
 
 type SnapshotManager struct {
 	cache cache.SnapshotCache
-	mu    sync.RWMutex
 }
 
 func NewSnapshotManager() *SnapshotManager {
