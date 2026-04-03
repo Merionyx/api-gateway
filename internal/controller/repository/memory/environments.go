@@ -84,7 +84,8 @@ func (r *EnvironmentsRepository) Initialize(config *config.Config) error {
 		slog.Info("environment from config", "name", environment.Name, "bundles", len(environment.Bundles.Static), "services", len(environment.Services.Static))
 	}
 
-	return r.rebuildMergedXDSSnapshotsLocked(context.Background())
+	r.rebuildMergedXDSSnapshotsLocked(context.Background())
+	return nil
 }
 
 func bundleDedupeKey(b models.StaticContractBundleConfig) string {
@@ -184,44 +185,46 @@ func (r *EnvironmentsRepository) mergedLocked() map[string]*models.Environment {
 	return out
 }
 
-func (r *EnvironmentsRepository) envWithSnapshotsFromEtcd(ctx context.Context, env *models.Environment) *models.Environment {
+func (r *EnvironmentsRepository) envWithSnapshotsFromEtcd(ctx context.Context, env *models.Environment) (*models.Environment, error) {
 	if env == nil {
-		return nil
+		return nil, nil
 	}
 	if r.schemaRepo == nil {
-		return env
+		return env, nil
 	}
 	out := *env
 	out.Snapshots = nil
 	if env.Bundles == nil {
-		return &out
+		return &out, nil
 	}
 	for _, bundle := range env.Bundles.Static {
 		snaps, err := r.schemaRepo.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref, bundle.Path)
 		if err != nil {
-			slog.Warn("xDS rebuild from memory: list contract snapshots", "environment", env.Name, "repository", bundle.Repository, "ref", bundle.Ref, "path", bundle.Path, "error", err)
-			continue
+			return nil, fmt.Errorf("list contract snapshots for bundle %q (repo %q ref %q path %q): %w", bundle.Name, bundle.Repository, bundle.Ref, bundle.Path, err)
 		}
 		out.Snapshots = append(out.Snapshots, snaps...)
 	}
-	return &out
+	return &out, nil
 }
 
-func (r *EnvironmentsRepository) rebuildMergedXDSSnapshotsLocked(ctx context.Context) error {
+func (r *EnvironmentsRepository) rebuildMergedXDSSnapshotsLocked(ctx context.Context) {
 	if r.xdsSnapshotManager == nil || r.xdsBuilder == nil {
-		return nil
+		return
 	}
 	for envName, env := range r.mergedLocked() {
-		buildEnv := r.envWithSnapshotsFromEtcd(ctx, env)
+		buildEnv, err := r.envWithSnapshotsFromEtcd(ctx, env)
+		if err != nil {
+			slog.Error("xDS rebuild from memory: enrich snapshots from etcd", "environment", envName, "error", err)
+			continue
+		}
 		snap := snapshot.BuildEnvoySnapshot(r.xdsBuilder, buildEnv)
 		nodeID := fmt.Sprintf("envoy-%s", envName)
 		if err := r.xdsSnapshotManager.UpdateSnapshot(nodeID, snap); err != nil {
 			slog.Error("xDS snapshot update failed", "node_id", nodeID, "error", err)
-			return err
+			continue
 		}
 		slog.Info("updated xDS snapshot", "environment", envName, "node_id", nodeID)
 	}
-	return nil
 }
 
 // ApplyKubernetesEnvironments replaces the Kubernetes-sourced environment map and rebuilds xDS.
@@ -229,19 +232,25 @@ func (r *EnvironmentsRepository) ApplyKubernetesEnvironments(ctx context.Context
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.fromK8s = envs
-	return r.rebuildMergedXDSSnapshotsLocked(ctx)
+	r.rebuildMergedXDSSnapshotsLocked(ctx)
+	return nil
 }
 
-// GetEnvironment returns kubernetes overlay first, then static config.
+// GetEnvironment returns the merged view when the same name exists in static config and Kubernetes; otherwise the sole source.
 func (r *EnvironmentsRepository) GetEnvironment(ctx context.Context, name string) (*models.Environment, error) {
 	_ = ctx
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	if env, ok := r.fromK8s[name]; ok {
-		return env, nil
+	fileEnv, fromFile := r.fromFile[name]
+	k8sEnv, fromK8s := r.fromK8s[name]
+	if fromFile && fromK8s {
+		return mergeEnvironment(fileEnv, k8sEnv), nil
 	}
-	if env, ok := r.fromFile[name]; ok {
-		return env, nil
+	if fromK8s {
+		return k8sEnv, nil
+	}
+	if fromFile {
+		return fileEnv, nil
 	}
 	return nil, fmt.Errorf("environment %s not found in config", name)
 }
