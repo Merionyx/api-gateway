@@ -109,7 +109,7 @@ func buildCluster(name, upstream string) *clusterv3.Cluster {
 		Name:           name,
 		ConnectTimeout: durationpb.New(5 * time.Second),
 		ClusterDiscoveryType: &clusterv3.Cluster_Type{
-			Type: clusterv3.Cluster_LOGICAL_DNS,
+			Type: clusterv3.Cluster_STRICT_DNS,
 		},
 		DnsLookupFamily: clusterv3.Cluster_V4_ONLY,
 		LoadAssignment: &endpointv3.ClusterLoadAssignment{

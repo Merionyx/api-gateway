@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/name: mock-be-service-01-dev
     app.kubernetes.io/part-of: api-gateway-dev
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app.kubernetes.io/name: mock-be-service-01-dev
@@ -53,7 +53,7 @@ metadata:
     app.kubernetes.io/name: mock-be-service-02-dev
     app.kubernetes.io/part-of: api-gateway-dev
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app.kubernetes.io/name: mock-be-service-02-dev
@@ -98,7 +98,7 @@ metadata:
     app.kubernetes.io/name: mock-be-service-03
     app.kubernetes.io/part-of: api-gateway-dev
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app.kubernetes.io/name: mock-be-service-03
