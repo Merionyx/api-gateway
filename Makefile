@@ -142,15 +142,15 @@ proto-generate: ## Generate protobuf code
 	cp ./schemas.pb.go ./pkg/api/schemas/v1/schemas.pb.go && \
 	cp ./environment_grpc.pb.go ./pkg/api/environments/v1/environment_grpc.pb.go && \
 	cp ./environment.pb.go ./pkg/api/environments/v1/environment.pb.go && \
-	cp ./auth_grpc.pb.go ./pkg/api/auth/v1/auth_grpc.pb.go && \
-	cp ./auth.pb.go ./pkg/api/auth/v1/auth.pb.go && \
+	cp ./gateway_auth_grpc.pb.go ./pkg/api/auth/v1/auth_grpc.pb.go && \
+	cp ./gateway_auth.pb.go ./pkg/api/auth/v1/auth.pb.go && \
 	cp ./contract_syncer_grpc.pb.go ./pkg/api/contract_syncer/v1/contract_syncer_grpc.pb.go && \
 	cp ./contract_syncer.pb.go ./pkg/api/contract_syncer/v1/contract_syncer.pb.go && \
 	cp ./controller_registry_grpc.pb.go ./pkg/api/controller_registry/v1/controller_registry_grpc.pb.go && \
 	cp ./controller_registry.pb.go ./pkg/api/controller_registry/v1/controller_registry.pb.go && \
 	rm -f ./contract_types.pb.go ./snapshots_grpc.pb.go ./snapshots.pb.go \
 		./schemas_grpc.pb.go ./schemas.pb.go ./environment_grpc.pb.go ./environment.pb.go \
-		./auth_grpc.pb.go ./auth.pb.go ./contract_syncer_grpc.pb.go ./contract_syncer.pb.go \
+		./gateway_auth_grpc.pb.go ./gateway_auth.pb.go ./contract_syncer_grpc.pb.go ./contract_syncer.pb.go \
 		./controller_registry_grpc.pb.go ./controller_registry.pb.go
 
 proto-install: ## Install protobuf tools

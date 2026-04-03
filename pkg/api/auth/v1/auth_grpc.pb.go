@@ -2,7 +2,10 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.29.3
-// source: auth.proto
+// source: gateway_auth.proto
+
+// Renamed from auth.proto: global protobuf registry path must be unique;
+// go.etcd.io/etcd/api/v3/authpb also registers "auth.proto".
 
 package authv1
 
@@ -158,5 +161,5 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "auth.proto",
+	Metadata: "gateway_auth.proto",
 }

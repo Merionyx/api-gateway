@@ -1,5 +1,8 @@
 syntax = "proto3";
 
+// Renamed from auth.proto: global protobuf registry path must be unique;
+// go.etcd.io/etcd/api/v3/authpb also registers "auth.proto".
+
 package api.auth.v1;
 
 option go_package = "merionyx/api-gateway/pkg/api/auth/v1;authv1";
@@ -58,7 +61,7 @@ message Heartbeat {
 service AuthService {
   // Bidirectional streaming for synchronization
   rpc SyncAccess(stream SyncAccessRequest) returns (stream SyncAccessResponse);
-  
+
   // Get current configuration (unary)
   rpc GetAccessConfig(GetAccessConfigRequest) returns (AccessConfig);
 }
