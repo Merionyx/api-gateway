@@ -8,8 +8,7 @@ import (
 )
 
 var (
-	patternCache     sync.Map
-	patternCompileMu sync.Mutex
+	patternCache sync.Map
 )
 
 // MatchesAnyEnvironment checks if the current environment matches any pattern in the list
@@ -44,21 +43,7 @@ func MatchesEnvironmentPattern(env, pattern string) bool {
 			return re.MatchString(env)
 		}
 
-		// Slow path: compile pattern at most once using double-checked locking
-		patternCompileMu.Lock()
-		defer patternCompileMu.Unlock()
-
-		// Check cache again in case another goroutine stored it while we were waiting
-		if cached, ok := patternCache.Load(pattern); ok {
-			re, ok := cached.(*regexp.Regexp)
-			if !ok || re == nil {
-				log.Printf("[AUTH] Invalid cache entry for pattern %s: %#v", pattern, cached)
-				return false
-			}
-			return re.MatchString(env)
-		}
-
-		// Compile new pattern
+		// Slow path: compile pattern and store atomically
 		regexPattern := regexp.QuoteMeta(pattern)
 		regexPattern = strings.ReplaceAll(regexPattern, "\\*", ".*")
 		var builder strings.Builder
@@ -72,9 +57,17 @@ func MatchesEnvironmentPattern(env, pattern string) bool {
 			return false
 		}
 
-		// Save to cache
-		patternCache.Store(pattern, compiled)
-		return compiled.MatchString(env)
+		// Atomically load or store the compiled pattern
+		actual, loaded := patternCache.LoadOrStore(pattern, compiled)
+		re, ok := actual.(*regexp.Regexp)
+		if !ok || re == nil {
+			log.Printf("[AUTH] Invalid cache entry for pattern %s: %#v", pattern, actual)
+			return false
+		}
+
+		// Use the regexp from the cache (whether newly stored or pre-existing)
+		_ = loaded // loaded is not currently used, but kept for clarity and future use
+		return re.MatchString(env)
 	}
 	return false
 }
