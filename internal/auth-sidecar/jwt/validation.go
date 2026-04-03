@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"math/big"
 	"net/http"
 	"sync"
@@ -241,7 +241,7 @@ func (v *JWTValidator) periodicCacheCleanup() {
 		})
 
 		if expiredCount > 0 {
-			log.Printf("[JWT-CACHE] Cleaned up %d expired tokens from cache", expiredCount)
+			slog.Debug("JWT cache: cleaned expired tokens", "count", expiredCount)
 		}
 	}
 }

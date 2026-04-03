@@ -3,7 +3,7 @@ package etcd
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"strings"
 
 	"merionyx/api-gateway/internal/controller/domain/models"
@@ -18,11 +18,11 @@ type WatcherCallback func(eventType string, env *models.Environment) error
 func StartEnvironmentWatcher(ctx context.Context, client *clientv3.Client, callback WatcherCallback) {
 	watchChan := client.Watch(ctx, environmentPrefix, clientv3.WithPrefix())
 
-	log.Println("Environment watcher started")
+	slog.Info("environment watcher started")
 
 	for watchResp := range watchChan {
 		if watchResp.Err() != nil {
-			log.Printf("Watch error: %v", watchResp.Err())
+			slog.Warn("environment watch error", "error", watchResp.Err())
 			continue
 		}
 
@@ -35,12 +35,12 @@ func StartEnvironmentWatcher(ctx context.Context, client *clientv3.Client, callb
 			case clientv3.EventTypePut:
 				var env models.Environment
 				if err := json.Unmarshal(event.Kv.Value, &env); err != nil {
-					log.Printf("Failed to unmarshal environment: %v", err)
+					slog.Warn("failed to unmarshal environment", "error", err)
 					continue
 				}
 
 				if err := callback("put", &env); err != nil {
-					log.Printf("Failed to handle environment update: %v", err)
+					slog.Warn("failed to handle environment update", "error", err)
 				}
 
 			case clientv3.EventTypeDelete:
@@ -48,13 +48,13 @@ func StartEnvironmentWatcher(ctx context.Context, client *clientv3.Client, callb
 				env := &models.Environment{Name: envName}
 
 				if err := callback("delete", env); err != nil {
-					log.Printf("Failed to handle environment deletion: %v", err)
+					slog.Warn("failed to handle environment deletion", "error", err)
 				}
 			}
 		}
 	}
 
-	log.Println("Environment watcher stopped")
+	slog.Info("environment watcher stopped")
 }
 
 // extractEnvNameFromKey extracts environment name from etcd key

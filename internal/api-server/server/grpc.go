@@ -2,7 +2,7 @@ package server
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"merionyx/api-gateway/internal/api-server/container"
 	pb "merionyx/api-gateway/pkg/api/controller_registry/v1"
 	"net"
@@ -24,6 +24,6 @@ func StartGRPCServer(cnt *container.Container) error {
 
 	reflection.Register(server)
 
-	log.Printf("gRPC server starting on %s", address)
+	slog.Info("gRPC server starting", "address", address)
 	return server.Serve(lis)
 }

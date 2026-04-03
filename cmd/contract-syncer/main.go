@@ -1,12 +1,15 @@
 package main
 
 import (
-	"log"
+	"log/slog"
+	"os"
+
 	syncer "merionyx/api-gateway/internal/contract-syncer/app"
 )
 
 func main() {
 	if err := syncer.Run(); err != nil {
-		log.Fatalf("Failed to run contract syncer: %v", err)
+		slog.Error("failed to run contract syncer", "error", err)
+		os.Exit(1)
 	}
 }

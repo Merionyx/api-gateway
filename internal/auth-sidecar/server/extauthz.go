@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"time"
 
@@ -42,7 +42,7 @@ func StartExtAuthzServer(cnt *container.Container) error {
 
 	reflection.Register(grpcServer)
 
-	log.Printf("ExtAuthz server listening on port %s", cnt.Config.Server.GRPCPort)
+	slog.Info("ext_authz server listening", "port", cnt.Config.Server.GRPCPort)
 
 	if err := grpcServer.Serve(lis); err != nil {
 		return fmt.Errorf("failed to serve: %w", err)
@@ -60,7 +60,7 @@ func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*
 	accessConfig := s.container.AccessStorage.FindContractByPath(path)
 
 	if accessConfig == nil {
-		log.Printf("[AUTH] Unable to find contract for path: %s", path)
+		slog.Warn("auth: contract not found for path", "path", path)
 		return denyResponse("Contract not found", 404), nil
 	}
 
@@ -74,14 +74,14 @@ func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*
 	// 4. Extract the JWT from the X-App-Token: Bearer <token> header
 	token := req.Attributes.Request.Http.Headers["x-app-token"]
 	if token == "" {
-		log.Printf("[AUTH] Missing x-app-token header")
+		slog.Warn("auth: missing x-app-token header")
 		return denyResponse("Missing x-app-token header", 401), nil
 	}
 
 	// 5. Validate the JWT
 	claims, err := s.container.JWTValidator.ValidateToken(token)
 	if err != nil {
-		log.Printf("[AUTH] Invalid JWT: %v", err)
+		slog.Warn("auth: invalid JWT", "error", err)
 		return denyResponse("Invalid token", 401), nil
 	}
 
@@ -122,13 +122,14 @@ func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*
 	// 8. Check access rights from in-memory storage
 	allowed := s.container.AccessStorage.CheckAccess(contractName, appID, currentEnv)
 	if !allowed {
-		log.Printf("[AUTH] Access denied: app=%s contract=%s env=%s", appID, contractName, currentEnv)
+		slog.Warn("auth: access denied", "app_id", appID, "contract", contractName, "environment", currentEnv)
 		return denyResponse(fmt.Sprintf("Access denied to contract %s", contractName), 403), nil
 	}
 
 	duration := time.Since(startTime)
-	log.Printf("[AUTH] ✓ Allowed: app=%s contract=%s env=%s envPatterns=%v duration=%v",
-		appID, contractName, currentEnv, tokenEnvironments, duration)
+	slog.Info("auth: allowed",
+		"app_id", appID, "contract", contractName, "environment", currentEnv,
+		"env_patterns", tokenEnvironments, "duration", duration)
 
 	return allowResponse(appID, contractName), nil
 }

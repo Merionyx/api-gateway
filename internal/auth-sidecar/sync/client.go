@@ -3,7 +3,7 @@ package sync
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -56,7 +56,7 @@ func (c *SyncClient) Start(ctx context.Context) error {
 	c.conn = conn
 	c.client = authv1.NewAuthServiceClient(conn)
 
-	log.Printf("[SYNC] Connected to Controller at %s", c.config.Controller.Address)
+	slog.Info("auth sidecar sync connected to controller", "address", c.config.Controller.Address)
 
 	const (
 		initialBackoff = 5 * time.Second
@@ -72,7 +72,7 @@ func (c *SyncClient) Start(ctx context.Context) error {
 		}
 
 		if backoff > 0 {
-			log.Printf("[SYNC] Reconnecting after backoff %v", backoff)
+			slog.Info("auth sidecar sync reconnecting after backoff", "backoff", backoff)
 			if err := grpcutil.SleepOrDone(ctx, backoff); err != nil {
 				return err
 			}
@@ -82,7 +82,7 @@ func (c *SyncClient) Start(ctx context.Context) error {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
-			log.Printf("[SYNC] Sync error: %v", err)
+			slog.Warn("auth sidecar sync error", "error", err)
 			backoff = grpcutil.NextReconnectBackoff(backoff, initialBackoff, maxBackoff)
 		}
 	}
@@ -104,7 +104,7 @@ func (c *SyncClient) syncLoop(ctx context.Context) error {
 	}
 
 	c.setConnected(true)
-	log.Printf("[SYNC] Started sync stream for environment: %s", c.config.Controller.Environment)
+	slog.Info("auth sidecar sync stream started", "environment", c.config.Controller.Environment)
 
 	// Listen for updates from the Controller
 	for {
@@ -117,20 +117,19 @@ func (c *SyncClient) syncLoop(ctx context.Context) error {
 		switch msg := resp.Message.(type) {
 		case *authv1.SyncAccessResponse_InitialConfig:
 			// Initial configuration
-			log.Printf("[SYNC] Received initial config: %d contracts", len(msg.InitialConfig.Contracts))
+			slog.Info("auth sidecar sync received initial config", "contracts", len(msg.InitialConfig.Contracts))
 			c.storage.SetAccessConfig(msg.InitialConfig)
 
 		case *authv1.SyncAccessResponse_Update:
 			// Incremental update
-			log.Printf("[SYNC] Received update: +%d =%d -%d contracts",
-				len(msg.Update.AddedContracts),
-				len(msg.Update.UpdatedContracts),
-				len(msg.Update.RemovedContracts))
+			slog.Info("auth sidecar sync received update",
+				"added", len(msg.Update.AddedContracts),
+				"updated", len(msg.Update.UpdatedContracts),
+				"removed", len(msg.Update.RemovedContracts))
 			c.storage.ApplyUpdate(msg.Update)
 
 		case *authv1.SyncAccessResponse_Heartbeat:
 			// Heartbeat for keep-alive
-			// log.Printf("[SYNC] Heartbeat received")
 		}
 	}
 }

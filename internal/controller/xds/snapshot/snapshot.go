@@ -3,9 +3,10 @@ package snapshot
 import (
 	"crypto/sha256"
 	"fmt"
-	"log"
+	"log/slog"
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
 	"merionyx/api-gateway/internal/controller/domain/models"
+	"os"
 	"sort"
 	"time"
 
@@ -42,7 +43,7 @@ func BuildEnvoySnapshot(xdsBuilder interfaces.XDSBuilder, env *models.Environmen
 
 	version, err := snapshotVersionFromResources(listenerResources, clusterResources, routeResources, endpointResources)
 	if err != nil {
-		log.Printf("snapshot: stable version failed (%v), using time-based version", err)
+		slog.Warn("snapshot: stable version failed, using time-based version", "error", err)
 		version = fmt.Sprintf("v%d", time.Now().Unix())
 	}
 
@@ -56,7 +57,8 @@ func BuildEnvoySnapshot(xdsBuilder interfaces.XDSBuilder, env *models.Environmen
 		},
 	)
 	if err != nil {
-		log.Fatalf("Failed to create snapshot: %v", err)
+		slog.Error("failed to create envoy snapshot", "error", err)
+		os.Exit(1)
 	}
 
 	return snapshot

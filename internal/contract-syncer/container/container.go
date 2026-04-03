@@ -1,7 +1,8 @@
 package container
 
 import (
-	"log"
+	"log/slog"
+	"os"
 
 	"merionyx/api-gateway/internal/contract-syncer/config"
 	"merionyx/api-gateway/internal/contract-syncer/delivery/grpc/handler"
@@ -52,24 +53,25 @@ func (c *Container) initGitRepositoryManager() {
 	}
 
 	if err := c.GitRepositoryManager.InitializeRepositories(repos); err != nil {
-		log.Fatalf("Failed to initialize repositories: %v", err)
+		slog.Error("failed to initialize git repositories", "error", err)
+		os.Exit(1)
 	}
 
-	log.Println("Git repository manager initialized")
+	slog.Info("git repository manager initialized")
 }
 
 func (c *Container) initUseCases() {
 	c.SyncUseCase = usecase.NewSyncUseCase(c.GitRepositoryManager)
 
-	log.Println("Use cases initialized")
+	slog.Info("use cases initialized")
 }
 
 func (c *Container) initHandlers() {
 	c.SyncGRPCHandler = handler.NewSyncHandler(c.SyncUseCase)
 
-	log.Println("Handlers initialized")
+	slog.Info("handlers initialized")
 }
 
 func (c *Container) Close() {
-	log.Println("Container closed")
+	slog.Info("contract syncer container closed")
 }

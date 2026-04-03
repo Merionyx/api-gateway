@@ -1,7 +1,7 @@
 package container
 
 import (
-	"log"
+	"log/slog"
 
 	"merionyx/api-gateway/internal/auth-sidecar/config"
 	"merionyx/api-gateway/internal/auth-sidecar/jwt"
@@ -36,17 +36,17 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 
 func (c *Container) initStorage() {
 	c.AccessStorage = storage.NewAccessStorage()
-	log.Println("Access storage initialized")
+	slog.Info("access storage initialized")
 }
 
 func (c *Container) initJWTValidator() {
 	c.JWTValidator = jwt.NewJWTValidator(c.Config.JWT.JWKSURL)
-	log.Println("JWT validator initialized")
+	slog.Info("JWT validator initialized")
 }
 
 func (c *Container) initSyncClient() {
 	c.SyncClient = sync.NewSyncClient(c.Config, c.AccessStorage)
-	log.Println("Sync client initialized")
+	slog.Info("sync client initialized")
 }
 
 func (c *Container) Close() {

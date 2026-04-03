@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"log"
+	"log/slog"
 	"regexp"
 	"strings"
 	"sync"
@@ -31,7 +31,7 @@ func MatchesEnvironmentPattern(env, pattern string) bool {
 	if cached, ok := patternCache.Load(src); ok {
 		re, ok := cached.(*regexp.Regexp)
 		if !ok || re == nil {
-			log.Printf("[AUTH] Invalid cache entry for pattern %s: %#v", pattern, cached)
+			slog.Warn("auth: invalid pattern cache entry", "pattern", pattern, "cached", cached)
 			return false
 		}
 		return re.MatchString(env)
@@ -39,14 +39,14 @@ func MatchesEnvironmentPattern(env, pattern string) bool {
 
 	compiled, err := regexp.Compile(src)
 	if err != nil {
-		log.Printf("[AUTH] Error compiling pattern %q: %v", pattern, err)
+		slog.Warn("auth: error compiling environment pattern", "pattern", pattern, "error", err)
 		return false
 	}
 
 	actual, _ := patternCache.LoadOrStore(src, compiled)
 	re, ok := actual.(*regexp.Regexp)
 	if !ok || re == nil {
-		log.Printf("[AUTH] Invalid cache entry for pattern %q: %#v", pattern, actual)
+		slog.Warn("auth: invalid pattern cache entry", "pattern", pattern, "actual", actual)
 		return false
 	}
 	return re.MatchString(env)

@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"log"
+	"log/slog"
 	"strings"
 	"sync"
 
@@ -28,8 +28,7 @@ func (s *AccessStorage) ReceiveAccessConfig(contractName string) *authv1.Contrac
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	log.Printf("ReceiveAccessConfig: %s", contractName)
-	log.Printf("Contracts: %v", s.contracts)
+	slog.Debug("access storage lookup", "contract", contractName, "contracts_count", len(s.contracts))
 
 	contract, ok := s.contracts[contractName]
 	if !ok {

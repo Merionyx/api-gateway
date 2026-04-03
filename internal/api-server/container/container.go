@@ -3,7 +3,7 @@ package container
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -58,24 +58,26 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 func (c *Container) initEtcd() {
 	etcdClient, err := sharedetcd.NewEtcdClient(c.Config.Etcd)
 	if err != nil {
-		log.Fatalf("Failed to initialize etcd client: %v", err)
+		slog.Error("failed to initialize etcd client", "error", err)
+		os.Exit(1)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if _, err := etcdClient.Status(ctx, c.Config.Etcd.Endpoints[0]); err != nil {
-		log.Fatalf("Failed to connect to etcd: %v", err)
+		slog.Error("failed to connect to etcd", "error", err)
+		os.Exit(1)
 	}
 
 	c.EtcdClient = etcdClient
-	log.Println("etcd client initialized and connected successfully")
+	slog.Info("etcd client initialized and connected successfully")
 }
 
 func (c *Container) initLeaderGate() {
 	if !c.Config.LeaderElection.Enabled {
 		c.LeaderGate = election.NoopGate{}
-		log.Println("API Server leader election disabled (noop gate)")
+		slog.Info("API server leader election disabled (noop gate)")
 		return
 	}
 
@@ -97,14 +99,14 @@ func (c *Container) initLeaderGate() {
 	g := election.NewEtcdGate(c.EtcdClient, prefix, id, ttl)
 	c.LeaderGate = g
 	go g.Run(context.Background())
-	log.Printf("API Server leader election started (prefix=%s identity=%s)", prefix, id)
+	slog.Info("API server leader election started", "prefix", prefix, "identity", id)
 }
 
 func (c *Container) initRepositories() {
 	c.SnapshotRepository = etcd.NewSnapshotRepository(c.EtcdClient)
 	c.ControllerRepository = etcd.NewControllerRepository(c.EtcdClient)
 
-	log.Println("Repositories initialized")
+	slog.Info("repositories initialized")
 }
 
 func (c *Container) initUseCases() {
@@ -115,7 +117,8 @@ func (c *Container) initUseCases() {
 		c.Config.JWT.Issuer,
 	)
 	if err != nil {
-		log.Fatalf("Failed to initialize JWT use case: %v", err)
+		slog.Error("failed to initialize JWT use case", "error", err)
+		os.Exit(1)
 	}
 
 	c.ControllerRegistryUseCase = usecase.NewControllerRegistryUseCase(
@@ -135,29 +138,29 @@ func (c *Container) initUseCases() {
 
 	c.BundleSyncUseCase = bundleSyncUseCase
 
-	log.Println("Use cases initialized")
+	slog.Info("use cases initialized")
 }
 
 func (c *Container) initHandlers() {
 	c.JWTHandler = httphandler.NewJWTHandler(c.JWTUseCase)
 	c.ControllerRegistryHandler = grpchandler.NewControllerRegistryHandler(c.ControllerRegistryUseCase)
 
-	log.Println("Handlers initialized")
+	slog.Info("handlers initialized")
 }
 
 func (c *Container) startBackgroundWork() {
 	reg := c.ControllerRegistryUseCase.(*usecase.ControllerRegistryUseCase)
 	go reg.StartEtcdWatch(context.Background())
 	go c.BundleSyncUseCase.StartBundleWatcher(context.Background())
-	log.Println("API Server etcd watch and bundle watcher started")
+	slog.Info("API server etcd watch and bundle watcher started")
 }
 
 // Close closes all resources in the container
 func (c *Container) Close() {
 	if c.EtcdClient != nil {
 		if err := c.EtcdClient.Close(); err != nil {
-			log.Printf("Failed to close etcd client: %v", err)
+			slog.Error("failed to close etcd client", "error", err)
 		}
-		log.Println("etcd client closed")
+		slog.Info("etcd client closed")
 	}
 }

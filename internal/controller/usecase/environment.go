@@ -3,7 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
 	"merionyx/api-gateway/internal/controller/domain/models"
@@ -49,11 +49,11 @@ func (uc *environmentsUseCase) CreateEnvironment(ctx context.Context, req *model
 		return nil, fmt.Errorf("failed to save environment: %w", err)
 	}
 
-	log.Printf("Environment %s created", req.Name)
+	slog.Info("environment created", "name", req.Name)
 
 	// Create initial xDS snapshot
 	if err := uc.rebuildXDSSnapshot(ctx, env); err != nil {
-		log.Printf("Failed to build initial xDS snapshot for %s: %v", req.Name, err)
+		slog.Warn("failed to build initial xDS snapshot", "environment", req.Name, "error", err)
 	}
 
 	return env, nil
@@ -110,11 +110,11 @@ func (uc *environmentsUseCase) UpdateEnvironment(ctx context.Context, req *model
 		return nil, fmt.Errorf("failed to update environment: %w", err)
 	}
 
-	log.Printf("Environment %s updated", req.Name)
+	slog.Info("environment updated", "name", req.Name)
 
 	// Rebuild xDS snapshot
 	if err := uc.rebuildXDSSnapshot(ctx, existing); err != nil {
-		log.Printf("Failed to rebuild xDS snapshot for %s: %v", req.Name, err)
+		slog.Warn("failed to rebuild xDS snapshot", "environment", req.Name, "error", err)
 	}
 
 	return existing, nil
@@ -132,7 +132,7 @@ func (uc *environmentsUseCase) DeleteEnvironment(ctx context.Context, name strin
 		return fmt.Errorf("failed to delete environment: %w", err)
 	}
 
-	log.Printf("Environment %s deleted", name)
+	slog.Info("environment deleted", "name", name)
 
 	// Delete xDS snapshot (optional, depends on your implementation)
 	nodeID := fmt.Sprintf("envoy-%s", name)
@@ -149,6 +149,6 @@ func (uc *environmentsUseCase) rebuildXDSSnapshot(ctx context.Context, env *mode
 		return fmt.Errorf("failed to update xDS snapshot: %w", err)
 	}
 
-	log.Printf("xDS snapshot rebuilt for environment: %s", env.Name)
+	slog.Info("xDS snapshot rebuilt", "environment", env.Name)
 	return nil
 }

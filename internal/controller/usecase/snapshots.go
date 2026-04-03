@@ -3,7 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
 	"merionyx/api-gateway/internal/controller/domain/models"
@@ -41,7 +41,7 @@ func (uc *snapshotsUseCase) UpdateSnapshot(ctx context.Context, req *models.Upda
 
 		for envName, env := range environments {
 			if err := uc.rebuildSnapshot(ctx, envName, env); err != nil {
-				log.Printf("Failed to rebuild snapshot for %s: %v", envName, err)
+				slog.Warn("failed to rebuild xDS snapshot", "environment", envName, "error", err)
 			} else {
 				updatedEnvironments = append(updatedEnvironments, envName)
 			}
@@ -98,6 +98,6 @@ func (uc *snapshotsUseCase) rebuildSnapshot(ctx context.Context, envName string,
 		return fmt.Errorf("failed to update xDS snapshot: %w", err)
 	}
 
-	log.Printf("xDS snapshot rebuilt for environment: %s (nodeID: %s)", envName, nodeID)
+	slog.Info("xDS snapshot rebuilt", "environment", envName, "node_id", nodeID)
 	return nil
 }

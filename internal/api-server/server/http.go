@@ -1,7 +1,7 @@
 package server
 
 import (
-	"log"
+	"log/slog"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cors"
@@ -41,7 +41,7 @@ func StartHTTPServer(c *container.Container) error {
 
 	// Start server
 	port := c.Config.Server.HTTPPort
-	log.Printf("HTTP Server starting on port %s", port)
+	slog.Info("HTTP server starting", "port", port)
 	return app.Listen(":" + port)
 }
 

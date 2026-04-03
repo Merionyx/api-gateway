@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"merionyx/api-gateway/internal/controller/xds"
 	"net"
 
@@ -56,7 +56,7 @@ func (s *Server) Start(port int) error {
 		return fmt.Errorf("failed to listen: %w", err)
 	}
 
-	log.Printf("xDS server listening on port %d", port)
+	slog.Info("xDS server listening", "port", port)
 	return s.grpcServer.Serve(lis)
 }
 func (s *Server) Stop() {

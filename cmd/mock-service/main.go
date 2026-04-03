@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
@@ -44,7 +44,7 @@ func main() {
 		if timeoutStr := r.URL.Query().Get("timeout"); timeoutStr != "" {
 			if timeoutMs, err := strconv.Atoi(timeoutStr); err == nil && timeoutMs > 0 {
 				duration := time.Duration(timeoutMs) * time.Millisecond
-				log.Printf("[%s][%s] Sleeping for %v before responding", environment, serviceName, duration)
+				slog.Info("mock service sleeping before respond", "environment", environment, "service", serviceName, "duration", duration)
 				time.Sleep(duration)
 			}
 		}
@@ -72,12 +72,12 @@ func main() {
 			Query:       query,
 			Host:        hostname,
 		}
-		log.Printf("[%s][%s] %s %s from %s",
-			environment,
-			serviceName,
-			r.Method,
-			r.URL.Path,
-			r.RemoteAddr,
+		slog.Info("mock service request",
+			"environment", environment,
+			"service", serviceName,
+			"method", r.Method,
+			"path", r.URL.Path,
+			"remote", r.RemoteAddr,
 		)
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Service-Name", serviceName)
@@ -94,9 +94,10 @@ func main() {
 	})
 
 	addr := ":" + port
-	log.Printf("Starting %s service in %s environment on %s", serviceName, environment, addr)
+	slog.Info("starting mock service", "service", serviceName, "environment", environment, "addr", addr)
 
 	if err := http.ListenAndServe(addr, nil); err != nil {
-		log.Fatal(err)
+		slog.Error("mock service listen and serve failed", "error", err)
+		os.Exit(1)
 	}
 }

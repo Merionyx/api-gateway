@@ -2,7 +2,7 @@ package xds
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	discoveryv3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
@@ -12,23 +12,23 @@ import (
 type Callbacks struct{}
 
 func (c *Callbacks) OnStreamOpen(ctx context.Context, streamID int64, typeURL string) error {
-	log.Printf("Stream opened: streamID=%d, typeURL=%s", streamID, typeURL)
+	slog.Debug("xDS stream opened", "stream_id", streamID, "type_url", typeURL)
 	return nil
 }
 
 func (c *Callbacks) OnStreamClosed(streamID int64, node *corev3.Node) {
-	log.Printf("Stream closed: streamID=%d", streamID)
+	slog.Debug("xDS stream closed", "stream_id", streamID)
 }
 
 func (c *Callbacks) OnStreamRequest(streamID int64, req *discoveryv3.DiscoveryRequest) error {
-	log.Printf("Stream request: streamID=%d, node=%s, version=%s",
-		streamID, req.GetNode().GetId(), req.GetVersionInfo())
+	slog.Debug("xDS stream request",
+		"stream_id", streamID, "node", req.GetNode().GetId(), "version", req.GetVersionInfo())
 	return nil
 }
 
 func (c *Callbacks) OnStreamResponse(ctx context.Context, streamID int64, req *discoveryv3.DiscoveryRequest, resp *discoveryv3.DiscoveryResponse) {
-	log.Printf("Stream response: streamID=%d, typeURL=%s, version=%s",
-		streamID, resp.GetTypeUrl(), resp.GetVersionInfo())
+	slog.Debug("xDS stream response",
+		"stream_id", streamID, "type_url", resp.GetTypeUrl(), "version", resp.GetVersionInfo())
 }
 
 func (c *Callbacks) OnFetchRequest(ctx context.Context, req *discoveryv3.DiscoveryRequest) error {
@@ -40,20 +40,18 @@ func (c *Callbacks) OnFetchResponse(req *discoveryv3.DiscoveryRequest, resp *dis
 
 // Delta xDS methods
 func (c *Callbacks) OnDeltaStreamOpen(ctx context.Context, streamID int64, typeURL string) error {
-	log.Printf("Delta stream opened: streamID=%d, typeURL=%s", streamID, typeURL)
+	slog.Debug("xDS delta stream opened", "stream_id", streamID, "type_url", typeURL)
 	return nil
 }
 func (c *Callbacks) OnDeltaStreamClosed(streamID int64, node *corev3.Node) {
-	log.Printf("Delta stream closed: streamID=%d", streamID)
+	slog.Debug("xDS delta stream closed", "stream_id", streamID)
 }
 func (c *Callbacks) OnStreamDeltaRequest(streamID int64, req *discoveryv3.DeltaDiscoveryRequest) error {
-	log.Printf("Delta stream request: streamID=%d, node=%s",
-		streamID, req.GetNode().GetId())
+	slog.Debug("xDS delta stream request", "stream_id", streamID, "node", req.GetNode().GetId())
 	return nil
 }
 func (c *Callbacks) OnStreamDeltaResponse(streamID int64, req *discoveryv3.DeltaDiscoveryRequest, resp *discoveryv3.DeltaDiscoveryResponse) {
-	log.Printf("Delta stream response: streamID=%d, typeURL=%s",
-		streamID, resp.GetTypeUrl())
+	slog.Debug("xDS delta stream response", "stream_id", streamID, "type_url", resp.GetTypeUrl())
 }
 
 var _ server.Callbacks = (*Callbacks)(nil)

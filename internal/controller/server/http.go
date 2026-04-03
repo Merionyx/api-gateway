@@ -1,7 +1,7 @@
 package server
 
 import (
-	"log"
+	"log/slog"
 	"merionyx/api-gateway/internal/controller/container"
 	"net/http"
 )
@@ -15,6 +15,6 @@ func StartHTTPServer(container *container.Container) error {
 		Handler: handler,
 	}
 
-	log.Printf("HTTP server starting on :8080")
+	slog.Info("HTTP server starting", "addr", ":8080")
 	return server.ListenAndServe()
 }

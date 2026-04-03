@@ -1,12 +1,15 @@
 package main
 
 import (
-	"log"
+	"log/slog"
+	"os"
+
 	controller "merionyx/api-gateway/internal/controller/app"
 )
 
 func main() {
 	if err := controller.Run(); err != nil {
-		log.Fatalf("Failed to run control plane: %v", err)
+		slog.Error("failed to run controller", "error", err)
+		os.Exit(1)
 	}
 }

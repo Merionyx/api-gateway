@@ -3,7 +3,6 @@ package container
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"os"
 	"strconv"
@@ -86,24 +85,26 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 func (c *Container) initEtcd() {
 	etcdClient, err := etcd.NewEtcdClient(c.Config.Etcd)
 	if err != nil {
-		log.Fatalf("Failed to initialize etcd client: %v", err)
+		slog.Error("failed to initialize etcd client", "error", err)
+		os.Exit(1)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if _, err := etcdClient.Status(ctx, c.Config.Etcd.Endpoints[0]); err != nil {
-		log.Fatalf("Failed to connect to etcd: %v", err)
+		slog.Error("failed to connect to etcd", "error", err)
+		os.Exit(1)
 	}
 
 	c.EtcdClient = etcdClient
-	log.Println("etcd client initialized and connected successfully")
+	slog.Info("etcd client initialized and connected successfully")
 }
 
 func (c *Container) initLeaderGate() {
 	if !c.Config.LeaderElection.Enabled {
 		c.LeaderGate = election.NoopGate{}
-		log.Println("Gateway Controller leader election disabled (noop gate)")
+		slog.Info("gateway controller leader election disabled (noop gate)")
 		return
 	}
 
@@ -124,7 +125,7 @@ func (c *Container) initLeaderGate() {
 	g := election.NewEtcdGate(c.EtcdClient, prefix, id, c.Config.LeaderElection.SessionTTLSeconds)
 	c.LeaderGate = g
 	go g.Run(context.Background())
-	log.Printf("Gateway Controller leader election started (prefix=%s identity=%s)", prefix, id)
+	slog.Info("gateway controller leader election started", "prefix", prefix, "identity", id)
 }
 
 func (c *Container) createInMemoryServiceRepository() {
@@ -136,27 +137,29 @@ func (c *Container) initInMemoryRepositories() {
 	c.InMemoryEnvironmentsRepository.SetDependencies(c.XDSSnapshotManager, c.XDSBuilder, c.SchemaRepository)
 
 	if err := c.InMemoryServiceRepository.Initialize(c.Config); err != nil {
-		log.Fatalf("Failed to initialize service repository: %v", err)
+		slog.Error("failed to initialize service repository", "error", err)
+		os.Exit(1)
 	}
 
 	if err := c.InMemoryEnvironmentsRepository.Initialize(c.Config); err != nil {
-		log.Fatalf("Failed to initialize environments repository: %v", err)
+		slog.Error("failed to initialize environments repository", "error", err)
+		os.Exit(1)
 	}
 
-	log.Println("In-memory repositories initialized")
+	slog.Info("in-memory repositories initialized")
 }
 
 func (c *Container) initXDSBuilder() {
 	c.XDSBuilder = builder.NewXDSBuilder(c.InMemoryServiceRepository)
 
-	log.Println("xDS builder initialized")
+	slog.Info("xDS builder initialized")
 }
 
 func (c *Container) initRepositories() {
 	c.SchemaRepository = ctrlrepoetcd.NewSchemaRepository(c.EtcdClient)
 	c.EnvironmentRepository = ctrlrepoetcd.NewEnvironmentRepository(c.EtcdClient)
 
-	log.Println("etcd repositories initialized")
+	slog.Info("etcd repositories initialized")
 }
 
 func (c *Container) initUseCases() {
@@ -178,7 +181,7 @@ func (c *Container) initUseCases() {
 		c.EtcdClient,
 	)
 
-	log.Println("Use cases initialized")
+	slog.Info("use cases initialized")
 }
 
 func (c *Container) initHandlers() {
@@ -187,7 +190,7 @@ func (c *Container) initHandlers() {
 	c.SchemasGRPCHandler = handler.NewSchemasHandler(c.SchemasUseCase)
 	c.AuthGRPCHandler = handler.NewAuthHandler(c.EnvironmentRepository, c.InMemoryEnvironmentsRepository, c.SchemaRepository, c.EtcdClient)
 
-	log.Println("Handlers initialized")
+	slog.Info("handlers initialized")
 }
 
 func (c *Container) initRouter() {
@@ -197,18 +200,19 @@ func (c *Container) initRouter() {
 	// c.ListenerUseCase,
 	)
 
-	log.Println("Router initialized")
+	slog.Info("router initialized")
 }
 
 func (c *Container) initXDS() {
 	c.XDSSnapshotManager = xdscache.NewSnapshotManager()
 	xdsPort, err := strconv.Atoi(c.Config.Server.XDSPort)
 	if err != nil {
-		log.Fatalf("Failed to convert xDS port to int: %v", err)
+		slog.Error("failed to convert xDS port to int", "error", err)
+		os.Exit(1)
 	}
 	c.XDSServer = xdsserver.NewXDSServer(c.XDSSnapshotManager.GetCache(), xdsPort)
 
-	log.Println("xDS server initialized")
+	slog.Info("xDS server initialized")
 }
 
 func (c *Container) startWatchers() {
@@ -225,7 +229,7 @@ func (c *Container) startWatchers() {
 					sctx, syncCancel = context.WithCancel(context.Background())
 					go func() {
 						if err := c.APIServerSyncUseCase.RegisterAndStream(sctx); err != nil {
-							log.Printf("API Server sync ended: %v", err)
+							slog.Warn("API server sync ended", "error", err)
 						}
 					}()
 				}
@@ -263,8 +267,8 @@ func (c *Container) StartKubernetesDiscovery(ctx context.Context) {
 func (c *Container) Close() {
 	if c.EtcdClient != nil {
 		if err := c.EtcdClient.Close(); err != nil {
-			log.Printf("Failed to close etcd client: %v", err)
+			slog.Error("failed to close etcd client", "error", err)
 		}
-		log.Println("etcd client closed")
+		slog.Info("etcd client closed")
 	}
 }

@@ -3,7 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -60,7 +60,7 @@ func (h *AuthHandler) SyncAccess(stream authv1.AuthService_SyncAccessServer) err
 	sidecarID := req.SidecarId
 	environment := req.Environment
 
-	log.Printf("[AUTH-SYNC] New connection from sidecar %s (env: %s)", sidecarID, environment)
+	slog.Info("auth sync: new sidecar connection", "sidecar_id", sidecarID, "environment", environment)
 
 	// Create a channel for this sidecar
 	updateChan := make(chan *authv1.SyncAccessResponse, 100)
@@ -75,13 +75,15 @@ func (h *AuthHandler) SyncAccess(stream authv1.AuthService_SyncAccessServer) err
 		delete(h.subscribers, subscriberKey)
 		close(updateChan)
 		h.mu.Unlock()
-		log.Printf("[AUTH-SYNC] Disconnected sidecar %s", sidecarID)
+		slog.Info("auth sync: sidecar disconnected", "sidecar_id", sidecarID)
 	}()
 
 	initialConfig, err := h.buildAccessConfig(ctx, environment)
-	log.Printf("[AUTH-SYNC] Initial config: %v", initialConfig)
+	if err == nil {
+		slog.Debug("auth sync: initial config built", "environment", environment, "contracts", len(initialConfig.Contracts))
+	}
 	if err != nil {
-		log.Printf("[AUTH-SYNC] Environment %s not found, sending empty config: %v", environment, err)
+		slog.Warn("auth sync: environment not found, sending empty config", "environment", environment, "error", err)
 		initialConfig = &authv1.AccessConfig{
 			Environment: environment,
 			Contracts:   make([]*authv1.ContractAccess, 0),
@@ -96,7 +98,7 @@ func (h *AuthHandler) SyncAccess(stream authv1.AuthService_SyncAccessServer) err
 		return err
 	}
 
-	log.Printf("[AUTH-SYNC] Sent initial config to %s: %d contracts", sidecarID, len(initialConfig.Contracts))
+	slog.Info("auth sync: sent initial config", "sidecar_id", sidecarID, "contracts", len(initialConfig.Contracts))
 
 	// Start the heartbeat
 	heartbeatTicker := time.NewTicker(30 * time.Second)
@@ -195,7 +197,7 @@ func (h *AuthHandler) buildAccessConfig(ctx context.Context, environment string)
 		// Get all contracts from the bundle
 		snapshots, err := h.schemaRepo.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref, bundle.Path)
 		if err != nil {
-			log.Printf("Failed to get snapshots for bundle %s: %v", bundle.Name, err)
+			slog.Warn("auth sync: failed to list snapshots for bundle", "bundle", bundle.Name, "error", err)
 			continue
 		}
 
@@ -243,11 +245,11 @@ func (h *AuthHandler) buildAccessConfig(ctx context.Context, environment string)
 func (h *AuthHandler) watchEtcdChanges() {
 	watchChan := h.etcdClient.Watch(context.Background(), "/api-gateway/controller/schemas/", clientv3.WithPrefix())
 
-	log.Println("[AUTH-SYNC] Started watching etcd for schema changes")
+	slog.Info("auth sync: watching etcd for schema changes")
 
 	for watchResp := range watchChan {
 		if watchResp.Err() != nil {
-			log.Printf("[AUTH-SYNC] Watch error: %v", watchResp.Err())
+			slog.Warn("auth sync: etcd watch error", "error", watchResp.Err())
 			continue
 		}
 
@@ -255,7 +257,7 @@ func (h *AuthHandler) watchEtcdChanges() {
 			// Parse the key to determine the environment
 			// /api-gateway/schemas/{repo}/{ref}/contracts/{contract}/snapshot
 
-			log.Printf("[AUTH-SYNC] Schema changed: %s", string(event.Kv.Key))
+			slog.Info("auth sync: schema key changed", "key", string(event.Kv.Key))
 
 			// Notify all subscribers
 			// TODO: Determine which environments are affected
@@ -279,7 +281,7 @@ func (h *AuthHandler) notifyAllSubscribers() {
 		// Build the updated configuration
 		config, err := h.buildAccessConfig(context.Background(), environment)
 		if err != nil {
-			log.Printf("[AUTH-SYNC] Failed to build config for %s: %v", subscriberKey, err)
+			slog.Warn("auth sync: failed to build config for subscriber", "subscriber", subscriberKey, "error", err)
 			continue
 		}
 
@@ -290,9 +292,9 @@ func (h *AuthHandler) notifyAllSubscribers() {
 				InitialConfig: config,
 			},
 		}:
-			log.Printf("[AUTH-SYNC] Sent update to %s", subscriberKey)
+			slog.Debug("auth sync: sent update to subscriber", "subscriber", subscriberKey)
 		default:
-			log.Printf("[AUTH-SYNC] Channel full for %s, skipping update", subscriberKey)
+			slog.Warn("auth sync: update channel full, skipping", "subscriber", subscriberKey)
 		}
 	}
 }

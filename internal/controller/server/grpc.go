@@ -2,7 +2,7 @@ package server
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"merionyx/api-gateway/internal/controller/container"
 	authv1 "merionyx/api-gateway/pkg/api/auth/v1"
 	environmentsv1 "merionyx/api-gateway/pkg/api/environments/v1"
@@ -30,6 +30,6 @@ func StartGRPCServer(container *container.Container) error {
 
 	reflection.Register(server)
 
-	log.Printf("gRPC server starting on :%s", container.Config.Server.GRPCPort)
+	slog.Info("gRPC server starting", "port", container.Config.Server.GRPCPort)
 	return server.Serve(lis)
 }
