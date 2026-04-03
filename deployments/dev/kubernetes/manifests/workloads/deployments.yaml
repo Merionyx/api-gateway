@@ -20,7 +20,7 @@ spec:
       containers:
       - name: mock
         image: merionyx/api-gateway-mock-service:latest
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         env:
         - name: SERVICE_NAME
           value: be-service-01
@@ -65,7 +65,7 @@ spec:
       containers:
       - name: mock
         image: merionyx/api-gateway-mock-service:latest
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         env:
         - name: SERVICE_NAME
           value: be-service-02
@@ -110,7 +110,7 @@ spec:
       containers:
       - name: mock
         image: merionyx/api-gateway-mock-service:latest
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         env:
         - name: SERVICE_NAME
           value: be-service-03
@@ -157,7 +157,7 @@ spec:
       containers:
       - name: api-server
         image: merionyx/api-gateway-api-server:latest
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         env:
         - name: CONFIG_PATH
           value: /api-server/config/k8s.yaml
@@ -226,7 +226,7 @@ spec:
       containers:
       - name: contract-syncer
         image: merionyx/api-gateway-contract-syncer:latest
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         env:
         - name: CONFIG_PATH
           value: /contract-syncer/config/k8s.yaml
@@ -275,7 +275,7 @@ spec:
       containers:
       - name: controller
         image: merionyx/api-gateway-controller:latest
-        imagePullPolicy: Never
+        imagePullPolicy: IfNotPresent
         env:
         - name: CONFIG_PATH
           value: /controller/config/k8s.yaml
