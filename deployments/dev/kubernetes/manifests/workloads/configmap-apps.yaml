@@ -1,0 +1,110 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-dev-apps-config
+  namespace: default
+  labels:
+    app.kubernetes.io/part-of: api-gateway-dev
+data:
+  controller.yaml: |
+    server:
+      http1_port: "8080"
+      http2_port: "8443"
+      grpc_port: "19090"
+      xds_port: "19091"
+      host: "0.0.0.0"
+
+    etcd:
+      endpoints:
+      - "https://etcd-0.etcd.default.svc.cluster.local:2379"
+      - "https://etcd-1.etcd.default.svc.cluster.local:2379"
+      - "https://etcd-2.etcd.default.svc.cluster.local:2379"
+      dial_timeout: "5s"
+      tls:
+        enabled: true
+        cert_file: "/etc/etcd-tls/tls.crt"
+        key_file: "/etc/etcd-tls/tls.key"
+        ca_file: "/etc/etcd-tls/ca.crt"
+
+    tenant: "dev-cluster"
+
+    ha:
+      controller_id: "gateway-controller-dev"
+
+    leader_election:
+      enabled: true
+      key_prefix: "/api-gateway/controller/election/leader-dev"
+      identity: ""
+      session_ttl_seconds: 5
+
+    api_server:
+      address: "gateway-api-server:19093"
+
+    environments: []
+
+    services:
+      static: []
+
+    kubernetes_discovery:
+      enabled: true
+      resource_label_selector:
+        gateway.merionyx.io/team: demo
+
+  api-server.yaml: |
+    server:
+      http_port: "8080"
+      grpc_port: "19093"
+      host: "0.0.0.0"
+
+    etcd:
+      endpoints:
+      - "https://etcd-0.etcd.default.svc.cluster.local:2379"
+      - "https://etcd-1.etcd.default.svc.cluster.local:2379"
+      - "https://etcd-2.etcd.default.svc.cluster.local:2379"
+      dial_timeout: "5s"
+      tls:
+        enabled: true
+        cert_file: "/etc/etcd-tls/tls.crt"
+        key_file: "/etc/etcd-tls/tls.key"
+        ca_file: "/etc/etcd-tls/ca.crt"
+
+    jwt:
+      keys_dir: "/api-server/secrets/api-server/keys/jwt"
+      issuer: "api-gateway-api-server"
+
+    contract_syncer:
+      address: "gateway-contract-syncer:19092"
+
+    leader_election:
+      enabled: true
+      key_prefix: "/api-gateway/api-server/election/leader"
+      identity: ""
+      session_ttl_seconds: 5
+
+  contract-syncer.yaml: |
+    server:
+      grpc_port: "19092"
+      host: "0.0.0.0"
+
+    repositories:
+    - name: api-gateway-schemas-https
+      source: git
+      url: "https://github.com/MikhailMinaev/api-gateway-schemas.git"
+      auth:
+        type: "token"
+        token_env: "GITHUB_ACCESS_TOKEN"
+
+    api_server:
+      address: "gateway-api-server:19093"
+
+  auth-sidecar.yaml: |
+    server:
+      grpc_port: "9001"
+      host: "0.0.0.0"
+
+    controller:
+      address: "gateway-controller-dev:19090"
+      environment: "dev"
+
+    jwt:
+      jwks_url: "http://gateway-api-server:8080/.well-known/jwks.json"

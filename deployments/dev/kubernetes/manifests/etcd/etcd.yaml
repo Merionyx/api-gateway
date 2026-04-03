@@ -1,8 +1,5 @@
 # file: etcd.yaml
-#
-# Если в логах peer URLs остаются http://..., а поды слушают https://, кластер
-# поднимался раньше без TLS: снимите StatefulSet, удалите PVC etcd-data-* и
-# задеплойте заново (или обновите peer URLs через etcdctl member update).
+
 ---
 apiVersion: v1
 kind: Service

@@ -1,0 +1,19 @@
+apiVersion: gateway.merionyx.io/v1alpha1
+kind: Environment
+metadata:
+  name: prod
+  namespace: default
+  labels:
+    gateway.merionyx.io/team: demo
+spec:
+  logicalName: prod
+---
+apiVersion: gateway.merionyx.io/v1alpha1
+kind: Environment
+metadata:
+  name: dev
+  namespace: default
+  labels:
+    gateway.merionyx.io/team: demo
+spec:
+  logicalName: dev

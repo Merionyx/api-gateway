@@ -1,0 +1,10 @@
+apiVersion: gateway.merionyx.io/v1alpha1
+kind: GatewayUpstream
+metadata:
+  name: be-service-03-global-mock
+  namespace: default
+  labels:
+    gateway.merionyx.io/team: demo
+spec:
+  name: be-service-03
+  upstream: "http://mock-be-service-03:8080"

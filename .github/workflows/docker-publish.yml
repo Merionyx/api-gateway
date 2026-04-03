@@ -9,7 +9,6 @@ env:
   IMAGE_PREFIX: merionyx/api-gateway
 
 jobs:
-  # amd64 на x86-раннере и arm64 на нативном ARM — без QEMU, быстрее чем эмуляция.
   build:
     runs-on: ${{ matrix.runner }}
     strategy:

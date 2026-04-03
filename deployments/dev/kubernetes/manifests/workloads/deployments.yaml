@@ -1,0 +1,322 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-be-service-01-dev
+  namespace: default
+  labels:
+    app.kubernetes.io/name: mock-be-service-01-dev
+    app.kubernetes.io/part-of: api-gateway-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mock-be-service-01-dev
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mock-be-service-01-dev
+    spec:
+      containers:
+      - name: mock
+        image: merionyx/api-gateway-mock-service:latest
+        imagePullPolicy: Always
+        env:
+        - name: SERVICE_NAME
+          value: be-service-01
+        - name: ENVIRONMENT
+          value: dev
+        - name: PORT
+          value: "8080"
+        ports:
+        - name: http
+          containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 3
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 20
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-be-service-02-dev
+  namespace: default
+  labels:
+    app.kubernetes.io/name: mock-be-service-02-dev
+    app.kubernetes.io/part-of: api-gateway-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mock-be-service-02-dev
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mock-be-service-02-dev
+    spec:
+      containers:
+      - name: mock
+        image: merionyx/api-gateway-mock-service:latest
+        imagePullPolicy: Always
+        env:
+        - name: SERVICE_NAME
+          value: be-service-02
+        - name: ENVIRONMENT
+          value: dev
+        - name: PORT
+          value: "8080"
+        ports:
+        - name: http
+          containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 3
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 20
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-be-service-03
+  namespace: default
+  labels:
+    app.kubernetes.io/name: mock-be-service-03
+    app.kubernetes.io/part-of: api-gateway-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mock-be-service-03
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mock-be-service-03
+    spec:
+      containers:
+      - name: mock
+        image: merionyx/api-gateway-mock-service:latest
+        imagePullPolicy: Always
+        env:
+        - name: SERVICE_NAME
+          value: be-service-03
+        - name: ENVIRONMENT
+          value: global
+        - name: PORT
+          value: "8080"
+        ports:
+        - name: http
+          containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 3
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 20
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway-api-server
+  namespace: default
+  labels:
+    app.kubernetes.io/name: gateway-api-server
+    app.kubernetes.io/part-of: api-gateway-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gateway-api-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gateway-api-server
+    spec:
+      securityContext:
+        fsGroup: 1001
+      containers:
+      - name: api-server
+        image: merionyx/api-gateway-api-server:latest
+        imagePullPolicy: Always
+        env:
+        - name: CONFIG_PATH
+          value: /api-server/config/k8s.yaml
+        ports:
+        - name: http
+          containerPort: 8080
+        - name: grpc
+          containerPort: 19093
+        volumeMounts:
+        - name: app-config
+          mountPath: /api-server/config/k8s.yaml
+          subPath: api-server.yaml
+          readOnly: true
+        - name: etcd-tls
+          mountPath: /etc/etcd-tls
+          readOnly: true
+        - name: jwt-keys
+          mountPath: /api-server/secrets/api-server/keys/jwt
+        readinessProbe:
+          httpGet:
+            path: /.well-known/jwks.json
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 15
+          periodSeconds: 30
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1001
+          runAsGroup: 1001
+      volumes:
+      - name: app-config
+        configMap:
+          name: api-gateway-dev-apps-config
+      - name: etcd-tls
+        secret:
+          secretName: etcd-client-tls
+      - name: jwt-keys
+        emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway-contract-syncer
+  namespace: default
+  labels:
+    app.kubernetes.io/name: gateway-contract-syncer
+    app.kubernetes.io/part-of: api-gateway-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gateway-contract-syncer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gateway-contract-syncer
+    spec:
+      securityContext:
+        fsGroup: 1001
+      containers:
+      - name: contract-syncer
+        image: merionyx/api-gateway-contract-syncer:latest
+        imagePullPolicy: Always
+        env:
+        - name: CONFIG_PATH
+          value: /contract-syncer/config/k8s.yaml
+        envFrom:
+        - secretRef:
+            name: api-gateway-contract-syncer
+        ports:
+        - name: grpc
+          containerPort: 19092
+        volumeMounts:
+        - name: app-config
+          mountPath: /contract-syncer/config/k8s.yaml
+          subPath: contract-syncer.yaml
+          readOnly: true
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1001
+          runAsGroup: 1001
+      volumes:
+      - name: app-config
+        configMap:
+          name: api-gateway-dev-apps-config
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway-controller-dev
+  namespace: default
+  labels:
+    app.kubernetes.io/name: gateway-controller-dev
+    app.kubernetes.io/part-of: api-gateway-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gateway-controller-dev
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gateway-controller-dev
+    spec:
+      serviceAccountName: api-gateway-controller
+      securityContext:
+        fsGroup: 1001
+      containers:
+      - name: controller
+        image: merionyx/api-gateway-controller:latest
+        imagePullPolicy: Always
+        env:
+        - name: CONFIG_PATH
+          value: /controller/config/k8s.yaml
+        ports:
+        - name: http
+          containerPort: 8080
+        - name: https
+          containerPort: 8443
+        - name: grpc
+          containerPort: 19090
+        - name: xds
+          containerPort: 19091
+        volumeMounts:
+        - name: app-config
+          mountPath: /controller/config/k8s.yaml
+          subPath: controller.yaml
+          readOnly: true
+        - name: etcd-tls
+          mountPath: /etc/etcd-tls
+          readOnly: true
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 20
+          periodSeconds: 30
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1001
+          runAsGroup: 1001
+      volumes:
+      - name: app-config
+        configMap:
+          name: api-gateway-dev-apps-config
+      - name: etcd-tls
+        secret:
+          secretName: etcd-client-tls
