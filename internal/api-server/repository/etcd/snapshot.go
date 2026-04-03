@@ -29,6 +29,11 @@ func NewSnapshotRepository(client *clientv3.Client) *SnapshotRepository {
 func (r *SnapshotRepository) SaveSnapshots(ctx context.Context, bundleKey string, snapshots []sharedgit.ContractSnapshot) (written bool, err error) {
 	slog.Info("Saving snapshots to etcd", "bundle_key", bundleKey, "count", len(snapshots))
 
+	desired := make(map[string]struct{}, len(snapshots))
+	for _, s := range snapshots {
+		desired[s.Name] = struct{}{}
+	}
+
 	for _, snapshot := range snapshots {
 		key := fmt.Sprintf("%s%s/contracts/%s", snapshotPrefix, bundleKey, snapshot.Name)
 
@@ -50,6 +55,27 @@ func (r *SnapshotRepository) SaveSnapshots(ctx context.Context, bundleKey string
 
 		written = true
 		slog.Debug("Saved snapshot", "key", key, "name", snapshot.Name)
+	}
+
+	contractsPrefix := fmt.Sprintf("%s%s/contracts/", snapshotPrefix, bundleKey)
+	listResp, err := r.client.Get(ctx, contractsPrefix, clientv3.WithPrefix())
+	if err != nil {
+		return written, fmt.Errorf("failed to list contract keys for prune: %w", err)
+	}
+	for _, kv := range listResp.Kvs {
+		keyStr := string(kv.Key)
+		if !strings.HasPrefix(keyStr, contractsPrefix) {
+			continue
+		}
+		name := strings.TrimPrefix(keyStr, contractsPrefix)
+		if _, ok := desired[name]; ok {
+			continue
+		}
+		if _, delErr := r.client.Delete(ctx, keyStr); delErr != nil {
+			return written, fmt.Errorf("failed to delete orphan snapshot key %s: %w", keyStr, delErr)
+		}
+		written = true
+		slog.Debug("Deleted orphan snapshot", "key", keyStr, "name", name)
 	}
 
 	return written, nil

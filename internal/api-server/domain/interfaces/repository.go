@@ -7,7 +7,7 @@ import (
 )
 
 type SnapshotRepository interface {
-	// SaveSnapshots returns true if at least one etcd key was written (revision changed).
+	// SaveSnapshots returns true if the contract key set changed: at least one Put or Delete under the bundle contracts prefix.
 	SaveSnapshots(ctx context.Context, bundleKey string, snapshots []sharedgit.ContractSnapshot) (written bool, err error)
 	GetSnapshots(ctx context.Context, bundleKey string) ([]sharedgit.ContractSnapshot, error)
 	ListBundleKeys(ctx context.Context) ([]string, error)
