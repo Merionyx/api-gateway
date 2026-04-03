@@ -11,7 +11,7 @@ var (
 	patternCache sync.Map
 )
 
-// matchesAnyEnvironment checks if the current environment matches any pattern in the list
+// MatchesAnyEnvironment checks if the current environment matches any pattern in the list
 // Patterns can be exact matches or regex patterns (e.g., "dyn-*" becomes "^dyn-.*$")
 func MatchesAnyEnvironment(currentEnv string, patterns []string) bool {
 	for _, pattern := range patterns {
@@ -22,7 +22,7 @@ func MatchesAnyEnvironment(currentEnv string, patterns []string) bool {
 	return false
 }
 
-// matchesEnvironmentPattern checks if the environment matches a pattern
+// MatchesEnvironmentPattern checks if the environment matches a pattern
 // If pattern contains '*', it's treated as a wildcard pattern
 // Otherwise, it's an exact match
 func MatchesEnvironmentPattern(env, pattern string) bool {
@@ -34,7 +34,12 @@ func MatchesEnvironmentPattern(env, pattern string) bool {
 	if strings.Contains(pattern, "*") {
 		// Check cache (lock-free read!)
 		if cached, ok := patternCache.Load(pattern); ok {
-			return cached.(*regexp.Regexp).MatchString(env)
+			re, ok := cached.(*regexp.Regexp)
+			if !ok || re == nil {
+				log.Printf("[AUTH] Invalid cache entry for pattern %s: %#v", pattern, cached)
+				return false
+			}
+			return re.MatchString(env)
 		}
 		// Compile new pattern
 		regexPattern := regexp.QuoteMeta(pattern)
@@ -52,7 +57,11 @@ func MatchesEnvironmentPattern(env, pattern string) bool {
 		// Save to cache (atomic operation!)
 		// LoadOrStore returns the existing value if someone else has already stored it
 		actual, _ := patternCache.LoadOrStore(pattern, compiled)
-		return actual.(*regexp.Regexp).MatchString(env)
+		if re, ok := actual.(*regexp.Regexp); ok {
+			return re.MatchString(env)
+		}
+		log.Printf("[AUTH] Unexpected type in patternCache for pattern %s", pattern)
+		return false
 	}
 	return false
 }
