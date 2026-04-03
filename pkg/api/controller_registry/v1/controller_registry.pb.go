@@ -2,13 +2,14 @@
 // versions:
 // 	protoc-gen-go v1.36.10
 // 	protoc        v5.29.3
-// source: api/proto/v1/controller_registry.proto
+// source: controller_registry.proto
 
 package controllerregistryv1
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	v1 "merionyx/api-gateway/pkg/api/contract/v1"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -21,7 +22,9 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// RegisterControllerRequest request to register Gateway Controller
+// RegisterControllerRequest registers a Gateway Controller with the API Server.
+// environments is the full snapshot of environments this controller declares (static + K8s + etcd CRUD merge);
+// it is not a delta.
 type RegisterControllerRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ControllerId  string                 `protobuf:"bytes,1,opt,name=controller_id,json=controllerId,proto3" json:"controller_id,omitempty"`
@@ -33,7 +36,7 @@ type RegisterControllerRequest struct {
 
 func (x *RegisterControllerRequest) Reset() {
 	*x = RegisterControllerRequest{}
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[0]
+	mi := &file_controller_registry_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45,7 +48,7 @@ func (x *RegisterControllerRequest) String() string {
 func (*RegisterControllerRequest) ProtoMessage() {}
 
 func (x *RegisterControllerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[0]
+	mi := &file_controller_registry_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -58,7 +61,7 @@ func (x *RegisterControllerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterControllerRequest.ProtoReflect.Descriptor instead.
 func (*RegisterControllerRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_controller_registry_proto_rawDescGZIP(), []int{0}
+	return file_controller_registry_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *RegisterControllerRequest) GetControllerId() string {
@@ -93,7 +96,7 @@ type EnvironmentInfo struct {
 
 func (x *EnvironmentInfo) Reset() {
 	*x = EnvironmentInfo{}
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[1]
+	mi := &file_controller_registry_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -105,7 +108,7 @@ func (x *EnvironmentInfo) String() string {
 func (*EnvironmentInfo) ProtoMessage() {}
 
 func (x *EnvironmentInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[1]
+	mi := &file_controller_registry_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -118,7 +121,7 @@ func (x *EnvironmentInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnvironmentInfo.ProtoReflect.Descriptor instead.
 func (*EnvironmentInfo) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_controller_registry_proto_rawDescGZIP(), []int{1}
+	return file_controller_registry_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *EnvironmentInfo) GetName() string {
@@ -148,7 +151,7 @@ type BundleInfo struct {
 
 func (x *BundleInfo) Reset() {
 	*x = BundleInfo{}
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[2]
+	mi := &file_controller_registry_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -160,7 +163,7 @@ func (x *BundleInfo) String() string {
 func (*BundleInfo) ProtoMessage() {}
 
 func (x *BundleInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[2]
+	mi := &file_controller_registry_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -173,7 +176,7 @@ func (x *BundleInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BundleInfo.ProtoReflect.Descriptor instead.
 func (*BundleInfo) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_controller_registry_proto_rawDescGZIP(), []int{2}
+	return file_controller_registry_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *BundleInfo) GetName() string {
@@ -215,7 +218,7 @@ type RegisterControllerResponse struct {
 
 func (x *RegisterControllerResponse) Reset() {
 	*x = RegisterControllerResponse{}
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[3]
+	mi := &file_controller_registry_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -227,7 +230,7 @@ func (x *RegisterControllerResponse) String() string {
 func (*RegisterControllerResponse) ProtoMessage() {}
 
 func (x *RegisterControllerResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[3]
+	mi := &file_controller_registry_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -240,7 +243,7 @@ func (x *RegisterControllerResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterControllerResponse.ProtoReflect.Descriptor instead.
 func (*RegisterControllerResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_controller_registry_proto_rawDescGZIP(), []int{3}
+	return file_controller_registry_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *RegisterControllerResponse) GetSuccess() bool {
@@ -267,7 +270,7 @@ type StreamSnapshotsRequest struct {
 
 func (x *StreamSnapshotsRequest) Reset() {
 	*x = StreamSnapshotsRequest{}
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[4]
+	mi := &file_controller_registry_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -279,7 +282,7 @@ func (x *StreamSnapshotsRequest) String() string {
 func (*StreamSnapshotsRequest) ProtoMessage() {}
 
 func (x *StreamSnapshotsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[4]
+	mi := &file_controller_registry_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -292,7 +295,7 @@ func (x *StreamSnapshotsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamSnapshotsRequest.ProtoReflect.Descriptor instead.
 func (*StreamSnapshotsRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_controller_registry_proto_rawDescGZIP(), []int{4}
+	return file_controller_registry_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *StreamSnapshotsRequest) GetControllerId() string {
@@ -307,14 +310,14 @@ type StreamSnapshotsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Environment   string                 `protobuf:"bytes,1,opt,name=environment,proto3" json:"environment,omitempty"`
 	BundleKey     string                 `protobuf:"bytes,2,opt,name=bundle_key,json=bundleKey,proto3" json:"bundle_key,omitempty"`
-	Snapshots     []*ContractSnapshot    `protobuf:"bytes,3,rep,name=snapshots,proto3" json:"snapshots,omitempty"`
+	Snapshots     []*v1.ContractSnapshot `protobuf:"bytes,3,rep,name=snapshots,proto3" json:"snapshots,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *StreamSnapshotsResponse) Reset() {
 	*x = StreamSnapshotsResponse{}
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[5]
+	mi := &file_controller_registry_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -326,7 +329,7 @@ func (x *StreamSnapshotsResponse) String() string {
 func (*StreamSnapshotsResponse) ProtoMessage() {}
 
 func (x *StreamSnapshotsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[5]
+	mi := &file_controller_registry_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -339,7 +342,7 @@ func (x *StreamSnapshotsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamSnapshotsResponse.ProtoReflect.Descriptor instead.
 func (*StreamSnapshotsResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_controller_registry_proto_rawDescGZIP(), []int{5}
+	return file_controller_registry_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *StreamSnapshotsResponse) GetEnvironment() string {
@@ -356,242 +359,16 @@ func (x *StreamSnapshotsResponse) GetBundleKey() string {
 	return ""
 }
 
-func (x *StreamSnapshotsResponse) GetSnapshots() []*ContractSnapshot {
+func (x *StreamSnapshotsResponse) GetSnapshots() []*v1.ContractSnapshot {
 	if x != nil {
 		return x.Snapshots
 	}
 	return nil
 }
 
-// ContractSnapshot represents a contract snapshot
-type ContractSnapshot struct {
-	state                 protoimpl.MessageState `protogen:"open.v1"`
-	Name                  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Prefix                string                 `protobuf:"bytes,2,opt,name=prefix,proto3" json:"prefix,omitempty"`
-	Upstream              *ContractUpstream      `protobuf:"bytes,3,opt,name=upstream,proto3" json:"upstream,omitempty"`
-	AllowUndefinedMethods bool                   `protobuf:"varint,4,opt,name=allow_undefined_methods,json=allowUndefinedMethods,proto3" json:"allow_undefined_methods,omitempty"`
-	Access                *Access                `protobuf:"bytes,5,opt,name=access,proto3" json:"access,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
-}
-
-func (x *ContractSnapshot) Reset() {
-	*x = ContractSnapshot{}
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ContractSnapshot) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ContractSnapshot) ProtoMessage() {}
-
-func (x *ContractSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ContractSnapshot.ProtoReflect.Descriptor instead.
-func (*ContractSnapshot) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_controller_registry_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *ContractSnapshot) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *ContractSnapshot) GetPrefix() string {
-	if x != nil {
-		return x.Prefix
-	}
-	return ""
-}
-
-func (x *ContractSnapshot) GetUpstream() *ContractUpstream {
-	if x != nil {
-		return x.Upstream
-	}
-	return nil
-}
-
-func (x *ContractSnapshot) GetAllowUndefinedMethods() bool {
-	if x != nil {
-		return x.AllowUndefinedMethods
-	}
-	return false
-}
-
-func (x *ContractSnapshot) GetAccess() *Access {
-	if x != nil {
-		return x.Access
-	}
-	return nil
-}
-
-// ContractUpstream represents an upstream for a contract
-type ContractUpstream struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ContractUpstream) Reset() {
-	*x = ContractUpstream{}
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ContractUpstream) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ContractUpstream) ProtoMessage() {}
-
-func (x *ContractUpstream) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ContractUpstream.ProtoReflect.Descriptor instead.
-func (*ContractUpstream) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_controller_registry_proto_rawDescGZIP(), []int{7}
-}
-
-func (x *ContractUpstream) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-// Access represents access settings
-type Access struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Secure        bool                   `protobuf:"varint,1,opt,name=secure,proto3" json:"secure,omitempty"`
-	Apps          []*App                 `protobuf:"bytes,2,rep,name=apps,proto3" json:"apps,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Access) Reset() {
-	*x = Access{}
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[8]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Access) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Access) ProtoMessage() {}
-
-func (x *Access) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[8]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Access.ProtoReflect.Descriptor instead.
-func (*Access) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_controller_registry_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *Access) GetSecure() bool {
-	if x != nil {
-		return x.Secure
-	}
-	return false
-}
-
-func (x *Access) GetApps() []*App {
-	if x != nil {
-		return x.Apps
-	}
-	return nil
-}
-
-// App represents an application with access
-type App struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
-	Environments  []string               `protobuf:"bytes,2,rep,name=environments,proto3" json:"environments,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *App) Reset() {
-	*x = App{}
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[9]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *App) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*App) ProtoMessage() {}
-
-func (x *App) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[9]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use App.ProtoReflect.Descriptor instead.
-func (*App) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_controller_registry_proto_rawDescGZIP(), []int{9}
-}
-
-func (x *App) GetAppId() string {
-	if x != nil {
-		return x.AppId
-	}
-	return ""
-}
-
-func (x *App) GetEnvironments() []string {
-	if x != nil {
-		return x.Environments
-	}
-	return nil
-}
-
-// HeartbeatRequest request to heartbeat from controller
+// HeartbeatRequest periodic update from controller.
+// environments must be the full current snapshot (same semantics as RegisterControllerRequest.environments).
+// The API Server replaces the stored controller record's environment list with this payload (not a merge/delta).
 type HeartbeatRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ControllerId  string                 `protobuf:"bytes,1,opt,name=controller_id,json=controllerId,proto3" json:"controller_id,omitempty"`
@@ -602,7 +379,7 @@ type HeartbeatRequest struct {
 
 func (x *HeartbeatRequest) Reset() {
 	*x = HeartbeatRequest{}
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[10]
+	mi := &file_controller_registry_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -614,7 +391,7 @@ func (x *HeartbeatRequest) String() string {
 func (*HeartbeatRequest) ProtoMessage() {}
 
 func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[10]
+	mi := &file_controller_registry_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -627,7 +404,7 @@ func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatRequest.ProtoReflect.Descriptor instead.
 func (*HeartbeatRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_controller_registry_proto_rawDescGZIP(), []int{10}
+	return file_controller_registry_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *HeartbeatRequest) GetControllerId() string {
@@ -654,7 +431,7 @@ type HeartbeatResponse struct {
 
 func (x *HeartbeatResponse) Reset() {
 	*x = HeartbeatResponse{}
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[11]
+	mi := &file_controller_registry_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -666,7 +443,7 @@ func (x *HeartbeatResponse) String() string {
 func (*HeartbeatResponse) ProtoMessage() {}
 
 func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_controller_registry_proto_msgTypes[11]
+	mi := &file_controller_registry_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -679,7 +456,7 @@ func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatResponse.ProtoReflect.Descriptor instead.
 func (*HeartbeatResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_controller_registry_proto_rawDescGZIP(), []int{11}
+	return file_controller_registry_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *HeartbeatResponse) GetSuccess() bool {
@@ -689,11 +466,11 @@ func (x *HeartbeatResponse) GetSuccess() bool {
 	return false
 }
 
-var File_api_proto_v1_controller_registry_proto protoreflect.FileDescriptor
+var File_controller_registry_proto protoreflect.FileDescriptor
 
-const file_api_proto_v1_controller_registry_proto_rawDesc = "" +
+const file_controller_registry_proto_rawDesc = "" +
 	"\n" +
-	"&api/proto/v1/controller_registry.proto\x12\x1aapi.controller_registry.v1\"\xa9\x01\n" +
+	"\x19controller_registry.proto\x12\x1aapi.controller_registry.v1\x1a\x14contract_types.proto\"\xa9\x01\n" +
 	"\x19RegisterControllerRequest\x12#\n" +
 	"\rcontroller_id\x18\x01 \x01(\tR\fcontrollerId\x12\x16\n" +
 	"\x06tenant\x18\x02 \x01(\tR\x06tenant\x12O\n" +
@@ -713,26 +490,12 @@ const file_api_proto_v1_controller_registry_proto_rawDesc = "" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\"=\n" +
 	"\x16StreamSnapshotsRequest\x12#\n" +
-	"\rcontroller_id\x18\x01 \x01(\tR\fcontrollerId\"\xa6\x01\n" +
+	"\rcontroller_id\x18\x01 \x01(\tR\fcontrollerId\"\x9b\x01\n" +
 	"\x17StreamSnapshotsResponse\x12 \n" +
 	"\venvironment\x18\x01 \x01(\tR\venvironment\x12\x1d\n" +
 	"\n" +
-	"bundle_key\x18\x02 \x01(\tR\tbundleKey\x12J\n" +
-	"\tsnapshots\x18\x03 \x03(\v2,.api.controller_registry.v1.ContractSnapshotR\tsnapshots\"\xfc\x01\n" +
-	"\x10ContractSnapshot\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
-	"\x06prefix\x18\x02 \x01(\tR\x06prefix\x12H\n" +
-	"\bupstream\x18\x03 \x01(\v2,.api.controller_registry.v1.ContractUpstreamR\bupstream\x126\n" +
-	"\x17allow_undefined_methods\x18\x04 \x01(\bR\x15allowUndefinedMethods\x12:\n" +
-	"\x06access\x18\x05 \x01(\v2\".api.controller_registry.v1.AccessR\x06access\"&\n" +
-	"\x10ContractUpstream\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\"U\n" +
-	"\x06Access\x12\x16\n" +
-	"\x06secure\x18\x01 \x01(\bR\x06secure\x123\n" +
-	"\x04apps\x18\x02 \x03(\v2\x1f.api.controller_registry.v1.AppR\x04apps\"@\n" +
-	"\x03App\x12\x15\n" +
-	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\"\n" +
-	"\fenvironments\x18\x02 \x03(\tR\fenvironments\"\x88\x01\n" +
+	"bundle_key\x18\x02 \x01(\tR\tbundleKey\x12?\n" +
+	"\tsnapshots\x18\x03 \x03(\v2!.api.contract.v1.ContractSnapshotR\tsnapshots\"\x88\x01\n" +
 	"\x10HeartbeatRequest\x12#\n" +
 	"\rcontroller_id\x18\x01 \x01(\tR\fcontrollerId\x12O\n" +
 	"\fenvironments\x18\x02 \x03(\v2+.api.controller_registry.v1.EnvironmentInfoR\fenvironments\"-\n" +
@@ -744,73 +507,67 @@ const file_api_proto_v1_controller_registry_proto_rawDesc = "" +
 	"\tHeartbeat\x12,.api.controller_registry.v1.HeartbeatRequest\x1a-.api.controller_registry.v1.HeartbeatResponseBUZSmerionyx/api-gateway/controller/pkg/api/controller_registry/v1;controllerregistryv1b\x06proto3"
 
 var (
-	file_api_proto_v1_controller_registry_proto_rawDescOnce sync.Once
-	file_api_proto_v1_controller_registry_proto_rawDescData []byte
+	file_controller_registry_proto_rawDescOnce sync.Once
+	file_controller_registry_proto_rawDescData []byte
 )
 
-func file_api_proto_v1_controller_registry_proto_rawDescGZIP() []byte {
-	file_api_proto_v1_controller_registry_proto_rawDescOnce.Do(func() {
-		file_api_proto_v1_controller_registry_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_api_proto_v1_controller_registry_proto_rawDesc), len(file_api_proto_v1_controller_registry_proto_rawDesc)))
+func file_controller_registry_proto_rawDescGZIP() []byte {
+	file_controller_registry_proto_rawDescOnce.Do(func() {
+		file_controller_registry_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_controller_registry_proto_rawDesc), len(file_controller_registry_proto_rawDesc)))
 	})
-	return file_api_proto_v1_controller_registry_proto_rawDescData
+	return file_controller_registry_proto_rawDescData
 }
 
-var file_api_proto_v1_controller_registry_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
-var file_api_proto_v1_controller_registry_proto_goTypes = []any{
+var file_controller_registry_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_controller_registry_proto_goTypes = []any{
 	(*RegisterControllerRequest)(nil),  // 0: api.controller_registry.v1.RegisterControllerRequest
 	(*EnvironmentInfo)(nil),            // 1: api.controller_registry.v1.EnvironmentInfo
 	(*BundleInfo)(nil),                 // 2: api.controller_registry.v1.BundleInfo
 	(*RegisterControllerResponse)(nil), // 3: api.controller_registry.v1.RegisterControllerResponse
 	(*StreamSnapshotsRequest)(nil),     // 4: api.controller_registry.v1.StreamSnapshotsRequest
 	(*StreamSnapshotsResponse)(nil),    // 5: api.controller_registry.v1.StreamSnapshotsResponse
-	(*ContractSnapshot)(nil),           // 6: api.controller_registry.v1.ContractSnapshot
-	(*ContractUpstream)(nil),           // 7: api.controller_registry.v1.ContractUpstream
-	(*Access)(nil),                     // 8: api.controller_registry.v1.Access
-	(*App)(nil),                        // 9: api.controller_registry.v1.App
-	(*HeartbeatRequest)(nil),           // 10: api.controller_registry.v1.HeartbeatRequest
-	(*HeartbeatResponse)(nil),          // 11: api.controller_registry.v1.HeartbeatResponse
+	(*HeartbeatRequest)(nil),           // 6: api.controller_registry.v1.HeartbeatRequest
+	(*HeartbeatResponse)(nil),          // 7: api.controller_registry.v1.HeartbeatResponse
+	(*v1.ContractSnapshot)(nil),        // 8: api.contract.v1.ContractSnapshot
 }
-var file_api_proto_v1_controller_registry_proto_depIdxs = []int32{
-	1,  // 0: api.controller_registry.v1.RegisterControllerRequest.environments:type_name -> api.controller_registry.v1.EnvironmentInfo
-	2,  // 1: api.controller_registry.v1.EnvironmentInfo.bundles:type_name -> api.controller_registry.v1.BundleInfo
-	6,  // 2: api.controller_registry.v1.StreamSnapshotsResponse.snapshots:type_name -> api.controller_registry.v1.ContractSnapshot
-	7,  // 3: api.controller_registry.v1.ContractSnapshot.upstream:type_name -> api.controller_registry.v1.ContractUpstream
-	8,  // 4: api.controller_registry.v1.ContractSnapshot.access:type_name -> api.controller_registry.v1.Access
-	9,  // 5: api.controller_registry.v1.Access.apps:type_name -> api.controller_registry.v1.App
-	1,  // 6: api.controller_registry.v1.HeartbeatRequest.environments:type_name -> api.controller_registry.v1.EnvironmentInfo
-	0,  // 7: api.controller_registry.v1.ControllerRegistryService.RegisterController:input_type -> api.controller_registry.v1.RegisterControllerRequest
-	4,  // 8: api.controller_registry.v1.ControllerRegistryService.StreamSnapshots:input_type -> api.controller_registry.v1.StreamSnapshotsRequest
-	10, // 9: api.controller_registry.v1.ControllerRegistryService.Heartbeat:input_type -> api.controller_registry.v1.HeartbeatRequest
-	3,  // 10: api.controller_registry.v1.ControllerRegistryService.RegisterController:output_type -> api.controller_registry.v1.RegisterControllerResponse
-	5,  // 11: api.controller_registry.v1.ControllerRegistryService.StreamSnapshots:output_type -> api.controller_registry.v1.StreamSnapshotsResponse
-	11, // 12: api.controller_registry.v1.ControllerRegistryService.Heartbeat:output_type -> api.controller_registry.v1.HeartbeatResponse
-	10, // [10:13] is the sub-list for method output_type
-	7,  // [7:10] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+var file_controller_registry_proto_depIdxs = []int32{
+	1, // 0: api.controller_registry.v1.RegisterControllerRequest.environments:type_name -> api.controller_registry.v1.EnvironmentInfo
+	2, // 1: api.controller_registry.v1.EnvironmentInfo.bundles:type_name -> api.controller_registry.v1.BundleInfo
+	8, // 2: api.controller_registry.v1.StreamSnapshotsResponse.snapshots:type_name -> api.contract.v1.ContractSnapshot
+	1, // 3: api.controller_registry.v1.HeartbeatRequest.environments:type_name -> api.controller_registry.v1.EnvironmentInfo
+	0, // 4: api.controller_registry.v1.ControllerRegistryService.RegisterController:input_type -> api.controller_registry.v1.RegisterControllerRequest
+	4, // 5: api.controller_registry.v1.ControllerRegistryService.StreamSnapshots:input_type -> api.controller_registry.v1.StreamSnapshotsRequest
+	6, // 6: api.controller_registry.v1.ControllerRegistryService.Heartbeat:input_type -> api.controller_registry.v1.HeartbeatRequest
+	3, // 7: api.controller_registry.v1.ControllerRegistryService.RegisterController:output_type -> api.controller_registry.v1.RegisterControllerResponse
+	5, // 8: api.controller_registry.v1.ControllerRegistryService.StreamSnapshots:output_type -> api.controller_registry.v1.StreamSnapshotsResponse
+	7, // 9: api.controller_registry.v1.ControllerRegistryService.Heartbeat:output_type -> api.controller_registry.v1.HeartbeatResponse
+	7, // [7:10] is the sub-list for method output_type
+	4, // [4:7] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
-func init() { file_api_proto_v1_controller_registry_proto_init() }
-func file_api_proto_v1_controller_registry_proto_init() {
-	if File_api_proto_v1_controller_registry_proto != nil {
+func init() { file_controller_registry_proto_init() }
+func file_controller_registry_proto_init() {
+	if File_controller_registry_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_proto_v1_controller_registry_proto_rawDesc), len(file_api_proto_v1_controller_registry_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_controller_registry_proto_rawDesc), len(file_controller_registry_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_api_proto_v1_controller_registry_proto_goTypes,
-		DependencyIndexes: file_api_proto_v1_controller_registry_proto_depIdxs,
-		MessageInfos:      file_api_proto_v1_controller_registry_proto_msgTypes,
+		GoTypes:           file_controller_registry_proto_goTypes,
+		DependencyIndexes: file_controller_registry_proto_depIdxs,
+		MessageInfos:      file_controller_registry_proto_msgTypes,
 	}.Build()
-	File_api_proto_v1_controller_registry_proto = out.File
-	file_api_proto_v1_controller_registry_proto_goTypes = nil
-	file_api_proto_v1_controller_registry_proto_depIdxs = nil
+	File_controller_registry_proto = out.File
+	file_controller_registry_proto_goTypes = nil
+	file_controller_registry_proto_depIdxs = nil
 }

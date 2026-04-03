@@ -6,6 +6,7 @@ import (
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
 	"merionyx/api-gateway/internal/controller/domain/models"
 	"merionyx/api-gateway/internal/shared/election"
+	contractv1 "merionyx/api-gateway/pkg/api/contract/v1"
 	environmentsv1 "merionyx/api-gateway/pkg/api/environments/v1"
 
 	"google.golang.org/grpc/codes"
@@ -168,14 +169,25 @@ func modelToProtoServicesConfig(services *models.EnvironmentServiceConfig) *envi
 	}
 }
 
-func modelToProtoSnapshots(snapshots []models.ContractSnapshot) []*environmentsv1.ContractSnapshot {
-	var result []*environmentsv1.ContractSnapshot
+func modelToProtoSnapshots(snapshots []models.ContractSnapshot) []*contractv1.ContractSnapshot {
+	var result []*contractv1.ContractSnapshot
 	for _, s := range snapshots {
-		result = append(result, &environmentsv1.ContractSnapshot{
+		var pbApps []*contractv1.App
+		for _, app := range s.Access.Apps {
+			pbApps = append(pbApps, &contractv1.App{
+				AppId:        app.AppID,
+				Environments: app.Environments,
+			})
+		}
+		result = append(result, &contractv1.ContractSnapshot{
 			Name:                  s.Name,
 			Prefix:                s.Prefix,
-			Upstream:              &environmentsv1.ContractUpstream{Name: s.Upstream.Name},
+			Upstream:              &contractv1.ContractUpstream{Name: s.Upstream.Name},
 			AllowUndefinedMethods: s.AllowUndefinedMethods,
+			Access: &contractv1.Access{
+				Secure: s.Access.Secure,
+				Apps:   pbApps,
+			},
 		})
 	}
 	return result

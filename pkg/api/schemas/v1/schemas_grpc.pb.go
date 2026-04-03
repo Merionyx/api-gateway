@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.29.3
-// source: api/proto/v1/schemas.proto
+// source: schemas.proto
 
 package schemasv1
 
@@ -235,5 +235,5 @@ var SchemasService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "api/proto/v1/schemas.proto",
+	Metadata: "schemas.proto",
 }

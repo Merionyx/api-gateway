@@ -7,6 +7,7 @@ import (
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
 	"merionyx/api-gateway/internal/controller/domain/models"
 	"merionyx/api-gateway/internal/controller/usecase"
+	contractv1 "merionyx/api-gateway/pkg/api/contract/v1"
 	schemasv1 "merionyx/api-gateway/pkg/api/schemas/v1"
 
 	"google.golang.org/grpc/codes"
@@ -71,7 +72,7 @@ func (h *SchemasHandler) ListContractSnapshots(ctx context.Context, req *schemas
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	var protoSnapshots []*schemasv1.ContractSnapshot
+	var protoSnapshots []*contractv1.ContractSnapshot
 	for _, s := range snapshots {
 		protoSnapshots = append(protoSnapshots, modelToProtoContractSnapshot(&s))
 	}
@@ -98,25 +99,35 @@ func (h *SchemasHandler) SyncAllContracts(ctx context.Context, req *schemasv1.Sy
 	}, nil
 }
 
-func modelToProtoContractSnapshot(snapshot *models.ContractSnapshot) *schemasv1.ContractSnapshot {
+func modelToProtoContractSnapshot(snapshot *models.ContractSnapshot) *contractv1.ContractSnapshot {
 	if snapshot == nil {
 		return nil
 	}
-
-	return &schemasv1.ContractSnapshot{
+	var pbApps []*contractv1.App
+	for _, app := range snapshot.Access.Apps {
+		pbApps = append(pbApps, &contractv1.App{
+			AppId:        app.AppID,
+			Environments: app.Environments,
+		})
+	}
+	return &contractv1.ContractSnapshot{
 		Name:                  snapshot.Name,
 		Prefix:                snapshot.Prefix,
-		Upstream:              &schemasv1.ContractUpstream{Name: snapshot.Upstream.Name},
+		Upstream:              &contractv1.ContractUpstream{Name: snapshot.Upstream.Name},
 		AllowUndefinedMethods: snapshot.AllowUndefinedMethods,
+		Access: &contractv1.Access{
+			Secure: snapshot.Access.Secure,
+			Apps:   pbApps,
+		},
 	}
 }
 
-func modelToProtoContractSnapshots(snapshots []models.ContractSnapshot) []*schemasv1.ContractSnapshot {
+func modelToProtoContractSnapshots(snapshots []models.ContractSnapshot) []*contractv1.ContractSnapshot {
 	if snapshots == nil {
 		return nil
 	}
 
-	var protoSnapshots []*schemasv1.ContractSnapshot
+	var protoSnapshots []*contractv1.ContractSnapshot
 	for _, s := range snapshots {
 		protoSnapshots = append(protoSnapshots, modelToProtoContractSnapshot(&s))
 	}

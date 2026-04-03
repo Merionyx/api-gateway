@@ -119,22 +119,29 @@ func (uc *BundleSyncUseCase) syncBundleOnce(ctx context.Context, bundle models.B
 	var snapshots []sharedgit.ContractSnapshot
 	for _, pbSnapshot := range resp.Snapshots {
 		var apps []sharedgit.App
-		for _, pbApp := range pbSnapshot.Access.Apps {
-			apps = append(apps, sharedgit.App{
-				AppID:        pbApp.AppId,
-				Environments: pbApp.Environments,
-			})
+		if acc := pbSnapshot.GetAccess(); acc != nil {
+			for _, pbApp := range acc.GetApps() {
+				apps = append(apps, sharedgit.App{
+					AppID:        pbApp.GetAppId(),
+					Environments: pbApp.GetEnvironments(),
+				})
+			}
 		}
-
+		upstreamName := ""
+		if u := pbSnapshot.GetUpstream(); u != nil {
+			upstreamName = u.GetName()
+		}
+		secure := false
+		if acc := pbSnapshot.GetAccess(); acc != nil {
+			secure = acc.GetSecure()
+		}
 		snapshots = append(snapshots, sharedgit.ContractSnapshot{
-			Name:   pbSnapshot.Name,
-			Prefix: pbSnapshot.Prefix,
-			Upstream: sharedgit.ContractUpstream{
-				Name: pbSnapshot.Upstream.Name,
-			},
-			AllowUndefinedMethods: pbSnapshot.AllowUndefinedMethods,
+			Name:                  pbSnapshot.GetName(),
+			Prefix:                pbSnapshot.GetPrefix(),
+			Upstream:              sharedgit.ContractUpstream{Name: upstreamName},
+			AllowUndefinedMethods: pbSnapshot.GetAllowUndefinedMethods(),
 			Access: sharedgit.Access{
-				Secure: pbSnapshot.Access.Secure,
+				Secure: secure,
 				Apps:   apps,
 			},
 		})

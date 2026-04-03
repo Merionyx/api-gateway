@@ -2,13 +2,14 @@
 // versions:
 // 	protoc-gen-go v1.36.10
 // 	protoc        v5.29.3
-// source: api/proto/v1/schemas.proto
+// source: schemas.proto
 
 package schemasv1
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	v1 "merionyx/api-gateway/pkg/api/contract/v1"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -20,120 +21,6 @@ const (
 	// Verify that runtime/protoimpl is sufficiently up-to-date.
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
-
-// ContractSnapshot represents a contract snapshot
-type ContractSnapshot struct {
-	state                 protoimpl.MessageState `protogen:"open.v1"`
-	Name                  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Prefix                string                 `protobuf:"bytes,2,opt,name=prefix,proto3" json:"prefix,omitempty"`
-	Upstream              *ContractUpstream      `protobuf:"bytes,3,opt,name=upstream,proto3" json:"upstream,omitempty"`
-	AllowUndefinedMethods bool                   `protobuf:"varint,4,opt,name=allow_undefined_methods,json=allowUndefinedMethods,proto3" json:"allow_undefined_methods,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
-}
-
-func (x *ContractSnapshot) Reset() {
-	*x = ContractSnapshot{}
-	mi := &file_api_proto_v1_schemas_proto_msgTypes[0]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ContractSnapshot) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ContractSnapshot) ProtoMessage() {}
-
-func (x *ContractSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_schemas_proto_msgTypes[0]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ContractSnapshot.ProtoReflect.Descriptor instead.
-func (*ContractSnapshot) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_schemas_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *ContractSnapshot) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-func (x *ContractSnapshot) GetPrefix() string {
-	if x != nil {
-		return x.Prefix
-	}
-	return ""
-}
-
-func (x *ContractSnapshot) GetUpstream() *ContractUpstream {
-	if x != nil {
-		return x.Upstream
-	}
-	return nil
-}
-
-func (x *ContractSnapshot) GetAllowUndefinedMethods() bool {
-	if x != nil {
-		return x.AllowUndefinedMethods
-	}
-	return false
-}
-
-// ContractUpstream represents an upstream for a contract
-type ContractUpstream struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ContractUpstream) Reset() {
-	*x = ContractUpstream{}
-	mi := &file_api_proto_v1_schemas_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ContractUpstream) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ContractUpstream) ProtoMessage() {}
-
-func (x *ContractUpstream) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_schemas_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ContractUpstream.ProtoReflect.Descriptor instead.
-func (*ContractUpstream) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_schemas_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *ContractUpstream) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
 
 // SyncContractBundleRequest represents a request to sync a contract bundle
 type SyncContractBundleRequest struct {
@@ -148,7 +35,7 @@ type SyncContractBundleRequest struct {
 
 func (x *SyncContractBundleRequest) Reset() {
 	*x = SyncContractBundleRequest{}
-	mi := &file_api_proto_v1_schemas_proto_msgTypes[2]
+	mi := &file_schemas_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -160,7 +47,7 @@ func (x *SyncContractBundleRequest) String() string {
 func (*SyncContractBundleRequest) ProtoMessage() {}
 
 func (x *SyncContractBundleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_schemas_proto_msgTypes[2]
+	mi := &file_schemas_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -173,7 +60,7 @@ func (x *SyncContractBundleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyncContractBundleRequest.ProtoReflect.Descriptor instead.
 func (*SyncContractBundleRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_schemas_proto_rawDescGZIP(), []int{2}
+	return file_schemas_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *SyncContractBundleRequest) GetRepository() string {
@@ -207,7 +94,7 @@ func (x *SyncContractBundleRequest) GetForce() bool {
 // SyncContractBundleResponse represents a response to sync a contract bundle
 type SyncContractBundleResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Snapshots     []*ContractSnapshot    `protobuf:"bytes,1,rep,name=snapshots,proto3" json:"snapshots,omitempty"`
+	Snapshots     []*v1.ContractSnapshot `protobuf:"bytes,1,rep,name=snapshots,proto3" json:"snapshots,omitempty"`
 	FromCache     bool                   `protobuf:"varint,2,opt,name=from_cache,json=fromCache,proto3" json:"from_cache,omitempty"` // true if taken from etcd, false if from Git
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -215,7 +102,7 @@ type SyncContractBundleResponse struct {
 
 func (x *SyncContractBundleResponse) Reset() {
 	*x = SyncContractBundleResponse{}
-	mi := &file_api_proto_v1_schemas_proto_msgTypes[3]
+	mi := &file_schemas_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -227,7 +114,7 @@ func (x *SyncContractBundleResponse) String() string {
 func (*SyncContractBundleResponse) ProtoMessage() {}
 
 func (x *SyncContractBundleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_schemas_proto_msgTypes[3]
+	mi := &file_schemas_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -240,10 +127,10 @@ func (x *SyncContractBundleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyncContractBundleResponse.ProtoReflect.Descriptor instead.
 func (*SyncContractBundleResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_schemas_proto_rawDescGZIP(), []int{3}
+	return file_schemas_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *SyncContractBundleResponse) GetSnapshots() []*ContractSnapshot {
+func (x *SyncContractBundleResponse) GetSnapshots() []*v1.ContractSnapshot {
 	if x != nil {
 		return x.Snapshots
 	}
@@ -267,7 +154,7 @@ type GetContractRequest struct {
 
 func (x *GetContractRequest) Reset() {
 	*x = GetContractRequest{}
-	mi := &file_api_proto_v1_schemas_proto_msgTypes[4]
+	mi := &file_schemas_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -279,7 +166,7 @@ func (x *GetContractRequest) String() string {
 func (*GetContractRequest) ProtoMessage() {}
 
 func (x *GetContractRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_schemas_proto_msgTypes[4]
+	mi := &file_schemas_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -292,7 +179,7 @@ func (x *GetContractRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetContractRequest.ProtoReflect.Descriptor instead.
 func (*GetContractRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_schemas_proto_rawDescGZIP(), []int{4}
+	return file_schemas_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *GetContractRequest) GetContract() string {
@@ -316,7 +203,7 @@ type GetContractSnapshotRequest struct {
 
 func (x *GetContractSnapshotRequest) Reset() {
 	*x = GetContractSnapshotRequest{}
-	mi := &file_api_proto_v1_schemas_proto_msgTypes[5]
+	mi := &file_schemas_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -328,7 +215,7 @@ func (x *GetContractSnapshotRequest) String() string {
 func (*GetContractSnapshotRequest) ProtoMessage() {}
 
 func (x *GetContractSnapshotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_schemas_proto_msgTypes[5]
+	mi := &file_schemas_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -341,7 +228,7 @@ func (x *GetContractSnapshotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetContractSnapshotRequest.ProtoReflect.Descriptor instead.
 func (*GetContractSnapshotRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_schemas_proto_rawDescGZIP(), []int{5}
+	return file_schemas_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetContractSnapshotRequest) GetRepository() string {
@@ -375,14 +262,14 @@ func (x *GetContractSnapshotRequest) GetPath() string {
 // GetContractSnapshotResponse represents a response to get a contract snapshot
 type GetContractSnapshotResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Snapshot      *ContractSnapshot      `protobuf:"bytes,1,opt,name=snapshot,proto3" json:"snapshot,omitempty"`
+	Snapshot      *v1.ContractSnapshot   `protobuf:"bytes,1,opt,name=snapshot,proto3" json:"snapshot,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetContractSnapshotResponse) Reset() {
 	*x = GetContractSnapshotResponse{}
-	mi := &file_api_proto_v1_schemas_proto_msgTypes[6]
+	mi := &file_schemas_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -394,7 +281,7 @@ func (x *GetContractSnapshotResponse) String() string {
 func (*GetContractSnapshotResponse) ProtoMessage() {}
 
 func (x *GetContractSnapshotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_schemas_proto_msgTypes[6]
+	mi := &file_schemas_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -407,10 +294,10 @@ func (x *GetContractSnapshotResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetContractSnapshotResponse.ProtoReflect.Descriptor instead.
 func (*GetContractSnapshotResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_schemas_proto_rawDescGZIP(), []int{6}
+	return file_schemas_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *GetContractSnapshotResponse) GetSnapshot() *ContractSnapshot {
+func (x *GetContractSnapshotResponse) GetSnapshot() *v1.ContractSnapshot {
 	if x != nil {
 		return x.Snapshot
 	}
@@ -429,7 +316,7 @@ type ListContractSnapshotsRequest struct {
 
 func (x *ListContractSnapshotsRequest) Reset() {
 	*x = ListContractSnapshotsRequest{}
-	mi := &file_api_proto_v1_schemas_proto_msgTypes[7]
+	mi := &file_schemas_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -441,7 +328,7 @@ func (x *ListContractSnapshotsRequest) String() string {
 func (*ListContractSnapshotsRequest) ProtoMessage() {}
 
 func (x *ListContractSnapshotsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_schemas_proto_msgTypes[7]
+	mi := &file_schemas_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -454,7 +341,7 @@ func (x *ListContractSnapshotsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListContractSnapshotsRequest.ProtoReflect.Descriptor instead.
 func (*ListContractSnapshotsRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_schemas_proto_rawDescGZIP(), []int{7}
+	return file_schemas_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ListContractSnapshotsRequest) GetRepository() string {
@@ -481,14 +368,14 @@ func (x *ListContractSnapshotsRequest) GetPath() string {
 // ListContractSnapshotsResponse represents a response to list contract snapshots
 type ListContractSnapshotsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Snapshots     []*ContractSnapshot    `protobuf:"bytes,1,rep,name=snapshots,proto3" json:"snapshots,omitempty"`
+	Snapshots     []*v1.ContractSnapshot `protobuf:"bytes,1,rep,name=snapshots,proto3" json:"snapshots,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ListContractSnapshotsResponse) Reset() {
 	*x = ListContractSnapshotsResponse{}
-	mi := &file_api_proto_v1_schemas_proto_msgTypes[8]
+	mi := &file_schemas_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -500,7 +387,7 @@ func (x *ListContractSnapshotsResponse) String() string {
 func (*ListContractSnapshotsResponse) ProtoMessage() {}
 
 func (x *ListContractSnapshotsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_schemas_proto_msgTypes[8]
+	mi := &file_schemas_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -513,10 +400,10 @@ func (x *ListContractSnapshotsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListContractSnapshotsResponse.ProtoReflect.Descriptor instead.
 func (*ListContractSnapshotsResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_schemas_proto_rawDescGZIP(), []int{8}
+	return file_schemas_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *ListContractSnapshotsResponse) GetSnapshots() []*ContractSnapshot {
+func (x *ListContractSnapshotsResponse) GetSnapshots() []*v1.ContractSnapshot {
 	if x != nil {
 		return x.Snapshots
 	}
@@ -533,7 +420,7 @@ type SyncAllContractsRequest struct {
 
 func (x *SyncAllContractsRequest) Reset() {
 	*x = SyncAllContractsRequest{}
-	mi := &file_api_proto_v1_schemas_proto_msgTypes[9]
+	mi := &file_schemas_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -545,7 +432,7 @@ func (x *SyncAllContractsRequest) String() string {
 func (*SyncAllContractsRequest) ProtoMessage() {}
 
 func (x *SyncAllContractsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_schemas_proto_msgTypes[9]
+	mi := &file_schemas_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -558,7 +445,7 @@ func (x *SyncAllContractsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyncAllContractsRequest.ProtoReflect.Descriptor instead.
 func (*SyncAllContractsRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_schemas_proto_rawDescGZIP(), []int{9}
+	return file_schemas_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SyncAllContractsRequest) GetEnvironment() string {
@@ -579,7 +466,7 @@ type SyncAllContractsResponse struct {
 
 func (x *SyncAllContractsResponse) Reset() {
 	*x = SyncAllContractsResponse{}
-	mi := &file_api_proto_v1_schemas_proto_msgTypes[10]
+	mi := &file_schemas_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -591,7 +478,7 @@ func (x *SyncAllContractsResponse) String() string {
 func (*SyncAllContractsResponse) ProtoMessage() {}
 
 func (x *SyncAllContractsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_schemas_proto_msgTypes[10]
+	mi := &file_schemas_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -604,7 +491,7 @@ func (x *SyncAllContractsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyncAllContractsResponse.ProtoReflect.Descriptor instead.
 func (*SyncAllContractsResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_schemas_proto_rawDescGZIP(), []int{10}
+	return file_schemas_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *SyncAllContractsResponse) GetSyncedCount() int32 {
@@ -621,27 +508,20 @@ func (x *SyncAllContractsResponse) GetErrors() []string {
 	return nil
 }
 
-var File_api_proto_v1_schemas_proto protoreflect.FileDescriptor
+var File_schemas_proto protoreflect.FileDescriptor
 
-const file_api_proto_v1_schemas_proto_rawDesc = "" +
+const file_schemas_proto_rawDesc = "" +
 	"\n" +
-	"\x1aapi/proto/v1/schemas.proto\x12\x0eapi.schemas.v1\"\xb4\x01\n" +
-	"\x10ContractSnapshot\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
-	"\x06prefix\x18\x02 \x01(\tR\x06prefix\x12<\n" +
-	"\bupstream\x18\x03 \x01(\v2 .api.schemas.v1.ContractUpstreamR\bupstream\x126\n" +
-	"\x17allow_undefined_methods\x18\x04 \x01(\bR\x15allowUndefinedMethods\"&\n" +
-	"\x10ContractUpstream\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\"{\n" +
+	"\rschemas.proto\x12\x0eapi.schemas.v1\x1a\x14contract_types.proto\"{\n" +
 	"\x19SyncContractBundleRequest\x12\x1e\n" +
 	"\n" +
 	"repository\x18\x01 \x01(\tR\n" +
 	"repository\x12\x10\n" +
 	"\x03ref\x18\x02 \x01(\tR\x03ref\x12\x16\n" +
 	"\x06bundle\x18\x03 \x01(\tR\x06bundle\x12\x14\n" +
-	"\x05force\x18\x04 \x01(\bR\x05force\"{\n" +
-	"\x1aSyncContractBundleResponse\x12>\n" +
-	"\tsnapshots\x18\x01 \x03(\v2 .api.schemas.v1.ContractSnapshotR\tsnapshots\x12\x1d\n" +
+	"\x05force\x18\x04 \x01(\bR\x05force\"|\n" +
+	"\x1aSyncContractBundleResponse\x12?\n" +
+	"\tsnapshots\x18\x01 \x03(\v2!.api.contract.v1.ContractSnapshotR\tsnapshots\x12\x1d\n" +
 	"\n" +
 	"from_cache\x18\x02 \x01(\bR\tfromCache\"0\n" +
 	"\x12GetContractRequest\x12\x1a\n" +
@@ -652,17 +532,17 @@ const file_api_proto_v1_schemas_proto_rawDesc = "" +
 	"repository\x12\x10\n" +
 	"\x03ref\x18\x02 \x01(\tR\x03ref\x12\x1a\n" +
 	"\bcontract\x18\x03 \x01(\tR\bcontract\x12\x12\n" +
-	"\x04path\x18\x04 \x01(\tR\x04path\"[\n" +
-	"\x1bGetContractSnapshotResponse\x12<\n" +
-	"\bsnapshot\x18\x01 \x01(\v2 .api.schemas.v1.ContractSnapshotR\bsnapshot\"d\n" +
+	"\x04path\x18\x04 \x01(\tR\x04path\"\\\n" +
+	"\x1bGetContractSnapshotResponse\x12=\n" +
+	"\bsnapshot\x18\x01 \x01(\v2!.api.contract.v1.ContractSnapshotR\bsnapshot\"d\n" +
 	"\x1cListContractSnapshotsRequest\x12\x1e\n" +
 	"\n" +
 	"repository\x18\x01 \x01(\tR\n" +
 	"repository\x12\x10\n" +
 	"\x03ref\x18\x02 \x01(\tR\x03ref\x12\x12\n" +
-	"\x04path\x18\x03 \x01(\tR\x04path\"_\n" +
-	"\x1dListContractSnapshotsResponse\x12>\n" +
-	"\tsnapshots\x18\x01 \x03(\v2 .api.schemas.v1.ContractSnapshotR\tsnapshots\";\n" +
+	"\x04path\x18\x03 \x01(\tR\x04path\"`\n" +
+	"\x1dListContractSnapshotsResponse\x12?\n" +
+	"\tsnapshots\x18\x01 \x03(\v2!.api.contract.v1.ContractSnapshotR\tsnapshots\";\n" +
 	"\x17SyncAllContractsRequest\x12 \n" +
 	"\venvironment\x18\x01 \x01(\tR\venvironment\"U\n" +
 	"\x18SyncAllContractsResponse\x12!\n" +
@@ -675,71 +555,69 @@ const file_api_proto_v1_schemas_proto_rawDesc = "" +
 	"\x10SyncAllContracts\x12'.api.schemas.v1.SyncAllContractsRequest\x1a(.api.schemas.v1.SyncAllContractsResponseB>Z<merionyx/api-gateway/controller/pkg/api/schemas/v1;schemasv1b\x06proto3"
 
 var (
-	file_api_proto_v1_schemas_proto_rawDescOnce sync.Once
-	file_api_proto_v1_schemas_proto_rawDescData []byte
+	file_schemas_proto_rawDescOnce sync.Once
+	file_schemas_proto_rawDescData []byte
 )
 
-func file_api_proto_v1_schemas_proto_rawDescGZIP() []byte {
-	file_api_proto_v1_schemas_proto_rawDescOnce.Do(func() {
-		file_api_proto_v1_schemas_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_api_proto_v1_schemas_proto_rawDesc), len(file_api_proto_v1_schemas_proto_rawDesc)))
+func file_schemas_proto_rawDescGZIP() []byte {
+	file_schemas_proto_rawDescOnce.Do(func() {
+		file_schemas_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_schemas_proto_rawDesc), len(file_schemas_proto_rawDesc)))
 	})
-	return file_api_proto_v1_schemas_proto_rawDescData
+	return file_schemas_proto_rawDescData
 }
 
-var file_api_proto_v1_schemas_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
-var file_api_proto_v1_schemas_proto_goTypes = []any{
-	(*ContractSnapshot)(nil),              // 0: api.schemas.v1.ContractSnapshot
-	(*ContractUpstream)(nil),              // 1: api.schemas.v1.ContractUpstream
-	(*SyncContractBundleRequest)(nil),     // 2: api.schemas.v1.SyncContractBundleRequest
-	(*SyncContractBundleResponse)(nil),    // 3: api.schemas.v1.SyncContractBundleResponse
-	(*GetContractRequest)(nil),            // 4: api.schemas.v1.GetContractRequest
-	(*GetContractSnapshotRequest)(nil),    // 5: api.schemas.v1.GetContractSnapshotRequest
-	(*GetContractSnapshotResponse)(nil),   // 6: api.schemas.v1.GetContractSnapshotResponse
-	(*ListContractSnapshotsRequest)(nil),  // 7: api.schemas.v1.ListContractSnapshotsRequest
-	(*ListContractSnapshotsResponse)(nil), // 8: api.schemas.v1.ListContractSnapshotsResponse
-	(*SyncAllContractsRequest)(nil),       // 9: api.schemas.v1.SyncAllContractsRequest
-	(*SyncAllContractsResponse)(nil),      // 10: api.schemas.v1.SyncAllContractsResponse
+var file_schemas_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_schemas_proto_goTypes = []any{
+	(*SyncContractBundleRequest)(nil),     // 0: api.schemas.v1.SyncContractBundleRequest
+	(*SyncContractBundleResponse)(nil),    // 1: api.schemas.v1.SyncContractBundleResponse
+	(*GetContractRequest)(nil),            // 2: api.schemas.v1.GetContractRequest
+	(*GetContractSnapshotRequest)(nil),    // 3: api.schemas.v1.GetContractSnapshotRequest
+	(*GetContractSnapshotResponse)(nil),   // 4: api.schemas.v1.GetContractSnapshotResponse
+	(*ListContractSnapshotsRequest)(nil),  // 5: api.schemas.v1.ListContractSnapshotsRequest
+	(*ListContractSnapshotsResponse)(nil), // 6: api.schemas.v1.ListContractSnapshotsResponse
+	(*SyncAllContractsRequest)(nil),       // 7: api.schemas.v1.SyncAllContractsRequest
+	(*SyncAllContractsResponse)(nil),      // 8: api.schemas.v1.SyncAllContractsResponse
+	(*v1.ContractSnapshot)(nil),           // 9: api.contract.v1.ContractSnapshot
 }
-var file_api_proto_v1_schemas_proto_depIdxs = []int32{
-	1,  // 0: api.schemas.v1.ContractSnapshot.upstream:type_name -> api.schemas.v1.ContractUpstream
-	0,  // 1: api.schemas.v1.SyncContractBundleResponse.snapshots:type_name -> api.schemas.v1.ContractSnapshot
-	0,  // 2: api.schemas.v1.GetContractSnapshotResponse.snapshot:type_name -> api.schemas.v1.ContractSnapshot
-	0,  // 3: api.schemas.v1.ListContractSnapshotsResponse.snapshots:type_name -> api.schemas.v1.ContractSnapshot
-	2,  // 4: api.schemas.v1.SchemasService.SyncContractBundle:input_type -> api.schemas.v1.SyncContractBundleRequest
-	5,  // 5: api.schemas.v1.SchemasService.GetContractSnapshot:input_type -> api.schemas.v1.GetContractSnapshotRequest
-	7,  // 6: api.schemas.v1.SchemasService.ListContractSnapshots:input_type -> api.schemas.v1.ListContractSnapshotsRequest
-	9,  // 7: api.schemas.v1.SchemasService.SyncAllContracts:input_type -> api.schemas.v1.SyncAllContractsRequest
-	3,  // 8: api.schemas.v1.SchemasService.SyncContractBundle:output_type -> api.schemas.v1.SyncContractBundleResponse
-	6,  // 9: api.schemas.v1.SchemasService.GetContractSnapshot:output_type -> api.schemas.v1.GetContractSnapshotResponse
-	8,  // 10: api.schemas.v1.SchemasService.ListContractSnapshots:output_type -> api.schemas.v1.ListContractSnapshotsResponse
-	10, // 11: api.schemas.v1.SchemasService.SyncAllContracts:output_type -> api.schemas.v1.SyncAllContractsResponse
-	8,  // [8:12] is the sub-list for method output_type
-	4,  // [4:8] is the sub-list for method input_type
-	4,  // [4:4] is the sub-list for extension type_name
-	4,  // [4:4] is the sub-list for extension extendee
-	0,  // [0:4] is the sub-list for field type_name
+var file_schemas_proto_depIdxs = []int32{
+	9, // 0: api.schemas.v1.SyncContractBundleResponse.snapshots:type_name -> api.contract.v1.ContractSnapshot
+	9, // 1: api.schemas.v1.GetContractSnapshotResponse.snapshot:type_name -> api.contract.v1.ContractSnapshot
+	9, // 2: api.schemas.v1.ListContractSnapshotsResponse.snapshots:type_name -> api.contract.v1.ContractSnapshot
+	0, // 3: api.schemas.v1.SchemasService.SyncContractBundle:input_type -> api.schemas.v1.SyncContractBundleRequest
+	3, // 4: api.schemas.v1.SchemasService.GetContractSnapshot:input_type -> api.schemas.v1.GetContractSnapshotRequest
+	5, // 5: api.schemas.v1.SchemasService.ListContractSnapshots:input_type -> api.schemas.v1.ListContractSnapshotsRequest
+	7, // 6: api.schemas.v1.SchemasService.SyncAllContracts:input_type -> api.schemas.v1.SyncAllContractsRequest
+	1, // 7: api.schemas.v1.SchemasService.SyncContractBundle:output_type -> api.schemas.v1.SyncContractBundleResponse
+	4, // 8: api.schemas.v1.SchemasService.GetContractSnapshot:output_type -> api.schemas.v1.GetContractSnapshotResponse
+	6, // 9: api.schemas.v1.SchemasService.ListContractSnapshots:output_type -> api.schemas.v1.ListContractSnapshotsResponse
+	8, // 10: api.schemas.v1.SchemasService.SyncAllContracts:output_type -> api.schemas.v1.SyncAllContractsResponse
+	7, // [7:11] is the sub-list for method output_type
+	3, // [3:7] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
-func init() { file_api_proto_v1_schemas_proto_init() }
-func file_api_proto_v1_schemas_proto_init() {
-	if File_api_proto_v1_schemas_proto != nil {
+func init() { file_schemas_proto_init() }
+func file_schemas_proto_init() {
+	if File_schemas_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_proto_v1_schemas_proto_rawDesc), len(file_api_proto_v1_schemas_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_schemas_proto_rawDesc), len(file_schemas_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_api_proto_v1_schemas_proto_goTypes,
-		DependencyIndexes: file_api_proto_v1_schemas_proto_depIdxs,
-		MessageInfos:      file_api_proto_v1_schemas_proto_msgTypes,
+		GoTypes:           file_schemas_proto_goTypes,
+		DependencyIndexes: file_schemas_proto_depIdxs,
+		MessageInfos:      file_schemas_proto_msgTypes,
 	}.Build()
-	File_api_proto_v1_schemas_proto = out.File
-	file_api_proto_v1_schemas_proto_goTypes = nil
-	file_api_proto_v1_schemas_proto_depIdxs = nil
+	File_schemas_proto = out.File
+	file_schemas_proto_goTypes = nil
+	file_schemas_proto_depIdxs = nil
 }

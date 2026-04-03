@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.29.3
-// source: api/proto/v1/contract_syncer.proto
+// source: contract_syncer.proto
 
 package contractsyncerv1
 
@@ -121,5 +121,5 @@ var ContractSyncerService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "api/proto/v1/contract_syncer.proto",
+	Metadata: "contract_syncer.proto",
 }

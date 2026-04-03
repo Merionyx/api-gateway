@@ -6,8 +6,9 @@ import (
 
 	"merionyx/api-gateway/internal/api-server/domain/interfaces"
 	"merionyx/api-gateway/internal/api-server/domain/models"
-	pb "merionyx/api-gateway/pkg/api/controller_registry/v1"
 	sharedgit "merionyx/api-gateway/internal/shared/git"
+	contractv1 "merionyx/api-gateway/pkg/api/contract/v1"
+	pb "merionyx/api-gateway/pkg/api/controller_registry/v1"
 )
 
 type ControllerRegistryHandler struct {
@@ -65,24 +66,24 @@ type snapshotStreamWrapper struct {
 }
 
 func (w *snapshotStreamWrapper) Send(environment, bundleKey string, snapshots []sharedgit.ContractSnapshot) error {
-	var pbSnapshots []*pb.ContractSnapshot
+	var pbSnapshots []*contractv1.ContractSnapshot
 	for _, snapshot := range snapshots {
-		var pbApps []*pb.App
+		var pbApps []*contractv1.App
 		for _, app := range snapshot.Access.Apps {
-			pbApps = append(pbApps, &pb.App{
+			pbApps = append(pbApps, &contractv1.App{
 				AppId:        app.AppID,
 				Environments: app.Environments,
 			})
 		}
 
-		pbSnapshots = append(pbSnapshots, &pb.ContractSnapshot{
+		pbSnapshots = append(pbSnapshots, &contractv1.ContractSnapshot{
 			Name:   snapshot.Name,
 			Prefix: snapshot.Prefix,
-			Upstream: &pb.ContractUpstream{
+			Upstream: &contractv1.ContractUpstream{
 				Name: snapshot.Upstream.Name,
 			},
 			AllowUndefinedMethods: snapshot.AllowUndefinedMethods,
-			Access: &pb.Access{
+			Access: &contractv1.Access{
 				Secure: snapshot.Access.Secure,
 				Apps:   pbApps,
 			},

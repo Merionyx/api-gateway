@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"merionyx/api-gateway/internal/controller/config"
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
 	"merionyx/api-gateway/internal/controller/domain/models"
+	"merionyx/api-gateway/internal/controller/repository/memory"
 	xdscache "merionyx/api-gateway/internal/controller/xds/cache"
 	xdssnapshot "merionyx/api-gateway/internal/controller/xds/snapshot"
 	"merionyx/api-gateway/internal/shared/bundlekey"
@@ -36,7 +38,7 @@ type APIServerSyncUseCase struct {
 	config                   *config.Config
 	schemaRepo               interfaces.SchemaRepository
 	inMemoryEnvironmentsRepo interfaces.InMemoryEnvironmentsRepository
-	environmentsUseCase      interfaces.EnvironmentsUseCase
+	environmentRepo          interfaces.EnvironmentRepository
 	xdsSnapshotManager       *xdscache.SnapshotManager
 	apiServerAddress         string
 	controllerID             string
@@ -48,7 +50,7 @@ func NewAPIServerSyncUseCase(
 	cfg *config.Config,
 	schemaRepo interfaces.SchemaRepository,
 	inMemoryEnvironmentsRepo interfaces.InMemoryEnvironmentsRepository,
-	environmentsUseCase interfaces.EnvironmentsUseCase,
+	environmentRepo interfaces.EnvironmentRepository,
 	xdsSnapshotManager *xdscache.SnapshotManager,
 	xdsBuilder interfaces.XDSBuilder,
 	etcdClient *clientv3.Client,
@@ -67,7 +69,7 @@ func NewAPIServerSyncUseCase(
 		config:                   cfg,
 		schemaRepo:               schemaRepo,
 		inMemoryEnvironmentsRepo: inMemoryEnvironmentsRepo,
-		environmentsUseCase:      environmentsUseCase,
+		environmentRepo:          environmentRepo,
 		xdsSnapshotManager:       xdsSnapshotManager,
 		apiServerAddress:         cfg.APIServer.Address,
 		xdsBuilder:               xdsBuilder,
@@ -156,57 +158,9 @@ func (uc *APIServerSyncUseCase) runAPIServerSession(parentCtx context.Context) e
 }
 
 func (uc *APIServerSyncUseCase) registerController(ctx context.Context, client pb.ControllerRegistryServiceClient) error {
-	// Collect environments from in-memory repository (config) and etcd
-	environmentsMap := make(map[string]*pb.EnvironmentInfo)
-
-	// 1. Add environments from in-memory repository (config)
-	inMemoryEnvs, err := uc.inMemoryEnvironmentsRepo.ListEnvironments(ctx)
+	environments, err := uc.buildEnvironmentsForAPIServer(ctx)
 	if err != nil {
-		slog.Warn("Failed to list in-memory environments", "error", err)
-	} else {
-		for _, env := range inMemoryEnvs {
-			var bundles []*pb.BundleInfo
-			for _, bundle := range env.Bundles.Static {
-				bundles = append(bundles, &pb.BundleInfo{
-					Name:       bundle.Name,
-					Repository: bundle.Repository,
-					Ref:        bundle.Ref,
-					Path:       bundle.Path,
-				})
-			}
-			environmentsMap[env.Name] = &pb.EnvironmentInfo{
-				Name:    env.Name,
-				Bundles: bundles,
-			}
-		}
-	}
-
-	// 2. Add/update environments from etcd (dynamically created)
-	etcdEnvs, err := uc.environmentsUseCase.ListEnvironments(ctx)
-	if err != nil {
-		slog.Warn("Failed to list environments from etcd", "error", err)
-	} else {
-		for _, env := range etcdEnvs {
-			var bundles []*pb.BundleInfo
-			for _, bundle := range env.Bundles.Static {
-				bundles = append(bundles, &pb.BundleInfo{
-					Name:       bundle.Name,
-					Repository: bundle.Repository,
-					Ref:        bundle.Ref,
-					Path:       bundle.Path,
-				})
-			}
-			environmentsMap[env.Name] = &pb.EnvironmentInfo{
-				Name:    env.Name,
-				Bundles: bundles,
-			}
-		}
-	}
-
-	// 3. Convert map to slice
-	var environments []*pb.EnvironmentInfo
-	for _, env := range environmentsMap {
-		environments = append(environments, env)
+		return err
 	}
 
 	resp, err := client.RegisterController(ctx, &pb.RegisterControllerRequest{
@@ -235,57 +189,10 @@ func (uc *APIServerSyncUseCase) startHeartbeat(ctx context.Context, client pb.Co
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			// Collect environments from in-memory (config) and etcd
-			environmentsMap := make(map[string]*pb.EnvironmentInfo)
-
-			// 1. In-memory environments (config)
-			inMemoryEnvs, err := uc.inMemoryEnvironmentsRepo.ListEnvironments(ctx)
+			environments, err := uc.buildEnvironmentsForAPIServer(ctx)
 			if err != nil {
-				slog.Error("Failed to list in-memory environments for heartbeat", "error", err)
-			} else {
-				for _, env := range inMemoryEnvs {
-					var bundles []*pb.BundleInfo
-					for _, bundle := range env.Bundles.Static {
-						bundles = append(bundles, &pb.BundleInfo{
-							Name:       bundle.Name,
-							Repository: bundle.Repository,
-							Ref:        bundle.Ref,
-							Path:       bundle.Path,
-						})
-					}
-					environmentsMap[env.Name] = &pb.EnvironmentInfo{
-						Name:    env.Name,
-						Bundles: bundles,
-					}
-				}
-			}
-
-			// 2. Environments from etcd (dynamically created)
-			etcdEnvs, err := uc.environmentsUseCase.ListEnvironments(ctx)
-			if err != nil {
-				slog.Error("Failed to list etcd environments for heartbeat", "error", err)
-			} else {
-				for _, env := range etcdEnvs {
-					var bundles []*pb.BundleInfo
-					for _, bundle := range env.Bundles.Static {
-						bundles = append(bundles, &pb.BundleInfo{
-							Name:       bundle.Name,
-							Repository: bundle.Repository,
-							Ref:        bundle.Ref,
-							Path:       bundle.Path,
-						})
-					}
-					environmentsMap[env.Name] = &pb.EnvironmentInfo{
-						Name:    env.Name,
-						Bundles: bundles,
-					}
-				}
-			}
-
-			// 3. Convert map to slice
-			var environments []*pb.EnvironmentInfo
-			for _, env := range environmentsMap {
-				environments = append(environments, env)
+				slog.Error("Failed to build environments for heartbeat", "error", err)
+				continue
 			}
 
 			_, err = client.Heartbeat(ctx, &pb.HeartbeatRequest{
@@ -340,22 +247,29 @@ func (uc *APIServerSyncUseCase) streamSnapshots(ctx context.Context, client pb.C
 		var snapshots []sharedgit.ContractSnapshot
 		for _, pbSnapshot := range resp.Snapshots {
 			var apps []sharedgit.App
-			for _, pbApp := range pbSnapshot.Access.Apps {
-				apps = append(apps, sharedgit.App{
-					AppID:        pbApp.AppId,
-					Environments: pbApp.Environments,
-				})
+			if acc := pbSnapshot.GetAccess(); acc != nil {
+				for _, pbApp := range acc.GetApps() {
+					apps = append(apps, sharedgit.App{
+						AppID:        pbApp.GetAppId(),
+						Environments: pbApp.GetEnvironments(),
+					})
+				}
 			}
-
+			upstreamName := ""
+			if u := pbSnapshot.GetUpstream(); u != nil {
+				upstreamName = u.GetName()
+			}
+			secure := false
+			if acc := pbSnapshot.GetAccess(); acc != nil {
+				secure = acc.GetSecure()
+			}
 			snapshots = append(snapshots, sharedgit.ContractSnapshot{
-				Name:   pbSnapshot.Name,
-				Prefix: pbSnapshot.Prefix,
-				Upstream: sharedgit.ContractUpstream{
-					Name: pbSnapshot.Upstream.Name,
-				},
-				AllowUndefinedMethods: pbSnapshot.AllowUndefinedMethods,
+				Name:                  pbSnapshot.GetName(),
+				Prefix:                pbSnapshot.GetPrefix(),
+				Upstream:              sharedgit.ContractUpstream{Name: upstreamName},
+				AllowUndefinedMethods: pbSnapshot.GetAllowUndefinedMethods(),
 				Access: sharedgit.Access{
-					Secure: pbSnapshot.Access.Secure,
+					Secure: secure,
 					Apps:   apps,
 				},
 			})
@@ -405,17 +319,152 @@ func (uc *APIServerSyncUseCase) updateXDSSnapshot(ctx context.Context, environme
 }
 
 func (uc *APIServerSyncUseCase) environmentForXDS(ctx context.Context, name string) (*models.Environment, error) {
-	env, err := uc.environmentsUseCase.GetEnvironment(ctx, name)
-	if err == nil {
-		return env, nil
+	skel, err := uc.effectiveEnvironmentSkeleton(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	return uc.environmentWithSnapshotsFromSchema(ctx, skel), nil
+}
+
+// effectiveEnvironmentSkeleton merges static+Kubernetes (in-memory) with controller etcd CRUD:
+// union of bundles and services. If only one side exists, that side is used.
+func (uc *APIServerSyncUseCase) effectiveEnvironmentSkeleton(ctx context.Context, name string) (*models.Environment, error) {
+	var mem *models.Environment
+	if m, err := uc.inMemoryEnvironmentsRepo.GetEnvironment(ctx, name); err == nil {
+		mem = m
 	}
 
-	memEnv, memErr := uc.inMemoryEnvironmentsRepo.GetEnvironment(ctx, name)
-	if memErr != nil {
-		return nil, fmt.Errorf("environment %s: etcd %v; memory %w", name, err, memErr)
+	var etcdEnv *models.Environment
+	if uc.environmentRepo != nil {
+		if e, err := uc.environmentRepo.GetEnvironment(ctx, name); err == nil {
+			etcdEnv = e
+		}
 	}
 
-	return uc.environmentWithSnapshotsFromSchema(ctx, memEnv), nil
+	if mem == nil && etcdEnv == nil {
+		return nil, fmt.Errorf("environment %s not found", name)
+	}
+	if mem == nil {
+		return skeletonFromEtcdOnly(etcdEnv), nil
+	}
+	if etcdEnv == nil {
+		return skeletonFromMemory(mem), nil
+	}
+
+	uB := memory.UnionStaticContractBundles(staticBundles(mem), staticBundles(etcdEnv))
+	uS := memory.UnionStaticServices(staticServices(mem), staticServices(etcdEnv))
+	return &models.Environment{
+		Name:      mem.Name,
+		Type:      mem.Type,
+		Bundles:   &models.EnvironmentBundleConfig{Static: uB},
+		Services:  &models.EnvironmentServiceConfig{Static: uS},
+		Snapshots: nil,
+	}, nil
+}
+
+func skeletonFromMemory(mem *models.Environment) *models.Environment {
+	return &models.Environment{
+		Name:      mem.Name,
+		Type:      mem.Type,
+		Bundles:   cloneBundlesConfig(mem.Bundles),
+		Services:  cloneServicesConfig(mem.Services),
+		Snapshots: nil,
+	}
+}
+
+func skeletonFromEtcdOnly(etcdEnv *models.Environment) *models.Environment {
+	return &models.Environment{
+		Name:      etcdEnv.Name,
+		Type:      etcdEnv.Type,
+		Bundles:   cloneBundlesConfig(etcdEnv.Bundles),
+		Services:  cloneServicesConfig(etcdEnv.Services),
+		Snapshots: nil,
+	}
+}
+
+func staticBundles(e *models.Environment) []models.StaticContractBundleConfig {
+	if e == nil || e.Bundles == nil {
+		return nil
+	}
+	return e.Bundles.Static
+}
+
+func staticServices(e *models.Environment) []models.StaticServiceConfig {
+	if e == nil || e.Services == nil {
+		return nil
+	}
+	return e.Services.Static
+}
+
+func cloneBundlesConfig(b *models.EnvironmentBundleConfig) *models.EnvironmentBundleConfig {
+	if b == nil {
+		return &models.EnvironmentBundleConfig{Static: nil}
+	}
+	cp := make([]models.StaticContractBundleConfig, len(b.Static))
+	copy(cp, b.Static)
+	return &models.EnvironmentBundleConfig{Static: cp}
+}
+
+func cloneServicesConfig(s *models.EnvironmentServiceConfig) *models.EnvironmentServiceConfig {
+	if s == nil {
+		return &models.EnvironmentServiceConfig{Static: nil}
+	}
+	cp := make([]models.StaticServiceConfig, len(s.Static))
+	copy(cp, s.Static)
+	return &models.EnvironmentServiceConfig{Static: cp}
+}
+
+// buildEnvironmentsForAPIServer returns the full declared environment set for Register/Heartbeat
+// (union of names from in-memory and etcd CRUD), with merged bundles per name.
+func (uc *APIServerSyncUseCase) buildEnvironmentsForAPIServer(ctx context.Context) ([]*pb.EnvironmentInfo, error) {
+	names := uc.collectEnvironmentNames(ctx)
+	sort.Strings(names)
+	out := make([]*pb.EnvironmentInfo, 0, len(names))
+	for _, n := range names {
+		skel, err := uc.effectiveEnvironmentSkeleton(ctx, n)
+		if err != nil {
+			slog.Warn("buildEnvironmentsForAPIServer: skip environment", "name", n, "error", err)
+			continue
+		}
+		var bundles []*pb.BundleInfo
+		if skel.Bundles != nil {
+			for _, b := range skel.Bundles.Static {
+				bundles = append(bundles, &pb.BundleInfo{
+					Name:       b.Name,
+					Repository: b.Repository,
+					Ref:        b.Ref,
+					Path:       b.Path,
+				})
+			}
+		}
+		out = append(out, &pb.EnvironmentInfo{Name: skel.Name, Bundles: bundles})
+	}
+	return out, nil
+}
+
+func (uc *APIServerSyncUseCase) collectEnvironmentNames(ctx context.Context) []string {
+	names := make(map[string]struct{})
+	if m, err := uc.inMemoryEnvironmentsRepo.ListEnvironments(ctx); err != nil {
+		slog.Warn("collectEnvironmentNames: in-memory list failed", "error", err)
+	} else {
+		for k := range m {
+			names[k] = struct{}{}
+		}
+	}
+	if uc.environmentRepo != nil {
+		if m, err := uc.environmentRepo.ListEnvironments(ctx); err != nil {
+			slog.Warn("collectEnvironmentNames: etcd environments list failed", "error", err)
+		} else {
+			for k := range m {
+				names[k] = struct{}{}
+			}
+		}
+	}
+	out := make([]string, 0, len(names))
+	for k := range names {
+		out = append(out, k)
+	}
+	return out
 }
 
 func (uc *APIServerSyncUseCase) environmentWithSnapshotsFromSchema(ctx context.Context, src *models.Environment) *models.Environment {
@@ -491,25 +540,8 @@ func (uc *APIServerSyncUseCase) StartEtcdFollowerWatch(ctx context.Context) {
 }
 
 func (uc *APIServerSyncUseCase) rebuildAllXDS(ctx context.Context) error {
-	names := make(map[string]struct{})
-
-	if m, err := uc.inMemoryEnvironmentsRepo.ListEnvironments(ctx); err == nil {
-		for k := range m {
-			names[k] = struct{}{}
-		}
-	} else {
-		slog.Warn("rebuildAllXDS: list in-memory environments", "error", err)
-	}
-
-	if m, err := uc.environmentsUseCase.ListEnvironments(ctx); err == nil {
-		for k := range m {
-			names[k] = struct{}{}
-		}
-	} else {
-		slog.Warn("rebuildAllXDS: list etcd environments", "error", err)
-	}
-
-	for name := range names {
+	names := uc.collectEnvironmentNames(ctx)
+	for _, name := range names {
 		if err := uc.updateXDSSnapshot(ctx, name); err != nil {
 			slog.Warn("rebuildAllXDS: environment", "name", name, "error", err)
 		}

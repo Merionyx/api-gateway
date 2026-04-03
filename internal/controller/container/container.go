@@ -172,7 +172,7 @@ func (c *Container) initUseCases() {
 		c.Config,
 		c.SchemaRepository,
 		c.InMemoryEnvironmentsRepository,
-		c.EnvironmentsUseCase,
+		c.EnvironmentRepository,
 		c.XDSSnapshotManager,
 		c.XDSBuilder,
 		c.EtcdClient,

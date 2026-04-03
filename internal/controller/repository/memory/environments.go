@@ -92,6 +92,16 @@ func bundleDedupeKey(b models.StaticContractBundleConfig) string {
 	return b.Repository + "\x00" + b.Ref + "\x00" + b.Path + "\x00" + b.Name
 }
 
+// UnionStaticContractBundles returns the union of two bundle lists keyed by repository, ref, path, and name.
+func UnionStaticContractBundles(a, b []models.StaticContractBundleConfig) []models.StaticContractBundleConfig {
+	return unionStaticBundles(a, b)
+}
+
+// UnionStaticServices returns the union of two service lists by name (later entries override same name).
+func UnionStaticServices(a, b []models.StaticServiceConfig) []models.StaticServiceConfig {
+	return unionStaticServices(a, b)
+}
+
 func unionStaticBundles(file, k8s []models.StaticContractBundleConfig) []models.StaticContractBundleConfig {
 	byKey := make(map[string]models.StaticContractBundleConfig)
 	for _, b := range file {

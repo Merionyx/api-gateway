@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package api.environments.v1;
 
+import "contract_types.proto";
+
 option go_package = "merionyx/api-gateway/controller/pkg/api/environments/v1;environmentsv1";
 
 // Environment represents an environment
@@ -10,7 +12,7 @@ message Environment {
   string type = 2;
   EnvironmentBundleConfig bundles = 3;
   EnvironmentServiceConfig services = 4;
-  repeated ContractSnapshot snapshots = 5;
+  repeated api.contract.v1.ContractSnapshot snapshots = 5;
 }
 
 // EnvironmentContractConfig represents the contract configuration for an environment
@@ -35,19 +37,6 @@ message EnvironmentServiceConfig {
 message StaticServiceConfig {
   string name = 1;
   string upstream = 2;
-}
-
-// ContractSnapshot represents a contract snapshot
-message ContractSnapshot {
-  string name = 1;
-  string prefix = 2;
-  ContractUpstream upstream = 3;
-  bool allow_undefined_methods = 4;
-}
-
-// ContractUpstream represents an upstream for a contract
-message ContractUpstream {
-  string name = 1;
 }
 
 // Requests & Responses

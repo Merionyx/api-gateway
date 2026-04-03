@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.29.3
-// source: api/proto/v1/environment.proto
+// source: environment.proto
 
 package environmentsv1
 
@@ -273,5 +273,5 @@ var EnvironmentsService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "api/proto/v1/environment.proto",
+	Metadata: "environment.proto",
 }

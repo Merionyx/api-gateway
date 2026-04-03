@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.29.3
-// source: api/proto/v1/controller_registry.proto
+// source: controller_registry.proto
 
 package controllerregistryv1
 
@@ -202,5 +202,5 @@ var ControllerRegistryService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "api/proto/v1/controller_registry.proto",
+	Metadata: "controller_registry.proto",
 }

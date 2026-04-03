@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.10
 // 	protoc        v5.29.3
-// source: api/proto/v1/snapshots.proto
+// source: snapshots.proto
 
 package snapshotsv1
 
@@ -31,7 +31,7 @@ type UpdateSnapshotRequest struct {
 
 func (x *UpdateSnapshotRequest) Reset() {
 	*x = UpdateSnapshotRequest{}
-	mi := &file_api_proto_v1_snapshots_proto_msgTypes[0]
+	mi := &file_snapshots_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +43,7 @@ func (x *UpdateSnapshotRequest) String() string {
 func (*UpdateSnapshotRequest) ProtoMessage() {}
 
 func (x *UpdateSnapshotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_snapshots_proto_msgTypes[0]
+	mi := &file_snapshots_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +56,7 @@ func (x *UpdateSnapshotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateSnapshotRequest.ProtoReflect.Descriptor instead.
 func (*UpdateSnapshotRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_snapshots_proto_rawDescGZIP(), []int{0}
+	return file_snapshots_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *UpdateSnapshotRequest) GetEnvironment() string {
@@ -77,7 +77,7 @@ type UpdateSnapshotResponse struct {
 
 func (x *UpdateSnapshotResponse) Reset() {
 	*x = UpdateSnapshotResponse{}
-	mi := &file_api_proto_v1_snapshots_proto_msgTypes[1]
+	mi := &file_snapshots_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -89,7 +89,7 @@ func (x *UpdateSnapshotResponse) String() string {
 func (*UpdateSnapshotResponse) ProtoMessage() {}
 
 func (x *UpdateSnapshotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_snapshots_proto_msgTypes[1]
+	mi := &file_snapshots_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -102,7 +102,7 @@ func (x *UpdateSnapshotResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateSnapshotResponse.ProtoReflect.Descriptor instead.
 func (*UpdateSnapshotResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_snapshots_proto_rawDescGZIP(), []int{1}
+	return file_snapshots_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *UpdateSnapshotResponse) GetSuccess() bool {
@@ -129,7 +129,7 @@ type GetSnapshotStatusRequest struct {
 
 func (x *GetSnapshotStatusRequest) Reset() {
 	*x = GetSnapshotStatusRequest{}
-	mi := &file_api_proto_v1_snapshots_proto_msgTypes[2]
+	mi := &file_snapshots_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -141,7 +141,7 @@ func (x *GetSnapshotStatusRequest) String() string {
 func (*GetSnapshotStatusRequest) ProtoMessage() {}
 
 func (x *GetSnapshotStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_snapshots_proto_msgTypes[2]
+	mi := &file_snapshots_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -154,7 +154,7 @@ func (x *GetSnapshotStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSnapshotStatusRequest.ProtoReflect.Descriptor instead.
 func (*GetSnapshotStatusRequest) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_snapshots_proto_rawDescGZIP(), []int{2}
+	return file_snapshots_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *GetSnapshotStatusRequest) GetEnvironment() string {
@@ -178,7 +178,7 @@ type GetSnapshotStatusResponse struct {
 
 func (x *GetSnapshotStatusResponse) Reset() {
 	*x = GetSnapshotStatusResponse{}
-	mi := &file_api_proto_v1_snapshots_proto_msgTypes[3]
+	mi := &file_snapshots_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -190,7 +190,7 @@ func (x *GetSnapshotStatusResponse) String() string {
 func (*GetSnapshotStatusResponse) ProtoMessage() {}
 
 func (x *GetSnapshotStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_v1_snapshots_proto_msgTypes[3]
+	mi := &file_snapshots_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -203,7 +203,7 @@ func (x *GetSnapshotStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSnapshotStatusResponse.ProtoReflect.Descriptor instead.
 func (*GetSnapshotStatusResponse) Descriptor() ([]byte, []int) {
-	return file_api_proto_v1_snapshots_proto_rawDescGZIP(), []int{3}
+	return file_snapshots_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetSnapshotStatusResponse) GetEnvironment() string {
@@ -241,11 +241,11 @@ func (x *GetSnapshotStatusResponse) GetRoutesCount() int32 {
 	return 0
 }
 
-var File_api_proto_v1_snapshots_proto protoreflect.FileDescriptor
+var File_snapshots_proto protoreflect.FileDescriptor
 
-const file_api_proto_v1_snapshots_proto_rawDesc = "" +
+const file_snapshots_proto_rawDesc = "" +
 	"\n" +
-	"\x1capi/proto/v1/snapshots.proto\x12\x10api.snapshots.v1\"9\n" +
+	"\x0fsnapshots.proto\x12\x10api.snapshots.v1\"9\n" +
 	"\x15UpdateSnapshotRequest\x12 \n" +
 	"\venvironment\x18\x01 \x01(\tR\venvironment\"e\n" +
 	"\x16UpdateSnapshotResponse\x12\x18\n" +
@@ -264,25 +264,25 @@ const file_api_proto_v1_snapshots_proto_rawDesc = "" +
 	"\x11GetSnapshotStatus\x12*.api.snapshots.v1.GetSnapshotStatusRequest\x1a+.api.snapshots.v1.GetSnapshotStatusResponseBBZ@merionyx/api-gateway/controller/pkg/api/snapshots/v1;snapshotsv1b\x06proto3"
 
 var (
-	file_api_proto_v1_snapshots_proto_rawDescOnce sync.Once
-	file_api_proto_v1_snapshots_proto_rawDescData []byte
+	file_snapshots_proto_rawDescOnce sync.Once
+	file_snapshots_proto_rawDescData []byte
 )
 
-func file_api_proto_v1_snapshots_proto_rawDescGZIP() []byte {
-	file_api_proto_v1_snapshots_proto_rawDescOnce.Do(func() {
-		file_api_proto_v1_snapshots_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_api_proto_v1_snapshots_proto_rawDesc), len(file_api_proto_v1_snapshots_proto_rawDesc)))
+func file_snapshots_proto_rawDescGZIP() []byte {
+	file_snapshots_proto_rawDescOnce.Do(func() {
+		file_snapshots_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_snapshots_proto_rawDesc), len(file_snapshots_proto_rawDesc)))
 	})
-	return file_api_proto_v1_snapshots_proto_rawDescData
+	return file_snapshots_proto_rawDescData
 }
 
-var file_api_proto_v1_snapshots_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
-var file_api_proto_v1_snapshots_proto_goTypes = []any{
+var file_snapshots_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_snapshots_proto_goTypes = []any{
 	(*UpdateSnapshotRequest)(nil),     // 0: api.snapshots.v1.UpdateSnapshotRequest
 	(*UpdateSnapshotResponse)(nil),    // 1: api.snapshots.v1.UpdateSnapshotResponse
 	(*GetSnapshotStatusRequest)(nil),  // 2: api.snapshots.v1.GetSnapshotStatusRequest
 	(*GetSnapshotStatusResponse)(nil), // 3: api.snapshots.v1.GetSnapshotStatusResponse
 }
-var file_api_proto_v1_snapshots_proto_depIdxs = []int32{
+var file_snapshots_proto_depIdxs = []int32{
 	0, // 0: api.snapshots.v1.SnapshotsService.UpdateSnapshot:input_type -> api.snapshots.v1.UpdateSnapshotRequest
 	2, // 1: api.snapshots.v1.SnapshotsService.GetSnapshotStatus:input_type -> api.snapshots.v1.GetSnapshotStatusRequest
 	1, // 2: api.snapshots.v1.SnapshotsService.UpdateSnapshot:output_type -> api.snapshots.v1.UpdateSnapshotResponse
@@ -294,26 +294,26 @@ var file_api_proto_v1_snapshots_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_api_proto_v1_snapshots_proto_init() }
-func file_api_proto_v1_snapshots_proto_init() {
-	if File_api_proto_v1_snapshots_proto != nil {
+func init() { file_snapshots_proto_init() }
+func file_snapshots_proto_init() {
+	if File_snapshots_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_proto_v1_snapshots_proto_rawDesc), len(file_api_proto_v1_snapshots_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_snapshots_proto_rawDesc), len(file_snapshots_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_api_proto_v1_snapshots_proto_goTypes,
-		DependencyIndexes: file_api_proto_v1_snapshots_proto_depIdxs,
-		MessageInfos:      file_api_proto_v1_snapshots_proto_msgTypes,
+		GoTypes:           file_snapshots_proto_goTypes,
+		DependencyIndexes: file_snapshots_proto_depIdxs,
+		MessageInfos:      file_snapshots_proto_msgTypes,
 	}.Build()
-	File_api_proto_v1_snapshots_proto = out.File
-	file_api_proto_v1_snapshots_proto_goTypes = nil
-	file_api_proto_v1_snapshots_proto_depIdxs = nil
+	File_snapshots_proto = out.File
+	file_snapshots_proto_goTypes = nil
+	file_snapshots_proto_depIdxs = nil
 }

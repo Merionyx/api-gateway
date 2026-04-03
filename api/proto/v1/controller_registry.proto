@@ -2,9 +2,13 @@ syntax = "proto3";
 
 package api.controller_registry.v1;
 
+import "contract_types.proto";
+
 option go_package = "merionyx/api-gateway/controller/pkg/api/controller_registry/v1;controllerregistryv1";
 
-// RegisterControllerRequest request to register Gateway Controller
+// RegisterControllerRequest registers a Gateway Controller with the API Server.
+// environments is the full snapshot of environments this controller declares (static + K8s + etcd CRUD merge);
+// it is not a delta.
 message RegisterControllerRequest {
   string controller_id = 1;
   string tenant = 2;
@@ -40,36 +44,12 @@ message StreamSnapshotsRequest {
 message StreamSnapshotsResponse {
   string environment = 1;
   string bundle_key = 2;
-  repeated ContractSnapshot snapshots = 3;
+  repeated api.contract.v1.ContractSnapshot snapshots = 3;
 }
 
-// ContractSnapshot represents a contract snapshot
-message ContractSnapshot {
-  string name = 1;
-  string prefix = 2;
-  ContractUpstream upstream = 3;
-  bool allow_undefined_methods = 4;
-  Access access = 5;
-}
-
-// ContractUpstream represents an upstream for a contract
-message ContractUpstream {
-  string name = 1;
-}
-
-// Access represents access settings
-message Access {
-  bool secure = 1;
-  repeated App apps = 2;
-}
-
-// App represents an application with access
-message App {
-  string app_id = 1;
-  repeated string environments = 2;
-}
-
-// HeartbeatRequest request to heartbeat from controller
+// HeartbeatRequest periodic update from controller.
+// environments must be the full current snapshot (same semantics as RegisterControllerRequest.environments).
+// The API Server replaces the stored controller record's environment list with this payload (not a merge/delta).
 message HeartbeatRequest {
   string controller_id = 1;
   repeated EnvironmentInfo environments = 2;

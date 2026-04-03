@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"merionyx/api-gateway/internal/contract-syncer/domain/interfaces"
+	contractv1 "merionyx/api-gateway/pkg/api/contract/v1"
 	pb "merionyx/api-gateway/pkg/api/contract_syncer/v1"
 )
 
@@ -31,24 +32,24 @@ func (h *SyncHandler) Sync(ctx context.Context, req *pb.SyncRequest) (*pb.SyncRe
 		}, nil
 	}
 
-	var pbSnapshots []*pb.ContractSnapshot
+	var pbSnapshots []*contractv1.ContractSnapshot
 	for _, snapshot := range snapshots {
-		var pbApps []*pb.App
+		var pbApps []*contractv1.App
 		for _, app := range snapshot.Access.Apps {
-			pbApps = append(pbApps, &pb.App{
+			pbApps = append(pbApps, &contractv1.App{
 				AppId:        app.AppID,
 				Environments: app.Environments,
 			})
 		}
 
-		pbSnapshots = append(pbSnapshots, &pb.ContractSnapshot{
+		pbSnapshots = append(pbSnapshots, &contractv1.ContractSnapshot{
 			Name:   snapshot.Name,
 			Prefix: snapshot.Prefix,
-			Upstream: &pb.ContractUpstream{
+			Upstream: &contractv1.ContractUpstream{
 				Name: snapshot.Upstream.Name,
 			},
 			AllowUndefinedMethods: snapshot.AllowUndefinedMethods,
-			Access: &pb.Access{
+			Access: &contractv1.Access{
 				Secure: snapshot.Access.Secure,
 				Apps:   pbApps,
 			},

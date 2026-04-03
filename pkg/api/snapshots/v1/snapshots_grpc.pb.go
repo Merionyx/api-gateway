@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.29.3
-// source: api/proto/v1/snapshots.proto
+// source: snapshots.proto
 
 package snapshotsv1
 
@@ -159,5 +159,5 @@ var SnapshotsService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "api/proto/v1/snapshots.proto",
+	Metadata: "snapshots.proto",
 }

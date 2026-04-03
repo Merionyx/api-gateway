@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package api.contract_syncer.v1;
 
+import "contract_types.proto";
+
 option go_package = "merionyx/api-gateway/controller/pkg/api/contract_syncer/v1;contractsyncerv1";
 
 // SyncRequest request to sync snapshots for a specific bundle
@@ -13,34 +15,8 @@ message SyncRequest {
 
 // SyncResponse response with snapshots for a bundle
 message SyncResponse {
-  repeated ContractSnapshot snapshots = 1;
+  repeated api.contract.v1.ContractSnapshot snapshots = 1;
   string error = 2;
-}
-
-// ContractSnapshot represents a contract snapshot
-message ContractSnapshot {
-  string name = 1;
-  string prefix = 2;
-  ContractUpstream upstream = 3;
-  bool allow_undefined_methods = 4;
-  Access access = 5;
-}
-
-// ContractUpstream represents an upstream for a contract
-message ContractUpstream {
-  string name = 1;
-}
-
-// Access represents access settings
-message Access {
-  bool secure = 1;
-  repeated App apps = 2;
-}
-
-// App represents an application with access
-message App {
-  string app_id = 1;
-  repeated string environments = 2;
 }
 
 // ContractSyncerService service for synchronizing contracts

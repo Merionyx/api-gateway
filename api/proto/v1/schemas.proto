@@ -2,20 +2,9 @@ syntax = "proto3";
 
 package api.schemas.v1;
 
+import "contract_types.proto";
+
 option go_package = "merionyx/api-gateway/controller/pkg/api/schemas/v1;schemasv1";
-
-// ContractSnapshot represents a contract snapshot
-message ContractSnapshot {
-  string name = 1;
-  string prefix = 2;
-  ContractUpstream upstream = 3;
-  bool allow_undefined_methods = 4;
-}
-
-// ContractUpstream represents an upstream for a contract
-message ContractUpstream {
-  string name = 1;
-}
 
 // Requests & Responses
 
@@ -29,7 +18,7 @@ message SyncContractBundleRequest {
 
 // SyncContractBundleResponse represents a response to sync a contract bundle
 message SyncContractBundleResponse {
-  repeated ContractSnapshot snapshots = 1;
+  repeated api.contract.v1.ContractSnapshot snapshots = 1;
   bool from_cache = 2; // true if taken from etcd, false if from Git
 }
 
@@ -49,7 +38,7 @@ message GetContractSnapshotRequest {
 
 // GetContractSnapshotResponse represents a response to get a contract snapshot
 message GetContractSnapshotResponse {
-  ContractSnapshot snapshot = 1;
+  api.contract.v1.ContractSnapshot snapshot = 1;
 }
 
 // ListContractSnapshotsRequest represents a request to list contract snapshots
@@ -61,7 +50,7 @@ message ListContractSnapshotsRequest {
 
 // ListContractSnapshotsResponse represents a response to list contract snapshots
 message ListContractSnapshotsResponse {
-  repeated ContractSnapshot snapshots = 1;
+  repeated api.contract.v1.ContractSnapshot snapshots = 1;
 }
 
 // SyncAllContractsRequest represents a request to sync all contracts
