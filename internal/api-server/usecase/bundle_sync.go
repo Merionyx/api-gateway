@@ -141,11 +141,15 @@ func (uc *BundleSyncUseCase) syncBundleOnce(ctx context.Context, bundle models.B
 	}
 
 	bundleKey := bundlekey.Build(bundle.Repository, bundle.Ref, bundle.Path)
-	if err := uc.snapshotRepo.SaveSnapshots(ctx, bundleKey, snapshots); err != nil {
+	written, err := uc.snapshotRepo.SaveSnapshots(ctx, bundleKey, snapshots)
+	if err != nil {
 		return nil, fmt.Errorf("save snapshots: %w", err)
 	}
+	if !written {
+		slog.Debug("API Server: bundle sync finished, no etcd snapshot keys changed", "bundle_key", bundleKey)
+	}
 
-	// Controllers are notified via etcd watch (StartEtcdWatch) on every API Server replica.
+	// Controllers are notified via etcd watch only when a snapshot key revision changes.
 
 	return snapshots, nil
 }

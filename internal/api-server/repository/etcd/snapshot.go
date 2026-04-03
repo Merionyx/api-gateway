@@ -26,26 +26,33 @@ func NewSnapshotRepository(client *clientv3.Client) *SnapshotRepository {
 	}
 }
 
-func (r *SnapshotRepository) SaveSnapshots(ctx context.Context, bundleKey string, snapshots []sharedgit.ContractSnapshot) error {
+func (r *SnapshotRepository) SaveSnapshots(ctx context.Context, bundleKey string, snapshots []sharedgit.ContractSnapshot) (written bool, err error) {
 	slog.Info("Saving snapshots to etcd", "bundle_key", bundleKey, "count", len(snapshots))
 
 	for _, snapshot := range snapshots {
 		key := fmt.Sprintf("%s%s/contracts/%s", snapshotPrefix, bundleKey, snapshot.Name)
-		
+
 		data, err := json.Marshal(snapshot)
 		if err != nil {
-			return fmt.Errorf("failed to marshal snapshot: %w", err)
+			return false, fmt.Errorf("failed to marshal snapshot: %w", err)
+		}
+
+		getResp, err := r.client.Get(ctx, key)
+		if err == nil && len(getResp.Kvs) == 1 && string(getResp.Kvs[0].Value) == string(data) {
+			slog.Debug("API Server etcd: snapshot unchanged, skip write", "key", key)
+			continue
 		}
 
 		_, err = r.client.Put(ctx, key, string(data))
 		if err != nil {
-			return fmt.Errorf("failed to save snapshot to etcd: %w", err)
+			return written, fmt.Errorf("failed to save snapshot to etcd: %w", err)
 		}
 
+		written = true
 		slog.Debug("Saved snapshot", "key", key, "name", snapshot.Name)
 	}
 
-	return nil
+	return written, nil
 }
 
 func (r *SnapshotRepository) GetSnapshots(ctx context.Context, bundleKey string) ([]sharedgit.ContractSnapshot, error) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sort"
 	"sync"
 
 	"merionyx/api-gateway/internal/controller/config"
@@ -21,6 +22,7 @@ type EnvironmentsRepository struct {
 
 	xdsSnapshotManager *xdscache.SnapshotManager
 	xdsBuilder         interfaces.XDSBuilder
+	schemaRepo         interfaces.SchemaRepository
 }
 
 func NewEnvironmentsRepository() interfaces.InMemoryEnvironmentsRepository {
@@ -30,9 +32,10 @@ func NewEnvironmentsRepository() interfaces.InMemoryEnvironmentsRepository {
 	}
 }
 
-func (r *EnvironmentsRepository) SetDependencies(xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder interfaces.XDSBuilder) {
+func (r *EnvironmentsRepository) SetDependencies(xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder interfaces.XDSBuilder, schemaRepo interfaces.SchemaRepository) {
 	r.xdsSnapshotManager = xdsSnapshotManager
 	r.xdsBuilder = xdsBuilder
+	r.schemaRepo = schemaRepo
 }
 
 func (r *EnvironmentsRepository) Initialize(config *config.Config) error {
@@ -81,7 +84,89 @@ func (r *EnvironmentsRepository) Initialize(config *config.Config) error {
 		slog.Info("environment from config", "name", environment.Name, "bundles", len(environment.Bundles.Static), "services", len(environment.Services.Static))
 	}
 
-	return r.rebuildMergedXDSSnapshotsLocked()
+	return r.rebuildMergedXDSSnapshotsLocked(context.Background())
+}
+
+func bundleDedupeKey(b models.StaticContractBundleConfig) string {
+	return b.Repository + "\x00" + b.Ref + "\x00" + b.Path + "\x00" + b.Name
+}
+
+func unionStaticBundles(file, k8s []models.StaticContractBundleConfig) []models.StaticContractBundleConfig {
+	byKey := make(map[string]models.StaticContractBundleConfig)
+	for _, b := range file {
+		byKey[bundleDedupeKey(b)] = b
+	}
+	for _, b := range k8s {
+		byKey[bundleDedupeKey(b)] = b
+	}
+	keys := make([]string, 0, len(byKey))
+	for k := range byKey {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	out := make([]models.StaticContractBundleConfig, 0, len(keys))
+	for _, k := range keys {
+		out = append(out, byKey[k])
+	}
+	return out
+}
+
+func unionStaticServices(file, k8s []models.StaticServiceConfig) []models.StaticServiceConfig {
+	byName := make(map[string]models.StaticServiceConfig)
+	for _, s := range file {
+		byName[s.Name] = s
+	}
+	for _, s := range k8s {
+		byName[s.Name] = s
+	}
+	names := make([]string, 0, len(byName))
+	for n := range byName {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	out := make([]models.StaticServiceConfig, 0, len(names))
+	for _, n := range names {
+		out = append(out, byName[n])
+	}
+	return out
+}
+
+// mergeEnvironment overlays Kubernetes-discovered bundles/services onto static config for the same logical environment.
+func mergeEnvironment(file, k8s *models.Environment) *models.Environment {
+	var fBundles, kBundles []models.StaticContractBundleConfig
+	if file != nil && file.Bundles != nil {
+		fBundles = file.Bundles.Static
+	}
+	if k8s != nil && k8s.Bundles != nil {
+		kBundles = k8s.Bundles.Static
+	}
+	var fSvc, kSvc []models.StaticServiceConfig
+	if file != nil && file.Services != nil {
+		fSvc = file.Services.Static
+	}
+	if k8s != nil && k8s.Services != nil {
+		kSvc = k8s.Services.Static
+	}
+	name := ""
+	typ := "kubernetes"
+	if k8s != nil {
+		name = k8s.Name
+		typ = k8s.Type
+	} else if file != nil {
+		name = file.Name
+		typ = file.Type
+	}
+	return &models.Environment{
+		Name: name,
+		Type: typ,
+		Bundles: &models.EnvironmentBundleConfig{
+			Static: unionStaticBundles(fBundles, kBundles),
+		},
+		Services: &models.EnvironmentServiceConfig{
+			Static: unionStaticServices(fSvc, kSvc),
+		},
+		Snapshots: nil,
+	}
 }
 
 func (r *EnvironmentsRepository) mergedLocked() map[string]*models.Environment {
@@ -89,18 +174,46 @@ func (r *EnvironmentsRepository) mergedLocked() map[string]*models.Environment {
 	for k, v := range r.fromFile {
 		out[k] = v
 	}
-	for k, v := range r.fromK8s {
-		out[k] = v
+	for k, k8s := range r.fromK8s {
+		if fileEnv, ok := r.fromFile[k]; ok {
+			out[k] = mergeEnvironment(fileEnv, k8s)
+		} else {
+			out[k] = k8s
+		}
 	}
 	return out
 }
 
-func (r *EnvironmentsRepository) rebuildMergedXDSSnapshotsLocked() error {
+func (r *EnvironmentsRepository) envWithSnapshotsFromEtcd(ctx context.Context, env *models.Environment) *models.Environment {
+	if env == nil {
+		return nil
+	}
+	if r.schemaRepo == nil {
+		return env
+	}
+	out := *env
+	out.Snapshots = nil
+	if env.Bundles == nil {
+		return &out
+	}
+	for _, bundle := range env.Bundles.Static {
+		snaps, err := r.schemaRepo.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref, bundle.Path)
+		if err != nil {
+			slog.Warn("xDS rebuild from memory: list contract snapshots", "environment", env.Name, "repository", bundle.Repository, "ref", bundle.Ref, "path", bundle.Path, "error", err)
+			continue
+		}
+		out.Snapshots = append(out.Snapshots, snaps...)
+	}
+	return &out
+}
+
+func (r *EnvironmentsRepository) rebuildMergedXDSSnapshotsLocked(ctx context.Context) error {
 	if r.xdsSnapshotManager == nil || r.xdsBuilder == nil {
 		return nil
 	}
 	for envName, env := range r.mergedLocked() {
-		snap := snapshot.BuildEnvoySnapshot(r.xdsBuilder, env)
+		buildEnv := r.envWithSnapshotsFromEtcd(ctx, env)
+		snap := snapshot.BuildEnvoySnapshot(r.xdsBuilder, buildEnv)
 		nodeID := fmt.Sprintf("envoy-%s", envName)
 		if err := r.xdsSnapshotManager.UpdateSnapshot(nodeID, snap); err != nil {
 			slog.Error("xDS snapshot update failed", "node_id", nodeID, "error", err)
@@ -112,11 +225,11 @@ func (r *EnvironmentsRepository) rebuildMergedXDSSnapshotsLocked() error {
 }
 
 // ApplyKubernetesEnvironments replaces the Kubernetes-sourced environment map and rebuilds xDS.
-func (r *EnvironmentsRepository) ApplyKubernetesEnvironments(_ context.Context, envs map[string]*models.Environment) error {
+func (r *EnvironmentsRepository) ApplyKubernetesEnvironments(ctx context.Context, envs map[string]*models.Environment) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.fromK8s = envs
-	return r.rebuildMergedXDSSnapshotsLocked()
+	return r.rebuildMergedXDSSnapshotsLocked(ctx)
 }
 
 // GetEnvironment returns kubernetes overlay first, then static config.

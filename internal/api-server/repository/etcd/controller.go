@@ -35,6 +35,8 @@ func (r *ControllerRepository) RegisterController(ctx context.Context, info mode
 
 	key := fmt.Sprintf("%s%s", controllerPrefix, info.ControllerID)
 
+	info.Environments = models.CanonicalEnvironmentsForStorage(info.Environments)
+
 	data, err := json.Marshal(info)
 	if err != nil {
 		return fmt.Errorf("failed to marshal controller info: %w", err)
@@ -105,46 +107,52 @@ func (r *ControllerRepository) ListControllers(ctx context.Context) ([]models.Co
 	return controllers, nil
 }
 
-func (r *ControllerRepository) UpdateControllerHeartbeat(ctx context.Context, controllerID string, environments []models.EnvironmentInfo) error {
+func (r *ControllerRepository) UpdateControllerHeartbeat(ctx context.Context, controllerID string, environments []models.EnvironmentInfo) (mainKeyUpdated bool, err error) {
 	heartbeatKey := fmt.Sprintf("%s%s/heartbeat", controllerPrefix, controllerID)
 	heartbeatData, err := json.Marshal(HeartbeatInfo{
 		Timestamp: time.Now(),
 	})
 	if err != nil {
-		return fmt.Errorf("failed to marshal heartbeat info: %w", err)
+		return false, fmt.Errorf("failed to marshal heartbeat info: %w", err)
 	}
 
 	_, err = r.client.Put(ctx, heartbeatKey, string(heartbeatData))
 	if err != nil {
-		return fmt.Errorf("failed to update heartbeat: %w", err)
+		return false, fmt.Errorf("failed to update heartbeat: %w", err)
 	}
 
 	key := fmt.Sprintf("%s%s", controllerPrefix, controllerID)
 	resp, err := r.client.Get(ctx, key)
 	if err != nil {
-		return fmt.Errorf("failed to get controller: %w", err)
+		return false, fmt.Errorf("failed to get controller: %w", err)
 	}
 
 	if len(resp.Kvs) == 0 {
-		return fmt.Errorf("controller not found")
+		return false, fmt.Errorf("controller not found")
 	}
 
 	var info models.ControllerInfo
 	if err := json.Unmarshal(resp.Kvs[0].Value, &info); err != nil {
-		return fmt.Errorf("failed to unmarshal controller info: %w", err)
+		return false, fmt.Errorf("failed to unmarshal controller info: %w", err)
 	}
 
-	info.Environments = environments
+	info.Environments = models.CanonicalEnvironmentsForStorage(environments)
 
 	data, err := json.Marshal(info)
 	if err != nil {
-		return fmt.Errorf("failed to marshal controller info: %w", err)
+		return false, fmt.Errorf("failed to marshal controller info: %w", err)
+	}
+
+	prev := resp.Kvs[0].Value
+	if string(prev) == string(data) {
+		slog.Debug("API Server etcd: controller record unchanged, skip write", "controller_id", controllerID)
+		return false, nil
 	}
 
 	_, err = r.client.Put(ctx, key, string(data))
 	if err != nil {
-		return fmt.Errorf("failed to update controller: %w", err)
+		return false, fmt.Errorf("failed to update controller: %w", err)
 	}
 
-	return nil
+	return true, nil
 }

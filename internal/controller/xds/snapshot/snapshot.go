@@ -1,20 +1,20 @@
 package snapshot
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"log"
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
 	"merionyx/api-gateway/internal/controller/domain/models"
+	"sort"
 	"time"
 
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
-	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
+	envoycache "github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/resource/v3"
 )
 
-func BuildEnvoySnapshot(xdsBuilder interfaces.XDSBuilder, env *models.Environment) *cache.Snapshot {
-	version := fmt.Sprintf("v%d", time.Now().Unix())
-
+func BuildEnvoySnapshot(xdsBuilder interfaces.XDSBuilder, env *models.Environment) *envoycache.Snapshot {
 	listeners := xdsBuilder.BuildListeners(env)
 	clusters := xdsBuilder.BuildClusters(env)
 	routes := xdsBuilder.BuildRoutes(env)
@@ -40,7 +40,13 @@ func BuildEnvoySnapshot(xdsBuilder interfaces.XDSBuilder, env *models.Environmen
 		endpointResources[i] = e
 	}
 
-	snapshot, err := cache.NewSnapshot(
+	version, err := snapshotVersionFromResources(listenerResources, clusterResources, routeResources, endpointResources)
+	if err != nil {
+		log.Printf("snapshot: stable version failed (%v), using time-based version", err)
+		version = fmt.Sprintf("v%d", time.Now().Unix())
+	}
+
+	snapshot, err := envoycache.NewSnapshot(
 		version,
 		map[resource.Type][]types.Resource{
 			resource.ListenerType: listenerResources,
@@ -54,4 +60,58 @@ func BuildEnvoySnapshot(xdsBuilder interfaces.XDSBuilder, env *models.Environmen
 	}
 
 	return snapshot
+}
+
+func snapshotVersionFromResources(
+	listenerResources, clusterResources, routeResources, endpointResources []types.Resource,
+) (string, error) {
+	h := sha256.New()
+	groups := []struct {
+		tag string
+		res []types.Resource
+	}{
+		{"L", listenerResources},
+		{"C", clusterResources},
+		{"R", routeResources},
+		{"E", endpointResources},
+	}
+	for _, g := range groups {
+		h.Write([]byte(g.tag))
+		part, err := hashResourceList(g.res)
+		if err != nil {
+			return "", err
+		}
+		h.Write(part)
+	}
+	sum := h.Sum(nil)
+	return fmt.Sprintf("v%x", sum[:16]), nil
+}
+
+func hashResourceList(resources []types.Resource) ([]byte, error) {
+	if len(resources) == 0 {
+		return []byte{0}, nil
+	}
+	idx := make([]int, len(resources))
+	for i := range idx {
+		idx[i] = i
+	}
+	sort.Slice(idx, func(i, j int) bool {
+		a := envoycache.GetResourceName(resources[idx[i]])
+		b := envoycache.GetResourceName(resources[idx[j]])
+		if a != b {
+			return a < b
+		}
+		return idx[i] < idx[j]
+	})
+	inner := sha256.New()
+	for _, i := range idx {
+		b, err := envoycache.MarshalResource(resources[i])
+		if err != nil {
+			return nil, err
+		}
+		inner.Write([]byte(envoycache.GetResourceName(resources[i])))
+		inner.Write([]byte{0})
+		inner.Write(b)
+	}
+	return inner.Sum(nil), nil
 }

@@ -51,7 +51,7 @@ type InMemoryServiceRepository interface {
 }
 
 type InMemoryEnvironmentsRepository interface {
-	SetDependencies(xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder XDSBuilder)
+	SetDependencies(xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder XDSBuilder, schemaRepo SchemaRepository)
 	Initialize(config *config.Config) error
 	GetEnvironment(ctx context.Context, name string) (*models.Environment, error)
 	ListEnvironments(ctx context.Context) (map[string]*models.Environment, error)

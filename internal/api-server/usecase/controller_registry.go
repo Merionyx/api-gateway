@@ -109,19 +109,13 @@ func (uc *ControllerRegistryUseCase) StreamSnapshots(ctx context.Context, contro
 func (uc *ControllerRegistryUseCase) Heartbeat(ctx context.Context, controllerID string, environments []models.EnvironmentInfo) error {
 	slog.Debug("Received heartbeat", "controller_id", controllerID)
 
-	controller, err := uc.controllerRepo.GetController(ctx, controllerID)
+	mainUpdated, err := uc.controllerRepo.UpdateControllerHeartbeat(ctx, controllerID, environments)
 	if err != nil {
-		return fmt.Errorf("failed to get controller: %w", err)
-	}
-
-	hasChanges := controllerEnvironmentsChanged(controller.Environments, environments)
-
-	if err := uc.controllerRepo.UpdateControllerHeartbeat(ctx, controllerID, environments); err != nil {
 		return fmt.Errorf("failed to update heartbeat: %w", err)
 	}
 
-	if hasChanges {
-		slog.Info("Detected environment changes, sending snapshots to stream", "controller_id", controllerID)
+	if mainUpdated {
+		slog.Info("Controller record updated, sending snapshots to stream", "controller_id", controllerID)
 
 		uc.mu.RLock()
 		stream, exists := uc.controllerStreams[controllerID]
@@ -129,7 +123,7 @@ func (uc *ControllerRegistryUseCase) Heartbeat(ctx context.Context, controllerID
 
 		if exists {
 			if err := uc.sendAllSnapshotsForControllerStream(ctx, controllerID, stream); err != nil {
-				slog.Error("Failed to send snapshots after env change", "error", err)
+				slog.Error("Failed to send snapshots after controller update", "error", err)
 			}
 		}
 	}
@@ -265,47 +259,6 @@ func parseControllerIDKey(key string) (controllerID string, ok bool) {
 		return "", false
 	}
 	return rest, true
-}
-
-// controllerEnvironmentsChanged is true when env names or bundle sets (repository/ref/path) differ.
-func controllerEnvironmentsChanged(stored, incoming []models.EnvironmentInfo) bool {
-	incomingByName := make(map[string][]models.BundleInfo, len(incoming))
-	for _, e := range incoming {
-		incomingByName[e.Name] = e.Bundles
-	}
-	if len(stored) != len(incomingByName) {
-		return true
-	}
-	for _, e := range stored {
-		bundlesIn, ok := incomingByName[e.Name]
-		if !ok || !bundleMultisetsEqual(e.Bundles, bundlesIn) {
-			return true
-		}
-	}
-	return false
-}
-
-func bundleMultisetsEqual(a, b []models.BundleInfo) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	counts := make(map[string]int, len(a))
-	for _, x := range a {
-		counts[bundlekey.Build(x.Repository, x.Ref, x.Path)]++
-	}
-	for _, x := range b {
-		k := bundlekey.Build(x.Repository, x.Ref, x.Path)
-		counts[k]--
-		if counts[k] < 0 {
-			return false
-		}
-	}
-	for _, c := range counts {
-		if c != 0 {
-			return false
-		}
-	}
-	return true
 }
 
 func (uc *ControllerRegistryUseCase) resyncConnectedController(ctx context.Context, controllerID string) error {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
+	res "github.com/envoyproxy/go-control-plane/pkg/resource/v3"
 )
 
 type SnapshotManager struct {
@@ -18,6 +19,16 @@ func NewSnapshotManager() *SnapshotManager {
 }
 
 func (sm *SnapshotManager) UpdateSnapshot(nodeID string, snapshot *cache.Snapshot) error {
+	prev, err := sm.cache.GetSnapshot(nodeID)
+	if err == nil {
+		if ps, ok := prev.(*cache.Snapshot); ok {
+			pv := ps.GetVersion(res.ClusterType)
+			nv := snapshot.GetVersion(res.ClusterType)
+			if pv != "" && nv != "" && pv == nv {
+				return nil
+			}
+		}
+	}
 	return sm.cache.SetSnapshot(context.Background(), nodeID, snapshot)
 }
 

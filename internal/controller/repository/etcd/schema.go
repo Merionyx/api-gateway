@@ -38,6 +38,12 @@ func (r *schemaRepository) SaveContractSnapshot(ctx context.Context, repo, ref, 
 		return fmt.Errorf("failed to marshal contract snapshot: %w", err)
 	}
 
+	getResp, err := r.client.Get(ctx, key)
+	if err == nil && len(getResp.Kvs) == 1 && string(getResp.Kvs[0].Value) == string(data) {
+		slog.Debug("Controller etcd: contract snapshot unchanged, skip write", "key", key, "contract", contract)
+		return nil
+	}
+
 	_, err = r.client.Put(ctx, key, string(data))
 	if err != nil {
 		return fmt.Errorf("failed to save contract snapshot to etcd: %w", err)

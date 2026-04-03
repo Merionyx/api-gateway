@@ -133,7 +133,7 @@ func (c *Container) createInMemoryServiceRepository() {
 }
 
 func (c *Container) initInMemoryRepositories() {
-	c.InMemoryEnvironmentsRepository.SetDependencies(c.XDSSnapshotManager, c.XDSBuilder)
+	c.InMemoryEnvironmentsRepository.SetDependencies(c.XDSSnapshotManager, c.XDSBuilder, c.SchemaRepository)
 
 	if err := c.InMemoryServiceRepository.Initialize(c.Config); err != nil {
 		log.Fatalf("Failed to initialize service repository: %v", err)

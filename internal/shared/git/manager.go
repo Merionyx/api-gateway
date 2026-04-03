@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
@@ -43,15 +44,69 @@ type ManagedRepo struct {
 	Path   string
 }
 
+type bundleSnapshotCacheEntry struct {
+	commitHash string
+	snapshots  []ContractSnapshot
+}
+
 type RepositoryManager struct {
-	repos map[string]*ManagedRepo
-	mu    sync.RWMutex
+	repos           map[string]*ManagedRepo
+	mu              sync.RWMutex
+	bundleSnapCache map[string]bundleSnapshotCacheEntry
+	cacheMu         sync.RWMutex
 }
 
 func NewRepositoryManager() *RepositoryManager {
 	return &RepositoryManager{
-		repos: make(map[string]*ManagedRepo),
+		repos:           make(map[string]*ManagedRepo),
+		bundleSnapCache: make(map[string]bundleSnapshotCacheEntry),
 	}
+}
+
+func bundleSnapCacheKey(repoName, ref, path string) string {
+	return repoName + "\x00" + ref + "\x00" + path
+}
+
+func cloneContractSnapshots(src []ContractSnapshot) []ContractSnapshot {
+	out := make([]ContractSnapshot, len(src))
+	for i := range src {
+		out[i] = src[i]
+		out[i].Access.Apps = append([]App(nil), src[i].Access.Apps...)
+		for j := range out[i].Access.Apps {
+			out[i].Access.Apps[j].Environments = append([]string(nil), src[i].Access.Apps[j].Environments...)
+		}
+	}
+	return out
+}
+
+func normalizeContractSnapshotAccess(s ContractSnapshot) ContractSnapshot {
+	apps := append([]App(nil), s.Access.Apps...)
+	sort.Slice(apps, func(i, j int) bool { return apps[i].AppID < apps[j].AppID })
+	for i := range apps {
+		envs := append([]string(nil), apps[i].Environments...)
+		sort.Strings(envs)
+		apps[i].Environments = envs
+	}
+	s.Access.Apps = apps
+	return s
+}
+
+func dedupeContractSnapshotsByName(snapshots []ContractSnapshot) []ContractSnapshot {
+	byName := make(map[string]ContractSnapshot, len(snapshots))
+	for _, s := range snapshots {
+		s = normalizeContractSnapshotAccess(s)
+		byName[s.Name] = s
+	}
+	names := make([]string, 0, len(byName))
+	for n := range byName {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	out := make([]ContractSnapshot, 0, len(names))
+	for _, n := range names {
+		out = append(out, byName[n])
+	}
+	return out
 }
 
 func (rm *RepositoryManager) InitializeRepositories(repos []RepositoryConfig) error {
@@ -217,6 +272,10 @@ func (rm *RepositoryManager) GetRepositorySnapshots(name string, ref string, pat
 	managedRepo := rm.repos[name]
 	rm.mu.RUnlock()
 
+	if managedRepo == nil {
+		return nil, fmt.Errorf("repository %s not found", name)
+	}
+
 	log.Println("Getting repository snapshots for", name, ref, path)
 
 	switch managedRepo.Source {
@@ -268,19 +327,48 @@ func (rm *RepositoryManager) getSnapshotsFromGit(managedRepo *ManagedRepo, ref s
 		return nil, fmt.Errorf("failed to get auth for repository %s: %w", managedRepo.Name, err)
 	}
 
-	err = w.Pull(&git.PullOptions{
-		Force: true,
-		Auth:  auth,
-	})
-
-	if err != nil {
-		if err != git.NoErrAlreadyUpToDate {
-			return nil, fmt.Errorf("failed to pull repository %s: %w", managedRepo.Name, err)
+	switch managedRepo.Source {
+	case "git":
+		fetchErr := repo.Fetch(&git.FetchOptions{
+			RemoteName: git.DefaultRemoteName,
+			Auth:       auth,
+		})
+		if fetchErr != nil && fetchErr != git.NoErrAlreadyUpToDate {
+			return nil, fmt.Errorf("failed to fetch repository %s: %w", managedRepo.Name, fetchErr)
 		}
-		log.Println("Repository", managedRepo.Name, "is already up to date")
+		if fetchErr == git.NoErrAlreadyUpToDate {
+			slog.Debug("git remote unchanged, skip pull", "repository", managedRepo.Name, "ref", ref)
+		} else {
+			if err = w.Pull(&git.PullOptions{Force: true, Auth: auth}); err != nil && err != git.NoErrAlreadyUpToDate {
+				return nil, fmt.Errorf("failed to pull repository %s: %w", managedRepo.Name, err)
+			}
+			log.Println("Pulled repository", managedRepo.Name)
+		}
+	default:
+		err = w.Pull(&git.PullOptions{
+			Force: true,
+			Auth:  auth,
+		})
+		if err != nil {
+			if err != git.NoErrAlreadyUpToDate {
+				return nil, fmt.Errorf("failed to pull repository %s: %w", managedRepo.Name, err)
+			}
+			log.Println("Repository", managedRepo.Name, "is already up to date")
+		}
+		log.Println("Pulled repository", managedRepo.Name)
 	}
 
-	log.Println("Pulled repository", managedRepo.Name)
+	headRef, headErr := repo.Head()
+	cacheKey := bundleSnapCacheKey(managedRepo.Name, ref, path)
+	if headErr == nil {
+		rm.cacheMu.RLock()
+		ent, ok := rm.bundleSnapCache[cacheKey]
+		rm.cacheMu.RUnlock()
+		if ok && ent.commitHash == headRef.Hash().String() {
+			slog.Debug("git bundle parse cache hit", "repository", managedRepo.Name, "ref", ref, "path", path, "commit", ent.commitHash)
+			return cloneContractSnapshots(ent.snapshots), nil
+		}
+	}
 
 	var files []RepositoryFile
 
@@ -343,6 +431,18 @@ func (rm *RepositoryManager) getSnapshotsFromGit(managedRepo *ManagedRepo, ref s
 	if err != nil {
 		return nil, fmt.Errorf("failed to walk directory for repository %s: %w", managedRepo.Name, err)
 	}
+
+	snapshots = dedupeContractSnapshotsByName(snapshots)
+
+	if headErr == nil {
+		rm.cacheMu.Lock()
+		rm.bundleSnapCache[cacheKey] = bundleSnapshotCacheEntry{
+			commitHash: headRef.Hash().String(),
+			snapshots:  cloneContractSnapshots(snapshots),
+		}
+		rm.cacheMu.Unlock()
+	}
+
 	return snapshots, nil
 }
 
@@ -399,7 +499,7 @@ func (rm *RepositoryManager) getSnapshotsFromLocalDir(basePath, subPath string) 
 		})
 	}
 
-	return snapshots, nil
+	return dedupeContractSnapshotsByName(snapshots), nil
 }
 
 func parseContractSchema(filename string, content []byte) (*ContractSchema, error) {
