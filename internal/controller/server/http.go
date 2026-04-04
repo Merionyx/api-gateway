@@ -1,20 +1,27 @@
 package server
 
 import (
+	"fmt"
 	"log/slog"
-	"merionyx/api-gateway/internal/controller/container"
+	"net"
 	"net/http"
+
+	"merionyx/api-gateway/internal/controller/container"
+	"merionyx/api-gateway/internal/controller/delivery/http"
 )
 
 func StartHTTPServer(container *container.Container) error {
-	// Setup routes
-	handler := container.Router.SetupRoutes()
+	addr := net.JoinHostPort(container.Config.Server.Host, container.Config.Server.HTTP1Port)
+	handler := httpdelivery.NewMux()
 
-	server := &http.Server{
-		Addr:    ":8080",
+	srv := &http.Server{
+		Addr:    addr,
 		Handler: handler,
 	}
 
-	slog.Info("HTTP server starting", "addr", ":8080")
-	return server.ListenAndServe()
+	slog.Info("HTTP probe server starting", "addr", addr)
+	if err := srv.ListenAndServe(); err != nil {
+		return fmt.Errorf("http listen %s: %w", addr, err)
+	}
+	return nil
 }

@@ -10,7 +10,6 @@ import (
 	"merionyx/api-gateway/internal/controller/config"
 	"merionyx/api-gateway/internal/controller/discovery/kubernetes"
 	"merionyx/api-gateway/internal/controller/delivery/grpc/handler"
-	"merionyx/api-gateway/internal/controller/delivery/http/router"
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
 	ctrlrepoetcd "merionyx/api-gateway/internal/controller/repository/etcd"
 	"merionyx/api-gateway/internal/controller/repository/memory"
@@ -48,9 +47,7 @@ type Container struct {
 	SnapshotGRPCHandler     *handler.SnapshotHandler
 	EnvironmentsGRPCHandler *handler.EnvironmentsHandler
 	SchemasGRPCHandler      *handler.SchemasHandler
-	AuthGRPCHandler         *handler.AuthHandler
-
-	Router *router.Router
+	AuthGRPCHandler *handler.AuthHandler
 
 	XDSSnapshotManager *xdscache.SnapshotManager
 	XDSServer          *xdsserver.Server
@@ -84,7 +81,6 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 
 	c.initUseCases()
 	c.initHandlers()
-	c.initRouter()
 	if err := c.initInMemoryRepositories(); err != nil {
 		return nil, err
 	}
@@ -179,16 +175,6 @@ func (c *Container) initHandlers() {
 	c.AuthGRPCHandler = handler.NewAuthHandler(c.EnvironmentRepository, c.InMemoryEnvironmentsRepository, c.SchemaRepository, c.EtcdClient)
 
 	slog.Info("handlers initialized")
-}
-
-func (c *Container) initRouter() {
-	c.Router = router.NewRouter(
-	// c.TenantUseCase,
-	// c.EnvironmentUseCase,
-	// c.ListenerUseCase,
-	)
-
-	slog.Info("router initialized")
 }
 
 func (c *Container) initXDS() error {
