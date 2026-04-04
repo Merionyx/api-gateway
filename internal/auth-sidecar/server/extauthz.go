@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"merionyx/api-gateway/internal/auth-sidecar/container"
+	authmetrics "merionyx/api-gateway/internal/auth-sidecar/metrics"
 	"merionyx/api-gateway/internal/shared/grpcobs"
 	"merionyx/api-gateway/internal/shared/serviceapp"
 	"merionyx/api-gateway/internal/shared/utils"
@@ -58,6 +59,10 @@ func RunExtAuthzServer(ctx context.Context, cnt *container.Container) error {
 // Check implements the ext_authz Check method
 func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*authv3.CheckResponse, error) {
 	startTime := time.Now()
+	enabled := s.container.Config.MetricsHTTP.Enabled
+	record := func(result, reason string) {
+		authmetrics.RecordAuthorization(enabled, result, reason, time.Since(startTime))
+	}
 
 	// 1. Find the contract by path (longest prefix match)
 	path := req.Attributes.Request.Http.Path
@@ -65,6 +70,7 @@ func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*
 
 	if accessConfig == nil {
 		slog.Warn("auth: contract not found for path", "path", path)
+		record(authmetrics.ResultDeny, authmetrics.ReasonContractNotFound)
 		return denyResponse("Contract not found", 404), nil
 	}
 
@@ -72,6 +78,7 @@ func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*
 
 	// 3. Check if the contract is secure
 	if !accessConfig.Secure {
+		record(authmetrics.ResultAllow, authmetrics.ReasonInsecureAllow)
 		return allowResponse(contractName, contractName), nil
 	}
 
@@ -79,6 +86,7 @@ func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*
 	token := req.Attributes.Request.Http.Headers["x-app-token"]
 	if token == "" {
 		slog.Warn("auth: missing x-app-token header")
+		record(authmetrics.ResultDeny, authmetrics.ReasonMissingToken)
 		return denyResponse("Missing x-app-token header", 401), nil
 	}
 
@@ -86,24 +94,28 @@ func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*
 	claims, err := s.container.JWTValidator.ValidateToken(token)
 	if err != nil {
 		slog.Warn("auth: invalid JWT", "error", err)
+		record(authmetrics.ResultDeny, authmetrics.ReasonInvalidJWT)
 		return denyResponse("Invalid token", 401), nil
 	}
 
 	// 6. Extract the app_id and environments from the JWT
 	appID, ok := claims["app_id"].(string)
 	if !ok {
+		record(authmetrics.ResultDeny, authmetrics.ReasonMissingAppID)
 		return denyResponse("Invalid token: missing app_id", 401), nil
 	}
 
 	// Extract environments array from JWT
 	environmentsRaw, ok := claims["environments"]
 	if !ok {
+		record(authmetrics.ResultDeny, authmetrics.ReasonMissingEnvironments)
 		return denyResponse("Invalid token: missing environments", 401), nil
 	}
 
 	// Convert to string slice
 	environmentsInterface, ok := environmentsRaw.([]interface{})
 	if !ok {
+		record(authmetrics.ResultDeny, authmetrics.ReasonEnvironmentsWrongType)
 		return denyResponse("Invalid token: environments must be an array", 401), nil
 	}
 
@@ -111,6 +123,7 @@ func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*
 	for _, env := range environmentsInterface {
 		envStr, ok := env.(string)
 		if !ok {
+			record(authmetrics.ResultDeny, authmetrics.ReasonEnvironmentNotString)
 			return denyResponse("Invalid token: environment must be a string", 401), nil
 		}
 		tokenEnvironments = append(tokenEnvironments, envStr)
@@ -119,6 +132,7 @@ func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*
 	// 7. Check that the current environment matches any of the patterns in the token
 	currentEnv := s.container.Config.Controller.Environment
 	if !utils.MatchesAnyEnvironment(currentEnv, tokenEnvironments) {
+		record(authmetrics.ResultDeny, authmetrics.ReasonEnvNotAllowed)
 		return denyResponse(fmt.Sprintf("Token environments %v don't match current env %s",
 			tokenEnvironments, currentEnv), 403), nil
 	}
@@ -127,6 +141,7 @@ func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*
 	allowed := s.container.AccessStorage.CheckAccess(contractName, appID, currentEnv)
 	if !allowed {
 		slog.Warn("auth: access denied", "app_id", appID, "contract", contractName, "environment", currentEnv)
+		record(authmetrics.ResultDeny, authmetrics.ReasonAccessDenied)
 		return denyResponse(fmt.Sprintf("Access denied to contract %s", contractName), 403), nil
 	}
 
@@ -135,6 +150,7 @@ func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*
 		"app_id", appID, "contract", contractName, "environment", currentEnv,
 		"env_patterns", tokenEnvironments, "duration", duration)
 
+	record(authmetrics.ResultAllow, authmetrics.ReasonAllowOK)
 	return allowResponse(appID, contractName), nil
 }
 

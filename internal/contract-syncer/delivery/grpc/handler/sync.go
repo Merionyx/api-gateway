@@ -3,20 +3,24 @@ package handler
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"merionyx/api-gateway/internal/contract-syncer/domain/interfaces"
+	syncmetrics "merionyx/api-gateway/internal/contract-syncer/metrics"
 	contractv1 "merionyx/api-gateway/pkg/api/contract/v1"
 	pb "merionyx/api-gateway/pkg/api/contract_syncer/v1"
 )
 
 type SyncHandler struct {
 	pb.UnimplementedContractSyncerServiceServer
-	syncUseCase interfaces.SyncUseCase
+	syncUseCase    interfaces.SyncUseCase
+	metricsEnabled bool
 }
 
-func NewSyncHandler(syncUseCase interfaces.SyncUseCase) *SyncHandler {
+func NewSyncHandler(syncUseCase interfaces.SyncUseCase, metricsEnabled bool) *SyncHandler {
 	return &SyncHandler{
-		syncUseCase: syncUseCase,
+		syncUseCase:    syncUseCase,
+		metricsEnabled: metricsEnabled,
 	}
 }
 
@@ -24,13 +28,16 @@ func NewSyncHandler(syncUseCase interfaces.SyncUseCase) *SyncHandler {
 func (h *SyncHandler) Sync(ctx context.Context, req *pb.SyncRequest) (*pb.SyncResponse, error) {
 	slog.Info("Received sync request", "repository", req.Repository, "ref", req.Ref, "path", req.Path)
 
+	start := time.Now()
 	snapshots, err := h.syncUseCase.Sync(req.Repository, req.Ref, req.Path)
 	if err != nil {
 		slog.Error("Failed to sync repository", "error", err)
+		syncmetrics.RecordSync(h.metricsEnabled, syncmetrics.OutcomeResponseError, time.Since(start))
 		return &pb.SyncResponse{
 			Error: err.Error(),
 		}, nil
 	}
+	syncmetrics.RecordSync(h.metricsEnabled, syncmetrics.OutcomeOK, time.Since(start))
 
 	var pbSnapshots []*contractv1.ContractSnapshot
 	for _, snapshot := range snapshots {

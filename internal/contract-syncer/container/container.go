@@ -69,7 +69,7 @@ func (c *Container) initUseCases() {
 }
 
 func (c *Container) initHandlers() {
-	c.SyncGRPCHandler = handler.NewSyncHandler(c.SyncUseCase)
+	c.SyncGRPCHandler = handler.NewSyncHandler(c.SyncUseCase, c.Config.MetricsHTTP.Enabled)
 
 	slog.Info("handlers initialized")
 }

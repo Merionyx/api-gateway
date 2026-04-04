@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"merionyx/api-gateway/internal/controller/config"
+	ctrlmetrics "merionyx/api-gateway/internal/controller/metrics"
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
 	xdscache "merionyx/api-gateway/internal/controller/xds/cache"
 	"merionyx/api-gateway/internal/shared/grpcutil"
@@ -86,15 +87,18 @@ func (uc *APIServerSyncUseCase) RegisterAndStream(ctx context.Context) error {
 		slog.Info("Connecting to API Server", "address", uc.apiServerAddress)
 		sessErr := uc.runAPIServerSession(ctx)
 		if err := ctx.Err(); err != nil {
+			ctrlmetrics.RecordAPIServerSessionEnd(uc.config.MetricsHTTP.Enabled, ctrlmetrics.SessionReasonCanceled)
 			return err
 		}
 		if sessErr == nil {
 			return nil
 		}
 		if errors.Is(sessErr, context.Canceled) {
+			ctrlmetrics.RecordAPIServerSessionEnd(uc.config.MetricsHTTP.Enabled, ctrlmetrics.SessionReasonCanceled)
 			return sessErr
 		}
 
+		ctrlmetrics.RecordAPIServerSessionEnd(uc.config.MetricsHTTP.Enabled, ctrlmetrics.SessionReasonError)
 		slog.Warn("API Server sync session ended", "error", sessErr)
 		backoff = grpcutil.NextReconnectBackoff(backoff, initialBackoff, maxBackoff)
 	}

@@ -6,15 +6,19 @@ import (
 
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	res "github.com/envoyproxy/go-control-plane/pkg/resource/v3"
+
+	ctrlmetrics "merionyx/api-gateway/internal/controller/metrics"
 )
 
 type SnapshotManager struct {
-	cache cache.SnapshotCache
+	cache          cache.SnapshotCache
+	metricsEnabled bool
 }
 
-func NewSnapshotManager() *SnapshotManager {
+func NewSnapshotManager(metricsEnabled bool) *SnapshotManager {
 	return &SnapshotManager{
-		cache: cache.NewSnapshotCache(false, cache.IDHash{}, nil),
+		cache:          cache.NewSnapshotCache(false, cache.IDHash{}, nil),
+		metricsEnabled: metricsEnabled,
 	}
 }
 
@@ -29,7 +33,13 @@ func (sm *SnapshotManager) UpdateSnapshot(nodeID string, snapshot *cache.Snapsho
 			}
 		}
 	}
-	return sm.cache.SetSnapshot(context.Background(), nodeID, snapshot)
+	err = sm.cache.SetSnapshot(context.Background(), nodeID, snapshot)
+	if err != nil {
+		ctrlmetrics.RecordXDSnapshotUpdate(sm.metricsEnabled, ctrlmetrics.XDSResultError)
+		return err
+	}
+	ctrlmetrics.RecordXDSnapshotUpdate(sm.metricsEnabled, ctrlmetrics.XDSResultOK)
+	return nil
 }
 
 func (sm *SnapshotManager) GetCache() cache.SnapshotCache {
