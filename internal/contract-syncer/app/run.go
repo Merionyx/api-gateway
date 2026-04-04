@@ -2,8 +2,13 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 
 	"merionyx/api-gateway/internal/contract-syncer/config"
 	"merionyx/api-gateway/internal/contract-syncer/container"
@@ -16,7 +21,6 @@ func Run() error {
 	logger := serviceapp.NewJSONLogger()
 	serviceapp.SetDefaultLogger(logger)
 
-	// Load config
 	cfg, err := config.LoadConfig(os.Getenv("CONFIG_PATH"))
 	if err != nil {
 		logger.Error(fmt.Sprintf("Failed to load config: %v", err))
@@ -24,35 +28,41 @@ func Run() error {
 	}
 	logger.Info("Config loaded", "config", cfg)
 
-	// Initialize DI container
 	cnt, err := container.NewContainer(cfg)
 	if err != nil {
 		logger.Error(fmt.Sprintf("Failed to initialize container: %v", err))
 		os.Exit(1)
 	}
-	defer cnt.Close()
 
-	// Setup graceful shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
-	// Start gRPC server
-	go func() {
-		if err := server.StartGRPCServer(cnt); err != nil {
-			logger.Error(fmt.Sprintf("gRPC server error: %v", err))
-			cancel()
-		}
-	}()
+	runCtx, cancelRun := context.WithCancel(sigCtx)
+	defer cancelRun()
 
-	go func() {
-		if err := metricshttp.ListenAndServe(cfg.MetricsHTTP); err != nil {
-			logger.Error(fmt.Sprintf("metrics HTTP error: %v", err))
-			cancel()
-		}
-	}()
+	var failOnce sync.Once
+	onFail := func() { failOnce.Do(cancelRun) }
 
-	serviceapp.WaitSignalOrContext(ctx)
+	var wg sync.WaitGroup
+	run := func(name string, fn func(context.Context) error) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := fn(runCtx); err != nil {
+				if errors.Is(err, context.Canceled) {
+					return
+				}
+				slog.Error("server stopped", "name", name, "error", err)
+				onFail()
+			}
+		}()
+	}
 
-	logger.Info("Shutting down servers...")
+	run("grpc", func(c context.Context) error { return server.RunGRPCServer(c, cnt) })
+	run("metrics_http", func(c context.Context) error { return metricshttp.ListenAndServeUntil(c, cfg.MetricsHTTP) })
+
+	wg.Wait()
+	logger.Info("Shutting down...")
+	cnt.Close()
 	return nil
 }

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net"
@@ -8,9 +9,11 @@ import (
 
 	"merionyx/api-gateway/internal/controller/container"
 	"merionyx/api-gateway/internal/controller/delivery/http"
+	"merionyx/api-gateway/internal/shared/serviceapp"
 )
 
-func StartHTTPServer(container *container.Container) error {
+// RunHTTPServer serves the probe mux until ctx is cancelled.
+func RunHTTPServer(ctx context.Context, container *container.Container) error {
 	addr := net.JoinHostPort(container.Config.Server.Host, container.Config.Server.HTTP1Port)
 	handler := httpdelivery.NewMux()
 
@@ -20,7 +23,7 @@ func StartHTTPServer(container *container.Container) error {
 	}
 
 	slog.Info("HTTP probe server starting", "addr", addr)
-	if err := srv.ListenAndServe(); err != nil {
+	if err := serviceapp.RunHTTPServerUntil(ctx, srv, addr); err != nil {
 		return fmt.Errorf("http listen %s: %w", addr, err)
 	}
 	return nil

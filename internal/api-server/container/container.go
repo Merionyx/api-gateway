@@ -58,7 +58,6 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 		return nil, err
 	}
 	c.initHandlers()
-	c.startBackgroundWork()
 
 	ok = true
 	return c, nil
@@ -128,9 +127,10 @@ func (c *Container) initHandlers() {
 	slog.Info("handlers initialized")
 }
 
-func (c *Container) startBackgroundWork() {
-	go c.ControllerRegistryUseCase.StartEtcdWatch(context.Background())
-	go c.BundleSyncUseCase.StartBundleWatcher(context.Background())
+// StartBackgroundWork runs etcd watch and bundle sync until ctx is cancelled.
+func (c *Container) StartBackgroundWork(ctx context.Context) {
+	go c.ControllerRegistryUseCase.StartEtcdWatch(ctx)
+	go c.BundleSyncUseCase.StartBundleWatcher(ctx)
 	slog.Info("API server etcd watch and bundle watcher started")
 }
 

@@ -18,6 +18,7 @@ import (
 
 	"merionyx/api-gateway/internal/auth-sidecar/container"
 	"merionyx/api-gateway/internal/shared/grpcobs"
+	"merionyx/api-gateway/internal/shared/serviceapp"
 	"merionyx/api-gateway/internal/shared/utils"
 )
 
@@ -30,7 +31,8 @@ func NewExtAuthzServer(cnt *container.Container) *ExtAuthzServer {
 	return &ExtAuthzServer{container: cnt}
 }
 
-func StartExtAuthzServer(cnt *container.Container) error {
+// RunExtAuthzServer serves ext_authz until ctx is cancelled.
+func RunExtAuthzServer(ctx context.Context, cnt *container.Container) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", cnt.Config.Server.GRPCPort))
 	if err != nil {
 		return fmt.Errorf("failed to listen: %w", err)
@@ -40,22 +42,17 @@ func StartExtAuthzServer(cnt *container.Container) error {
 	if err != nil {
 		return fmt.Errorf("ext_authz gRPC options: %w", err)
 	}
-	grpcServer := grpc.NewServer(opts...)
+	grpcSrv := grpc.NewServer(opts...)
 	extAuthzServer := NewExtAuthzServer(cnt)
 
-	authv3.RegisterAuthorizationServer(grpcServer, extAuthzServer)
+	authv3.RegisterAuthorizationServer(grpcSrv, extAuthzServer)
 
 	if cnt.Config.GRPCExtAuthz.Observability.ReflectionEnabled {
-		reflection.Register(grpcServer)
+		reflection.Register(grpcSrv)
 	}
 
 	slog.Info("ext_authz server listening", "port", cnt.Config.Server.GRPCPort)
-
-	if err := grpcServer.Serve(lis); err != nil {
-		return fmt.Errorf("failed to serve: %w", err)
-	}
-
-	return nil
+	return serviceapp.RunGRPCServeUntil(ctx, grpcSrv, lis)
 }
 
 // Check implements the ext_authz Check method

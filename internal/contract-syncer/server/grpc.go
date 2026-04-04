@@ -1,19 +1,22 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net"
 
 	"merionyx/api-gateway/internal/contract-syncer/container"
 	"merionyx/api-gateway/internal/shared/grpcobs"
+	"merionyx/api-gateway/internal/shared/serviceapp"
 	pb "merionyx/api-gateway/pkg/api/contract_syncer/v1"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
-func StartGRPCServer(cnt *container.Container) error {
+// RunGRPCServer serves the sync API until ctx is cancelled.
+func RunGRPCServer(ctx context.Context, cnt *container.Container) error {
 	address := fmt.Sprintf("%s:%s", cnt.Config.Server.Host, cnt.Config.Server.GRPCPort)
 	lis, err := net.Listen("tcp", address)
 	if err != nil {
@@ -24,19 +27,14 @@ func StartGRPCServer(cnt *container.Container) error {
 	if err != nil {
 		return fmt.Errorf("gRPC server options: %w", err)
 	}
-	grpcServer := grpc.NewServer(opts...)
+	grpcSrv := grpc.NewServer(opts...)
 
-	pb.RegisterContractSyncerServiceServer(grpcServer, cnt.SyncGRPCHandler)
+	pb.RegisterContractSyncerServiceServer(grpcSrv, cnt.SyncGRPCHandler)
 
 	if cnt.Config.Server.GRPC.Observability.ReflectionEnabled {
-		reflection.Register(grpcServer)
+		reflection.Register(grpcSrv)
 	}
 
 	slog.Info("Starting gRPC server", "address", address)
-
-	if err := grpcServer.Serve(lis); err != nil {
-		return fmt.Errorf("failed to serve: %w", err)
-	}
-
-	return nil
+	return serviceapp.RunGRPCServeUntil(ctx, grpcSrv, lis)
 }

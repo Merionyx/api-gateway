@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"merionyx/api-gateway/internal/controller/xds"
+	"merionyx/api-gateway/internal/shared/serviceapp"
 	"net"
 
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
@@ -53,14 +54,20 @@ func NewXDSServer(snapshotCache cache.SnapshotCache, registerReflection bool, op
 }
 
 func (s *Server) Start(port int) error {
+	return s.Run(context.Background(), port)
+}
+
+// Run serves xDS until ctx is cancelled, then stops gracefully.
+func (s *Server) Run(ctx context.Context, port int) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return fmt.Errorf("failed to listen: %w", err)
 	}
 
 	slog.Info("xDS server listening", "port", port)
-	return s.grpcServer.Serve(lis)
+	return serviceapp.RunGRPCServeUntil(ctx, s.grpcServer, lis)
 }
+
 func (s *Server) Stop() {
 	s.grpcServer.GracefulStop()
 }

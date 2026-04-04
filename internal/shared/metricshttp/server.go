@@ -5,6 +5,7 @@
 package metricshttp
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -16,6 +17,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"merionyx/api-gateway/internal/shared/serviceapp"
 )
 
 var registerDefaults sync.Once
@@ -43,6 +46,12 @@ func registerDefaultCollectors() {
 // ListenAndServe blocks, serving /metrics (or cfg.Path) on cfg.Host:cfg.Port.
 // It is a no-op when cfg.Enabled is false.
 func ListenAndServe(cfg Config) error {
+	return ListenAndServeUntil(context.Background(), cfg)
+}
+
+// ListenAndServeUntil serves until ctx is cancelled, then shuts down gracefully.
+// It is a no-op when cfg.Enabled is false.
+func ListenAndServeUntil(ctx context.Context, cfg Config) error {
 	if !cfg.Enabled {
 		return nil
 	}
@@ -67,7 +76,7 @@ func ListenAndServe(cfg Config) error {
 	addr := net.JoinHostPort(host, port)
 	slog.Info("metrics HTTP listening", "addr", addr, "path", path)
 	srv := &http.Server{Addr: addr, Handler: mux}
-	if err := srv.ListenAndServe(); err != nil {
+	if err := serviceapp.RunHTTPServerUntil(ctx, srv, addr); err != nil {
 		return fmt.Errorf("metrics http %s: %w", addr, err)
 	}
 	return nil

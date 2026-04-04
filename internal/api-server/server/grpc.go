@@ -1,10 +1,12 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"merionyx/api-gateway/internal/api-server/container"
 	"merionyx/api-gateway/internal/shared/grpcobs"
+	"merionyx/api-gateway/internal/shared/serviceapp"
 	pb "merionyx/api-gateway/pkg/api/controller_registry/v1"
 	"net"
 
@@ -12,7 +14,8 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-func StartGRPCServer(cnt *container.Container) error {
+// RunGRPCServer serves the registry until ctx is cancelled.
+func RunGRPCServer(ctx context.Context, cnt *container.Container) error {
 	address := fmt.Sprintf("%s:%s", cnt.Config.Server.Host, cnt.Config.Server.GRPCPort)
 	lis, err := net.Listen("tcp", address)
 	if err != nil {
@@ -23,14 +26,14 @@ func StartGRPCServer(cnt *container.Container) error {
 	if err != nil {
 		return fmt.Errorf("gRPC registry options: %w", err)
 	}
-	server := grpc.NewServer(opts...)
+	grpcSrv := grpc.NewServer(opts...)
 
-	pb.RegisterControllerRegistryServiceServer(server, cnt.ControllerRegistryHandler)
+	pb.RegisterControllerRegistryServiceServer(grpcSrv, cnt.ControllerRegistryHandler)
 
 	if cnt.Config.GRPCRegistry.Observability.ReflectionEnabled {
-		reflection.Register(server)
+		reflection.Register(grpcSrv)
 	}
 
 	slog.Info("gRPC server starting", "address", address)
-	return server.Serve(lis)
+	return serviceapp.RunGRPCServeUntil(ctx, grpcSrv, lis)
 }

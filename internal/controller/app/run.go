@@ -2,21 +2,26 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
+	"os"
+	"os/signal"
+	"strconv"
+	"sync"
+	"syscall"
+
 	"merionyx/api-gateway/internal/controller/config"
 	"merionyx/api-gateway/internal/controller/container"
 	"merionyx/api-gateway/internal/controller/server"
 	"merionyx/api-gateway/internal/shared/metricshttp"
 	"merionyx/api-gateway/internal/shared/serviceapp"
-	"os"
-	"strconv"
 )
 
 func Run() error {
 	logger := serviceapp.NewJSONLogger()
 	serviceapp.SetDefaultLogger(logger)
 
-	// Load config
 	cfg, err := config.LoadConfig(os.Getenv("CONFIG_PATH"))
 	if err != nil {
 		logger.Error(fmt.Sprintf("Failed to load config: %v", err))
@@ -24,58 +29,51 @@ func Run() error {
 	}
 	logger.Info("Config loaded", "config", cfg)
 
-	// Initialize DI container
 	container, err := container.NewContainer(cfg)
 	if err != nil {
 		logger.Error(fmt.Sprintf("Failed to initialize container: %v", err))
 		os.Exit(1)
 	}
-	defer container.Close()
 
-	// Setup graceful shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
-	container.StartKubernetesDiscovery(ctx)
+	runCtx, cancelRun := context.WithCancel(sigCtx)
+	defer cancelRun()
 
-	// Start HTTP server
-	go func() {
-		if err := server.StartHTTPServer(container); err != nil {
-			logger.Error(fmt.Sprintf("HTTP server error: %v", err))
-			cancel()
-		}
-	}()
+	var failOnce sync.Once
+	onFail := func() { failOnce.Do(cancelRun) }
 
-	go func() {
-		if err := metricshttp.ListenAndServe(cfg.MetricsHTTP); err != nil {
-			logger.Error(fmt.Sprintf("metrics HTTP error: %v", err))
-			cancel()
-		}
-	}()
+	container.StartKubernetesDiscovery(runCtx)
 
-	// Start gRPC server
-	go func() {
-		if err := server.StartGRPCServer(container); err != nil {
-			logger.Error(fmt.Sprintf("gRPC server error: %v", err))
-			cancel()
-		}
-	}()
+	var wg sync.WaitGroup
+	run := func(name string, fn func(context.Context) error) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := fn(runCtx); err != nil {
+				if errors.Is(err, context.Canceled) {
+					return
+				}
+				slog.Error("server stopped", "name", name, "error", err)
+				onFail()
+			}
+		}()
+	}
 
-	// Start xDS server
-	go func() {
+	run("http_probe", func(c context.Context) error { return server.RunHTTPServer(c, container) })
+	run("metrics_http", func(c context.Context) error { return metricshttp.ListenAndServeUntil(c, cfg.MetricsHTTP) })
+	run("grpc_control_plane", func(c context.Context) error { return server.RunGRPCServer(c, container) })
+	run("grpc_xds", func(c context.Context) error {
 		xdsPort, err := strconv.Atoi(container.Config.Server.XDSPort)
 		if err != nil {
-			logger.Error(fmt.Sprintf("Failed to convert xDS port to int: %v", err))
-			cancel()
+			return fmt.Errorf("parse xDS port %q: %w", container.Config.Server.XDSPort, err)
 		}
-		if err := container.XDSServer.Start(xdsPort); err != nil {
-			logger.Error(fmt.Sprintf("xDS server error: %v", err))
-			cancel()
-		}
-	}()
+		return container.XDSServer.Run(c, xdsPort)
+	})
 
-	serviceapp.WaitSignalOrContext(ctx)
-
-	logger.Info("Shutting down servers...")
+	wg.Wait()
+	logger.Info("Shutting down...")
+	container.Close()
 	return nil
 }

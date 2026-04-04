@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/gofiber/fiber/v3"
@@ -11,7 +12,8 @@ import (
 	"merionyx/api-gateway/internal/api-server/container"
 )
 
-func StartHTTPServer(c *container.Container) error {
+// RunHTTPServer runs Fiber until ctx is cancelled, then Shutdown().
+func RunHTTPServer(ctx context.Context, c *container.Container) error {
 	app := fiber.New(fiber.Config{
 		AppName: "API Gateway - API Server",
 		ErrorHandler: func(ctx fiber.Ctx, err error) error {
@@ -25,7 +27,6 @@ func StartHTTPServer(c *container.Container) error {
 		},
 	})
 
-	// Middleware
 	app.Use(recover.New())
 	app.Use(logger.New(logger.Config{
 		Format: "[${time}] ${status} - ${method} ${path} ${latency}\n",
@@ -36,32 +37,37 @@ func StartHTTPServer(c *container.Container) error {
 		AllowHeaders: []string{"Origin", "Content-Type", "Accept", "Authorization"},
 	}))
 
-	// Setup routes
 	setupRoutes(app, c)
 
-	// Start server
-	port := c.Config.Server.HTTPPort
-	slog.Info("HTTP server starting", "port", port)
-	return app.Listen(":" + port)
+	port := ":" + c.Config.Server.HTTPPort
+	slog.Info("HTTP server starting", "port", c.Config.Server.HTTPPort)
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- app.Listen(port)
+	}()
+
+	select {
+	case <-ctx.Done():
+		if err := app.Shutdown(); err != nil {
+			slog.Warn("fiber shutdown", "error", err)
+		}
+		return <-errCh
+	case err := <-errCh:
+		return err
+	}
 }
 
 func setupRoutes(app *fiber.App, c *container.Container) {
-	// Health check
 	app.Get("/health", func(ctx fiber.Ctx) error {
 		return ctx.JSON(fiber.Map{
 			"status": "ok",
 		})
 	})
 
-	// JWKS endpoint (well-known)
 	app.Get("/.well-known/jwks.json", c.JWTHandler.GetJWKS)
 
-	// API v1
 	api := app.Group("/api/v1")
-
-	// JWT Tokens
 	api.Post("/tokens", c.JWTHandler.GenerateToken)
-
-	// Signing Keys (for administration)
 	api.Get("/keys", c.JWTHandler.GetSigningKeys)
 }
