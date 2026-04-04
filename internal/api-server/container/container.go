@@ -4,9 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
-	"strings"
-	"time"
 
 	"merionyx/api-gateway/internal/api-server/config"
 	grpchandler "merionyx/api-gateway/internal/api-server/delivery/grpc/handler"
@@ -14,8 +11,8 @@ import (
 	"merionyx/api-gateway/internal/api-server/domain/interfaces"
 	"merionyx/api-gateway/internal/api-server/repository/etcd"
 	"merionyx/api-gateway/internal/api-server/usecase"
+	"merionyx/api-gateway/internal/shared/bootstrap"
 	"merionyx/api-gateway/internal/shared/election"
-	sharedetcd "merionyx/api-gateway/internal/shared/etcd"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
@@ -68,50 +65,25 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 }
 
 func (c *Container) initEtcd() error {
-	etcdClient, err := sharedetcd.NewEtcdClient(c.Config.Etcd)
+	client, err := bootstrap.ConnectEtcd(context.Background(), c.Config.Etcd, bootstrap.DefaultEtcdStatusTimeout)
 	if err != nil {
-		return fmt.Errorf("initialize etcd client: %w", err)
+		return err
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if _, err := etcdClient.Status(ctx, c.Config.Etcd.Endpoints[0]); err != nil {
-		_ = etcdClient.Close()
-		return fmt.Errorf("connect to etcd at %q: %w", c.Config.Etcd.Endpoints[0], err)
-	}
-
-	c.EtcdClient = etcdClient
-	slog.Info("etcd client initialized and connected successfully")
+	c.EtcdClient = client
 	return nil
 }
 
 func (c *Container) initLeaderGate() {
-	if !c.Config.LeaderElection.Enabled {
-		c.LeaderGate = election.NoopGate{}
-		slog.Info("API server leader election disabled (noop gate)")
-		return
-	}
-
-	id := strings.TrimSpace(c.Config.LeaderElection.Identity)
-	if id == "" {
-		var err error
-		id, err = os.Hostname()
-		if err != nil || id == "" {
-			id = fmt.Sprintf("api-server-%d", time.Now().UnixNano())
-		}
-	}
-
-	prefix := strings.TrimSpace(c.Config.LeaderElection.KeyPrefix)
-	if prefix == "" {
-		prefix = "/api-gateway/api-server/election/leader"
-	}
-
-	ttl := c.Config.LeaderElection.SessionTTLSeconds
-	g := election.NewEtcdGate(c.EtcdClient, prefix, id, ttl)
-	c.LeaderGate = g
-	go g.Run(context.Background())
-	slog.Info("API server leader election started", "prefix", prefix, "identity", id)
+	le := c.Config.LeaderElection
+	c.LeaderGate = bootstrap.StartLeaderElection(context.Background(), c.EtcdClient, bootstrap.LeaderElectionSettings{
+		Enabled:           le.Enabled,
+		Identity:          le.Identity,
+		KeyPrefix:         le.KeyPrefix,
+		SessionTTLSeconds: le.SessionTTLSeconds,
+		DefaultKeyPrefix:  "/api-gateway/api-server/election/leader",
+		FallbackIDPrefix:  "api-server",
+		Service:           "api-server",
+	})
 }
 
 func (c *Container) initRepositories() {
@@ -168,10 +140,5 @@ func (c *Container) startBackgroundWork() {
 
 // Close closes all resources in the container
 func (c *Container) Close() {
-	if c.EtcdClient != nil {
-		if err := c.EtcdClient.Close(); err != nil {
-			slog.Error("failed to close etcd client", "error", err)
-		}
-		slog.Info("etcd client closed")
-	}
+	bootstrap.CloseEtcdClient(c.EtcdClient)
 }

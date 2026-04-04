@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"merionyx/api-gateway/internal/controller/config"
@@ -17,8 +15,8 @@ import (
 	ctrlrepoetcd "merionyx/api-gateway/internal/controller/repository/etcd"
 	"merionyx/api-gateway/internal/controller/repository/memory"
 	"merionyx/api-gateway/internal/controller/usecase"
+	"merionyx/api-gateway/internal/shared/bootstrap"
 	"merionyx/api-gateway/internal/shared/election"
-	"merionyx/api-gateway/internal/shared/etcd"
 
 	"merionyx/api-gateway/internal/controller/xds/builder"
 	xdscache "merionyx/api-gateway/internal/controller/xds/cache"
@@ -97,49 +95,25 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 }
 
 func (c *Container) initEtcd() error {
-	etcdClient, err := etcd.NewEtcdClient(c.Config.Etcd)
+	client, err := bootstrap.ConnectEtcd(context.Background(), c.Config.Etcd, bootstrap.DefaultEtcdStatusTimeout)
 	if err != nil {
-		return fmt.Errorf("initialize etcd client: %w", err)
+		return err
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if _, err := etcdClient.Status(ctx, c.Config.Etcd.Endpoints[0]); err != nil {
-		_ = etcdClient.Close()
-		return fmt.Errorf("connect to etcd at %q: %w", c.Config.Etcd.Endpoints[0], err)
-	}
-
-	c.EtcdClient = etcdClient
-	slog.Info("etcd client initialized and connected successfully")
+	c.EtcdClient = client
 	return nil
 }
 
 func (c *Container) initLeaderGate() {
-	if !c.Config.LeaderElection.Enabled {
-		c.LeaderGate = election.NoopGate{}
-		slog.Info("gateway controller leader election disabled (noop gate)")
-		return
-	}
-
-	id := strings.TrimSpace(c.Config.LeaderElection.Identity)
-	if id == "" {
-		var err error
-		id, err = os.Hostname()
-		if err != nil || id == "" {
-			id = fmt.Sprintf("controller-%d", time.Now().UnixNano())
-		}
-	}
-
-	prefix := strings.TrimSpace(c.Config.LeaderElection.KeyPrefix)
-	if prefix == "" {
-		prefix = "/api-gateway/controller/election/leader"
-	}
-
-	g := election.NewEtcdGate(c.EtcdClient, prefix, id, c.Config.LeaderElection.SessionTTLSeconds)
-	c.LeaderGate = g
-	go g.Run(context.Background())
-	slog.Info("gateway controller leader election started", "prefix", prefix, "identity", id)
+	le := c.Config.LeaderElection
+	c.LeaderGate = bootstrap.StartLeaderElection(context.Background(), c.EtcdClient, bootstrap.LeaderElectionSettings{
+		Enabled:           le.Enabled,
+		Identity:          le.Identity,
+		KeyPrefix:         le.KeyPrefix,
+		SessionTTLSeconds: le.SessionTTLSeconds,
+		DefaultKeyPrefix:  "/api-gateway/controller/election/leader",
+		FallbackIDPrefix:  "controller",
+		Service:           "gateway-controller",
+	})
 }
 
 func (c *Container) createInMemoryServiceRepository() {
@@ -278,10 +252,5 @@ func (c *Container) StartKubernetesDiscovery(ctx context.Context) {
 
 // Close closes all resources in the container
 func (c *Container) Close() {
-	if c.EtcdClient != nil {
-		if err := c.EtcdClient.Close(); err != nil {
-			slog.Error("failed to close etcd client", "error", err)
-		}
-		slog.Info("etcd client closed")
-	}
+	bootstrap.CloseEtcdClient(c.EtcdClient)
 }

@@ -3,22 +3,17 @@ package app
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"merionyx/api-gateway/internal/api-server/config"
 	"merionyx/api-gateway/internal/api-server/container"
 	"merionyx/api-gateway/internal/api-server/server"
+	"merionyx/api-gateway/internal/shared/serviceapp"
 )
 
 func Run() error {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	}))
-
-	slog.SetDefault(logger)
+	logger := serviceapp.NewJSONLogger()
+	serviceapp.SetDefaultLogger(logger)
 
 	// Load config
 	cfg, err := config.LoadConfig(os.Getenv("CONFIG_PATH"))
@@ -56,16 +51,7 @@ func Run() error {
 		}
 	}()
 
-	// Wait for shutdown signal
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-	select {
-	case <-sigChan:
-		logger.Info("Shutdown signal received")
-	case <-ctx.Done():
-		logger.Info("Context cancelled")
-	}
+	serviceapp.WaitSignalOrContext(ctx)
 
 	logger.Info("Shutting down servers...")
 	return nil
