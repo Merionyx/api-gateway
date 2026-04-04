@@ -36,6 +36,9 @@ func (b *xdsBuilder) BuildRoutes(env *models.Environment) []*routev3.RouteConfig
 			Name:    env.Name + "_vhost",
 			Domains: []string{"*"},
 			Routes:  routes,
+
+			// Strip credentials before upstream; ext_authz still sees the original request.
+			RequestHeadersToRemove: []string{"x-app-token"},
 		}},
 	}
 
