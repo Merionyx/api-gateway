@@ -3,6 +3,8 @@ package config
 import (
 	"log/slog"
 
+	"merionyx/api-gateway/internal/shared/grpcobs"
+
 	"github.com/spf13/viper"
 )
 
@@ -10,11 +12,21 @@ type Config struct {
 	Server     ServerConfig     `mapstructure:"server" validate:"required" json:"server"`
 	Controller ControllerConfig `mapstructure:"controller" validate:"required" json:"controller"`
 	JWT        JWTConfig        `mapstructure:"jwt" validate:"required" json:"jwt"`
+	// GRPCExtAuthz: TLS and observability for the ext_authz gRPC server.
+	GRPCExtAuthz GRPCExtAuthzSection `mapstructure:"grpc_ext_authz" json:"grpc_ext_authz"`
+	// GRPCControllerClient: TLS when dialing Controller.
+	GRPCControllerClient grpcobs.ClientTLSConfig `mapstructure:"grpc_controller_client" json:"grpc_controller_client"`
 }
 
 type ServerConfig struct {
 	GRPCPort string `mapstructure:"grpc_port" validate:"required" json:"grpc_port"`
 	Host     string `mapstructure:"host" json:"host"`
+}
+
+// GRPCExtAuthzSection groups server TLS and observability for ext_authz gRPC.
+type GRPCExtAuthzSection struct {
+	TLS           grpcobs.ServerTLSConfig     `mapstructure:"tls" json:"tls"`
+	Observability grpcobs.ObservabilityConfig `mapstructure:"observability" json:"observability"`
 }
 
 type ControllerConfig struct {
@@ -32,6 +44,10 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("server.http_port", "8080")
 	v.SetDefault("server.host", "localhost")
 	v.SetDefault("jwt.jwks_url", "http://api-server:8080/.well-known/jwks.json")
+	v.SetDefault("grpc_ext_authz.observability.reflection_enabled", true)
+	v.SetDefault("grpc_ext_authz.observability.metrics_enabled", false)
+	v.SetDefault("grpc_ext_authz.observability.metrics_path", "/metrics")
+	v.SetDefault("grpc_ext_authz.observability.log_requests", false)
 
 	v.AutomaticEnv()
 	v.SetEnvPrefix("AUTH_SIDECAR_")

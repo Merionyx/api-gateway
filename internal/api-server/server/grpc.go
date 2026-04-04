@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"merionyx/api-gateway/internal/api-server/container"
+	"merionyx/api-gateway/internal/shared/grpcobs"
 	pb "merionyx/api-gateway/pkg/api/controller_registry/v1"
 	"net"
 
@@ -18,11 +19,17 @@ func StartGRPCServer(cnt *container.Container) error {
 		return fmt.Errorf("failed to listen on %s: %w", address, err)
 	}
 
-	server := grpc.NewServer()
+	opts, err := grpcobs.ServerOptions(&cnt.Config.GRPCRegistry.TLS, cnt.Config.GRPCRegistry.Observability)
+	if err != nil {
+		return fmt.Errorf("gRPC registry options: %w", err)
+	}
+	server := grpc.NewServer(opts...)
 
 	pb.RegisterControllerRegistryServiceServer(server, cnt.ControllerRegistryHandler)
 
-	reflection.Register(server)
+	if cnt.Config.GRPCRegistry.Observability.ReflectionEnabled {
+		reflection.Register(server)
+	}
 
 	slog.Info("gRPC server starting", "address", address)
 	return server.Serve(lis)

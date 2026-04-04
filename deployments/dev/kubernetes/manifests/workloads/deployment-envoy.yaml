@@ -35,7 +35,13 @@ spec:
         volumeMounts:
         - name: envoy-config
           mountPath: /etc/envoy/envoy.yaml
-          subPath: envoy.yaml
+          subPath: envoy.xds-tls.yaml
+          readOnly: true
+        - name: grpc-internal-ca
+          mountPath: /etc/grpc-internal-ca
+          readOnly: true
+        - name: grpc-xds-client-tls
+          mountPath: /etc/grpc-xds-client-tls
           readOnly: true
       - name: auth-sidecar
         image: merionyx/api-gateway-auth-sidecar:latest
@@ -51,6 +57,15 @@ spec:
           mountPath: /auth-sidecar/config/k8s.yaml
           subPath: auth-sidecar.yaml
           readOnly: true
+        - name: grpc-ext-authz-tls
+          mountPath: /etc/grpc-ext-authz-tls
+          readOnly: true
+        - name: grpc-client-controller-tls
+          mountPath: /etc/grpc-client-controller
+          readOnly: true
+        - name: grpc-internal-ca
+          mountPath: /etc/grpc-internal-ca
+          readOnly: true
         securityContext:
           allowPrivilegeEscalation: false
           runAsNonRoot: true
@@ -60,6 +75,18 @@ spec:
       - name: envoy-config
         configMap:
           name: api-gateway-dev-envoy
+      - name: grpc-internal-ca
+        secret:
+          secretName: api-gateway-grpc-ca-tls
+      - name: grpc-xds-client-tls
+        secret:
+          secretName: grpc-client-envoy-tls
       - name: auth-sidecar-config
         configMap:
           name: api-gateway-dev-apps-config
+      - name: grpc-ext-authz-tls
+        secret:
+          secretName: auth-sidecar-grpc-tls
+      - name: grpc-client-controller-tls
+        secret:
+          secretName: grpc-client-auth-sidecar-tls

@@ -6,6 +6,7 @@ metadata:
   labels:
     app.kubernetes.io/part-of: api-gateway-dev
 data:
+  # Plaintext xDS (fallback). Dev Deployment uses envoy.xds-tls.yaml + mTLS to controller :19091.
   envoy.yaml: |
     node:
       id: envoy-dev
@@ -46,6 +47,71 @@ data:
             "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
             explicit_http_config:
               http2_protocol_options: {}
+        load_assignment:
+          cluster_name: xds_cluster
+          endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: gateway-controller-dev
+                    port_value: 19091
+
+  # mTLS to xDS: mount api-gateway-grpc-ca-tls + grpc-client-envoy-tls (see deployment-envoy).
+  envoy.xds-tls.yaml: |
+    node:
+      id: envoy-dev
+      cluster: dev-cluster
+
+    admin:
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 9901
+
+    dynamic_resources:
+      ads_config:
+        api_type: GRPC
+        transport_api_version: V3
+        grpc_services:
+        - envoy_grpc:
+            cluster_name: xds_cluster
+
+      cds_config:
+        resource_api_version: V3
+        ads: {}
+
+      lds_config:
+        resource_api_version: V3
+        ads: {}
+
+    static_resources:
+      clusters:
+      - name: xds_cluster
+        type: STRICT_DNS
+        connect_timeout: 1s
+        lb_policy: ROUND_ROBIN
+        common_lb_config:
+          locality_weighted_lb_config: {}
+        typed_extension_protocol_options:
+          envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+            "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+            explicit_http_config:
+              http2_protocol_options: {}
+        transport_socket:
+          name: envoy.transport_sockets.tls
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+            sni: gateway-controller-dev.default.svc.cluster.local
+            common_tls_context:
+              tls_certificates:
+              - certificate_chain:
+                  filename: /etc/grpc-xds-client-tls/tls.crt
+                private_key:
+                  filename: /etc/grpc-xds-client-tls/tls.key
+              validation_context:
+                trusted_ca:
+                  filename: /etc/grpc-internal-ca/tls.crt
         load_assignment:
           cluster_name: xds_cluster
           endpoints:

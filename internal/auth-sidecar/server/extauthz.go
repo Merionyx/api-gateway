@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"merionyx/api-gateway/internal/auth-sidecar/container"
+	"merionyx/api-gateway/internal/shared/grpcobs"
 	"merionyx/api-gateway/internal/shared/utils"
 )
 
@@ -35,12 +36,18 @@ func StartExtAuthzServer(cnt *container.Container) error {
 		return fmt.Errorf("failed to listen: %w", err)
 	}
 
-	grpcServer := grpc.NewServer()
+	opts, err := grpcobs.ServerOptions(&cnt.Config.GRPCExtAuthz.TLS, cnt.Config.GRPCExtAuthz.Observability)
+	if err != nil {
+		return fmt.Errorf("ext_authz gRPC options: %w", err)
+	}
+	grpcServer := grpc.NewServer(opts...)
 	extAuthzServer := NewExtAuthzServer(cnt)
 
 	authv3.RegisterAuthorizationServer(grpcServer, extAuthzServer)
 
-	reflection.Register(grpcServer)
+	if cnt.Config.GRPCExtAuthz.Observability.ReflectionEnabled {
+		reflection.Register(grpcServer)
+	}
 
 	slog.Info("ext_authz server listening", "port", cnt.Config.Server.GRPCPort)
 

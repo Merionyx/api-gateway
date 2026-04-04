@@ -174,6 +174,15 @@ spec:
         - name: etcd-tls
           mountPath: /etc/etcd-tls
           readOnly: true
+        - name: grpc-server-tls
+          mountPath: /etc/grpc-server-tls
+          readOnly: true
+        - name: grpc-internal-ca
+          mountPath: /etc/grpc-internal-ca
+          readOnly: true
+        - name: grpc-client-contract-syncer-tls
+          mountPath: /etc/grpc-client-contract-syncer
+          readOnly: true
         - name: jwt-keys
           mountPath: /api-server/secrets/api-server/keys/jwt
         readinessProbe:
@@ -200,6 +209,15 @@ spec:
       - name: etcd-tls
         secret:
           secretName: etcd-client-tls
+      - name: grpc-server-tls
+        secret:
+          secretName: gateway-api-server-grpc-tls
+      - name: grpc-internal-ca
+        secret:
+          secretName: api-gateway-grpc-ca-tls
+      - name: grpc-client-contract-syncer-tls
+        secret:
+          secretName: grpc-client-api-server-tls
       - name: jwt-keys
         secret:
           secretName: api-gateway-jwt-keys
@@ -242,6 +260,12 @@ spec:
           mountPath: /contract-syncer/config/k8s.yaml
           subPath: contract-syncer.yaml
           readOnly: true
+        - name: grpc-server-tls
+          mountPath: /etc/grpc-server-tls
+          readOnly: true
+        - name: grpc-internal-ca
+          mountPath: /etc/grpc-internal-ca
+          readOnly: true
         securityContext:
           allowPrivilegeEscalation: false
           runAsNonRoot: true
@@ -251,6 +275,12 @@ spec:
       - name: app-config
         configMap:
           name: api-gateway-dev-apps-config
+      - name: grpc-server-tls
+        secret:
+          secretName: gateway-contract-syncer-grpc-tls
+      - name: grpc-internal-ca
+        secret:
+          secretName: api-gateway-grpc-ca-tls
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -297,6 +327,15 @@ spec:
         - name: etcd-tls
           mountPath: /etc/etcd-tls
           readOnly: true
+        - name: grpc-control-plane-tls
+          mountPath: /etc/grpc-control-plane-tls
+          readOnly: true
+        - name: grpc-client-api-server-tls
+          mountPath: /etc/grpc-client-api-server
+          readOnly: true
+        - name: grpc-internal-ca
+          mountPath: /etc/grpc-internal-ca
+          readOnly: true
         readinessProbe:
           httpGet:
             path: /health
@@ -321,3 +360,12 @@ spec:
       - name: etcd-tls
         secret:
           secretName: etcd-client-tls
+      - name: grpc-control-plane-tls
+        secret:
+          secretName: gateway-controller-dev-grpc-tls
+      - name: grpc-client-api-server-tls
+        secret:
+          secretName: grpc-client-controller-tls
+      - name: grpc-internal-ca
+        secret:
+          secretName: api-gateway-grpc-ca-tls

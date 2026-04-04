@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"merionyx/api-gateway/internal/shared/etcd"
+	"merionyx/api-gateway/internal/shared/grpcobs"
 
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
@@ -22,6 +23,18 @@ type Config struct {
 	HA                  HAConfig                   `mapstructure:"ha" json:"ha"`
 	LeaderElection      LeaderElectionConfig       `mapstructure:"leader_election" json:"leader_election"`
 	KubernetesDiscovery *KubernetesDiscoveryConfig `mapstructure:"kubernetes_discovery" json:"kubernetes_discovery"`
+	// GRPCControlPlane: TLS and observability for the management gRPC API (snapshots, environments, schemas, auth).
+	GRPCControlPlane GRPCServerSection `mapstructure:"grpc_control_plane" json:"grpc_control_plane"`
+	// GRPCXDS: TLS and observability for the Envoy xDS gRPC server.
+	GRPCXDS GRPCServerSection `mapstructure:"grpc_xds" json:"grpc_xds"`
+	// GRPCAPIServerClient: TLS when dialing API Server (RegisterAndStream).
+	GRPCAPIServerClient grpcobs.ClientTLSConfig `mapstructure:"grpc_api_server_client" json:"grpc_api_server_client"`
+}
+
+// GRPCServerSection groups server TLS and observability for one gRPC listener.
+type GRPCServerSection struct {
+	TLS           grpcobs.ServerTLSConfig      `mapstructure:"tls" json:"tls"`
+	Observability grpcobs.ObservabilityConfig  `mapstructure:"observability" json:"observability"`
 }
 
 // KubernetesDiscoveryConfig enables building environments from gateway.merionyx.io CRs and annotated Services.
@@ -98,6 +111,8 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("leader_election.enabled", true)
 	v.SetDefault("leader_election.key_prefix", "/api-gateway/controller/election/leader")
 	v.SetDefault("leader_election.session_ttl_seconds", 5)
+	setDefaultGRPCObservability(v, "grpc_control_plane.observability")
+	setDefaultGRPCObservability(v, "grpc_xds.observability")
 
 	v.AutomaticEnv()
 	v.SetEnvPrefix("CP_")
@@ -214,6 +229,13 @@ func flattenYAMLStringMap(v interface{}) map[string]string {
 		flattenYAMLStringMapMerge("", m2, out)
 	}
 	return out
+}
+
+func setDefaultGRPCObservability(v *viper.Viper, prefix string) {
+	v.SetDefault(prefix+".reflection_enabled", true)
+	v.SetDefault(prefix+".metrics_enabled", false)
+	v.SetDefault(prefix+".metrics_path", "/metrics")
+	v.SetDefault(prefix+".log_requests", false)
 }
 
 func flattenYAMLStringMapMerge(prefix string, m map[string]interface{}, out map[string]string) {

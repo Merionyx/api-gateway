@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strconv"
 	"time"
 
 	"merionyx/api-gateway/internal/controller/config"
@@ -16,6 +15,7 @@ import (
 	"merionyx/api-gateway/internal/controller/usecase"
 	"merionyx/api-gateway/internal/shared/bootstrap"
 	"merionyx/api-gateway/internal/shared/election"
+	"merionyx/api-gateway/internal/shared/grpcobs"
 
 	"merionyx/api-gateway/internal/controller/xds/builder"
 	xdscache "merionyx/api-gateway/internal/controller/xds/cache"
@@ -179,11 +179,15 @@ func (c *Container) initHandlers() {
 
 func (c *Container) initXDS() error {
 	c.XDSSnapshotManager = xdscache.NewSnapshotManager()
-	xdsPort, err := strconv.Atoi(c.Config.Server.XDSPort)
+	xdsOpts, err := grpcobs.ServerOptions(&c.Config.GRPCXDS.TLS, c.Config.GRPCXDS.Observability)
 	if err != nil {
-		return fmt.Errorf("parse xDS port %q: %w", c.Config.Server.XDSPort, err)
+		return fmt.Errorf("xDS gRPC options: %w", err)
 	}
-	c.XDSServer = xdsserver.NewXDSServer(c.XDSSnapshotManager.GetCache(), xdsPort)
+	c.XDSServer = xdsserver.NewXDSServer(
+		c.XDSSnapshotManager.GetCache(),
+		c.Config.GRPCXDS.Observability.ReflectionEnabled,
+		xdsOpts...,
+	)
 
 	slog.Info("xDS server initialized")
 	return nil

@@ -12,11 +12,11 @@ import (
 	"merionyx/api-gateway/internal/shared/bundlekey"
 	"merionyx/api-gateway/internal/shared/election"
 	sharedgit "merionyx/api-gateway/internal/shared/git"
+	"merionyx/api-gateway/internal/shared/grpcobs"
 	"merionyx/api-gateway/internal/shared/grpcutil"
 	pb "merionyx/api-gateway/pkg/api/contract_syncer/v1"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 )
 
@@ -27,6 +27,7 @@ type BundleSyncUseCase struct {
 	snapshotRepo       interfaces.SnapshotRepository
 	controllerRepo     interfaces.ControllerRepository
 	contractSyncerAddr string
+	contractSyncerTLS  grpcobs.ClientTLSConfig
 	leader             election.LeaderGate
 }
 
@@ -34,6 +35,7 @@ func NewBundleSyncUseCase(
 	snapshotRepo interfaces.SnapshotRepository,
 	controllerRepo interfaces.ControllerRepository,
 	contractSyncerAddr string,
+	contractSyncerTLS grpcobs.ClientTLSConfig,
 	leader election.LeaderGate,
 ) *BundleSyncUseCase {
 	if leader == nil {
@@ -43,19 +45,23 @@ func NewBundleSyncUseCase(
 		snapshotRepo:       snapshotRepo,
 		controllerRepo:     controllerRepo,
 		contractSyncerAddr: contractSyncerAddr,
+		contractSyncerTLS:  contractSyncerTLS,
 		leader:             leader,
 	}
 }
 
-func (uc *BundleSyncUseCase) grpcDialOptions() []grpc.DialOption {
-	return []grpc.DialOption{
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+func (uc *BundleSyncUseCase) grpcDialOptions() ([]grpc.DialOption, error) {
+	tlsOpts, err := grpcobs.DialOptions(uc.contractSyncerTLS)
+	if err != nil {
+		return nil, err
+	}
+	return append(tlsOpts,
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
 			Time:                20 * time.Second,
 			Timeout:             10 * time.Second,
 			PermitWithoutStream: true,
 		}),
-	}
+	), nil
 }
 
 // SyncBundle pulls schemas from Contract Syncer (with transient gRPC retries), writes API Server etcd, notifies controllers.
@@ -92,7 +98,11 @@ func (uc *BundleSyncUseCase) SyncBundle(ctx context.Context, bundle models.Bundl
 }
 
 func (uc *BundleSyncUseCase) syncBundleOnce(ctx context.Context, bundle models.BundleInfo) ([]sharedgit.ContractSnapshot, error) {
-	conn, err := grpc.NewClient(uc.contractSyncerAddr, uc.grpcDialOptions()...)
+	dialOpts, err := uc.grpcDialOptions()
+	if err != nil {
+		return nil, fmt.Errorf("contract syncer dial options: %w", err)
+	}
+	conn, err := grpc.NewClient(uc.contractSyncerAddr, dialOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("dial contract syncer: %w", err)
 	}

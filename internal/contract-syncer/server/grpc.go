@@ -6,6 +6,7 @@ import (
 	"net"
 
 	"merionyx/api-gateway/internal/contract-syncer/container"
+	"merionyx/api-gateway/internal/shared/grpcobs"
 	pb "merionyx/api-gateway/pkg/api/contract_syncer/v1"
 
 	"google.golang.org/grpc"
@@ -19,11 +20,17 @@ func StartGRPCServer(cnt *container.Container) error {
 		return fmt.Errorf("failed to listen: %w", err)
 	}
 
-	grpcServer := grpc.NewServer()
+	opts, err := grpcobs.ServerOptions(&cnt.Config.Server.GRPC.TLS, cnt.Config.Server.GRPC.Observability)
+	if err != nil {
+		return fmt.Errorf("gRPC server options: %w", err)
+	}
+	grpcServer := grpc.NewServer(opts...)
 
 	pb.RegisterContractSyncerServiceServer(grpcServer, cnt.SyncGRPCHandler)
 
-	reflection.Register(grpcServer)
+	if cnt.Config.Server.GRPC.Observability.ReflectionEnabled {
+		reflection.Register(grpcServer)
+	}
 
 	slog.Info("Starting gRPC server", "address", address)
 

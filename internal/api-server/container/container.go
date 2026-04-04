@@ -113,6 +113,7 @@ func (c *Container) initUseCases() error {
 		c.SnapshotRepository,
 		c.ControllerRepository,
 		c.Config.ContractSyncer.Address,
+		c.Config.GRPCContractSyncerClient,
 		c.LeaderGate,
 	)
 

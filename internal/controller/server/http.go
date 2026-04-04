@@ -12,7 +12,7 @@ import (
 
 func StartHTTPServer(container *container.Container) error {
 	addr := net.JoinHostPort(container.Config.Server.Host, container.Config.Server.HTTP1Port)
-	handler := httpdelivery.NewMux()
+	handler := httpdelivery.NewMux(container.Config)
 
 	srv := &http.Server{
 		Addr:    addr,

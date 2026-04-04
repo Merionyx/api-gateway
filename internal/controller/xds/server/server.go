@@ -28,8 +28,8 @@ type Server struct {
 	cache      cache.SnapshotCache
 }
 
-func NewXDSServer(snapshotCache cache.SnapshotCache, port int) *Server {
-	grpcServer := grpc.NewServer()
+func NewXDSServer(snapshotCache cache.SnapshotCache, registerReflection bool, opts ...grpc.ServerOption) *Server {
+	grpcServer := grpc.NewServer(opts...)
 
 	cb := &xds.Callbacks{}
 	xdsServer := server.NewServer(context.Background(), snapshotCache, cb)
@@ -41,7 +41,9 @@ func NewXDSServer(snapshotCache cache.SnapshotCache, port int) *Server {
 	routeservice.RegisterRouteDiscoveryServiceServer(grpcServer, xdsServer)
 	listenerservice.RegisterListenerDiscoveryServiceServer(grpcServer, xdsServer)
 
-	reflection.Register(grpcServer)
+	if registerReflection {
+		reflection.Register(grpcServer)
+	}
 
 	return &Server{
 		grpcServer: grpcServer,

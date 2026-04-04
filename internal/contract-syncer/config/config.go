@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"merionyx/api-gateway/internal/shared/etcd"
+	"merionyx/api-gateway/internal/shared/grpcobs"
 
 	"github.com/spf13/viper"
 )
@@ -21,6 +22,14 @@ type Config struct {
 type ServerConfig struct {
 	GRPCPort string `mapstructure:"grpc_port"`
 	Host     string `mapstructure:"host"`
+	// GRPC: TLS and observability for the sync gRPC server.
+	GRPC GRPCServerSection `mapstructure:"grpc" json:"grpc"`
+}
+
+// GRPCServerSection groups server TLS and observability for the gRPC listener.
+type GRPCServerSection struct {
+	TLS           grpcobs.ServerTLSConfig     `mapstructure:"tls" json:"tls"`
+	Observability grpcobs.ObservabilityConfig `mapstructure:"observability" json:"observability"`
 }
 
 type APIServerConfig struct {
@@ -51,6 +60,10 @@ func LoadConfig(configPath string) (*Config, error) {
 	v := viper.New()
 	v.SetDefault("server.grpc_port", "19092")
 	v.SetDefault("server.host", "0.0.0.0")
+	v.SetDefault("server.grpc.observability.reflection_enabled", true)
+	v.SetDefault("server.grpc.observability.metrics_enabled", false)
+	v.SetDefault("server.grpc.observability.metrics_path", "/metrics")
+	v.SetDefault("server.grpc.observability.log_requests", false)
 	v.SetDefault("etcd.dial_timeout", "5s")
 
 	v.SetConfigFile(configPath)

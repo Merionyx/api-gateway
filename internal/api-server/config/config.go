@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	sharedetcd "merionyx/api-gateway/internal/shared/etcd"
+	"merionyx/api-gateway/internal/shared/grpcobs"
 
 	"github.com/spf13/viper"
 )
@@ -14,6 +15,16 @@ type Config struct {
 	JWT            JWTConfig             `mapstructure:"jwt" validate:"required" json:"jwt"`
 	ContractSyncer ContractSyncerConfig  `mapstructure:"contract_syncer" validate:"required" json:"contract_syncer"`
 	LeaderElection LeaderElectionConfig  `mapstructure:"leader_election" json:"leader_election"`
+	// GRPCRegistry: TLS and observability for the API Server gRPC registry.
+	GRPCRegistry GRPCRegistrySection `mapstructure:"grpc_registry" json:"grpc_registry"`
+	// GRPCContractSyncerClient: TLS when dialing Contract Syncer.
+	GRPCContractSyncerClient grpcobs.ClientTLSConfig `mapstructure:"grpc_contract_syncer_client" json:"grpc_contract_syncer_client"`
+}
+
+// GRPCRegistrySection groups server TLS and observability for the gRPC registry listener.
+type GRPCRegistrySection struct {
+	TLS           grpcobs.ServerTLSConfig     `mapstructure:"tls" json:"tls"`
+	Observability grpcobs.ObservabilityConfig `mapstructure:"observability" json:"observability"`
 }
 
 // LeaderElectionConfig gates single-writer work (bundle pull from Contract Syncer) to one API Server replica.
@@ -50,6 +61,10 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("leader_election.enabled", true)
 	v.SetDefault("leader_election.key_prefix", "/api-gateway/api-server/election/leader")
 	v.SetDefault("leader_election.session_ttl_seconds", 5)
+	v.SetDefault("grpc_registry.observability.reflection_enabled", true)
+	v.SetDefault("grpc_registry.observability.metrics_enabled", false)
+	v.SetDefault("grpc_registry.observability.metrics_path", "/metrics")
+	v.SetDefault("grpc_registry.observability.log_requests", false)
 
 	v.AutomaticEnv()
 	v.SetEnvPrefix("API_SERVER_")

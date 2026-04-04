@@ -40,6 +40,38 @@ data:
     api_server:
       address: "gateway-api-server:19093"
 
+    # Dev gRPC mTLS (Secrets + api-gateway-grpc-ca-tls mounted at /etc/grpc-internal-ca).
+    grpc_control_plane:
+      tls:
+        enabled: true
+        cert_file: /etc/grpc-control-plane-tls/tls.crt
+        key_file: /etc/grpc-control-plane-tls/tls.key
+        client_ca_file: /etc/grpc-internal-ca/tls.crt
+      observability:
+        reflection_enabled: true
+        metrics_enabled: false
+        metrics_path: "/metrics"
+        log_requests: false
+
+    grpc_xds:
+      tls:
+        enabled: true
+        cert_file: /etc/grpc-control-plane-tls/tls.crt
+        key_file: /etc/grpc-control-plane-tls/tls.key
+        client_ca_file: /etc/grpc-internal-ca/tls.crt
+      observability:
+        reflection_enabled: true
+        metrics_enabled: false
+        metrics_path: "/metrics"
+        log_requests: false
+
+    grpc_api_server_client:
+      enabled: true
+      ca_file: /etc/grpc-internal-ca/tls.crt
+      cert_file: /etc/grpc-client-api-server/tls.crt
+      key_file: /etc/grpc-client-api-server/tls.key
+      server_name: gateway-api-server.default.svc.cluster.local
+
     environments: []
 
     services:
@@ -81,10 +113,40 @@ data:
       identity: ""
       session_ttl_seconds: 5
 
+    grpc_registry:
+      tls:
+        enabled: true
+        cert_file: /etc/grpc-server-tls/tls.crt
+        key_file: /etc/grpc-server-tls/tls.key
+        client_ca_file: /etc/grpc-internal-ca/tls.crt
+      observability:
+        reflection_enabled: true
+        metrics_enabled: false
+        metrics_path: "/metrics"
+        log_requests: false
+
+    grpc_contract_syncer_client:
+      enabled: true
+      ca_file: /etc/grpc-internal-ca/tls.crt
+      cert_file: /etc/grpc-client-contract-syncer/tls.crt
+      key_file: /etc/grpc-client-contract-syncer/tls.key
+      server_name: gateway-contract-syncer.default.svc.cluster.local
+
   contract-syncer.yaml: |
     server:
       grpc_port: "19092"
       host: "0.0.0.0"
+      grpc:
+        tls:
+          enabled: true
+          cert_file: /etc/grpc-server-tls/tls.crt
+          key_file: /etc/grpc-server-tls/tls.key
+          client_ca_file: /etc/grpc-internal-ca/tls.crt
+        observability:
+          reflection_enabled: true
+          metrics_enabled: false
+          metrics_path: "/metrics"
+          log_requests: false
 
     repositories:
     - name: api-gateway-schemas-https
@@ -108,3 +170,20 @@ data:
 
     jwt:
       jwks_url: "http://gateway-api-server:8080/.well-known/jwks.json"
+
+    # ext_authz остаётся plaintext: кластер к sidecar задаётся через xDS без TLS в этом репозитории.
+    grpc_ext_authz:
+      tls:
+        enabled: false
+      observability:
+        reflection_enabled: true
+        metrics_enabled: false
+        metrics_path: "/metrics"
+        log_requests: false
+
+    grpc_controller_client:
+      enabled: true
+      ca_file: /etc/grpc-internal-ca/tls.crt
+      cert_file: /etc/grpc-client-controller/tls.crt
+      key_file: /etc/grpc-client-controller/tls.key
+      server_name: gateway-controller-dev.default.svc.cluster.local

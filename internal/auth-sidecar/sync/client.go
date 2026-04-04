@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 
 	"merionyx/api-gateway/internal/auth-sidecar/config"
 	"merionyx/api-gateway/internal/auth-sidecar/storage"
+	"merionyx/api-gateway/internal/shared/grpcobs"
 	"merionyx/api-gateway/internal/shared/grpcutil"
 	authv1 "merionyx/api-gateway/pkg/api/auth/v1"
 )
@@ -40,15 +40,18 @@ func NewSyncClient(cfg *config.Config, storage *storage.AccessStorage) *SyncClie
 
 // Start starts the synchronization with the Controller
 func (c *SyncClient) Start(ctx context.Context) error {
-	conn, err := grpc.NewClient(
-		c.config.Controller.Address,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	tlsOpts, err := grpcobs.DialOptions(c.config.GRPCControllerClient)
+	if err != nil {
+		return fmt.Errorf("controller dial options: %w", err)
+	}
+	dialOpts := append(tlsOpts,
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
 			Time:                20 * time.Second,
 			Timeout:             10 * time.Second,
 			PermitWithoutStream: true,
 		}),
 	)
+	conn, err := grpc.NewClient(c.config.Controller.Address, dialOpts...)
 	if err != nil {
 		return fmt.Errorf("failed to connect to controller: %w", err)
 	}

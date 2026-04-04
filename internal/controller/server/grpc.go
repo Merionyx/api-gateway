@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"merionyx/api-gateway/internal/controller/container"
+	"merionyx/api-gateway/internal/shared/grpcobs"
 	authv1 "merionyx/api-gateway/pkg/api/auth/v1"
 	environmentsv1 "merionyx/api-gateway/pkg/api/environments/v1"
 	schemasv1 "merionyx/api-gateway/pkg/api/schemas/v1"
@@ -20,7 +21,11 @@ func StartGRPCServer(container *container.Container) error {
 		return fmt.Errorf("failed to listen on :%s: %w", container.Config.Server.GRPCPort, err)
 	}
 
-	server := grpc.NewServer()
+	opts, err := grpcobs.ServerOptions(&container.Config.GRPCControlPlane.TLS, container.Config.GRPCControlPlane.Observability)
+	if err != nil {
+		return fmt.Errorf("control-plane gRPC options: %w", err)
+	}
+	server := grpc.NewServer(opts...)
 
 	// Register services
 	snapshotsv1.RegisterSnapshotsServiceServer(server, container.SnapshotGRPCHandler)
@@ -28,7 +33,9 @@ func StartGRPCServer(container *container.Container) error {
 	schemasv1.RegisterSchemasServiceServer(server, container.SchemasGRPCHandler)
 	authv1.RegisterAuthServiceServer(server, container.AuthGRPCHandler)
 
-	reflection.Register(server)
+	if container.Config.GRPCControlPlane.Observability.ReflectionEnabled {
+		reflection.Register(server)
+	}
 
 	slog.Info("gRPC server starting", "port", container.Config.Server.GRPCPort)
 	return server.Serve(lis)

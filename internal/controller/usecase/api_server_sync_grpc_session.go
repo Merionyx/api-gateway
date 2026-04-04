@@ -8,25 +8,33 @@ import (
 
 	pb "merionyx/api-gateway/pkg/api/controller_registry/v1"
 
+	"merionyx/api-gateway/internal/shared/grpcobs"
+
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 )
 
-func (uc *APIServerSyncUseCase) grpcDialOptions() []grpc.DialOption {
-	return []grpc.DialOption{
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+func (uc *APIServerSyncUseCase) grpcDialOptions() ([]grpc.DialOption, error) {
+	tlsOpts, err := grpcobs.DialOptions(uc.config.GRPCAPIServerClient)
+	if err != nil {
+		return nil, err
+	}
+	return append(tlsOpts,
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{
 			Time:                20 * time.Second,
 			Timeout:             10 * time.Second,
 			PermitWithoutStream: true,
 		}),
-	}
+	), nil
 }
 
 // runAPIServerSession uses one connection: register, heartbeat goroutine, block on snapshot stream.
 func (uc *APIServerSyncUseCase) runAPIServerSession(parentCtx context.Context) error {
-	conn, err := grpc.NewClient(uc.apiServerAddress, uc.grpcDialOptions()...)
+	dialOpts, err := uc.grpcDialOptions()
+	if err != nil {
+		return fmt.Errorf("API Server dial options: %w", err)
+	}
+	conn, err := grpc.NewClient(uc.apiServerAddress, dialOpts...)
 	if err != nil {
 		return fmt.Errorf("dial API Server: %w", err)
 	}
