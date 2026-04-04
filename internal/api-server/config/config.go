@@ -5,6 +5,7 @@ import (
 
 	sharedetcd "merionyx/api-gateway/internal/shared/etcd"
 	"merionyx/api-gateway/internal/shared/grpcobs"
+	"merionyx/api-gateway/internal/shared/metricshttp"
 
 	"github.com/spf13/viper"
 )
@@ -19,6 +20,7 @@ type Config struct {
 	GRPCRegistry GRPCRegistrySection `mapstructure:"grpc_registry" json:"grpc_registry"`
 	// GRPCContractSyncerClient: TLS when dialing Contract Syncer.
 	GRPCContractSyncerClient grpcobs.ClientTLSConfig `mapstructure:"grpc_contract_syncer_client" json:"grpc_contract_syncer_client"`
+	MetricsHTTP              metricshttp.Config      `mapstructure:"metrics_http" json:"metrics_http"`
 }
 
 // GRPCRegistrySection groups server TLS and observability for the gRPC registry listener.
@@ -62,9 +64,11 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("leader_election.key_prefix", "/api-gateway/api-server/election/leader")
 	v.SetDefault("leader_election.session_ttl_seconds", 5)
 	v.SetDefault("grpc_registry.observability.reflection_enabled", true)
-	v.SetDefault("grpc_registry.observability.metrics_enabled", false)
-	v.SetDefault("grpc_registry.observability.metrics_path", "/metrics")
 	v.SetDefault("grpc_registry.observability.log_requests", false)
+	v.SetDefault("metrics_http.enabled", false)
+	v.SetDefault("metrics_http.host", "0.0.0.0")
+	v.SetDefault("metrics_http.port", "9090")
+	v.SetDefault("metrics_http.path", "/metrics")
 
 	v.AutomaticEnv()
 	v.SetEnvPrefix("API_SERVER_")

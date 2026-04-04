@@ -20,7 +20,7 @@ func StartGRPCServer(cnt *container.Container) error {
 		return fmt.Errorf("failed to listen: %w", err)
 	}
 
-	opts, err := grpcobs.ServerOptions(&cnt.Config.Server.GRPC.TLS, cnt.Config.Server.GRPC.Observability)
+	opts, err := grpcobs.ServerOptions(&cnt.Config.Server.GRPC.TLS, cnt.Config.Server.GRPC.Observability, cnt.Config.MetricsHTTP.Enabled)
 	if err != nil {
 		return fmt.Errorf("gRPC server options: %w", err)
 	}

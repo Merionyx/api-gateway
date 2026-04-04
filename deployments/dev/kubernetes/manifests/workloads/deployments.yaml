@@ -166,6 +166,8 @@ spec:
           containerPort: 8080
         - name: grpc
           containerPort: 19093
+        - name: metrics
+          containerPort: 9090
         volumeMounts:
         - name: app-config
           mountPath: /api-server/config/k8s.yaml
@@ -255,6 +257,8 @@ spec:
         ports:
         - name: grpc
           containerPort: 19092
+        - name: metrics
+          containerPort: 9090
         volumeMounts:
         - name: app-config
           mountPath: /contract-syncer/config/k8s.yaml
@@ -319,6 +323,8 @@ spec:
           containerPort: 19090
         - name: xds
           containerPort: 19091
+        - name: metrics
+          containerPort: 9090
         volumeMounts:
         - name: app-config
           mountPath: /controller/config/k8s.yaml

@@ -8,6 +8,7 @@ import (
 
 	"merionyx/api-gateway/internal/shared/etcd"
 	"merionyx/api-gateway/internal/shared/grpcobs"
+	"merionyx/api-gateway/internal/shared/metricshttp"
 
 	"github.com/spf13/viper"
 )
@@ -17,6 +18,7 @@ type Config struct {
 	Etcd         etcd.EtcdConfig    `mapstructure:"etcd"`
 	Repositories []RepositoryConfig `mapstructure:"repositories"`
 	APIServer    APIServerConfig    `mapstructure:"api_server"`
+	MetricsHTTP  metricshttp.Config `mapstructure:"metrics_http" json:"metrics_http"`
 }
 
 type ServerConfig struct {
@@ -61,9 +63,11 @@ func LoadConfig(configPath string) (*Config, error) {
 	v.SetDefault("server.grpc_port", "19092")
 	v.SetDefault("server.host", "0.0.0.0")
 	v.SetDefault("server.grpc.observability.reflection_enabled", true)
-	v.SetDefault("server.grpc.observability.metrics_enabled", false)
-	v.SetDefault("server.grpc.observability.metrics_path", "/metrics")
 	v.SetDefault("server.grpc.observability.log_requests", false)
+	v.SetDefault("metrics_http.enabled", false)
+	v.SetDefault("metrics_http.host", "0.0.0.0")
+	v.SetDefault("metrics_http.port", "9090")
+	v.SetDefault("metrics_http.path", "/metrics")
 	v.SetDefault("etcd.dial_timeout", "5s")
 
 	v.SetConfigFile(configPath)

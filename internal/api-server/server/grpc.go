@@ -19,7 +19,7 @@ func StartGRPCServer(cnt *container.Container) error {
 		return fmt.Errorf("failed to listen on %s: %w", address, err)
 	}
 
-	opts, err := grpcobs.ServerOptions(&cnt.Config.GRPCRegistry.TLS, cnt.Config.GRPCRegistry.Observability)
+	opts, err := grpcobs.ServerOptions(&cnt.Config.GRPCRegistry.TLS, cnt.Config.GRPCRegistry.Observability, cnt.Config.MetricsHTTP.Enabled)
 	if err != nil {
 		return fmt.Errorf("gRPC registry options: %w", err)
 	}

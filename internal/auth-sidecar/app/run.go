@@ -8,6 +8,7 @@ import (
 	"merionyx/api-gateway/internal/auth-sidecar/config"
 	"merionyx/api-gateway/internal/auth-sidecar/container"
 	"merionyx/api-gateway/internal/auth-sidecar/server"
+	"merionyx/api-gateway/internal/shared/metricshttp"
 	"merionyx/api-gateway/internal/shared/serviceapp"
 )
 
@@ -39,6 +40,13 @@ func Run() error {
 	go func() {
 		if err := server.StartExtAuthzServer(cnt); err != nil {
 			logger.Error(fmt.Sprintf("ExtAuthz server error: %v", err))
+			cancel()
+		}
+	}()
+
+	go func() {
+		if err := metricshttp.ListenAndServe(cfg.MetricsHTTP); err != nil {
+			logger.Error(fmt.Sprintf("metrics HTTP error: %v", err))
 			cancel()
 		}
 	}()

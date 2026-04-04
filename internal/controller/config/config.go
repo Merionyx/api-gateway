@@ -8,6 +8,7 @@ import (
 
 	"merionyx/api-gateway/internal/shared/etcd"
 	"merionyx/api-gateway/internal/shared/grpcobs"
+	"merionyx/api-gateway/internal/shared/metricshttp"
 
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
@@ -29,6 +30,7 @@ type Config struct {
 	GRPCXDS GRPCServerSection `mapstructure:"grpc_xds" json:"grpc_xds"`
 	// GRPCAPIServerClient: TLS when dialing API Server (RegisterAndStream).
 	GRPCAPIServerClient grpcobs.ClientTLSConfig `mapstructure:"grpc_api_server_client" json:"grpc_api_server_client"`
+	MetricsHTTP         metricshttp.Config      `mapstructure:"metrics_http" json:"metrics_http"`
 }
 
 // GRPCServerSection groups server TLS and observability for one gRPC listener.
@@ -113,6 +115,10 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("leader_election.session_ttl_seconds", 5)
 	setDefaultGRPCObservability(v, "grpc_control_plane.observability")
 	setDefaultGRPCObservability(v, "grpc_xds.observability")
+	v.SetDefault("metrics_http.enabled", false)
+	v.SetDefault("metrics_http.host", "0.0.0.0")
+	v.SetDefault("metrics_http.port", "9090")
+	v.SetDefault("metrics_http.path", "/metrics")
 
 	v.AutomaticEnv()
 	v.SetEnvPrefix("CP_")
@@ -233,8 +239,6 @@ func flattenYAMLStringMap(v interface{}) map[string]string {
 
 func setDefaultGRPCObservability(v *viper.Viper, prefix string) {
 	v.SetDefault(prefix+".reflection_enabled", true)
-	v.SetDefault(prefix+".metrics_enabled", false)
-	v.SetDefault(prefix+".metrics_path", "/metrics")
 	v.SetDefault(prefix+".log_requests", false)
 }
 

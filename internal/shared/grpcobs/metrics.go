@@ -1,16 +1,8 @@
 package grpcobs
 
 import (
-	"net/http"
-	"strings"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-)
-
-const (
-	defaultMetricsPath = "/metrics"
 )
 
 var (
@@ -30,15 +22,3 @@ var (
 		[]string{"grpc_method"},
 	)
 )
-
-// RegisterMetricsHandler attaches Prometheus scrape on mux at path (default /metrics).
-func RegisterMetricsHandler(mux *http.ServeMux, path string) {
-	if mux == nil {
-		return
-	}
-	p := strings.TrimSpace(path)
-	if p == "" {
-		p = defaultMetricsPath
-	}
-	mux.Handle(p, promhttp.Handler())
-}

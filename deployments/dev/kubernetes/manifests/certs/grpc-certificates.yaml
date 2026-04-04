@@ -1,0 +1,149 @@
+# Dev-only internal CA and gRPC TLS certificates (cert-manager).
+# Workloads expect these Secrets (optional: false): apply etcd issuer + this file before Deployments.
+# Client certs: controller → API Server, API Server → contract-syncer, auth sidecar → controller, Envoy → xDS.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: api-gateway-grpc-ca
+  namespace: default
+spec:
+  isCA: true
+  commonName: api-gateway-grpc-ca
+  secretName: api-gateway-grpc-ca-tls
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: selfsigned
+    kind: ClusterIssuer
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: api-gateway-grpc-ca-issuer
+  namespace: default
+spec:
+  ca:
+    secretName: api-gateway-grpc-ca-tls
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: gateway-api-server-grpc
+  namespace: default
+spec:
+  secretName: gateway-api-server-grpc-tls
+  dnsNames:
+  - gateway-api-server
+  - gateway-api-server.default.svc.cluster.local
+  issuerRef:
+    name: api-gateway-grpc-ca-issuer
+    kind: Issuer
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: gateway-controller-dev-grpc
+  namespace: default
+spec:
+  secretName: gateway-controller-dev-grpc-tls
+  dnsNames:
+  - gateway-controller-dev
+  - gateway-controller-dev.default.svc.cluster.local
+  issuerRef:
+    name: api-gateway-grpc-ca-issuer
+    kind: Issuer
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: gateway-contract-syncer-grpc
+  namespace: default
+spec:
+  secretName: gateway-contract-syncer-grpc-tls
+  dnsNames:
+  - gateway-contract-syncer
+  - gateway-contract-syncer.default.svc.cluster.local
+  issuerRef:
+    name: api-gateway-grpc-ca-issuer
+    kind: Issuer
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: auth-sidecar-grpc
+  namespace: default
+spec:
+  secretName: auth-sidecar-grpc-tls
+  dnsNames:
+  - auth-sidecar
+  - localhost
+  ipAddresses:
+  - 127.0.0.1
+  issuerRef:
+    name: api-gateway-grpc-ca-issuer
+    kind: Issuer
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grpc-client-controller
+  namespace: default
+spec:
+  secretName: grpc-client-controller-tls
+  commonName: grpc-client-controller
+  usages:
+  - digital signature
+  - key encipherment
+  - client auth
+  issuerRef:
+    name: api-gateway-grpc-ca-issuer
+    kind: Issuer
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grpc-client-api-server
+  namespace: default
+spec:
+  secretName: grpc-client-api-server-tls
+  commonName: grpc-client-api-server
+  usages:
+  - digital signature
+  - key encipherment
+  - client auth
+  issuerRef:
+    name: api-gateway-grpc-ca-issuer
+    kind: Issuer
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grpc-client-auth-sidecar
+  namespace: default
+spec:
+  secretName: grpc-client-auth-sidecar-tls
+  commonName: grpc-client-auth-sidecar
+  usages:
+  - digital signature
+  - key encipherment
+  - client auth
+  issuerRef:
+    name: api-gateway-grpc-ca-issuer
+    kind: Issuer
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grpc-client-envoy
+  namespace: default
+spec:
+  secretName: grpc-client-envoy-tls
+  commonName: grpc-client-envoy
+  usages:
+  - digital signature
+  - key encipherment
+  - client auth
+  issuerRef:
+    name: api-gateway-grpc-ca-issuer
+    kind: Issuer

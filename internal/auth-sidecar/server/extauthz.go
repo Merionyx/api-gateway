@@ -36,7 +36,7 @@ func StartExtAuthzServer(cnt *container.Container) error {
 		return fmt.Errorf("failed to listen: %w", err)
 	}
 
-	opts, err := grpcobs.ServerOptions(&cnt.Config.GRPCExtAuthz.TLS, cnt.Config.GRPCExtAuthz.Observability)
+	opts, err := grpcobs.ServerOptions(&cnt.Config.GRPCExtAuthz.TLS, cnt.Config.GRPCExtAuthz.Observability, cnt.Config.MetricsHTTP.Enabled)
 	if err != nil {
 		return fmt.Errorf("ext_authz gRPC options: %w", err)
 	}

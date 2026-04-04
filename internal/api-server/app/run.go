@@ -8,6 +8,7 @@ import (
 	"merionyx/api-gateway/internal/api-server/config"
 	"merionyx/api-gateway/internal/api-server/container"
 	"merionyx/api-gateway/internal/api-server/server"
+	"merionyx/api-gateway/internal/shared/metricshttp"
 	"merionyx/api-gateway/internal/shared/serviceapp"
 )
 
@@ -39,6 +40,13 @@ func Run() error {
 	go func() {
 		if err := server.StartHTTPServer(cnt); err != nil {
 			logger.Error(fmt.Sprintf("HTTP server error: %v", err))
+			cancel()
+		}
+	}()
+
+	go func() {
+		if err := metricshttp.ListenAndServe(cfg.MetricsHTTP); err != nil {
+			logger.Error(fmt.Sprintf("metrics HTTP error: %v", err))
 			cancel()
 		}
 	}()

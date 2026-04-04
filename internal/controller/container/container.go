@@ -179,7 +179,7 @@ func (c *Container) initHandlers() {
 
 func (c *Container) initXDS() error {
 	c.XDSSnapshotManager = xdscache.NewSnapshotManager()
-	xdsOpts, err := grpcobs.ServerOptions(&c.Config.GRPCXDS.TLS, c.Config.GRPCXDS.Observability)
+	xdsOpts, err := grpcobs.ServerOptions(&c.Config.GRPCXDS.TLS, c.Config.GRPCXDS.Observability, c.Config.MetricsHTTP.Enabled)
 	if err != nil {
 		return fmt.Errorf("xDS gRPC options: %w", err)
 	}

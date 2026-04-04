@@ -3,28 +3,12 @@ package httpdelivery
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
-
-	"merionyx/api-gateway/internal/controller/config"
-	"merionyx/api-gateway/internal/shared/grpcobs"
 )
 
-// NewMux returns HTTP routes for the Gateway Controller. There is no REST control plane here —
-// configuration is gRPC, xDS, and etcd; HTTP is limited to operational probes and optional /metrics.
-func NewMux(cfg *config.Config) http.Handler {
+// NewMux returns HTTP routes for the Gateway Controller: operational probes only (no REST control plane).
+func NewMux() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", health)
-	if cfg != nil {
-		cp := cfg.GRPCControlPlane.Observability
-		xds := cfg.GRPCXDS.Observability
-		if cp.MetricsEnabled || xds.MetricsEnabled {
-			path := strings.TrimSpace(cp.MetricsPath)
-			if path == "" {
-				path = "/metrics"
-			}
-			grpcobs.RegisterMetricsHandler(mux, path)
-		}
-	}
 	return mux
 }
 

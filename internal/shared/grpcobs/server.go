@@ -8,7 +8,8 @@ import (
 )
 
 // ServerOptions returns grpc.ServerOption slice: TLS (if any), chained interceptors.
-func ServerOptions(tlsCfg *ServerTLSConfig, obs ObservabilityConfig) ([]grpc.ServerOption, error) {
+// recordPrometheus should match metrics_http.enabled so gRPC counters match the scrape endpoint.
+func ServerOptions(tlsCfg *ServerTLSConfig, obs ObservabilityConfig, recordPrometheus bool) ([]grpc.ServerOption, error) {
 	var out []grpc.ServerOption
 
 	if tlsCfg != nil {
@@ -22,7 +23,7 @@ func ServerOptions(tlsCfg *ServerTLSConfig, obs ObservabilityConfig) ([]grpc.Ser
 	}
 
 	io := interceptorOpts{
-		metrics: obs.MetricsEnabled,
+		metrics: recordPrometheus,
 		log:     obs.LogRequests,
 	}
 	out = append(out,
@@ -34,8 +35,8 @@ func ServerOptions(tlsCfg *ServerTLSConfig, obs ObservabilityConfig) ([]grpc.Ser
 }
 
 // MustServerOptions like ServerOptions but panics on TLS error — avoid in library; use for tests only if needed.
-func MustServerOptions(tlsCfg *ServerTLSConfig, obs ObservabilityConfig) []grpc.ServerOption {
-	opts, err := ServerOptions(tlsCfg, obs)
+func MustServerOptions(tlsCfg *ServerTLSConfig, obs ObservabilityConfig, recordPrometheus bool) []grpc.ServerOption {
+	opts, err := ServerOptions(tlsCfg, obs, recordPrometheus)
 	if err != nil {
 		panic(fmt.Errorf("grpcobs.ServerOptions: %w", err))
 	}

@@ -8,6 +8,7 @@ import (
 	"merionyx/api-gateway/internal/contract-syncer/config"
 	"merionyx/api-gateway/internal/contract-syncer/container"
 	"merionyx/api-gateway/internal/contract-syncer/server"
+	"merionyx/api-gateway/internal/shared/metricshttp"
 	"merionyx/api-gateway/internal/shared/serviceapp"
 )
 
@@ -39,6 +40,13 @@ func Run() error {
 	go func() {
 		if err := server.StartGRPCServer(cnt); err != nil {
 			logger.Error(fmt.Sprintf("gRPC server error: %v", err))
+			cancel()
+		}
+	}()
+
+	go func() {
+		if err := metricshttp.ListenAndServe(cfg.MetricsHTTP); err != nil {
+			logger.Error(fmt.Sprintf("metrics HTTP error: %v", err))
 			cancel()
 		}
 	}()

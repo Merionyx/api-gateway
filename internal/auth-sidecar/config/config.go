@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	"merionyx/api-gateway/internal/shared/grpcobs"
+	"merionyx/api-gateway/internal/shared/metricshttp"
 
 	"github.com/spf13/viper"
 )
@@ -16,6 +17,7 @@ type Config struct {
 	GRPCExtAuthz GRPCExtAuthzSection `mapstructure:"grpc_ext_authz" json:"grpc_ext_authz"`
 	// GRPCControllerClient: TLS when dialing Controller.
 	GRPCControllerClient grpcobs.ClientTLSConfig `mapstructure:"grpc_controller_client" json:"grpc_controller_client"`
+	MetricsHTTP          metricshttp.Config      `mapstructure:"metrics_http" json:"metrics_http"`
 }
 
 type ServerConfig struct {
@@ -45,9 +47,11 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("server.host", "localhost")
 	v.SetDefault("jwt.jwks_url", "http://api-server:8080/.well-known/jwks.json")
 	v.SetDefault("grpc_ext_authz.observability.reflection_enabled", true)
-	v.SetDefault("grpc_ext_authz.observability.metrics_enabled", false)
-	v.SetDefault("grpc_ext_authz.observability.metrics_path", "/metrics")
 	v.SetDefault("grpc_ext_authz.observability.log_requests", false)
+	v.SetDefault("metrics_http.enabled", false)
+	v.SetDefault("metrics_http.host", "0.0.0.0")
+	v.SetDefault("metrics_http.port", "9090")
+	v.SetDefault("metrics_http.path", "/metrics")
 
 	v.AutomaticEnv()
 	v.SetEnvPrefix("AUTH_SIDECAR_")

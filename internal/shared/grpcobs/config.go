@@ -18,10 +18,9 @@ type ClientTLSConfig struct {
 	ServerName string `mapstructure:"server_name" json:"server_name"`
 }
 
-// ObservabilityConfig toggles gRPC reflection, Prometheus metrics, and request logging.
+// ObservabilityConfig toggles gRPC reflection and request logging.
+// Prometheus gRPC metrics are recorded when the binary sets metrics_http.enabled and passes recordPrometheus into ServerOptions.
 type ObservabilityConfig struct {
-	ReflectionEnabled bool   `mapstructure:"reflection_enabled" json:"reflection_enabled"`
-	MetricsEnabled    bool   `mapstructure:"metrics_enabled" json:"metrics_enabled"`
-	MetricsPath       string `mapstructure:"metrics_path" json:"metrics_path"`
-	LogRequests       bool   `mapstructure:"log_requests" json:"log_requests"`
+	ReflectionEnabled bool `mapstructure:"reflection_enabled" json:"reflection_enabled"`
+	LogRequests       bool `mapstructure:"log_requests" json:"log_requests"`
 }
