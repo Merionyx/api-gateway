@@ -9,6 +9,27 @@ import (
 	"github.com/go-git/go-git/v6/plumbing/transport/ssh"
 )
 
+func resolveTransportAuth(cfg AuthConfig, repoName string) (transport.AuthMethod, error) {
+	switch cfg.Type {
+	case "ssh":
+		auth, err := setupSSHAuth(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to setup SSH auth for repository %s: %w", repoName, err)
+		}
+		return auth, nil
+	case "token":
+		auth, err := setupTokenAuth(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to setup token auth for repository %s: %w", repoName, err)
+		}
+		return auth, nil
+	case "none", "":
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("unsupported auth type %s for repository %s", cfg.Type, repoName)
+	}
+}
+
 func setupSSHAuth(config AuthConfig) (transport.AuthMethod, error) {
 	var privateKeyPath string
 
