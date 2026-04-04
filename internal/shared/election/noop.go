@@ -4,3 +4,6 @@ package election
 type NoopGate struct{}
 
 func (NoopGate) IsLeader() bool { return true }
+
+// LeaderChanged returns nil: leadership never flips; callers reconcile once from IsLeader().
+func (NoopGate) LeaderChanged() <-chan struct{} { return nil }

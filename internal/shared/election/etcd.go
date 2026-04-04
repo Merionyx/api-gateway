@@ -19,6 +19,9 @@ type EtcdGate struct {
 	ttlSec   int
 
 	isLeader atomic.Bool
+
+	// leaderNotify signals after isLeader is updated (buffer 1 coalesces bursts).
+	leaderNotify chan struct{}
 }
 
 // NewEtcdGate creates a gate. ttlSec is the session TTL in seconds (keepalive refreshes it).
@@ -27,15 +30,28 @@ func NewEtcdGate(client *clientv3.Client, prefix, identity string, ttlSec int) *
 		ttlSec = 5
 	}
 	return &EtcdGate{
-		client:   client,
-		prefix:   prefix,
-		identity: identity,
-		ttlSec:   ttlSec,
+		client:       client,
+		prefix:       prefix,
+		identity:     identity,
+		ttlSec:       ttlSec,
+		leaderNotify: make(chan struct{}, 1),
 	}
 }
 
 func (g *EtcdGate) IsLeader() bool {
 	return g.isLeader.Load()
+}
+
+// LeaderChanged notifies subscribers when leadership may have changed.
+func (g *EtcdGate) LeaderChanged() <-chan struct{} {
+	return g.leaderNotify
+}
+
+func (g *EtcdGate) notifyLeaderChanged() {
+	select {
+	case g.leaderNotify <- struct{}{}:
+	default:
+	}
 }
 
 // Run blocks until ctx is cancelled, campaigning in a loop when leadership is lost.
@@ -70,6 +86,7 @@ func (g *EtcdGate) Run(ctx context.Context) {
 		}
 
 		g.isLeader.Store(true)
+		g.notifyLeaderChanged()
 		slog.Info("leader election: became leader", "identity", g.identity, "prefix", g.prefix)
 
 		select {
@@ -80,6 +97,7 @@ func (g *EtcdGate) Run(ctx context.Context) {
 		}
 
 		g.isLeader.Store(false)
+		g.notifyLeaderChanged()
 		slog.Info("leader election: stepped down", "identity", g.identity)
 		_ = sess.Close()
 	}

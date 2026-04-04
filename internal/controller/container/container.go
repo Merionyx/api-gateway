@@ -193,10 +193,14 @@ func (c *Container) startWatchers() {
 	go c.APIServerSyncUseCase.StartEtcdFollowerWatch(context.Background())
 
 	go func() {
-		tick := time.NewTicker(500 * time.Millisecond)
-		defer tick.Stop()
 		var syncCancel context.CancelFunc
-		for range tick.C {
+		defer func() {
+			if syncCancel != nil {
+				syncCancel()
+			}
+		}()
+
+		reconcile := func() {
 			if c.LeaderGate.IsLeader() {
 				if syncCancel == nil {
 					var sctx context.Context
@@ -213,6 +217,15 @@ func (c *Container) startWatchers() {
 					syncCancel = nil
 				}
 			}
+		}
+
+		reconcile()
+		ch := c.LeaderGate.LeaderChanged()
+		if ch == nil {
+			return
+		}
+		for range ch {
+			reconcile()
 		}
 	}()
 }
