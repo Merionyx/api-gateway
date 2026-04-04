@@ -10,7 +10,8 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
-// SnapshotsUseCase interface for xDS snapshots business logic
+// SnapshotsUseCase is xDS snapshot orchestration. SetDependencies breaks construction cycles:
+// the container calls New* then wires peers in a fixed order before serving traffic.
 type SnapshotsUseCase interface {
 	SetDependencies(environmentUseCase EnvironmentsUseCase, xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder XDSBuilder)
 
@@ -18,7 +19,7 @@ type SnapshotsUseCase interface {
 	GetSnapshotStatus(ctx context.Context, req *models.GetSnapshotStatusRequest) (*models.GetSnapshotStatusResponse, error)
 }
 
-// EnvironmentsUseCase interface for environments business logic
+// EnvironmentsUseCase manages environments in etcd and xDS. SetDependencies is two-phase wiring (see container).
 type EnvironmentsUseCase interface {
 	SetDependencies(environmentRepo EnvironmentRepository, schemasUseCase SchemasUseCase, xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder XDSBuilder)
 
@@ -29,7 +30,7 @@ type EnvironmentsUseCase interface {
 	DeleteEnvironment(ctx context.Context, name string) error
 }
 
-// SchemasUseCase interface for schemas/contracts business logic
+// SchemasUseCase loads contract snapshots. SetDependencies is two-phase wiring (see container).
 type SchemasUseCase interface {
 	SetDependencies(schemaRepo SchemaRepository, environmentRepo EnvironmentRepository)
 

@@ -51,6 +51,7 @@ type InMemoryServiceRepository interface {
 }
 
 type InMemoryEnvironmentsRepository interface {
+	// SetDependencies must run before Initialize so merged config/Kubernetes updates can rebuild xDS.
 	SetDependencies(xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder XDSBuilder, schemaRepo SchemaRepository)
 	Initialize(config *config.Config) error
 	GetEnvironment(ctx context.Context, name string) (*models.Environment, error)

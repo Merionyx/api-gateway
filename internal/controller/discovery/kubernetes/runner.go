@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"merionyx/api-gateway/internal/controller/config"
+	"merionyx/api-gateway/internal/controller/domain/interfaces"
 	"merionyx/api-gateway/internal/controller/domain/models"
-	"merionyx/api-gateway/internal/controller/repository/memory"
 	gwv1alpha1 "merionyx/api-gateway/pkg/apis/gateway/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
@@ -36,8 +36,8 @@ const (
 type Runner struct {
 	client  client.Client
 	cfg     *config.KubernetesDiscoveryConfig
-	envRepo *memory.EnvironmentsRepository
-	svcRepo *memory.ServiceRepository
+	envRepo interfaces.InMemoryEnvironmentsRepository
+	svcRepo interfaces.InMemoryServiceRepository
 }
 
 func restConfig() (*rest.Config, error) {
@@ -53,7 +53,7 @@ func restConfig() (*rest.Config, error) {
 }
 
 // NewRunner builds a client from in-cluster or ~/.kube/config.
-func NewRunner(kd *config.KubernetesDiscoveryConfig, envRepo *memory.EnvironmentsRepository, svcRepo *memory.ServiceRepository) (*Runner, error) {
+func NewRunner(kd *config.KubernetesDiscoveryConfig, envRepo interfaces.InMemoryEnvironmentsRepository, svcRepo interfaces.InMemoryServiceRepository) (*Runner, error) {
 	rc, err := restConfig()
 	if err != nil {
 		return nil, err

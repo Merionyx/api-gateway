@@ -109,16 +109,12 @@ func (c *Container) initUseCases() error {
 		c.EtcdClient,
 	)
 
-	bundleSyncUseCase := usecase.NewBundleSyncUseCase(
+	c.BundleSyncUseCase = usecase.NewBundleSyncUseCase(
 		c.SnapshotRepository,
 		c.ControllerRepository,
 		c.Config.ContractSyncer.Address,
 		c.LeaderGate,
 	)
-
-	bundleSyncUseCase.SetRegistryUseCase(c.ControllerRegistryUseCase.(*usecase.ControllerRegistryUseCase))
-
-	c.BundleSyncUseCase = bundleSyncUseCase
 
 	slog.Info("use cases initialized")
 	return nil
@@ -132,8 +128,7 @@ func (c *Container) initHandlers() {
 }
 
 func (c *Container) startBackgroundWork() {
-	reg := c.ControllerRegistryUseCase.(*usecase.ControllerRegistryUseCase)
-	go reg.StartEtcdWatch(context.Background())
+	go c.ControllerRegistryUseCase.StartEtcdWatch(context.Background())
 	go c.BundleSyncUseCase.StartBundleWatcher(context.Background())
 	slog.Info("API server etcd watch and bundle watcher started")
 }

@@ -154,6 +154,7 @@ func (c *Container) initUseCases() {
 	c.EnvironmentsUseCase = usecase.NewEnvironmentsUseCase()
 	c.SchemasUseCase = usecase.NewSchemasUseCase()
 
+	// Two-phase wiring: use cases reference each other; order matches dependency direction (schemas → env → snapshots).
 	c.EnvironmentsUseCase.SetDependencies(c.EnvironmentRepository, c.SchemasUseCase, c.XDSSnapshotManager, c.XDSBuilder)
 	c.SnapshotsUseCase.SetDependencies(c.EnvironmentsUseCase, c.XDSSnapshotManager, c.XDSBuilder)
 	c.SchemasUseCase.SetDependencies(c.SchemaRepository, c.EnvironmentRepository)
@@ -235,13 +236,7 @@ func (c *Container) StartKubernetesDiscovery(ctx context.Context) {
 	if c.Config.KubernetesDiscovery == nil || !c.Config.KubernetesDiscovery.Enabled {
 		return
 	}
-	envRepo, ok1 := c.InMemoryEnvironmentsRepository.(*memory.EnvironmentsRepository)
-	svcRepo, ok2 := c.InMemoryServiceRepository.(*memory.ServiceRepository)
-	if !ok1 || !ok2 {
-		slog.Error("kubernetes discovery: unexpected in-memory repository implementation")
-		return
-	}
-	runner, err := kubernetes.NewRunner(c.Config.KubernetesDiscovery, envRepo, svcRepo)
+	runner, err := kubernetes.NewRunner(c.Config.KubernetesDiscovery, c.InMemoryEnvironmentsRepository, c.InMemoryServiceRepository)
 	if err != nil {
 		slog.Error("kubernetes discovery: init client", "error", err)
 		return

@@ -27,7 +27,6 @@ type BundleSyncUseCase struct {
 	snapshotRepo       interfaces.SnapshotRepository
 	controllerRepo     interfaces.ControllerRepository
 	contractSyncerAddr string
-	registryUseCase    *ControllerRegistryUseCase
 	leader             election.LeaderGate
 }
 
@@ -46,10 +45,6 @@ func NewBundleSyncUseCase(
 		contractSyncerAddr: contractSyncerAddr,
 		leader:             leader,
 	}
-}
-
-func (uc *BundleSyncUseCase) SetRegistryUseCase(registryUseCase *ControllerRegistryUseCase) {
-	uc.registryUseCase = registryUseCase
 }
 
 func (uc *BundleSyncUseCase) grpcDialOptions() []grpc.DialOption {
