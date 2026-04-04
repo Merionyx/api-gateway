@@ -201,7 +201,8 @@ spec:
         secret:
           secretName: etcd-client-tls
       - name: jwt-keys
-        emptyDir: {}
+        secret:
+          secretName: api-gateway-jwt-keys
 ---
 apiVersion: apps/v1
 kind: Deployment
