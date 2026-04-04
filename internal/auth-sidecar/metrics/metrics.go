@@ -9,17 +9,17 @@ import (
 
 // Fixed reason labels for auth_sidecar_authorization_decisions_total (low cardinality).
 const (
-	ReasonContractNotFound       = "contract_not_found"
-	ReasonInsecureAllow          = "insecure_allow"
-	ReasonMissingToken           = "missing_token"
-	ReasonInvalidJWT             = "invalid_jwt"
-	ReasonMissingAppID           = "missing_app_id"
-	ReasonMissingEnvironments    = "missing_environments"
-	ReasonEnvironmentsWrongType  = "environments_wrong_type"
-	ReasonEnvironmentNotString   = "environment_not_string"
-	ReasonEnvNotAllowed          = "env_not_allowed"
-	ReasonAccessDenied           = "access_denied"
-	ReasonAllowOK                = "allow_ok"
+	ReasonContractNotFound      = "contract_not_found"
+	ReasonInsecureAllow         = "insecure_allow"
+	ReasonMissingToken          = "missing_token"
+	ReasonInvalidJWT            = "invalid_jwt"
+	ReasonMissingAppID          = "missing_app_id"
+	ReasonMissingEnvironments   = "missing_environments"
+	ReasonEnvironmentsWrongType = "environments_wrong_type"
+	ReasonEnvironmentNotString  = "environment_not_string"
+	ReasonEnvNotAllowed         = "env_not_allowed"
+	ReasonAccessDenied          = "access_denied"
+	ReasonAllowOK               = "allow_ok"
 )
 
 const (

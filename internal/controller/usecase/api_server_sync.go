@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"merionyx/api-gateway/internal/controller/config"
-	ctrlmetrics "merionyx/api-gateway/internal/controller/metrics"
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
+	ctrlmetrics "merionyx/api-gateway/internal/controller/metrics"
 	xdscache "merionyx/api-gateway/internal/controller/xds/cache"
 	"merionyx/api-gateway/internal/shared/grpcutil"
 
