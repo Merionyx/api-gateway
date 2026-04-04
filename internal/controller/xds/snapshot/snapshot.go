@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
 	"merionyx/api-gateway/internal/controller/domain/models"
-	"os"
 	"sort"
 	"time"
 
@@ -15,7 +14,7 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/resource/v3"
 )
 
-func BuildEnvoySnapshot(xdsBuilder interfaces.XDSBuilder, env *models.Environment) *envoycache.Snapshot {
+func BuildEnvoySnapshot(xdsBuilder interfaces.XDSBuilder, env *models.Environment) (*envoycache.Snapshot, error) {
 	listeners := xdsBuilder.BuildListeners(env)
 	clusters := xdsBuilder.BuildClusters(env)
 	routes := xdsBuilder.BuildRoutes(env)
@@ -57,11 +56,10 @@ func BuildEnvoySnapshot(xdsBuilder interfaces.XDSBuilder, env *models.Environmen
 		},
 	)
 	if err != nil {
-		slog.Error("failed to create envoy snapshot", "error", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("create envoy snapshot: %w", err)
 	}
 
-	return snapshot
+	return snapshot, nil
 }
 
 func snapshotVersionFromResources(

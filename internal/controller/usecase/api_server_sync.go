@@ -310,7 +310,10 @@ func (uc *APIServerSyncUseCase) updateXDSSnapshot(ctx context.Context, environme
 		return err
 	}
 
-	xdsSnap := xdssnapshot.BuildEnvoySnapshot(uc.xdsBuilder, env)
+	xdsSnap, err := xdssnapshot.BuildEnvoySnapshot(uc.xdsBuilder, env)
+	if err != nil {
+		return fmt.Errorf("build envoy snapshot: %w", err)
+	}
 	nodeID := fmt.Sprintf("envoy-%s", environment)
 	if err := uc.xdsSnapshotManager.UpdateSnapshot(nodeID, xdsSnap); err != nil {
 		return fmt.Errorf("failed to push xDS snapshot: %w", err)

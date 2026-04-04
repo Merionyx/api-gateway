@@ -1,8 +1,8 @@
 package container
 
 import (
+	"fmt"
 	"log/slog"
-	"os"
 
 	"merionyx/api-gateway/internal/contract-syncer/config"
 	"merionyx/api-gateway/internal/contract-syncer/delivery/grpc/handler"
@@ -26,14 +26,16 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 		Config: cfg,
 	}
 
-	container.initGitRepositoryManager()
+	if err := container.initGitRepositoryManager(); err != nil {
+		return nil, err
+	}
 	container.initUseCases()
 	container.initHandlers()
 
 	return container, nil
 }
 
-func (c *Container) initGitRepositoryManager() {
+func (c *Container) initGitRepositoryManager() error {
 	c.GitRepositoryManager = sharedgit.NewRepositoryManager()
 
 	var repos []sharedgit.RepositoryConfig
@@ -53,11 +55,11 @@ func (c *Container) initGitRepositoryManager() {
 	}
 
 	if err := c.GitRepositoryManager.InitializeRepositories(repos); err != nil {
-		slog.Error("failed to initialize git repositories", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("initialize git repositories: %w", err)
 	}
 
 	slog.Info("git repository manager initialized")
+	return nil
 }
 
 func (c *Container) initUseCases() {

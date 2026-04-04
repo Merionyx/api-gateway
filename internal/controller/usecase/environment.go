@@ -142,7 +142,10 @@ func (uc *environmentsUseCase) DeleteEnvironment(ctx context.Context, name strin
 }
 
 func (uc *environmentsUseCase) rebuildXDSSnapshot(ctx context.Context, env *models.Environment) error {
-	xdsSnapshot := snapshot.BuildEnvoySnapshot(uc.xdsBuilder, env)
+	xdsSnapshot, err := snapshot.BuildEnvoySnapshot(uc.xdsBuilder, env)
+	if err != nil {
+		return fmt.Errorf("build envoy snapshot: %w", err)
+	}
 	nodeID := fmt.Sprintf("envoy-%s", env.Name)
 
 	if err := uc.xdsSnapshotManager.UpdateSnapshot(nodeID, xdsSnapshot); err != nil {

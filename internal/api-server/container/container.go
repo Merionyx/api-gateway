@@ -41,37 +41,49 @@ type Container struct {
 
 // NewContainer creates and initializes a new DI container
 func NewContainer(cfg *config.Config) (*Container, error) {
-	container := &Container{
+	c := &Container{
 		Config: cfg,
 	}
 
-	container.initEtcd()
-	container.initLeaderGate()
-	container.initRepositories()
-	container.initUseCases()
-	container.initHandlers()
-	container.startBackgroundWork()
+	ok := false
+	defer func() {
+		if !ok {
+			c.Close()
+		}
+	}()
 
-	return container, nil
+	if err := c.initEtcd(); err != nil {
+		return nil, err
+	}
+	c.initLeaderGate()
+	c.initRepositories()
+	if err := c.initUseCases(); err != nil {
+		return nil, err
+	}
+	c.initHandlers()
+	c.startBackgroundWork()
+
+	ok = true
+	return c, nil
 }
 
-func (c *Container) initEtcd() {
+func (c *Container) initEtcd() error {
 	etcdClient, err := sharedetcd.NewEtcdClient(c.Config.Etcd)
 	if err != nil {
-		slog.Error("failed to initialize etcd client", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("initialize etcd client: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if _, err := etcdClient.Status(ctx, c.Config.Etcd.Endpoints[0]); err != nil {
-		slog.Error("failed to connect to etcd", "error", err)
-		os.Exit(1)
+		_ = etcdClient.Close()
+		return fmt.Errorf("connect to etcd at %q: %w", c.Config.Etcd.Endpoints[0], err)
 	}
 
 	c.EtcdClient = etcdClient
 	slog.Info("etcd client initialized and connected successfully")
+	return nil
 }
 
 func (c *Container) initLeaderGate() {
@@ -109,17 +121,15 @@ func (c *Container) initRepositories() {
 	slog.Info("repositories initialized")
 }
 
-func (c *Container) initUseCases() {
-	var err error
-
-	c.JWTUseCase, err = usecase.NewJWTUseCase(
+func (c *Container) initUseCases() error {
+	jwtUC, err := usecase.NewJWTUseCase(
 		c.Config.JWT.KeysDir,
 		c.Config.JWT.Issuer,
 	)
 	if err != nil {
-		slog.Error("failed to initialize JWT use case", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("initialize JWT use case: %w", err)
 	}
+	c.JWTUseCase = jwtUC
 
 	c.ControllerRegistryUseCase = usecase.NewControllerRegistryUseCase(
 		c.ControllerRepository,
@@ -139,6 +149,7 @@ func (c *Container) initUseCases() {
 	c.BundleSyncUseCase = bundleSyncUseCase
 
 	slog.Info("use cases initialized")
+	return nil
 }
 
 func (c *Container) initHandlers() {

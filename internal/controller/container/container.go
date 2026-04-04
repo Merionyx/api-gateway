@@ -60,45 +60,59 @@ type Container struct {
 
 // NewContainer creates and initializes a new DI container
 func NewContainer(cfg *config.Config) (*Container, error) {
-	container := &Container{
+	c := &Container{
 		Config: cfg,
 	}
 
-	container.initEtcd()
-	container.initLeaderGate()
-	container.initXDS()
+	ok := false
+	defer func() {
+		if !ok {
+			c.Close()
+		}
+	}()
 
-	container.createInMemoryServiceRepository()
-	container.initRepositories()
+	if err := c.initEtcd(); err != nil {
+		return nil, err
+	}
+	c.initLeaderGate()
+	if err := c.initXDS(); err != nil {
+		return nil, err
+	}
 
-	container.initXDSBuilder()
+	c.createInMemoryServiceRepository()
+	c.initRepositories()
 
-	container.initUseCases()
-	container.initHandlers()
-	container.initRouter()
-	container.initInMemoryRepositories()
-	container.startWatchers()
+	c.initXDSBuilder()
 
-	return container, nil
+	c.initUseCases()
+	c.initHandlers()
+	c.initRouter()
+	if err := c.initInMemoryRepositories(); err != nil {
+		return nil, err
+	}
+	c.startWatchers()
+
+	ok = true
+	return c, nil
 }
 
-func (c *Container) initEtcd() {
+func (c *Container) initEtcd() error {
 	etcdClient, err := etcd.NewEtcdClient(c.Config.Etcd)
 	if err != nil {
-		slog.Error("failed to initialize etcd client", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("initialize etcd client: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if _, err := etcdClient.Status(ctx, c.Config.Etcd.Endpoints[0]); err != nil {
-		slog.Error("failed to connect to etcd", "error", err)
-		os.Exit(1)
+		_ = etcdClient.Close()
+		return fmt.Errorf("connect to etcd at %q: %w", c.Config.Etcd.Endpoints[0], err)
 	}
 
 	c.EtcdClient = etcdClient
 	slog.Info("etcd client initialized and connected successfully")
+	return nil
 }
 
 func (c *Container) initLeaderGate() {
@@ -133,20 +147,19 @@ func (c *Container) createInMemoryServiceRepository() {
 	c.InMemoryEnvironmentsRepository = memory.NewEnvironmentsRepository()
 }
 
-func (c *Container) initInMemoryRepositories() {
+func (c *Container) initInMemoryRepositories() error {
 	c.InMemoryEnvironmentsRepository.SetDependencies(c.XDSSnapshotManager, c.XDSBuilder, c.SchemaRepository)
 
 	if err := c.InMemoryServiceRepository.Initialize(c.Config); err != nil {
-		slog.Error("failed to initialize service repository", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("initialize service repository: %w", err)
 	}
 
 	if err := c.InMemoryEnvironmentsRepository.Initialize(c.Config); err != nil {
-		slog.Error("failed to initialize environments repository", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("initialize environments repository: %w", err)
 	}
 
 	slog.Info("in-memory repositories initialized")
+	return nil
 }
 
 func (c *Container) initXDSBuilder() {
@@ -203,16 +216,16 @@ func (c *Container) initRouter() {
 	slog.Info("router initialized")
 }
 
-func (c *Container) initXDS() {
+func (c *Container) initXDS() error {
 	c.XDSSnapshotManager = xdscache.NewSnapshotManager()
 	xdsPort, err := strconv.Atoi(c.Config.Server.XDSPort)
 	if err != nil {
-		slog.Error("failed to convert xDS port to int", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("parse xDS port %q: %w", c.Config.Server.XDSPort, err)
 	}
 	c.XDSServer = xdsserver.NewXDSServer(c.XDSSnapshotManager.GetCache(), xdsPort)
 
 	slog.Info("xDS server initialized")
+	return nil
 }
 
 func (c *Container) startWatchers() {

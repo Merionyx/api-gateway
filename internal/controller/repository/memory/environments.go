@@ -227,7 +227,11 @@ func (r *EnvironmentsRepository) rebuildMergedXDSSnapshotsLocked(ctx context.Con
 			slog.Error("xDS rebuild from memory: enrich snapshots from etcd", "environment", envName, "error", err)
 			continue
 		}
-		snap := snapshot.BuildEnvoySnapshot(r.xdsBuilder, buildEnv)
+		snap, err := snapshot.BuildEnvoySnapshot(r.xdsBuilder, buildEnv)
+		if err != nil {
+			slog.Error("xDS rebuild from memory: build envoy snapshot", "environment", envName, "error", err)
+			continue
+		}
 		nodeID := fmt.Sprintf("envoy-%s", envName)
 		if err := r.xdsSnapshotManager.UpdateSnapshot(nodeID, snap); err != nil {
 			slog.Error("xDS snapshot update failed", "node_id", nodeID, "error", err)

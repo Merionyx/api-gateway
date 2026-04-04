@@ -91,7 +91,10 @@ func (uc *snapshotsUseCase) GetSnapshotStatus(ctx context.Context, req *models.G
 }
 
 func (uc *snapshotsUseCase) rebuildSnapshot(ctx context.Context, envName string, env *models.Environment) error {
-	xdsSnapshot := snapshot.BuildEnvoySnapshot(uc.xdsBuilder, env)
+	xdsSnapshot, err := snapshot.BuildEnvoySnapshot(uc.xdsBuilder, env)
+	if err != nil {
+		return fmt.Errorf("build envoy snapshot: %w", err)
+	}
 	nodeID := fmt.Sprintf("envoy-%s", envName)
 
 	if err := uc.xdsSnapshotManager.UpdateSnapshot(nodeID, xdsSnapshot); err != nil {
