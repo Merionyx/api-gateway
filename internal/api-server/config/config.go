@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"log/slog"
 
 	sharedetcd "merionyx/api-gateway/internal/shared/etcd"
@@ -41,47 +40,44 @@ type JWTConfig struct {
 }
 
 func LoadConfig(configFile ...string) (*Config, error) {
-	// Set default values
-	viper.SetDefault("server.http_port", "8080")
-	viper.SetDefault("server.host", "localhost")
-	viper.SetDefault("etcd.dial_timeout", "5s")
-	viper.SetDefault("jwt.keys_dir", "./secrets/keys/jwt")
-	viper.SetDefault("jwt.issuer", "api-gateway-api-server")
-	viper.SetDefault("leader_election.enabled", true)
-	viper.SetDefault("leader_election.key_prefix", "/api-gateway/api-server/election/leader")
-	viper.SetDefault("leader_election.session_ttl_seconds", 5)
+	// Isolated instance: global viper can be mutated by other imports; Unmarshal must see the same tree as Set.
+	v := viper.New()
+	v.SetDefault("server.http_port", "8080")
+	v.SetDefault("server.host", "localhost")
+	v.SetDefault("etcd.dial_timeout", "5s")
+	v.SetDefault("jwt.keys_dir", "./secrets/keys/jwt")
+	v.SetDefault("jwt.issuer", "api-gateway-api-server")
+	v.SetDefault("leader_election.enabled", true)
+	v.SetDefault("leader_election.key_prefix", "/api-gateway/api-server/election/leader")
+	v.SetDefault("leader_election.session_ttl_seconds", 5)
 
-	// Support environment variables
-	viper.AutomaticEnv()
-	viper.SetEnvPrefix("API_SERVER_")
+	v.AutomaticEnv()
+	v.SetEnvPrefix("API_SERVER_")
 
-	// If a specific config file is passed
 	if len(configFile) > 0 && configFile[0] != "" {
-		slog.Info(fmt.Sprintf("Loading config from %s", configFile[0]))
-		viper.SetConfigFile(configFile[0])
+		slog.Info("Loading config from explicit path", "path", configFile[0])
+		v.SetConfigFile(configFile[0])
 	} else {
-		// Default settings for finding the file
-		viper.SetConfigName("config")
-		viper.SetConfigType("yaml")
-		viper.AddConfigPath(".")
-		viper.AddConfigPath("./config")
-		viper.AddConfigPath("./configs/api-server")
+		v.SetConfigName("config")
+		v.SetConfigType("yaml")
+		v.AddConfigPath(".")
+		v.AddConfigPath("./config")
+		v.AddConfigPath("./configs/api-server")
 	}
 
-	// Read the config file
-	if err := viper.ReadInConfig(); err != nil {
+	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			slog.Info("Config file not found, using defaults and environment variables")
 		} else {
-			slog.Error(fmt.Sprintf("Error reading config file: %v", err))
+			slog.Error("Error reading config file", "error", err)
 			return nil, err
 		}
 	} else {
-		slog.Info(fmt.Sprintf("Using config file %s", viper.ConfigFileUsed()))
+		slog.Info("Using config file", "path", v.ConfigFileUsed())
 	}
 
 	var config Config
-	if err := viper.Unmarshal(&config); err != nil {
+	if err := v.Unmarshal(&config); err != nil {
 		return nil, err
 	}
 

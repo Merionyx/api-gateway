@@ -47,6 +47,7 @@ func LoadConfig(configPath string) (*Config, error) {
 		configPath = "./configs/contract-syncer/config.yaml"
 	}
 
+	// Isolated instance: global viper can be mutated by other imports; Unmarshal must see the same tree as Set.
 	v := viper.New()
 	v.SetDefault("server.grpc_port", "19092")
 	v.SetDefault("server.host", "0.0.0.0")

@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"log/slog"
 
 	"github.com/spf13/viper"
@@ -28,42 +27,39 @@ type JWTConfig struct {
 }
 
 func LoadConfig(configFile ...string) (*Config, error) {
-	// Set default values
-	viper.SetDefault("server.http_port", "8080")
-	viper.SetDefault("server.host", "localhost")
-	viper.SetDefault("jwt.jwks_url", "http://api-server:8080/.well-known/jwks.json")
+	// Isolated instance: global viper can be mutated by other imports; Unmarshal must see the same tree as Set.
+	v := viper.New()
+	v.SetDefault("server.http_port", "8080")
+	v.SetDefault("server.host", "localhost")
+	v.SetDefault("jwt.jwks_url", "http://api-server:8080/.well-known/jwks.json")
 
-	// Support environment variables
-	viper.AutomaticEnv()
-	viper.SetEnvPrefix("AUTH_SIDECAR_")
+	v.AutomaticEnv()
+	v.SetEnvPrefix("AUTH_SIDECAR_")
 
-	// If a specific config file is passed
 	if len(configFile) > 0 && configFile[0] != "" {
-		slog.Info(fmt.Sprintf("Loading config from %s", configFile[0]))
-		viper.SetConfigFile(configFile[0])
+		slog.Info("Loading config from explicit path", "path", configFile[0])
+		v.SetConfigFile(configFile[0])
 	} else {
-		// Default settings for finding the file
-		viper.SetConfigName("config")
-		viper.SetConfigType("yaml")
-		viper.AddConfigPath(".")
-		viper.AddConfigPath("./config")
-		viper.AddConfigPath("./configs/api-server")
+		v.SetConfigName("config")
+		v.SetConfigType("yaml")
+		v.AddConfigPath(".")
+		v.AddConfigPath("./config")
+		v.AddConfigPath("./configs/api-server")
 	}
 
-	// Read the config file
-	if err := viper.ReadInConfig(); err != nil {
+	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			slog.Info("Config file not found, using defaults and environment variables")
 		} else {
-			slog.Error(fmt.Sprintf("Error reading config file: %v", err))
+			slog.Error("Error reading config file", "error", err)
 			return nil, err
 		}
 	} else {
-		slog.Info("Using config file", "path", viper.ConfigFileUsed())
+		slog.Info("Using config file", "path", v.ConfigFileUsed())
 	}
 
 	var config Config
-	if err := viper.Unmarshal(&config); err != nil {
+	if err := v.Unmarshal(&config); err != nil {
 		return nil, err
 	}
 
