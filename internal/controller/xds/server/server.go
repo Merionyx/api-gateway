@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"merionyx/api-gateway/internal/controller/xds"
+	xdspkg "merionyx/api-gateway/internal/controller/xds"
 	"merionyx/api-gateway/internal/shared/serviceapp"
 	"net"
 
@@ -29,10 +29,10 @@ type Server struct {
 	cache      cache.SnapshotCache
 }
 
-func NewXDSServer(snapshotCache cache.SnapshotCache, registerReflection bool, opts ...grpc.ServerOption) *Server {
+func NewXDSServer(snapshotCache cache.SnapshotCache, registerReflection bool, metricsEnabled bool, opts ...grpc.ServerOption) *Server {
 	grpcServer := grpc.NewServer(opts...)
 
-	cb := &xds.Callbacks{}
+	cb := xdspkg.NewCallbacks(metricsEnabled)
 	xdsServer := server.NewServer(context.Background(), snapshotCache, cb)
 
 	// xDS services

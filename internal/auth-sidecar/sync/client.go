@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -11,6 +12,7 @@ import (
 	"google.golang.org/grpc/keepalive"
 
 	"merionyx/api-gateway/internal/auth-sidecar/config"
+	authmetrics "merionyx/api-gateway/internal/auth-sidecar/metrics"
 	"merionyx/api-gateway/internal/auth-sidecar/storage"
 	"merionyx/api-gateway/internal/shared/grpcobs"
 	"merionyx/api-gateway/internal/shared/grpcutil"
@@ -86,15 +88,18 @@ func (c *SyncClient) Start(ctx context.Context) error {
 				return ctx.Err()
 			}
 			slog.Warn("auth sidecar sync error", "error", err)
+			authmetrics.RecordControllerReconnect(c.config.MetricsHTTP.Enabled)
 			backoff = grpcutil.NextReconnectBackoff(backoff, initialBackoff, maxBackoff)
 		}
 	}
 }
 
 func (c *SyncClient) syncLoop(ctx context.Context) error {
+	en := c.config.MetricsHTTP.Enabled
 	// Create a bidirectional stream
 	stream, err := c.client.SyncAccess(ctx)
 	if err != nil {
+		authmetrics.RecordControllerStreamClose(en, authmetrics.SyncCloseDialError)
 		return fmt.Errorf("failed to create stream: %w", err)
 	}
 
@@ -103,9 +108,11 @@ func (c *SyncClient) syncLoop(ctx context.Context) error {
 		Environment: c.config.Controller.Environment,
 		SidecarId:   c.sidecarID,
 	}); err != nil {
+		authmetrics.RecordControllerStreamClose(en, authmetrics.SyncCloseSendError)
 		return fmt.Errorf("failed to send initial request: %w", err)
 	}
 
+	authmetrics.RecordControllerStreamOpen(en)
 	c.setConnected(true)
 	slog.Info("auth sidecar sync stream started", "environment", c.config.Controller.Environment)
 
@@ -114,6 +121,11 @@ func (c *SyncClient) syncLoop(ctx context.Context) error {
 		resp, err := stream.Recv()
 		if err != nil {
 			c.setConnected(false)
+			reason := authmetrics.SyncCloseRecvError
+			if errors.Is(err, context.Canceled) {
+				reason = authmetrics.SyncCloseOK
+			}
+			authmetrics.RecordControllerStreamClose(en, reason)
 			return fmt.Errorf("stream recv error: %w", err)
 		}
 
@@ -122,6 +134,8 @@ func (c *SyncClient) syncLoop(ctx context.Context) error {
 			// Initial configuration
 			slog.Info("auth sidecar sync received initial config", "contracts", len(msg.InitialConfig.Contracts))
 			c.storage.SetAccessConfig(msg.InitialConfig)
+			authmetrics.RecordControllerSyncMessage(en, authmetrics.SyncMsgInitial)
+			authmetrics.SetAccessContractsCount(en, c.storage.GetContractsCount())
 
 		case *authv1.SyncAccessResponse_Update:
 			// Incremental update
@@ -130,9 +144,11 @@ func (c *SyncClient) syncLoop(ctx context.Context) error {
 				"updated", len(msg.Update.UpdatedContracts),
 				"removed", len(msg.Update.RemovedContracts))
 			c.storage.ApplyUpdate(msg.Update)
+			authmetrics.RecordControllerSyncMessage(en, authmetrics.SyncMsgUpdate)
+			authmetrics.SetAccessContractsCount(en, c.storage.GetContractsCount())
 
 		case *authv1.SyncAccessResponse_Heartbeat:
-			// Heartbeat for keep-alive
+			authmetrics.RecordControllerSyncMessage(en, authmetrics.SyncMsgHeartbeat)
 		}
 	}
 }
@@ -141,6 +157,7 @@ func (c *SyncClient) setConnected(connected bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.connected = connected
+	authmetrics.SetControllerConnected(c.config.MetricsHTTP.Enabled, connected)
 }
 
 func (c *SyncClient) IsConnected() bool {

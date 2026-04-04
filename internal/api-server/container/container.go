@@ -114,6 +114,7 @@ func (c *Container) initUseCases() error {
 		c.Config.ContractSyncer.Address,
 		c.Config.GRPCContractSyncerClient,
 		c.LeaderGate,
+		c.Config.MetricsHTTP.Enabled,
 	)
 
 	slog.Info("use cases initialized")
@@ -121,7 +122,7 @@ func (c *Container) initUseCases() error {
 }
 
 func (c *Container) initHandlers() {
-	c.JWTHandler = httphandler.NewJWTHandler(c.JWTUseCase)
+	c.JWTHandler = httphandler.NewJWTHandler(c.JWTUseCase, c.Config.MetricsHTTP.Enabled)
 	c.ControllerRegistryHandler = grpchandler.NewControllerRegistryHandler(c.ControllerRegistryUseCase)
 
 	slog.Info("handlers initialized")

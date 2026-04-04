@@ -186,6 +186,7 @@ func (c *Container) initXDS() error {
 	c.XDSServer = xdsserver.NewXDSServer(
 		c.XDSSnapshotManager.GetCache(),
 		c.Config.GRPCXDS.Observability.ReflectionEnabled,
+		c.Config.MetricsHTTP.Enabled,
 		xdsOpts...,
 	)
 

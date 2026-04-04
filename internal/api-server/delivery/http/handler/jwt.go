@@ -4,17 +4,19 @@ import (
 	"time"
 
 	"merionyx/api-gateway/internal/api-server/domain/models"
+	apimetrics "merionyx/api-gateway/internal/api-server/metrics"
 	"merionyx/api-gateway/internal/api-server/usecase"
 
 	"github.com/gofiber/fiber/v3"
 )
 
 type JWTHandler struct {
-	jwtUseCase *usecase.JWTUseCase
+	jwtUseCase     *usecase.JWTUseCase
+	metricsEnabled bool
 }
 
-func NewJWTHandler(jwtUseCase *usecase.JWTUseCase) *JWTHandler {
-	return &JWTHandler{jwtUseCase: jwtUseCase}
+func NewJWTHandler(jwtUseCase *usecase.JWTUseCase, metricsEnabled bool) *JWTHandler {
+	return &JWTHandler{jwtUseCase: jwtUseCase, metricsEnabled: metricsEnabled}
 }
 
 // GenerateToken generates a JWT token
@@ -22,6 +24,7 @@ func NewJWTHandler(jwtUseCase *usecase.JWTUseCase) *JWTHandler {
 func (h *JWTHandler) GenerateToken(c fiber.Ctx) error {
 	var req models.GenerateTokenRequest
 	if err := c.Bind().Body(&req); err != nil {
+		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationBind)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
@@ -29,12 +32,14 @@ func (h *JWTHandler) GenerateToken(c fiber.Ctx) error {
 
 	// Validation
 	if req.AppID == "" {
+		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationAppID)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "app_id is required",
 		})
 	}
 
 	if len(req.Environments) == 0 {
+		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationEnvironments)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "environments are required",
 		})
@@ -42,6 +47,7 @@ func (h *JWTHandler) GenerateToken(c fiber.Ctx) error {
 
 	for _, environment := range req.Environments {
 		if environment == "" {
+			apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationEmptyEnv)
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "environment is required",
 			})
@@ -49,6 +55,7 @@ func (h *JWTHandler) GenerateToken(c fiber.Ctx) error {
 	}
 
 	if req.ExpiresAt.Before(time.Now()) {
+		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationExpiresAt)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "expires_at must be in the future",
 		})
@@ -56,11 +63,13 @@ func (h *JWTHandler) GenerateToken(c fiber.Ctx) error {
 
 	token, err := h.jwtUseCase.GenerateToken(&req)
 	if err != nil {
+		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultInternalError)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),
 		})
 	}
 
+	apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultCreated)
 	return c.Status(fiber.StatusCreated).JSON(token)
 }
 

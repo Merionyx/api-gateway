@@ -63,7 +63,7 @@ func (c *Container) initGitRepositoryManager() error {
 }
 
 func (c *Container) initUseCases() {
-	c.SyncUseCase = usecase.NewSyncUseCase(c.GitRepositoryManager)
+	c.SyncUseCase = usecase.NewSyncUseCase(c.GitRepositoryManager, c.Config.MetricsHTTP.Enabled)
 
 	slog.Info("use cases initialized")
 }
