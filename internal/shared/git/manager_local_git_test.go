@@ -40,6 +40,9 @@ x-api-gateway:
 	}
 
 	runGit(t, repoDir, "init", "-b", "main")
+	// Local identity only — CI runners often have no global git user.* configured.
+	runGit(t, repoDir, "config", "user.email", "test@example.com")
+	runGit(t, repoDir, "config", "user.name", "Test")
 	runGit(t, repoDir, "add", ".")
 	runGit(t, repoDir, "commit", "-m", "init", "--no-gpg-sign")
 
