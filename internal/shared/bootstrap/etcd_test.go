@@ -30,3 +30,30 @@ func TestConnectEtcd_InvalidEndpoint(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestConnectEtcd_StatusTimeoutNonPositiveUsesDefault(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	_, err := ConnectEtcd(ctx, etcd.EtcdConfig{
+		Endpoints:   []string{"http://127.0.0.1:1"},
+		DialTimeout: 200 * time.Millisecond,
+	}, 0)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestCloseEtcdClient_Nil(t *testing.T) {
+	CloseEtcdClient(nil)
+}
+
+func TestCloseEtcdClient_OpenClient(t *testing.T) {
+	cli, err := etcd.NewEtcdClient(etcd.EtcdConfig{
+		Endpoints:   []string{"127.0.0.1:2379"},
+		DialTimeout: 200 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatalf("NewEtcdClient: %v", err)
+	}
+	CloseEtcdClient(cli)
+}
