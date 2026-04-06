@@ -1,0 +1,62 @@
+package builder
+
+import (
+	"testing"
+
+	"merionyx/api-gateway/internal/controller/config"
+	"merionyx/api-gateway/internal/controller/domain/models"
+	"merionyx/api-gateway/internal/controller/repository/memory"
+)
+
+func TestXDSBuilder_BuildAll_RealisticEnvironment(t *testing.T) {
+	svc := memory.NewServiceRepository()
+	if err := svc.Initialize(&config.Config{
+		Services: config.ServicesConfig{
+			Static: []config.StaticServiceConfig{
+				{Name: "be-svc", Upstream: "http://backend.example:8080"},
+			},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	b := NewXDSBuilder(svc)
+
+	env := &models.Environment{
+		Name: "test-env",
+		Services: &models.EnvironmentServiceConfig{
+			Static: []models.StaticServiceConfig{
+				{Name: "be-svc", Upstream: "http://backend.example:8080"},
+			},
+		},
+		Snapshots: []models.ContractSnapshot{
+			{
+				Name:   "api-v1",
+				Prefix: "/api/v1/",
+				Upstream: models.ContractUpstream{
+					Name: "be-svc",
+				},
+				Access: models.Access{Secure: true, Apps: []models.App{{AppID: "app1", Environments: []string{"test-env"}}}},
+			},
+		},
+	}
+
+	listeners := b.BuildListeners(env)
+	if len(listeners) != 1 || listeners[0].GetName() == "" {
+		t.Fatalf("listeners: %+v", listeners)
+	}
+
+	clusters := b.BuildClusters(env)
+	if len(clusters) < 2 {
+		t.Fatalf("expected auth_sidecar + service clusters, got %d", len(clusters))
+	}
+
+	routes := b.BuildRoutes(env)
+	if len(routes) != 1 || len(routes[0].GetVirtualHosts()) != 1 {
+		t.Fatalf("routes: %+v", routes)
+	}
+
+	endpoints := b.BuildEndpoints(env)
+	if len(endpoints) != 1 {
+		t.Fatalf("endpoints: %+v", endpoints)
+	}
+}

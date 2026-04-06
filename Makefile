@@ -1,4 +1,4 @@
-.PHONY: run build test clean certs deps start lint fmt docker-build docker-run test-coverage help docker-up-dev-ha docker-down-dev-ha test-integration
+.PHONY: run build test clean certs deps start lint fmt docker-build docker-run test-coverage test-coverage-ci help docker-up-dev-ha docker-down-dev-ha test-integration
 
 # Variables
 BINARY_NAME=universal-server
@@ -21,6 +21,9 @@ test: ## Run all tests
 test-coverage: ## Run tests with coverage
 	go test -v -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
+
+test-coverage-ci: ## Unit tests + coverage gate (см. .coverage-min; без merionyx/api-gateway/pkg/*)
+	bash scripts/ci/check-coverage.sh
 
 test-integration: ## Run integration tests (starts etcd in Docker via scripts/dev/run-integration-tests.sh)
 	bash scripts/dev/run-integration-tests.sh
