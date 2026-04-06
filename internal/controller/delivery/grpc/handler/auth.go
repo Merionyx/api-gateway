@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 	"sync"
 	"time"
 
@@ -265,50 +264,36 @@ func (h *AuthHandler) watchEtcdChanges() {
 			key := string(event.Kv.Key)
 			slog.Info("auth sync: controller key changed", "key", key)
 
-			if strings.HasPrefix(key, etcd.ControllerWatchPrefix+"election/") {
+			eff := cache.ClassifyControllerEtcdWatchKey(key)
+			if eff.Ignore {
 				continue
 			}
 
-			if bk, ok := cache.BundleKeyFromSchemaEtcdKey(key); ok {
+			if eff.SchemaBundleKey != "" {
 				if h.schemaCache != nil {
-					h.schemaCache.InvalidateBundleKey(bk)
+					h.schemaCache.InvalidateBundleKey(eff.SchemaBundleKey)
 				}
-				envs := h.environmentsForBundleKey(bk)
-				if len(envs) == 0 {
-					slog.Warn("auth sync: no environments mapped to bundle; notifying all subscribers", "bundle_key", bk)
+				plan := PlanAuthSchemaNotify(eff.SchemaBundleKey, h.bundleIndex, h.metricsEnabled)
+				if plan.NotifyAll {
+					slog.Warn("auth sync: no environments mapped to bundle; notifying all subscribers", "bundle_key", eff.SchemaBundleKey)
 					h.notifyAllSubscribers()
 					continue
 				}
-				h.notifyEnvironments(envs)
+				h.notifyEnvironments(plan.TargetEnvironments)
 				continue
 			}
 
-			if envName, ok := cache.ParseEnvironmentNameFromConfigKey(key); ok {
+			if eff.Environment != "" {
 				if h.bundleIndex != nil {
 					ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 					h.bundleIndex.Rebuild(ctx)
 					cancel()
 					ctrlmetrics.RecordBundleEnvIndexRebuild(h.metricsEnabled)
 				}
-				h.notifyEnvironments([]string{envName})
+				h.notifyEnvironments([]string{eff.Environment})
 			}
 		}
 	}
-}
-
-func (h *AuthHandler) environmentsForBundleKey(bundleKey string) []string {
-	if h.bundleIndex == nil {
-		return nil
-	}
-	envs := h.bundleIndex.EnvironmentsForBundle(bundleKey)
-	if len(envs) > 0 {
-		return envs
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
-	h.bundleIndex.Rebuild(ctx)
-	cancel()
-	ctrlmetrics.RecordBundleEnvIndexRebuild(h.metricsEnabled)
-	return h.bundleIndex.EnvironmentsForBundle(bundleKey)
 }
 
 func (h *AuthHandler) notifyEnvironments(envs []string) {

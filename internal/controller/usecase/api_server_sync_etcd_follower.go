@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 	"sync"
 	"time"
 
@@ -99,16 +98,17 @@ func (uc *APIServerSyncUseCase) StartEtcdFollowerWatch(ctx context.Context) {
 				continue
 			}
 			key := string(event.Kv.Key)
-			if strings.HasPrefix(key, ctrlrepoetcd.ControllerWatchPrefix+"election/") {
+			eff := cache.ClassifyControllerEtcdWatchKey(key)
+			if eff.Ignore {
 				continue
 			}
 
-			if bk, ok := cache.BundleKeyFromSchemaEtcdKey(key); ok {
+			if eff.SchemaBundleKey != "" {
 				batchTouched = true
 				if uc.schemaCache != nil {
-					uc.schemaCache.InvalidateBundleKey(bk)
+					uc.schemaCache.InvalidateBundleKey(eff.SchemaBundleKey)
 				}
-				envNames := uc.environmentsForBundleKey(context.Background(), bk)
+				envNames := uc.environmentsForBundleKey(context.Background(), eff.SchemaBundleKey)
 				if len(envNames) == 0 {
 					mu.Lock()
 					needFull = true
@@ -123,7 +123,7 @@ func (uc *APIServerSyncUseCase) StartEtcdFollowerWatch(ctx context.Context) {
 				continue
 			}
 
-			if envName, ok := cache.ParseEnvironmentNameFromConfigKey(key); ok {
+			if eff.Environment != "" {
 				batchTouched = true
 				if uc.bundleEnvIndex != nil {
 					rctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
@@ -132,12 +132,12 @@ func (uc *APIServerSyncUseCase) StartEtcdFollowerWatch(ctx context.Context) {
 					ctrlmetrics.RecordBundleEnvIndexRebuild(en)
 				}
 				mu.Lock()
-				dirtyEnvs[envName] = struct{}{}
+				dirtyEnvs[eff.Environment] = struct{}{}
 				mu.Unlock()
 				continue
 			}
 
-			if strings.HasPrefix(key, ctrlrepoetcd.ControllerWatchPrefix) {
+			if eff.UnknownUnderPrefix {
 				batchTouched = true
 				mu.Lock()
 				needFull = true

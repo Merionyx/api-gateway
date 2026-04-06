@@ -28,6 +28,37 @@ func NewSnapshotRepository(client *clientv3.Client) *SnapshotRepository {
 	}
 }
 
+// snapshotPut is a planned Put for etcd (used by SaveSnapshots and tests).
+type snapshotPut struct {
+	key string
+	val string
+}
+
+// buildSnapshotSavePlan compares desired snapshots with existing etcd values and returns puts/deletes.
+func buildSnapshotSavePlan(bundleKey string, existingByName map[string][]byte, snapshots []sharedgit.ContractSnapshot) (puts []snapshotPut, dels []string, err error) {
+	desired := make(map[string]struct{}, len(snapshots))
+	for _, snapshot := range snapshots {
+		desired[snapshot.Name] = struct{}{}
+		key := fmt.Sprintf("%s%s/contracts/%s", snapshotPrefix, bundleKey, snapshot.Name)
+		data, err := json.Marshal(snapshot)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to marshal snapshot: %w", err)
+		}
+		if prev, ok := existingByName[snapshot.Name]; ok && bytes.Equal(prev, data) {
+			continue
+		}
+		puts = append(puts, snapshotPut{key: key, val: string(data)})
+	}
+
+	for name := range existingByName {
+		if _, ok := desired[name]; ok {
+			continue
+		}
+		dels = append(dels, fmt.Sprintf("%s%s/contracts/%s", snapshotPrefix, bundleKey, name))
+	}
+	return puts, dels, nil
+}
+
 func (r *SnapshotRepository) SaveSnapshots(ctx context.Context, bundleKey string, snapshots []sharedgit.ContractSnapshot) (written bool, err error) {
 	slog.Info("Saving snapshots to etcd", "bundle_key", bundleKey, "count", len(snapshots))
 
@@ -50,27 +81,9 @@ func (r *SnapshotRepository) SaveSnapshots(ctx context.Context, bundleKey string
 		existingByName[name] = kv.Value
 	}
 
-	desired := make(map[string]struct{}, len(snapshots))
-	var puts []struct{ key, val string }
-	for _, snapshot := range snapshots {
-		desired[snapshot.Name] = struct{}{}
-		key := fmt.Sprintf("%s%s/contracts/%s", snapshotPrefix, bundleKey, snapshot.Name)
-		data, err := json.Marshal(snapshot)
-		if err != nil {
-			return written, fmt.Errorf("failed to marshal snapshot: %w", err)
-		}
-		if prev, ok := existingByName[snapshot.Name]; ok && bytes.Equal(prev, data) {
-			continue
-		}
-		puts = append(puts, struct{ key, val string }{key, string(data)})
-	}
-
-	var dels []string
-	for name := range existingByName {
-		if _, ok := desired[name]; ok {
-			continue
-		}
-		dels = append(dels, fmt.Sprintf("%s%s/contracts/%s", snapshotPrefix, bundleKey, name))
+	puts, dels, err := buildSnapshotSavePlan(bundleKey, existingByName, snapshots)
+	if err != nil {
+		return false, err
 	}
 
 	if len(puts)+len(dels) == 0 {
@@ -78,7 +91,8 @@ func (r *SnapshotRepository) SaveSnapshots(ctx context.Context, bundleKey string
 	}
 
 	var ops []clientv3.Op
-	for _, p := range puts {
+	for i := range puts {
+		p := &puts[i]
 		ops = append(ops, clientv3.OpPut(p.key, p.val))
 	}
 	for _, k := range dels {

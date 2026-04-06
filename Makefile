@@ -1,4 +1,4 @@
-.PHONY: run build test clean certs deps start lint fmt docker-build docker-run test-coverage help docker-up-dev-ha docker-down-dev-ha
+.PHONY: run build test clean certs deps start lint fmt docker-build docker-run test-coverage help docker-up-dev-ha docker-down-dev-ha test-integration
 
 # Variables
 BINARY_NAME=universal-server
@@ -22,8 +22,8 @@ test-coverage: ## Run tests with coverage
 	go test -v -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
 
-test-integration: ## Run integration tests
-	go test -v -tags=integration ./test/...
+test-integration: ## Run integration tests (starts etcd in Docker via scripts/dev/run-integration-tests.sh)
+	bash scripts/dev/run-integration-tests.sh
 
 clean: ## Clean build artifacts
 	rm -rf $(BUILD_DIR)

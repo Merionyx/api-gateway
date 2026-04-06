@@ -9,6 +9,11 @@ on:
       dockerfile:
         required: true
         type: string
+      checkout_ref:
+        description: Git ref to build (commit SHA when triggered via workflow_run)
+        required: false
+        type: string
+        default: ""
 
 env:
   IMAGE_PREFIX: merionyx/api-gateway
@@ -30,6 +35,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.checkout_ref != '' && inputs.checkout_ref || github.sha }}
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
