@@ -20,8 +20,10 @@ jobs:
     - name: Go vet
       run: go vet ./...
 
-    - name: Unit tests
-      run: go test ./... -count=1 -timeout=10m
+    - name: Unit tests and coverage gate
+      env:
+        COVERAGE_MIN_PERCENT: "25"
+      run: bash scripts/ci/check-coverage.sh
 
   lint:
     runs-on: ubuntu-latest
