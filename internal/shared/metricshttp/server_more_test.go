@@ -41,7 +41,7 @@ func pickFreePort(t *testing.T) int {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer l.Close()
+	defer func() { _ = l.Close() }()
 	return l.Addr().(*net.TCPAddr).Port
 }
 
@@ -64,7 +64,7 @@ func TestListenAndServeUntil_ServesMetricsAndStopsOnCancel(t *testing.T) {
 	for i := 0; i < 50; i++ {
 		resp, err := http.Get(url)
 		if err == nil {
-			resp.Body.Close()
+			func() { _ = resp.Body.Close() }()
 			if resp.StatusCode == http.StatusOK {
 				break
 			}
@@ -100,7 +100,7 @@ func TestListenAndServeUntil_DefaultPathHostPort(t *testing.T) {
 	for i := 0; i < 50; i++ {
 		resp, err := http.Get(url)
 		if err == nil {
-			resp.Body.Close()
+			func() { _ = resp.Body.Close() }()
 			if resp.StatusCode == http.StatusOK {
 				cancel()
 				<-done
