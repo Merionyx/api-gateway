@@ -19,13 +19,7 @@ fi
 
 PROFILE="${COVERAGE_PROFILE:-coverage.out}"
 
-PKGS=$(go list ./... | grep -v 'merionyx/api-gateway/pkg/' | paste -sd' ' -)
-if [[ -z "${PKGS// }" ]]; then
-	echo "no packages to test" >&2
-	exit 1
-fi
-
-go test $PKGS -count=1 -timeout=10m -coverprofile="$PROFILE" -covermode=atomic
+go test ./internal/... -count=1 -timeout=10m -coverprofile="$PROFILE" -covermode=atomic
 
 line="$(go tool cover -func="$PROFILE" | grep '^total:' || true)"
 if [[ -z "$line" ]]; then
