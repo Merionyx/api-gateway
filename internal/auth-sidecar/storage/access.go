@@ -2,6 +2,7 @@ package storage
 
 import (
 	"log/slog"
+	"sort"
 	"strings"
 	"sync"
 
@@ -10,17 +11,37 @@ import (
 
 // AccessStorage stores access rights in memory
 type AccessStorage struct {
-	contracts    map[string]*authv1.ContractAccess // key: contract_name
-	prefixToName map[string]string                 // key: prefix, value: contract_name
-	version      int64
-	mu           sync.RWMutex
+	contracts      map[string]*authv1.ContractAccess // key: contract_name
+	prefixToName   map[string]string                 // key: prefix, value: contract_name
+	sortedPrefixes []string                          // longest prefix first for FindContractByPath
+	version        int64
+	mu             sync.RWMutex
 }
 
 func NewAccessStorage() *AccessStorage {
 	return &AccessStorage{
-		contracts:    make(map[string]*authv1.ContractAccess),
-		prefixToName: make(map[string]string),
+		contracts:      make(map[string]*authv1.ContractAccess),
+		prefixToName:   make(map[string]string),
+		sortedPrefixes: nil,
 	}
+}
+
+func (s *AccessStorage) rebuildPrefixOrderLocked() {
+	if len(s.prefixToName) == 0 {
+		s.sortedPrefixes = nil
+		return
+	}
+	prefs := make([]string, 0, len(s.prefixToName))
+	for p := range s.prefixToName {
+		prefs = append(prefs, p)
+	}
+	sort.Slice(prefs, func(i, j int) bool {
+		if len(prefs[i]) != len(prefs[j]) {
+			return len(prefs[i]) > len(prefs[j])
+		}
+		return prefs[i] < prefs[j]
+	})
+	s.sortedPrefixes = prefs
 }
 
 // ReceiveAccessConfig receives the full configuration
@@ -43,20 +64,13 @@ func (s *AccessStorage) FindContractByPath(path string) *authv1.ContractAccess {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	var longestPrefix string
-	var matchedContract *authv1.ContractAccess
-
-	// Find the longest prefix that matches the start of the path
-	for prefix, contractName := range s.prefixToName {
+	for _, prefix := range s.sortedPrefixes {
 		if strings.HasPrefix(path, prefix) {
-			if len(prefix) > len(longestPrefix) {
-				longestPrefix = prefix
-				matchedContract = s.contracts[contractName]
-			}
+			return s.contracts[s.prefixToName[prefix]]
 		}
 	}
 
-	return matchedContract
+	return nil
 }
 
 // SetAccessConfig sets the full configuration
@@ -70,6 +84,7 @@ func (s *AccessStorage) SetAccessConfig(config *authv1.AccessConfig) {
 			s.prefixToName[contract.Prefix] = contract.ContractName
 		}
 	}
+	s.rebuildPrefixOrderLocked()
 	s.version = config.Version
 }
 
@@ -78,7 +93,6 @@ func (s *AccessStorage) ApplyUpdate(update *authv1.AccessUpdate) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Add new contracts
 	for _, contract := range update.AddedContracts {
 		s.contracts[contract.ContractName] = contract
 		if contract.Prefix != "" {
@@ -86,7 +100,6 @@ func (s *AccessStorage) ApplyUpdate(update *authv1.AccessUpdate) {
 		}
 	}
 
-	// Update existing contracts
 	for _, contract := range update.UpdatedContracts {
 		s.contracts[contract.ContractName] = contract
 		if contract.Prefix != "" {
@@ -94,7 +107,6 @@ func (s *AccessStorage) ApplyUpdate(update *authv1.AccessUpdate) {
 		}
 	}
 
-	// Remove contracts
 	for _, contractName := range update.RemovedContracts {
 		contract := s.contracts[contractName]
 		if contract != nil && contract.Prefix != "" {
@@ -103,6 +115,7 @@ func (s *AccessStorage) ApplyUpdate(update *authv1.AccessUpdate) {
 		delete(s.contracts, contractName)
 	}
 
+	s.rebuildPrefixOrderLocked()
 	s.version = update.Version
 }
 
@@ -116,12 +129,10 @@ func (s *AccessStorage) CheckAccess(contractName, appID, environment string) boo
 		return false
 	}
 
-	// If the contract is not secure - allow all
 	if !contract.Secure {
 		return true
 	}
 
-	// Check if the application is in the list
 	for _, app := range contract.Apps {
 		if app.AppId == appID {
 			return true

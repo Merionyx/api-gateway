@@ -14,9 +14,11 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
-const (
-	schemaPrefix = "/api-gateway/controller/schemas/"
-)
+// ControllerWatchPrefix is the etcd prefix for controller-owned keys (schemas, environments, etc.).
+const ControllerWatchPrefix = "/api-gateway/controller/"
+
+// SchemaPrefix is the etcd prefix for contract snapshot keys (exported for cache/watch parsing).
+const SchemaPrefix = "/api-gateway/controller/schemas/"
 
 type schemaRepository struct {
 	client *clientv3.Client
@@ -76,9 +78,7 @@ func (r *schemaRepository) GetContractSnapshot(ctx context.Context, repo, ref, b
 
 // GetEnvironmentSnapshots gets all snapshots for environment
 func (r *schemaRepository) GetEnvironmentSnapshots(ctx context.Context, envName string) ([]models.ContractSnapshot, error) {
-	prefix := schemaPrefix
-
-	resp, err := r.client.Get(ctx, prefix, clientv3.WithPrefix())
+	resp, err := r.client.Get(ctx, SchemaPrefix, clientv3.WithPrefix())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get snapshots from etcd: %w", err)
 	}
@@ -123,7 +123,7 @@ func (r *schemaRepository) ListContractSnapshots(ctx context.Context, repo, ref,
 }
 
 func (r *schemaRepository) contractsPrefix(repo, ref, bundlePath string) string {
-	return fmt.Sprintf("%s%s/%s/%s/contracts/", schemaPrefix, repo, bundlekey.EscapeRef(ref), bundlekey.EscapePath(bundlePath))
+	return fmt.Sprintf("%s%s/%s/%s/contracts/", SchemaPrefix, repo, bundlekey.EscapeRef(ref), bundlekey.EscapePath(bundlePath))
 }
 
 func (r *schemaRepository) buildContractKey(repo, ref, bundlePath, contract string) string {
@@ -132,6 +132,5 @@ func (r *schemaRepository) buildContractKey(repo, ref, bundlePath, contract stri
 
 // WatchContractBundlesSnapshots watches contract bundles snapshots for repository/ref
 func (r *schemaRepository) WatchContractBundlesSnapshots(ctx context.Context) clientv3.WatchChan {
-	prefix := schemaPrefix
-	return r.client.Watch(ctx, prefix, clientv3.WithPrefix())
+	return r.client.Watch(ctx, SchemaPrefix, clientv3.WithPrefix())
 }

@@ -7,9 +7,11 @@ import (
 	"time"
 
 	"merionyx/api-gateway/internal/controller/config"
-	"merionyx/api-gateway/internal/controller/discovery/kubernetes"
 	"merionyx/api-gateway/internal/controller/delivery/grpc/handler"
+	"merionyx/api-gateway/internal/controller/discovery/kubernetes"
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
+	"merionyx/api-gateway/internal/controller/index/bundleenv"
+	"merionyx/api-gateway/internal/controller/repository/cache"
 	ctrlrepoetcd "merionyx/api-gateway/internal/controller/repository/etcd"
 	"merionyx/api-gateway/internal/controller/repository/memory"
 	"merionyx/api-gateway/internal/controller/usecase"
@@ -32,7 +34,9 @@ type Container struct {
 	LeaderGate election.LeaderGate
 
 	SchemaRepository      interfaces.SchemaRepository
+	SchemaCache           *cache.SchemaCache
 	EnvironmentRepository interfaces.EnvironmentRepository
+	BundleEnvIndex        *bundleenv.Index
 
 	InMemoryServiceRepository      interfaces.InMemoryServiceRepository
 	InMemoryEnvironmentsRepository interfaces.InMemoryEnvironmentsRepository
@@ -47,7 +51,7 @@ type Container struct {
 	SnapshotGRPCHandler     *handler.SnapshotHandler
 	EnvironmentsGRPCHandler *handler.EnvironmentsHandler
 	SchemasGRPCHandler      *handler.SchemasHandler
-	AuthGRPCHandler *handler.AuthHandler
+	AuthGRPCHandler         *handler.AuthHandler
 
 	XDSSnapshotManager *xdscache.SnapshotManager
 	XDSServer          *xdsserver.Server
@@ -81,6 +85,9 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 
 	c.initUseCases()
 	c.initHandlers()
+	if mem, ok := c.InMemoryEnvironmentsRepository.(*memory.EnvironmentsRepository); ok {
+		mem.SetBundleEnvIndex(c.BundleEnvIndex, c.Config.MetricsHTTP.Enabled)
+	}
 	if err := c.initInMemoryRepositories(); err != nil {
 		return nil, err
 	}
@@ -139,8 +146,11 @@ func (c *Container) initXDSBuilder() {
 }
 
 func (c *Container) initRepositories() {
-	c.SchemaRepository = ctrlrepoetcd.NewSchemaRepository(c.EtcdClient)
+	rawSchema := ctrlrepoetcd.NewSchemaRepository(c.EtcdClient)
+	c.SchemaCache = cache.NewSchemaCache(rawSchema, c.Config.MetricsHTTP.Enabled)
+	c.SchemaRepository = c.SchemaCache
 	c.EnvironmentRepository = ctrlrepoetcd.NewEnvironmentRepository(c.EtcdClient)
+	c.BundleEnvIndex = bundleenv.NewIndex(c.EnvironmentRepository, c.InMemoryEnvironmentsRepository)
 
 	slog.Info("etcd repositories initialized")
 }
@@ -163,6 +173,8 @@ func (c *Container) initUseCases() {
 		c.XDSSnapshotManager,
 		c.XDSBuilder,
 		c.EtcdClient,
+		c.BundleEnvIndex,
+		c.SchemaCache,
 	)
 
 	slog.Info("use cases initialized")
@@ -170,9 +182,22 @@ func (c *Container) initUseCases() {
 
 func (c *Container) initHandlers() {
 	c.SnapshotGRPCHandler = handler.NewSnapshotHandler(c.SnapshotsUseCase)
-	c.EnvironmentsGRPCHandler = handler.NewEnvironmentsHandler(c.EnvironmentsUseCase, c.LeaderGate)
+	c.EnvironmentsGRPCHandler = handler.NewEnvironmentsHandler(
+		c.EnvironmentsUseCase,
+		c.LeaderGate,
+		c.BundleEnvIndex,
+		c.Config.MetricsHTTP.Enabled,
+	)
 	c.SchemasGRPCHandler = handler.NewSchemasHandler(c.SchemasUseCase)
-	c.AuthGRPCHandler = handler.NewAuthHandler(c.EnvironmentRepository, c.InMemoryEnvironmentsRepository, c.SchemaRepository, c.EtcdClient)
+	c.AuthGRPCHandler = handler.NewAuthHandler(
+		c.EnvironmentRepository,
+		c.InMemoryEnvironmentsRepository,
+		c.SchemaRepository,
+		c.SchemaCache,
+		c.BundleEnvIndex,
+		c.Config.MetricsHTTP.Enabled,
+		c.EtcdClient,
+	)
 
 	slog.Info("handlers initialized")
 }

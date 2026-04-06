@@ -10,7 +10,9 @@ import (
 
 	"merionyx/api-gateway/internal/controller/config"
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
+	"merionyx/api-gateway/internal/controller/index/bundleenv"
 	ctrlmetrics "merionyx/api-gateway/internal/controller/metrics"
+	"merionyx/api-gateway/internal/controller/repository/cache"
 	xdscache "merionyx/api-gateway/internal/controller/xds/cache"
 	"merionyx/api-gateway/internal/shared/grpcutil"
 
@@ -29,6 +31,8 @@ type APIServerSyncUseCase struct {
 	controllerID             string
 	xdsBuilder               interfaces.XDSBuilder
 	etcdClient               *clientv3.Client
+	bundleEnvIndex           *bundleenv.Index
+	schemaCache              *cache.SchemaCache
 }
 
 func NewAPIServerSyncUseCase(
@@ -39,6 +43,8 @@ func NewAPIServerSyncUseCase(
 	xdsSnapshotManager *xdscache.SnapshotManager,
 	xdsBuilder interfaces.XDSBuilder,
 	etcdClient *clientv3.Client,
+	bundleEnvIndex *bundleenv.Index,
+	schemaCache *cache.SchemaCache,
 ) *APIServerSyncUseCase {
 	controllerID := strings.TrimSpace(cfg.HA.ControllerID)
 	if controllerID == "" {
@@ -60,6 +66,8 @@ func NewAPIServerSyncUseCase(
 		xdsBuilder:               xdsBuilder,
 		controllerID:             controllerID,
 		etcdClient:               etcdClient,
+		bundleEnvIndex:           bundleEnvIndex,
+		schemaCache:              schemaCache,
 	}
 }
 

@@ -16,7 +16,7 @@ type WatcherCallback func(eventType string, env *models.Environment) error
 
 // StartEnvironmentWatcher starts watcher for watching changes of environments
 func StartEnvironmentWatcher(ctx context.Context, client *clientv3.Client, callback WatcherCallback) {
-	watchChan := client.Watch(ctx, environmentPrefix, clientv3.WithPrefix())
+	watchChan := client.Watch(ctx, EnvironmentPrefix, clientv3.WithPrefix())
 
 	slog.Info("environment watcher started")
 
@@ -60,7 +60,7 @@ func StartEnvironmentWatcher(ctx context.Context, client *clientv3.Client, callb
 // extractEnvNameFromKey extracts environment name from etcd key
 // Example: /api-gateway/environments/dev/config -> dev
 func extractEnvNameFromKey(key string) string {
-	withoutPrefix := strings.TrimPrefix(key, environmentPrefix)
+	withoutPrefix := strings.TrimPrefix(key, EnvironmentPrefix)
 	parts := strings.Split(withoutPrefix, "/")
 	if len(parts) > 0 {
 		return parts[0]

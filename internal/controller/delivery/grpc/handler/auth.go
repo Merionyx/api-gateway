@@ -4,11 +4,16 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
 	"merionyx/api-gateway/internal/controller/domain/models"
+	"merionyx/api-gateway/internal/controller/index/bundleenv"
+	ctrlmetrics "merionyx/api-gateway/internal/controller/metrics"
+	"merionyx/api-gateway/internal/controller/repository/cache"
+	"merionyx/api-gateway/internal/controller/repository/etcd"
 	"merionyx/api-gateway/internal/shared/utils"
 	authv1 "merionyx/api-gateway/pkg/api/auth/v1"
 
@@ -20,9 +25,11 @@ type AuthHandler struct {
 	environmentRepo                interfaces.EnvironmentRepository
 	inMemoryEnvironmentsRepository interfaces.InMemoryEnvironmentsRepository
 	schemaRepo                     interfaces.SchemaRepository
+	schemaCache                    *cache.SchemaCache
+	bundleIndex                    *bundleenv.Index
+	metricsEnabled                 bool
 	etcdClient                     *clientv3.Client
 
-	// Active connections
 	subscribers map[string]chan *authv1.SyncAccessResponse
 	mu          sync.RWMutex
 }
@@ -31,18 +38,31 @@ func NewAuthHandler(
 	environmentRepo interfaces.EnvironmentRepository,
 	inMemoryEnvironmentsRepository interfaces.InMemoryEnvironmentsRepository,
 	schemaRepo interfaces.SchemaRepository,
+	schemaCache *cache.SchemaCache,
+	bundleIndex *bundleenv.Index,
+	metricsEnabled bool,
 	etcdClient *clientv3.Client,
 ) *AuthHandler {
 	handler := &AuthHandler{
 		environmentRepo:                environmentRepo,
 		inMemoryEnvironmentsRepository: inMemoryEnvironmentsRepository,
 		schemaRepo:                     schemaRepo,
+		schemaCache:                    schemaCache,
+		bundleIndex:                    bundleIndex,
+		metricsEnabled:                 metricsEnabled,
 		etcdClient:                     etcdClient,
 		subscribers:                    make(map[string]chan *authv1.SyncAccessResponse),
 	}
 
-	// Start the watcher for etcd
 	go handler.watchEtcdChanges()
+	if bundleIndex != nil {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel()
+			bundleIndex.Rebuild(ctx)
+			ctrlmetrics.RecordBundleEnvIndexRebuild(metricsEnabled)
+		}()
+	}
 
 	return handler
 }
@@ -51,7 +71,6 @@ func NewAuthHandler(
 func (h *AuthHandler) SyncAccess(stream authv1.AuthService_SyncAccessServer) error {
 	ctx := stream.Context()
 
-	// Read the first request from the sidecar
 	req, err := stream.Recv()
 	if err != nil {
 		return err
@@ -62,7 +81,6 @@ func (h *AuthHandler) SyncAccess(stream authv1.AuthService_SyncAccessServer) err
 
 	slog.Info("auth sync: new sidecar connection", "sidecar_id", sidecarID, "environment", environment)
 
-	// Create a channel for this sidecar
 	updateChan := make(chan *authv1.SyncAccessResponse, 100)
 
 	h.mu.Lock()
@@ -100,24 +118,20 @@ func (h *AuthHandler) SyncAccess(stream authv1.AuthService_SyncAccessServer) err
 
 	slog.Info("auth sync: sent initial config", "sidecar_id", sidecarID, "contracts", len(initialConfig.Contracts))
 
-	// Start the heartbeat
 	heartbeatTicker := time.NewTicker(30 * time.Second)
 	defer heartbeatTicker.Stop()
 
-	// Listen for updates and heartbeats
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 
 		case update := <-updateChan:
-			// Send the update
 			if err := stream.Send(update); err != nil {
 				return err
 			}
 
 		case <-heartbeatTicker.C:
-			// Send the heartbeat
 			if err := stream.Send(&authv1.SyncAccessResponse{
 				Message: &authv1.SyncAccessResponse_Heartbeat{
 					Heartbeat: &authv1.Heartbeat{
@@ -136,8 +150,12 @@ func (h *AuthHandler) GetAccessConfig(ctx context.Context, req *authv1.GetAccess
 	return h.buildAccessConfig(ctx, req.Environment)
 }
 
-// buildAccessConfig builds the access configuration for the environment
 func (h *AuthHandler) buildAccessConfig(ctx context.Context, environment string) (*authv1.AccessConfig, error) {
+	start := time.Now()
+	defer func() {
+		ctrlmetrics.ObserveAuthBuildAccessConfig(h.metricsEnabled, time.Since(start))
+	}()
+
 	var env *models.Environment
 
 	config := &authv1.AccessConfig{
@@ -146,7 +164,6 @@ func (h *AuthHandler) buildAccessConfig(ctx context.Context, environment string)
 		Version:     time.Now().Unix(),
 	}
 
-	// Get the environment from etcd
 	env, err := h.environmentRepo.GetEnvironment(ctx, environment)
 	if err != nil {
 		env, err = h.inMemoryEnvironmentsRepository.GetEnvironment(ctx, environment)
@@ -155,7 +172,6 @@ func (h *AuthHandler) buildAccessConfig(ctx context.Context, environment string)
 			return config, fmt.Errorf("environment not found: %w", err)
 		}
 
-		// For each snapshot get the contracts
 		for _, snapshot := range env.Snapshots {
 			contractAccess := &authv1.ContractAccess{
 				ContractName: snapshot.Name,
@@ -164,16 +180,13 @@ func (h *AuthHandler) buildAccessConfig(ctx context.Context, environment string)
 				Apps:         make([]*authv1.AppAccess, 0),
 			}
 
-			// Filter applications by environment
 			for _, app := range snapshot.Access.Apps {
-				// Check if there is access for this environment
 				hasAccess := false
 				if len(app.Environments) == 0 {
-					// If environments are not specified - access everywhere
 					hasAccess = true
 				} else {
-					for _, env := range app.Environments {
-						if env == environment {
+					for _, envName := range app.Environments {
+						if envName == environment {
 							hasAccess = true
 							break
 						}
@@ -192,58 +205,53 @@ func (h *AuthHandler) buildAccessConfig(ctx context.Context, environment string)
 		}
 	}
 
-	// For each bundle get the contracts
-	for _, bundle := range env.Bundles.Static {
-		// Get all contracts from the bundle
-		snapshots, err := h.schemaRepo.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref, bundle.Path)
-		if err != nil {
-			slog.Warn("auth sync: failed to list snapshots for bundle", "bundle", bundle.Name, "error", err)
-			continue
-		}
-
-		// Convert to ContractAccess
-		for _, snapshot := range snapshots {
-			contractAccess := &authv1.ContractAccess{
-				ContractName: snapshot.Name,
-				Prefix:       snapshot.Prefix,
-				Secure:       snapshot.Access.Secure,
-				Apps:         make([]*authv1.AppAccess, 0),
+	if env != nil && env.Bundles != nil {
+		for _, bundle := range env.Bundles.Static {
+			snapshots, err := h.schemaRepo.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref, bundle.Path)
+			if err != nil {
+				slog.Warn("auth sync: failed to list snapshots for bundle", "bundle", bundle.Name, "error", err)
+				continue
 			}
 
-			// Filter applications by environment
-			for _, app := range snapshot.Access.Apps {
-				// Check if there is access for this environment
-				hasAccess := false
-				if len(app.Environments) == 0 {
-					// If environments are not specified - access everywhere
-					hasAccess = true
-				} else {
-					for _, envPattern := range app.Environments {
-						if utils.MatchesEnvironmentPattern(environment, envPattern) {
-							hasAccess = true
-							break
+			for _, snapshot := range snapshots {
+				contractAccess := &authv1.ContractAccess{
+					ContractName: snapshot.Name,
+					Prefix:       snapshot.Prefix,
+					Secure:       snapshot.Access.Secure,
+					Apps:         make([]*authv1.AppAccess, 0),
+				}
+
+				for _, app := range snapshot.Access.Apps {
+					hasAccess := false
+					if len(app.Environments) == 0 {
+						hasAccess = true
+					} else {
+						for _, envPattern := range app.Environments {
+							if utils.MatchesEnvironmentPattern(environment, envPattern) {
+								hasAccess = true
+								break
+							}
 						}
+					}
+
+					if hasAccess {
+						contractAccess.Apps = append(contractAccess.Apps, &authv1.AppAccess{
+							AppId:        app.AppID,
+							Environments: app.Environments,
+						})
 					}
 				}
 
-				if hasAccess {
-					contractAccess.Apps = append(contractAccess.Apps, &authv1.AppAccess{
-						AppId:        app.AppID,
-						Environments: app.Environments,
-					})
-				}
+				config.Contracts = append(config.Contracts, contractAccess)
 			}
-
-			config.Contracts = append(config.Contracts, contractAccess)
 		}
 	}
 
 	return config, nil
 }
 
-// watchEtcdChanges watches for changes in etcd and notifies sidecars
 func (h *AuthHandler) watchEtcdChanges() {
-	watchChan := h.etcdClient.Watch(context.Background(), "/api-gateway/controller/schemas/", clientv3.WithPrefix())
+	watchChan := h.etcdClient.Watch(context.Background(), etcd.ControllerWatchPrefix, clientv3.WithPrefix())
 
 	slog.Info("auth sync: watching etcd for schema changes")
 
@@ -254,38 +262,105 @@ func (h *AuthHandler) watchEtcdChanges() {
 		}
 
 		for _, event := range watchResp.Events {
-			// Parse the key to determine the environment
-			// /api-gateway/schemas/{repo}/{ref}/contracts/{contract}/snapshot
+			key := string(event.Kv.Key)
+			slog.Info("auth sync: controller key changed", "key", key)
 
-			slog.Info("auth sync: schema key changed", "key", string(event.Kv.Key))
+			if strings.HasPrefix(key, etcd.ControllerWatchPrefix+"election/") {
+				continue
+			}
 
-			// Notify all subscribers
-			// TODO: Determine which environments are affected
-			// For simplicity - notify all
-			h.notifyAllSubscribers()
+			if bk, ok := cache.BundleKeyFromSchemaEtcdKey(key); ok {
+				if h.schemaCache != nil {
+					h.schemaCache.InvalidateBundleKey(bk)
+				}
+				envs := h.environmentsForBundleKey(bk)
+				if len(envs) == 0 {
+					slog.Warn("auth sync: no environments mapped to bundle; notifying all subscribers", "bundle_key", bk)
+					h.notifyAllSubscribers()
+					continue
+				}
+				h.notifyEnvironments(envs)
+				continue
+			}
+
+			if envName, ok := cache.ParseEnvironmentNameFromConfigKey(key); ok {
+				if h.bundleIndex != nil {
+					ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+					h.bundleIndex.Rebuild(ctx)
+					cancel()
+					ctrlmetrics.RecordBundleEnvIndexRebuild(h.metricsEnabled)
+				}
+				h.notifyEnvironments([]string{envName})
+			}
 		}
 	}
 }
 
-// notifyAllSubscribers notifies all connected sidecars
-func (h *AuthHandler) notifyAllSubscribers() {
+func (h *AuthHandler) environmentsForBundleKey(bundleKey string) []string {
+	if h.bundleIndex == nil {
+		return nil
+	}
+	envs := h.bundleIndex.EnvironmentsForBundle(bundleKey)
+	if len(envs) > 0 {
+		return envs
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	h.bundleIndex.Rebuild(ctx)
+	cancel()
+	ctrlmetrics.RecordBundleEnvIndexRebuild(h.metricsEnabled)
+	return h.bundleIndex.EnvironmentsForBundle(bundleKey)
+}
+
+func (h *AuthHandler) notifyEnvironments(envs []string) {
+	if len(envs) == 0 {
+		return
+	}
+	want := make(map[string]struct{}, len(envs))
+	for _, e := range envs {
+		want[e] = struct{}{}
+	}
+
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
 	for subscriberKey, updateChan := range h.subscribers {
-		// Extract the environment from the key
-		// subscriberKey format: "dev:sidecar-123"
-		parts := splitSubscriberKey(subscriberKey)
-		environment := parts[0]
+		environment := splitSubscriberKey(subscriberKey)[0]
+		if _, ok := want[environment]; !ok {
+			continue
+		}
 
-		// Build the updated configuration
 		config, err := h.buildAccessConfig(context.Background(), environment)
 		if err != nil {
 			slog.Warn("auth sync: failed to build config for subscriber", "subscriber", subscriberKey, "error", err)
 			continue
 		}
 
-		// Send the update (non-blocking)
+		select {
+		case updateChan <- &authv1.SyncAccessResponse{
+			Message: &authv1.SyncAccessResponse_InitialConfig{
+				InitialConfig: config,
+			},
+		}:
+			slog.Debug("auth sync: sent update to subscriber", "subscriber", subscriberKey)
+		default:
+			slog.Warn("auth sync: update channel full, skipping", "subscriber", subscriberKey)
+		}
+	}
+}
+
+func (h *AuthHandler) notifyAllSubscribers() {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	for subscriberKey, updateChan := range h.subscribers {
+		environment := splitSubscriberKey(subscriberKey)[0]
+
+		config, err := h.buildAccessConfig(context.Background(), environment)
+		if err != nil {
+			slog.Warn("auth sync: failed to build config for subscriber", "subscriber", subscriberKey, "error", err)
+			continue
+		}
+
 		select {
 		case updateChan <- &authv1.SyncAccessResponse{
 			Message: &authv1.SyncAccessResponse_InitialConfig{
@@ -300,7 +375,6 @@ func (h *AuthHandler) notifyAllSubscribers() {
 }
 
 func splitSubscriberKey(key string) []string {
-	// "dev:sidecar-123" -> ["dev", "sidecar-123"]
 	for i, c := range key {
 		if c == ':' {
 			return []string{key[:i], key[i+1:]}

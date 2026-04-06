@@ -2,9 +2,12 @@ package handler
 
 import (
 	"context"
+	"time"
 
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
 	"merionyx/api-gateway/internal/controller/domain/models"
+	"merionyx/api-gateway/internal/controller/index/bundleenv"
+	ctrlmetrics "merionyx/api-gateway/internal/controller/metrics"
 	"merionyx/api-gateway/internal/shared/election"
 	contractv1 "merionyx/api-gateway/pkg/api/contract/v1"
 	environmentsv1 "merionyx/api-gateway/pkg/api/environments/v1"
@@ -17,13 +20,37 @@ type EnvironmentsHandler struct {
 	environmentsv1.UnimplementedEnvironmentsServiceServer
 	environmentsUseCase interfaces.EnvironmentsUseCase
 	leader              election.LeaderGate
+	bundleIndex         *bundleenv.Index
+	metricsEnabled      bool
 }
 
-func NewEnvironmentsHandler(environmentsUseCase interfaces.EnvironmentsUseCase, leader election.LeaderGate) *EnvironmentsHandler {
+func NewEnvironmentsHandler(
+	environmentsUseCase interfaces.EnvironmentsUseCase,
+	leader election.LeaderGate,
+	bundleIndex *bundleenv.Index,
+	metricsEnabled bool,
+) *EnvironmentsHandler {
 	if leader == nil {
 		leader = election.NoopGate{}
 	}
-	return &EnvironmentsHandler{environmentsUseCase: environmentsUseCase, leader: leader}
+	return &EnvironmentsHandler{
+		environmentsUseCase: environmentsUseCase,
+		leader:              leader,
+		bundleIndex:         bundleIndex,
+		metricsEnabled:      metricsEnabled,
+	}
+}
+
+func (h *EnvironmentsHandler) rebuildBundleIndexAsync() {
+	if h.bundleIndex == nil {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+		defer cancel()
+		h.bundleIndex.Rebuild(ctx)
+		ctrlmetrics.RecordBundleEnvIndexRebuild(h.metricsEnabled)
+	}()
 }
 
 func (h *EnvironmentsHandler) CreateEnvironment(ctx context.Context, req *environmentsv1.CreateEnvironmentRequest) (*environmentsv1.CreateEnvironmentResponse, error) {
@@ -43,6 +70,8 @@ func (h *EnvironmentsHandler) CreateEnvironment(ctx context.Context, req *enviro
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+
+	h.rebuildBundleIndexAsync()
 
 	return &environmentsv1.CreateEnvironmentResponse{
 		Environment: modelToProtoEnvironment(env),
@@ -97,6 +126,8 @@ func (h *EnvironmentsHandler) UpdateEnvironment(ctx context.Context, req *enviro
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
+	h.rebuildBundleIndexAsync()
+
 	return &environmentsv1.UpdateEnvironmentResponse{
 		Environment: modelToProtoEnvironment(env),
 	}, nil
@@ -113,6 +144,8 @@ func (h *EnvironmentsHandler) DeleteEnvironment(ctx context.Context, req *enviro
 	if err := h.environmentsUseCase.DeleteEnvironment(ctx, req.Name); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+
+	h.rebuildBundleIndexAsync()
 
 	return &environmentsv1.DeleteEnvironmentResponse{
 		Success: true,

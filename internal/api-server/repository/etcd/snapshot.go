@@ -1,6 +1,7 @@
 package etcd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -13,7 +14,8 @@ import (
 )
 
 const (
-	snapshotPrefix = "/api-gateway/api-server/snapshots/"
+	snapshotPrefix    = "/api-gateway/api-server/snapshots/"
+	maxSnapshotTxnOps = 128
 )
 
 type SnapshotRepository struct {
@@ -29,63 +31,86 @@ func NewSnapshotRepository(client *clientv3.Client) *SnapshotRepository {
 func (r *SnapshotRepository) SaveSnapshots(ctx context.Context, bundleKey string, snapshots []sharedgit.ContractSnapshot) (written bool, err error) {
 	slog.Info("Saving snapshots to etcd", "bundle_key", bundleKey, "count", len(snapshots))
 
-	desired := make(map[string]struct{}, len(snapshots))
-	for _, s := range snapshots {
-		desired[s.Name] = struct{}{}
-	}
-
-	for _, snapshot := range snapshots {
-		key := fmt.Sprintf("%s%s/contracts/%s", snapshotPrefix, bundleKey, snapshot.Name)
-
-		data, err := json.Marshal(snapshot)
-		if err != nil {
-			return false, fmt.Errorf("failed to marshal snapshot: %w", err)
-		}
-
-		getResp, err := r.client.Get(ctx, key)
-		if err == nil && len(getResp.Kvs) == 1 && string(getResp.Kvs[0].Value) == string(data) {
-			slog.Debug("API Server etcd: snapshot unchanged, skip write", "key", key)
-			continue
-		}
-
-		_, err = r.client.Put(ctx, key, string(data))
-		if err != nil {
-			return written, fmt.Errorf("failed to save snapshot to etcd: %w", err)
-		}
-
-		written = true
-		slog.Debug("Saved snapshot", "key", key, "name", snapshot.Name)
-	}
-
 	contractsPrefix := fmt.Sprintf("%s%s/contracts/", snapshotPrefix, bundleKey)
 	listResp, err := r.client.Get(ctx, contractsPrefix, clientv3.WithPrefix())
 	if err != nil {
-		return written, fmt.Errorf("failed to list contract keys for prune: %w", err)
+		return false, fmt.Errorf("failed to list contract keys: %w", err)
 	}
+
+	existingByName := make(map[string][]byte)
 	for _, kv := range listResp.Kvs {
 		keyStr := string(kv.Key)
 		if !strings.HasPrefix(keyStr, contractsPrefix) {
 			continue
 		}
 		name := strings.TrimPrefix(keyStr, contractsPrefix)
+		if name == "" || strings.Contains(name, "/") {
+			continue
+		}
+		existingByName[name] = kv.Value
+	}
+
+	desired := make(map[string]struct{}, len(snapshots))
+	var puts []struct{ key, val string }
+	for _, snapshot := range snapshots {
+		desired[snapshot.Name] = struct{}{}
+		key := fmt.Sprintf("%s%s/contracts/%s", snapshotPrefix, bundleKey, snapshot.Name)
+		data, err := json.Marshal(snapshot)
+		if err != nil {
+			return written, fmt.Errorf("failed to marshal snapshot: %w", err)
+		}
+		if prev, ok := existingByName[snapshot.Name]; ok && bytes.Equal(prev, data) {
+			continue
+		}
+		puts = append(puts, struct{ key, val string }{key, string(data)})
+	}
+
+	var dels []string
+	for name := range existingByName {
 		if _, ok := desired[name]; ok {
 			continue
 		}
-		if _, delErr := r.client.Delete(ctx, keyStr); delErr != nil {
-			return written, fmt.Errorf("failed to delete orphan snapshot key %s: %w", keyStr, delErr)
-		}
-		written = true
-		slog.Debug("Deleted orphan snapshot", "key", keyStr, "name", name)
+		dels = append(dels, fmt.Sprintf("%s%s/contracts/%s", snapshotPrefix, bundleKey, name))
 	}
 
-	return written, nil
+	if len(puts)+len(dels) == 0 {
+		return false, nil
+	}
+
+	var ops []clientv3.Op
+	for _, p := range puts {
+		ops = append(ops, clientv3.OpPut(p.key, p.val))
+	}
+	for _, k := range dels {
+		ops = append(ops, clientv3.OpDelete(k))
+	}
+
+	if len(ops) <= maxSnapshotTxnOps {
+		if _, err := r.client.Txn(ctx).Then(ops...).Commit(); err != nil {
+			return false, fmt.Errorf("etcd txn save snapshots: %w", err)
+		}
+		return true, nil
+	}
+
+	for i := 0; i < len(ops); i += maxSnapshotTxnOps {
+		end := i + maxSnapshotTxnOps
+		if end > len(ops) {
+			end = len(ops)
+		}
+		chunk := ops[i:end]
+		if _, err := r.client.Txn(ctx).Then(chunk...).Commit(); err != nil {
+			return written, fmt.Errorf("etcd txn save snapshots (chunk): %w", err)
+		}
+		written = true
+	}
+	return true, nil
 }
 
 func (r *SnapshotRepository) GetSnapshots(ctx context.Context, bundleKey string) ([]sharedgit.ContractSnapshot, error) {
 	prefix := fmt.Sprintf("%s%s/contracts/", snapshotPrefix, bundleKey)
-	
+
 	slog.Debug("Getting snapshots from etcd", "prefix", prefix)
-	
+
 	resp, err := r.client.Get(ctx, prefix, clientv3.WithPrefix())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get snapshots from etcd: %w", err)
@@ -96,7 +121,7 @@ func (r *SnapshotRepository) GetSnapshots(ctx context.Context, bundleKey string)
 	var snapshots []sharedgit.ContractSnapshot
 	for _, kv := range resp.Kvs {
 		slog.Debug("Processing snapshot", "key", string(kv.Key))
-		
+
 		var snapshot sharedgit.ContractSnapshot
 		if err := json.Unmarshal(kv.Value, &snapshot); err != nil {
 			slog.Error("Failed to unmarshal snapshot", "key", string(kv.Key), "error", err)

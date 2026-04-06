@@ -12,9 +12,8 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
-const (
-	environmentPrefix = "/api-gateway/controller/environments/"
-)
+// EnvironmentPrefix is the etcd prefix for environment config keys.
+const EnvironmentPrefix = "/api-gateway/controller/environments/"
 
 type environmentRepository struct {
 	client *clientv3.Client
@@ -28,7 +27,7 @@ func NewEnvironmentRepository(client *clientv3.Client) interfaces.EnvironmentRep
 
 // SaveEnvironment saves environment to etcd
 func (r *environmentRepository) SaveEnvironment(ctx context.Context, env *models.Environment) error {
-	key := environmentPrefix + env.Name + "/config"
+	key := EnvironmentPrefix + env.Name + "/config"
 
 	data, err := json.Marshal(env)
 	if err != nil {
@@ -45,7 +44,7 @@ func (r *environmentRepository) SaveEnvironment(ctx context.Context, env *models
 
 // GetEnvironment gets environment by name
 func (r *environmentRepository) GetEnvironment(ctx context.Context, name string) (*models.Environment, error) {
-	key := environmentPrefix + name + "/config"
+	key := EnvironmentPrefix + name + "/config"
 
 	resp, err := r.client.Get(ctx, key)
 	if err != nil {
@@ -66,7 +65,7 @@ func (r *environmentRepository) GetEnvironment(ctx context.Context, name string)
 
 // ListEnvironments gets all environments
 func (r *environmentRepository) ListEnvironments(ctx context.Context) (map[string]*models.Environment, error) {
-	resp, err := r.client.Get(ctx, environmentPrefix, clientv3.WithPrefix())
+	resp, err := r.client.Get(ctx, EnvironmentPrefix, clientv3.WithPrefix())
 	if err != nil {
 		return nil, fmt.Errorf("failed to list environments from etcd: %w", err)
 	}
@@ -91,7 +90,7 @@ func (r *environmentRepository) ListEnvironments(ctx context.Context) (map[strin
 
 // DeleteEnvironment deletes environment from etcd
 func (r *environmentRepository) DeleteEnvironment(ctx context.Context, name string) error {
-	key := environmentPrefix + name + "/config"
+	key := EnvironmentPrefix + name + "/config"
 	_, err := r.client.Delete(ctx, key)
 	if err != nil {
 		return fmt.Errorf("failed to delete environment from etcd: %w", err)
@@ -101,5 +100,5 @@ func (r *environmentRepository) DeleteEnvironment(ctx context.Context, name stri
 
 // WatchEnvironments creates watch channel for watching changes
 func (r *environmentRepository) WatchEnvironments(ctx context.Context) clientv3.WatchChan {
-	return r.client.Watch(ctx, environmentPrefix, clientv3.WithPrefix())
+	return r.client.Watch(ctx, EnvironmentPrefix, clientv3.WithPrefix())
 }

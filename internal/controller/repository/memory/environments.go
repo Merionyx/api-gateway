@@ -6,10 +6,13 @@ import (
 	"log/slog"
 	"sort"
 	"sync"
+	"time"
 
 	"merionyx/api-gateway/internal/controller/config"
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
 	"merionyx/api-gateway/internal/controller/domain/models"
+	"merionyx/api-gateway/internal/controller/index/bundleenv"
+	ctrlmetrics "merionyx/api-gateway/internal/controller/metrics"
 	xdscache "merionyx/api-gateway/internal/controller/xds/cache"
 	"merionyx/api-gateway/internal/controller/xds/snapshot"
 )
@@ -23,6 +26,8 @@ type EnvironmentsRepository struct {
 	xdsSnapshotManager *xdscache.SnapshotManager
 	xdsBuilder         interfaces.XDSBuilder
 	schemaRepo         interfaces.SchemaRepository
+	bundleEnvIndex     *bundleenv.Index
+	bundleEnvMetrics   bool
 }
 
 func NewEnvironmentsRepository() interfaces.InMemoryEnvironmentsRepository {
@@ -36,6 +41,28 @@ func (r *EnvironmentsRepository) SetDependencies(xdsSnapshotManager *xdscache.Sn
 	r.xdsSnapshotManager = xdsSnapshotManager
 	r.xdsBuilder = xdsBuilder
 	r.schemaRepo = schemaRepo
+}
+
+// SetBundleEnvIndex wires the bundle→environment index refreshed after Kubernetes or static config changes.
+func (r *EnvironmentsRepository) SetBundleEnvIndex(idx *bundleenv.Index, metricsEnabled bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.bundleEnvIndex = idx
+	r.bundleEnvMetrics = metricsEnabled
+}
+
+func (r *EnvironmentsRepository) scheduleBundleEnvIndexRebuildLocked() {
+	idx := r.bundleEnvIndex
+	metrics := r.bundleEnvMetrics
+	if idx == nil {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+		defer cancel()
+		idx.Rebuild(ctx)
+		ctrlmetrics.RecordBundleEnvIndexRebuild(metrics)
+	}()
 }
 
 func (r *EnvironmentsRepository) Initialize(config *config.Config) error {
@@ -85,6 +112,7 @@ func (r *EnvironmentsRepository) Initialize(config *config.Config) error {
 	}
 
 	r.rebuildMergedXDSSnapshotsLocked(context.Background())
+	r.scheduleBundleEnvIndexRebuildLocked()
 	return nil
 }
 
@@ -247,6 +275,7 @@ func (r *EnvironmentsRepository) ApplyKubernetesEnvironments(ctx context.Context
 	defer r.mu.Unlock()
 	r.fromK8s = envs
 	r.rebuildMergedXDSSnapshotsLocked(ctx)
+	r.scheduleBundleEnvIndexRebuildLocked()
 	return nil
 }
 
