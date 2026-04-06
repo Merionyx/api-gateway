@@ -43,13 +43,8 @@ func MatchesEnvironmentPattern(env, pattern string) bool {
 		return false
 	}
 
-	actual, _ := patternCache.LoadOrStore(src, compiled)
-	re, ok := actual.(*regexp.Regexp)
-	if !ok || re == nil {
-		slog.Warn("auth: invalid pattern cache entry", "pattern", pattern, "actual", actual)
-		return false
-	}
-	return re.MatchString(env)
+	patternCache.LoadOrStore(src, compiled)
+	return compiled.MatchString(env)
 }
 
 func regexpSourceForEnvironmentPattern(pattern string) string {
