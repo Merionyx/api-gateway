@@ -1,0 +1,18 @@
+name: CI — Pull request to main
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    uses: ./.github/workflows/reusable-go-lint.yml
+    secrets: inherit
+
+  unit:
+    uses: ./.github/workflows/reusable-go-unit.yml
+    secrets: inherit
+
+  integration:
+    uses: ./.github/workflows/reusable-go-integration.yml
+    secrets: inherit

@@ -1,0 +1,24 @@
+name: Go unit tests and coverage gate
+
+on:
+  workflow_call:
+
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+
+    - uses: actions/setup-go@v6
+      with:
+        go-version-file: go.mod
+        cache: true
+
+    - name: Go vet
+      run: go vet ./...
+
+    - name: Unit tests and coverage gate
+      env:
+        COVERAGE_MIN_PERCENT: "25"
+      run: bash scripts/ci/check-coverage.sh

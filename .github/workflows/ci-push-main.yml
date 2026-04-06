@@ -1,0 +1,26 @@
+name: CI — Push to main
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  lint:
+    uses: ./.github/workflows/reusable-go-lint.yml
+    secrets: inherit
+
+  unit:
+    uses: ./.github/workflows/reusable-go-unit.yml
+    secrets: inherit
+
+  integration:
+    uses: ./.github/workflows/reusable-go-integration.yml
+    secrets: inherit
+
+  publish:
+    needs: [ lint, unit, integration ]
+    uses: ./.github/workflows/docker-publish.yml
+    with:
+      version: latest
+      checkout_ref: ${{ github.sha }}
+    secrets: inherit

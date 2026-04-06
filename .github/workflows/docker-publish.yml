@@ -1,75 +1,67 @@
-# Publish Docker images to Docker Hub only after successful Lint & Tests on main (see lint-and-tests.yml), or manually (workflow_dispatch).
-
 name: Publish Docker images to Docker Hub
 
 on:
-  workflow_run:
-    workflows: [ Lint & Tests ]
-    types:
-    - completed
+  workflow_call:
+    inputs:
+      version:
+        description: Docker image tag (latest, v1.0.0, ...)
+        required: false
+        type: string
+        default: latest
+      checkout_ref:
+        description: Git ref (SHA) для checkout
+        required: true
+        type: string
   workflow_dispatch:
-
+    inputs:
+      version:
+        description: Docker image tag (latest, v1.0.0, ...)
+        required: false
+        default: latest
+        type: string
 
 jobs:
-  gate:
-    runs-on: ubuntu-latest
-    if: >
-      github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_branch == 'main')
-    outputs:
-      checkout_ref: ${{ steps.ref.outputs.sha }}
-    steps:
-    - id: ref
-      run: |
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-        else
-          echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
-        fi
-
   api-server:
-    needs: gate
     uses: ./.github/workflows/docker-publish-component.yml
     with:
       component: api-server
       dockerfile: build/release/Dockerfile.api-server
-      checkout_ref: ${{ needs.gate.outputs.checkout_ref }}
+      checkout_ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || inputs.checkout_ref }}
+      version: ${{ inputs.version || 'latest' }}
     secrets: inherit
 
   auth-sidecar:
-    needs: gate
     uses: ./.github/workflows/docker-publish-component.yml
     with:
       component: auth-sidecar
       dockerfile: build/release/Dockerfile.auth-sidecar
-      checkout_ref: ${{ needs.gate.outputs.checkout_ref }}
+      checkout_ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || inputs.checkout_ref }}
+      version: ${{ inputs.version || 'latest' }}
     secrets: inherit
 
   contract-syncer:
-    needs: gate
     uses: ./.github/workflows/docker-publish-component.yml
     with:
       component: contract-syncer
       dockerfile: build/release/Dockerfile.contract-syncer
-      checkout_ref: ${{ needs.gate.outputs.checkout_ref }}
+      checkout_ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || inputs.checkout_ref }}
+      version: ${{ inputs.version || 'latest' }}
     secrets: inherit
 
   controller:
-    needs: gate
     uses: ./.github/workflows/docker-publish-component.yml
     with:
       component: controller
       dockerfile: build/release/Dockerfile.controller
-      checkout_ref: ${{ needs.gate.outputs.checkout_ref }}
+      checkout_ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || inputs.checkout_ref }}
+      version: ${{ inputs.version || 'latest' }}
     secrets: inherit
 
   mock-service:
-    needs: gate
     uses: ./.github/workflows/docker-publish-component.yml
     with:
       component: mock-service
       dockerfile: build/dev/Dockerfile.mock-service
-      checkout_ref: ${{ needs.gate.outputs.checkout_ref }}
+      checkout_ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || inputs.checkout_ref }}
+      version: ${{ inputs.version || 'latest' }}
     secrets: inherit
