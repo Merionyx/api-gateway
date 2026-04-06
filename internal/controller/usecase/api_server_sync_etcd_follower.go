@@ -187,6 +187,7 @@ func (uc *APIServerSyncUseCase) rebuildXDSForEnvironments(ctx context.Context, n
 	var wg sync.WaitGroup
 	var failMu sync.Mutex
 	var nFail int
+	var firstErr error
 	for _, name := range names {
 		name := name
 		wg.Add(1)
@@ -199,6 +200,9 @@ func (uc *APIServerSyncUseCase) rebuildXDSForEnvironments(ctx context.Context, n
 			if err := uc.updateXDSSnapshot(ctx, name); err != nil {
 				failMu.Lock()
 				nFail++
+				if firstErr == nil {
+					firstErr = err
+				}
 				failMu.Unlock()
 				slog.Warn("rebuildXDSForEnvironments: environment", "name", name, "error", err)
 			}
@@ -206,6 +210,9 @@ func (uc *APIServerSyncUseCase) rebuildXDSForEnvironments(ctx context.Context, n
 	}
 	wg.Wait()
 	if nFail > 0 {
+		if firstErr != nil {
+			return fmt.Errorf("rebuildXDSForEnvironments: %d of %d environments failed: %w", nFail, len(names), firstErr)
+		}
 		return fmt.Errorf("rebuildXDSForEnvironments: %d of %d environments failed", nFail, len(names))
 	}
 	return nil

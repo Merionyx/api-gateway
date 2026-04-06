@@ -1,8 +1,6 @@
 package grpcobs
 
 import (
-	"fmt"
-
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -32,13 +30,4 @@ func ServerOptions(tlsCfg *ServerTLSConfig, obs ObservabilityConfig, recordProme
 	)
 
 	return out, nil
-}
-
-// MustServerOptions like ServerOptions but panics on TLS error — avoid in library; use for tests only if needed.
-func MustServerOptions(tlsCfg *ServerTLSConfig, obs ObservabilityConfig, recordPrometheus bool) []grpc.ServerOption {
-	opts, err := ServerOptions(tlsCfg, obs, recordPrometheus)
-	if err != nil {
-		panic(fmt.Errorf("grpcobs.ServerOptions: %w", err))
-	}
-	return opts
 }

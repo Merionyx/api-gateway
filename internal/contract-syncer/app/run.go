@@ -23,15 +23,13 @@ func Run() error {
 
 	cfg, err := config.LoadConfig(os.Getenv("CONFIG_PATH"))
 	if err != nil {
-		logger.Error(fmt.Sprintf("Failed to load config: %v", err))
-		os.Exit(1)
+		return fmt.Errorf("load config: %w", err)
 	}
-	logger.Info("Config loaded", "config", cfg)
+	logger.Info("config loaded", "config", cfg)
 
 	cnt, err := container.NewContainer(cfg)
 	if err != nil {
-		logger.Error(fmt.Sprintf("Failed to initialize container: %v", err))
-		os.Exit(1)
+		return fmt.Errorf("init container: %w", err)
 	}
 
 	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -62,7 +60,7 @@ func Run() error {
 	run("metrics_http", func(c context.Context) error { return metricshttp.ListenAndServeUntil(c, cfg.MetricsHTTP) })
 
 	wg.Wait()
-	logger.Info("Shutting down...")
+	logger.Info("shutting down")
 	cnt.Close()
 	return nil
 }

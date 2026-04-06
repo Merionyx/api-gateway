@@ -51,6 +51,8 @@ func (c *Container) initSyncClient() {
 
 func (c *Container) Close() {
 	if c.SyncClient != nil {
-		c.SyncClient.Close()
+		if err := c.SyncClient.Close(); err != nil {
+			slog.Warn("sync client close", "error", err)
+		}
 	}
 }

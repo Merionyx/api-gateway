@@ -84,13 +84,17 @@ func main() {
 		w.Header().Set("X-Environment", environment)
 		w.WriteHeader(http.StatusOK)
 
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			slog.Error("mock service encode response", "error", err)
+		}
 	})
 
 	// Health check endpoint
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "OK")
+		if _, err := fmt.Fprintf(w, "OK"); err != nil {
+			slog.Error("mock service health write", "error", err)
+		}
 	})
 
 	addr := ":" + port

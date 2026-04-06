@@ -1,4 +1,3 @@
-// internal/xds/builder/endpoint.go
 package builder
 
 import (
@@ -8,7 +7,7 @@ import (
 	"merionyx/api-gateway/internal/controller/domain/models"
 )
 
-func (b *xdsBuilder) BuildEndpoints(env *models.Environment) []*endpointv3.ClusterLoadAssignment {
+func (b *xdsBuilder) BuildEndpoints(env *models.Environment) ([]*endpointv3.ClusterLoadAssignment, error) {
 	endpoints := make([]*endpointv3.ClusterLoadAssignment, 0)
 
 	for _, service := range env.Services.Static {
@@ -39,5 +38,5 @@ func (b *xdsBuilder) BuildEndpoints(env *models.Environment) []*endpointv3.Clust
 		endpoints = append(endpoints, endpoint)
 	}
 
-	return endpoints
+	return endpoints, nil
 }

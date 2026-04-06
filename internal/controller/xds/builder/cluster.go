@@ -1,6 +1,7 @@
 package builder
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -15,12 +16,14 @@ import (
 	"merionyx/api-gateway/internal/controller/domain/models"
 )
 
-func (b *xdsBuilder) BuildClusters(env *models.Environment) []*clusterv3.Cluster {
+func (b *xdsBuilder) BuildClusters(env *models.Environment) ([]*clusterv3.Cluster, error) {
 	clusters := make([]*clusterv3.Cluster, 0)
 	uniqueServices := make(map[string]string)
 
-	// 1. Add Auth Sidecar cluster
-	authSidecarCluster := buildAuthSidecarCluster()
+	authSidecarCluster, err := buildAuthSidecarCluster()
+	if err != nil {
+		return nil, err
+	}
 	clusters = append(clusters, authSidecarCluster)
 
 	// 2. Add services from environment
@@ -46,11 +49,24 @@ func (b *xdsBuilder) BuildClusters(env *models.Environment) []*clusterv3.Cluster
 		clusters = append(clusters, cluster)
 	}
 
-	return clusters
+	return clusters, nil
 }
 
-// buildAuthSidecarCluster creates a cluster for the Auth Sidecar
-func buildAuthSidecarCluster() *clusterv3.Cluster {
+func buildAuthSidecarCluster() (*clusterv3.Cluster, error) {
+	httpProtoOpts, err := anypb.New(
+		&upstreamhttpv3.HttpProtocolOptions{
+			UpstreamProtocolOptions: &upstreamhttpv3.HttpProtocolOptions_ExplicitHttpConfig_{
+				ExplicitHttpConfig: &upstreamhttpv3.HttpProtocolOptions_ExplicitHttpConfig{
+					ProtocolConfig: &upstreamhttpv3.HttpProtocolOptions_ExplicitHttpConfig_Http2ProtocolOptions{
+						Http2ProtocolOptions: &corev3.Http2ProtocolOptions{},
+					},
+				},
+			},
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("marshal auth sidecar HttpProtocolOptions: %w", err)
+	}
 	return &clusterv3.Cluster{
 		Name:           "auth_sidecar",
 		ConnectTimeout: durationpb.New(1 * time.Second),
@@ -85,21 +101,10 @@ func buildAuthSidecarCluster() *clusterv3.Cluster {
 			}},
 		},
 
-		// HTTP/2 for gRPC (new way)
 		TypedExtensionProtocolOptions: map[string]*anypb.Any{
-			"envoy.extensions.upstreams.http.v3.HttpProtocolOptions": mustMarshalAny(
-				&upstreamhttpv3.HttpProtocolOptions{
-					UpstreamProtocolOptions: &upstreamhttpv3.HttpProtocolOptions_ExplicitHttpConfig_{
-						ExplicitHttpConfig: &upstreamhttpv3.HttpProtocolOptions_ExplicitHttpConfig{
-							ProtocolConfig: &upstreamhttpv3.HttpProtocolOptions_ExplicitHttpConfig_Http2ProtocolOptions{
-								Http2ProtocolOptions: &corev3.Http2ProtocolOptions{},
-							},
-						},
-					},
-				},
-			),
+			"envoy.extensions.upstreams.http.v3.HttpProtocolOptions": httpProtoOpts,
 		},
-	}
+	}, nil
 }
 
 func buildCluster(name, upstream string) *clusterv3.Cluster {

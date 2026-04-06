@@ -136,7 +136,9 @@ func (uc *environmentsUseCase) DeleteEnvironment(ctx context.Context, name strin
 
 	// Delete xDS snapshot (optional, depends on your implementation)
 	nodeID := fmt.Sprintf("envoy-%s", name)
-	uc.xdsSnapshotManager.DeleteSnapshot(nodeID)
+	if err := uc.xdsSnapshotManager.DeleteSnapshot(nodeID); err != nil {
+		return fmt.Errorf("delete xds snapshot: %w", err)
+	}
 
 	return nil
 }

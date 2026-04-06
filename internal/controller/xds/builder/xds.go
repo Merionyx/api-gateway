@@ -1,3 +1,4 @@
+// Package builder constructs Envoy xDS resources from domain models.
 package builder
 
 import "merionyx/api-gateway/internal/controller/domain/interfaces"

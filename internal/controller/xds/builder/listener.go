@@ -1,4 +1,3 @@
-// internal/xds/builder/listener.go
 package builder
 
 import (
@@ -10,21 +9,25 @@ import (
 	extauthzv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ext_authz/v3"
 	routerv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/router/v3"
 	hcmv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"merionyx/api-gateway/internal/controller/domain/models"
 )
 
-func (b *xdsBuilder) BuildListeners(env *models.Environment) []*listenerv3.Listener {
-	listener := buildHTTPListener(env)
-	return []*listenerv3.Listener{listener}
+func (b *xdsBuilder) BuildListeners(env *models.Environment) ([]*listenerv3.Listener, error) {
+	listener, err := buildHTTPListener(env)
+	if err != nil {
+		return nil, err
+	}
+	return []*listenerv3.Listener{listener}, nil
 }
 
-func buildHTTPListener(env *models.Environment) *listenerv3.Listener {
-	// Create HTTP filters
-	httpFilters := buildHTTPFilters()
+func buildHTTPListener(env *models.Environment) (*listenerv3.Listener, error) {
+	httpFilters, err := buildHTTPFilters()
+	if err != nil {
+		return nil, err
+	}
 	manager := &hcmv3.HttpConnectionManager{
 		CodecType:  hcmv3.HttpConnectionManager_AUTO,
 		StatPrefix: fmt.Sprintf("ingress_http_%s", env.Name),
@@ -41,12 +44,11 @@ func buildHTTPListener(env *models.Environment) *listenerv3.Listener {
 		},
 		HttpFilters: httpFilters,
 
-		// Timeout settings
 		RequestTimeout: durationpb.New(30 * time.Second),
 	}
 	pbst, err := anypb.New(manager)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("marshal HttpConnectionManager: %w", err)
 	}
 	return &listenerv3.Listener{
 		Name: fmt.Sprintf("listener_%s", env.Name),
@@ -68,18 +70,22 @@ func buildHTTPListener(env *models.Environment) *listenerv3.Listener {
 				},
 			}},
 		}},
-	}
+	}, nil
 }
 
-// buildHTTPFilters creates a chain of HTTP filters
-func buildHTTPFilters() []*hcmv3.HttpFilter {
-	return []*hcmv3.HttpFilter{
-		buildExtAuthzFilter(),
-		buildRouterFilter(),
+func buildHTTPFilters() ([]*hcmv3.HttpFilter, error) {
+	extAuthz, err := buildExtAuthzFilter()
+	if err != nil {
+		return nil, err
 	}
+	router, err := buildRouterFilter()
+	if err != nil {
+		return nil, err
+	}
+	return []*hcmv3.HttpFilter{extAuthz, router}, nil
 }
 
-func buildExtAuthzFilter() *hcmv3.HttpFilter {
+func buildExtAuthzFilter() (*hcmv3.HttpFilter, error) {
 	extAuthz := &extauthzv3.ExtAuthz{
 		Services: &extauthzv3.ExtAuthz_GrpcService{
 			GrpcService: &corev3.GrpcService{
@@ -92,43 +98,38 @@ func buildExtAuthzFilter() *hcmv3.HttpFilter {
 			},
 		},
 
-		// Behavior on failure
 		FailureModeAllow: false,
 
-		// Pass headers to the Auth Sidecar
 		WithRequestBody: &extauthzv3.BufferSettings{
 			MaxRequestBytes:     8192,
 			AllowPartialMessage: true,
 		},
 
-		// Clear headers for security
 		ClearRouteCache: true,
+	}
+	anyExt, err := anypb.New(extAuthz)
+	if err != nil {
+		return nil, fmt.Errorf("marshal ext_authz: %w", err)
 	}
 	return &hcmv3.HttpFilter{
 		Name: "envoy.filters.http.ext_authz",
 		ConfigType: &hcmv3.HttpFilter_TypedConfig{
-			TypedConfig: mustMarshalAny(extAuthz),
+			TypedConfig: anyExt,
 		},
-	}
+	}, nil
 }
 
-// buildRouterFilter creates a router filter (must be last!)
-func buildRouterFilter() *hcmv3.HttpFilter {
+func buildRouterFilter() (*hcmv3.HttpFilter, error) {
+	anyRouter, err := anypb.New(&routerv3.Router{
+		SuppressEnvoyHeaders: false,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("marshal router: %w", err)
+	}
 	return &hcmv3.HttpFilter{
 		Name: "envoy.filters.http.router",
 		ConfigType: &hcmv3.HttpFilter_TypedConfig{
-			TypedConfig: mustMarshalAny(&routerv3.Router{
-				// Router settings
-				SuppressEnvoyHeaders: false,
-			}),
+			TypedConfig: anyRouter,
 		},
-	}
-}
-
-func mustMarshalAny(m proto.Message) *anypb.Any {
-	a, err := anypb.New(m)
-	if err != nil {
-		panic(err)
-	}
-	return a
+	}, nil
 }

@@ -20,7 +20,7 @@ func RunHTTPServerUntil(ctx context.Context, srv *http.Server, addr string) erro
 	if err != nil {
 		return err
 	}
-	defer ln.Close()
+	defer func() { _ = ln.Close() }()
 
 	errCh := make(chan error, 1)
 	go func() {

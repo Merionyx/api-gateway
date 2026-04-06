@@ -1,4 +1,4 @@
-package controller
+package app
 
 import (
 	"context"
@@ -24,15 +24,13 @@ func Run() error {
 
 	cfg, err := config.LoadConfig(os.Getenv("CONFIG_PATH"))
 	if err != nil {
-		logger.Error(fmt.Sprintf("Failed to load config: %v", err))
-		os.Exit(1)
+		return fmt.Errorf("load config: %w", err)
 	}
-	logger.Info("Config loaded", "config", cfg)
+	logger.Info("config loaded", "config", cfg)
 
-	container, err := container.NewContainer(cfg)
+	c, err := container.NewContainer(cfg)
 	if err != nil {
-		logger.Error(fmt.Sprintf("Failed to initialize container: %v", err))
-		os.Exit(1)
+		return fmt.Errorf("init container: %w", err)
 	}
 
 	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -44,7 +42,7 @@ func Run() error {
 	var failOnce sync.Once
 	onFail := func() { failOnce.Do(cancelRun) }
 
-	container.StartKubernetesDiscovery(runCtx)
+	c.StartKubernetesDiscovery(runCtx)
 
 	var wg sync.WaitGroup
 	run := func(name string, fn func(context.Context) error) {
@@ -61,19 +59,19 @@ func Run() error {
 		}()
 	}
 
-	run("http_probe", func(c context.Context) error { return server.RunHTTPServer(c, container) })
-	run("metrics_http", func(c context.Context) error { return metricshttp.ListenAndServeUntil(c, cfg.MetricsHTTP) })
-	run("grpc_control_plane", func(c context.Context) error { return server.RunGRPCServer(c, container) })
-	run("grpc_xds", func(c context.Context) error {
-		xdsPort, err := strconv.Atoi(container.Config.Server.XDSPort)
+	run("http_probe", func(ctx context.Context) error { return server.RunHTTPServer(ctx, c) })
+	run("metrics_http", func(ctx context.Context) error { return metricshttp.ListenAndServeUntil(ctx, cfg.MetricsHTTP) })
+	run("grpc_control_plane", func(ctx context.Context) error { return server.RunGRPCServer(ctx, c) })
+	run("grpc_xds", func(ctx context.Context) error {
+		xdsPort, err := strconv.Atoi(c.Config.Server.XDSPort)
 		if err != nil {
-			return fmt.Errorf("parse xDS port %q: %w", container.Config.Server.XDSPort, err)
+			return fmt.Errorf("parse xDS port %q: %w", c.Config.Server.XDSPort, err)
 		}
-		return container.XDSServer.Run(c, xdsPort)
+		return c.XDSServer.Run(ctx, xdsPort)
 	})
 
 	wg.Wait()
-	logger.Info("Shutting down...")
-	container.Close()
+	logger.Info("shutting down")
+	c.Close()
 	return nil
 }

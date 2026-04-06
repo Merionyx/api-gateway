@@ -40,22 +40,34 @@ func TestXDSBuilder_BuildAll_RealisticEnvironment(t *testing.T) {
 		},
 	}
 
-	listeners := b.BuildListeners(env)
+	listeners, err := b.BuildListeners(env)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(listeners) != 1 || listeners[0].GetName() == "" {
 		t.Fatalf("listeners: %+v", listeners)
 	}
 
-	clusters := b.BuildClusters(env)
+	clusters, err := b.BuildClusters(env)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(clusters) < 2 {
 		t.Fatalf("expected auth_sidecar + service clusters, got %d", len(clusters))
 	}
 
-	routes := b.BuildRoutes(env)
+	routes, err := b.BuildRoutes(env)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(routes) != 1 || len(routes[0].GetVirtualHosts()) != 1 {
 		t.Fatalf("routes: %+v", routes)
 	}
 
-	endpoints := b.BuildEndpoints(env)
+	endpoints, err := b.BuildEndpoints(env)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(endpoints) != 1 {
 		t.Fatalf("endpoints: %+v", endpoints)
 	}

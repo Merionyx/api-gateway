@@ -15,10 +15,22 @@ import (
 )
 
 func BuildEnvoySnapshot(xdsBuilder interfaces.XDSBuilder, env *models.Environment) (*envoycache.Snapshot, error) {
-	listeners := xdsBuilder.BuildListeners(env)
-	clusters := xdsBuilder.BuildClusters(env)
-	routes := xdsBuilder.BuildRoutes(env)
-	endpoints := xdsBuilder.BuildEndpoints(env)
+	listeners, err := xdsBuilder.BuildListeners(env)
+	if err != nil {
+		return nil, fmt.Errorf("build listeners: %w", err)
+	}
+	clusters, err := xdsBuilder.BuildClusters(env)
+	if err != nil {
+		return nil, fmt.Errorf("build clusters: %w", err)
+	}
+	routes, err := xdsBuilder.BuildRoutes(env)
+	if err != nil {
+		return nil, fmt.Errorf("build routes: %w", err)
+	}
+	endpoints, err := xdsBuilder.BuildEndpoints(env)
+	if err != nil {
+		return nil, fmt.Errorf("build endpoints: %w", err)
+	}
 
 	listenerResources := make([]types.Resource, len(listeners))
 	for i, l := range listeners {

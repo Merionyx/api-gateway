@@ -119,7 +119,11 @@ func (uc *BundleSyncUseCase) syncBundleOnce(ctx context.Context, bundle models.B
 		apimetrics.RecordBundleSyncAttempt(uc.metricsEnabled, apimetrics.BundleAttemptRPCError)
 		return nil, fmt.Errorf("dial contract syncer: %w", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if cerr := conn.Close(); cerr != nil {
+			slog.Debug("bundle sync: close contract syncer conn", "error", cerr)
+		}
+	}()
 
 	client := pb.NewContractSyncerServiceClient(conn)
 	resp, err := client.Sync(ctx, &pb.SyncRequest{

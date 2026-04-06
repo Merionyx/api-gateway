@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -36,7 +37,7 @@ func (uc *JWTUseCase) loadKeys() error {
 
 			keyPair, err := uc.loadKeyPair(keyPath)
 			if err != nil {
-				fmt.Printf("Warning: failed to load key %s: %v\n", file.Name(), err)
+				slog.Warn("jwt: skip key file", "file", file.Name(), "error", err)
 				continue
 			}
 
@@ -52,7 +53,7 @@ func (uc *JWTUseCase) loadKeys() error {
 	if newestKey != nil {
 		uc.activeKeyID = newestKey.Kid
 		uc.activeKeyAlg = newestKey.Algorithm
-		fmt.Printf("Active signing key: %s (%s)\n", uc.activeKeyID, uc.activeKeyAlg)
+		slog.Info("jwt: active signing key", "kid", uc.activeKeyID, "alg", uc.activeKeyAlg)
 	}
 
 	return nil
@@ -157,7 +158,7 @@ func (uc *JWTUseCase) generateDefaultKey() error {
 	uc.activeKeyID = kid
 	uc.activeKeyAlg = AlgorithmEdDSA
 
-	fmt.Printf("Generated default EdDSA key: %s\n", kid)
+	slog.Info("jwt: generated default EdDSA key", "kid", kid)
 
 	return nil
 }

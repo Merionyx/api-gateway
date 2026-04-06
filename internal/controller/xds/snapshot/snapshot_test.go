@@ -13,11 +13,17 @@ import (
 
 type stubXDSBuilder struct{}
 
-func (stubXDSBuilder) BuildListeners(*models.Environment) []*listenerv3.Listener   { return nil }
-func (stubXDSBuilder) BuildClusters(*models.Environment) []*clusterv3.Cluster      { return nil }
-func (stubXDSBuilder) BuildRoutes(*models.Environment) []*routev3.RouteConfiguration { return nil }
-func (stubXDSBuilder) BuildEndpoints(*models.Environment) []*endpointv3.ClusterLoadAssignment {
-	return nil
+func (stubXDSBuilder) BuildListeners(*models.Environment) ([]*listenerv3.Listener, error) {
+	return nil, nil
+}
+func (stubXDSBuilder) BuildClusters(*models.Environment) ([]*clusterv3.Cluster, error) {
+	return nil, nil
+}
+func (stubXDSBuilder) BuildRoutes(*models.Environment) ([]*routev3.RouteConfiguration, error) {
+	return nil, nil
+}
+func (stubXDSBuilder) BuildEndpoints(*models.Environment) ([]*endpointv3.ClusterLoadAssignment, error) {
+	return nil, nil
 }
 
 func TestBuildEnvoySnapshot_EmptyResources(t *testing.T) {

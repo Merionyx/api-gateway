@@ -1,4 +1,3 @@
-// internal/xds/builder/route.go
 package builder
 
 import (
@@ -7,7 +6,7 @@ import (
 	"merionyx/api-gateway/internal/controller/domain/models"
 )
 
-func (b *xdsBuilder) BuildRoutes(env *models.Environment) []*routev3.RouteConfiguration {
+func (b *xdsBuilder) BuildRoutes(env *models.Environment) ([]*routev3.RouteConfiguration, error) {
 	routes := make([]*routev3.Route, 0)
 
 	for _, snapshot := range env.Snapshots {
@@ -42,5 +41,5 @@ func (b *xdsBuilder) BuildRoutes(env *models.Environment) []*routev3.RouteConfig
 		}},
 	}
 
-	return []*routev3.RouteConfiguration{routeConfig}
+	return []*routev3.RouteConfiguration{routeConfig}, nil
 }

@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -13,6 +14,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 )
+
+// errRegistrationRejected is returned when the API Server responds with Success=false.
+var errRegistrationRejected = errors.New("registration rejected by API server")
 
 func (uc *APIServerSyncUseCase) grpcDialOptions() ([]grpc.DialOption, error) {
 	tlsOpts, err := grpcobs.DialOptions(uc.config.GRPCAPIServerClient)
@@ -78,10 +82,10 @@ func (uc *APIServerSyncUseCase) registerController(ctx context.Context, client p
 	}
 
 	if !resp.Success {
-		return fmt.Errorf("registration failed: %s", resp.Error)
+		return fmt.Errorf("%w: %s", errRegistrationRejected, resp.Error)
 	}
 
-	slog.Info("Successfully registered with API Server", "controller_id", uc.controllerID, "environments_count", len(environments))
+	slog.Info("registered with API server", "controller_id", uc.controllerID, "environments_count", len(environments))
 	return nil
 }
 
@@ -96,7 +100,7 @@ func (uc *APIServerSyncUseCase) startHeartbeat(ctx context.Context, client pb.Co
 		case <-ticker.C:
 			environments, err := uc.buildEnvironmentsForAPIServer(ctx)
 			if err != nil {
-				slog.Error("Failed to build environments for heartbeat", "error", err)
+				slog.Error("build environments for heartbeat", "error", err)
 				continue
 			}
 
@@ -105,7 +109,7 @@ func (uc *APIServerSyncUseCase) startHeartbeat(ctx context.Context, client pb.Co
 				Environments: environments,
 			})
 			if err != nil {
-				slog.Error("Failed to send heartbeat", "error", err)
+				slog.Error("send heartbeat", "error", err)
 			}
 		}
 	}

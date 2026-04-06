@@ -27,7 +27,7 @@ func TestJWTHandler_GenerateToken_ValidationAppID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != fiber.StatusBadRequest {
 		t.Fatalf("status %d", resp.StatusCode)
 	}
@@ -49,7 +49,7 @@ func TestJWTHandler_GenerateToken_Created(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != fiber.StatusCreated {
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("status %d body %s", resp.StatusCode, b)

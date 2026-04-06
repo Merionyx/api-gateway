@@ -10,8 +10,8 @@ import (
 )
 
 type XDSBuilder interface {
-	BuildListeners(env *models.Environment) []*listenerv3.Listener
-	BuildClusters(env *models.Environment) []*clusterv3.Cluster
-	BuildRoutes(env *models.Environment) []*routev3.RouteConfiguration
-	BuildEndpoints(env *models.Environment) []*endpointv3.ClusterLoadAssignment
+	BuildListeners(env *models.Environment) ([]*listenerv3.Listener, error)
+	BuildClusters(env *models.Environment) ([]*clusterv3.Cluster, error)
+	BuildRoutes(env *models.Environment) ([]*routev3.RouteConfiguration, error)
+	BuildEndpoints(env *models.Environment) ([]*endpointv3.ClusterLoadAssignment, error)
 }

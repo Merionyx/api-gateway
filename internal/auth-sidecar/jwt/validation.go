@@ -58,13 +58,13 @@ func NewJWTValidator(jwksURL string) *JWTValidator {
 
 	for i := 0; i < maxRetries; i++ {
 		if err := validator.RefreshKeys(); err != nil {
-			fmt.Printf("Attempt %d/%d: failed to load keys: %v\n", i+1, maxRetries, err)
+			slog.Warn("jwks: load keys attempt failed", "attempt", i+1, "max", maxRetries, "error", err)
 			if i < maxRetries-1 {
 				time.Sleep(backoff)
 				backoff *= 2 // Exponential delay: 1s, 2s, 4s, 8s, 16s
 			}
 		} else {
-			fmt.Printf("Successfully loaded keys on attempt %d\n", i+1)
+			slog.Info("jwks: loaded keys", "attempt", i+1)
 			break
 		}
 	}
@@ -167,7 +167,9 @@ func (v *JWTValidator) RefreshKeys() error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch JWKS: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("JWKS endpoint returned status %d", resp.StatusCode)
@@ -193,14 +195,14 @@ func (v *JWTValidator) RefreshKeys() error {
 	for _, jwk := range jwks.Keys {
 		publicKey, err := v.jwkToPublicKey(&jwk)
 		if err != nil {
-			fmt.Printf("Warning: failed to parse JWK %s: %v\n", jwk.Kid, err)
+			slog.Warn("jwks: skip JWK", "kid", jwk.Kid, "error", err)
 			continue
 		}
 
 		v.publicKeys[jwk.Kid] = publicKey
 	}
 
-	fmt.Printf("Loaded %d public keys from JWKS\n", len(v.publicKeys))
+	slog.Info("jwks: loaded public keys", "count", len(v.publicKeys))
 
 	return nil
 }
@@ -217,7 +219,7 @@ func (v *JWTValidator) periodicRefresh() {
 
 	for range ticker.C {
 		if err := v.RefreshKeys(); err != nil {
-			fmt.Printf("Failed to refresh keys: %v\n", err)
+			slog.Warn("jwks: periodic refresh failed", "error", err)
 		}
 	}
 }

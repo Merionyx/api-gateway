@@ -6,12 +6,20 @@ run:
 linters:
   default: none
   enable:
-    - govet
-    - staticcheck
-    - ineffassign
-    - misspell
+  - govet
+  - staticcheck
+  - ineffassign
+  - misspell
+  - errcheck
+  - forbidigo
+  settings:
+    forbidigo:
+      forbid:
+      - pattern: ^panic\(
+        msg: avoid panic in application code; return errors
   exclusions:
     rules:
-      - path: _test\.go
-        linters:
-          - staticcheck
+    - path: _test\.go
+      linters:
+      - staticcheck
+      - forbidigo
