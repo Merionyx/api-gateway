@@ -1,4 +1,4 @@
-# Публикация образов только после успешного CI на main (см. ci-verify.yml), либо вручную (workflow_dispatch).
+# Публикация образов только после успешного «Lint & Tests» на main (lint-and-tests.yml), либо вручную (workflow_dispatch).
 name: Publish Docker images to Docker Hub
 
 on:
