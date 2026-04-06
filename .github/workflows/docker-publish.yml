@@ -1,4 +1,5 @@
-# Публикация образов только после успешного «Lint & Tests» на main (lint-and-tests.yml), либо вручную (workflow_dispatch).
+# Publish Docker images to Docker Hub only after successful Lint & Tests on main (see lint-and-tests.yml), or manually (workflow_dispatch).
+
 name: Publish Docker images to Docker Hub
 
 on:

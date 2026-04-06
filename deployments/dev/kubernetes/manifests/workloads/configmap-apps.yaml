@@ -181,7 +181,7 @@ data:
     jwt:
       jwks_url: "http://gateway-api-server:8080/.well-known/jwks.json"
 
-    # ext_authz остаётся plaintext: кластер к sidecar задаётся через xDS без TLS в этом репозитории.
+    # ext_authz remains plaintext: cluster to sidecar is set via xDS without TLS in this repository.
     grpc_ext_authz:
       tls:
         enabled: false

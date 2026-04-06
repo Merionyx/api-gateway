@@ -36,7 +36,6 @@ jobs:
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v9
       with:
-        # Бинарь ≥2.9 собран с Go 1.26+ и принимает go 1.26.x в go.mod (см. changelog golangci-lint).
         version: v2.11.4
         args: --timeout=5m
 
