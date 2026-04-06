@@ -67,9 +67,6 @@ deployments/docker/configs/envoy/ssl/*.crt
 deployments/docker/configs/envoy/ssl/*.key
 deployments/docker/configs/envoy/ssl/*.pem
 
-# Docker
-.dockerignore
-
 # Kubernetes secrets
 secrets
 k8s-secrets/

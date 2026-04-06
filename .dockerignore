@@ -1,0 +1,11 @@
+.git
+.github
+bin
+**/tmp
+coverage.out
+coverage.html
+*.md
+deployments
+test
+secrets
+hack
