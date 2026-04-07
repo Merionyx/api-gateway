@@ -17,6 +17,15 @@ WORKDIR /root/
 
 COPY --from=builder /mock-service .
 
+LABEL org.opencontainers.image.title="API Gateway — Mock Service" \
+      org.opencontainers.image.source="https://github.com/merionyx/api-gateway" \
+      org.opencontainers.image.url="https://github.com/merionyx/api-gateway" \
+      org.opencontainers.image.documentation="https://github.com/merionyx/api-gateway-control-plane#readme" \
+      org.opencontainers.image.vendor="Merionyx" \
+      org.opencontainers.image.logo="https://avatars.githubusercontent.com/u/208366109?s=512" \
+      com.docker.extension.icon="https://avatars.githubusercontent.com/u/208366109?s=512" \
+      dev.orbstack.icon="https://avatars.githubusercontent.com/u/208366109?s=512"
+
 EXPOSE 8080
 
 CMD ["./mock-service"]
