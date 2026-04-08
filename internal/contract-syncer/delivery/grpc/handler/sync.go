@@ -67,3 +67,27 @@ func (h *SyncHandler) Sync(ctx context.Context, req *pb.SyncRequest) (*pb.SyncRe
 		Snapshots: pbSnapshots,
 	}, nil
 }
+
+func (h *SyncHandler) ExportContracts(ctx context.Context, req *pb.ExportContractsRequest) (*pb.ExportContractsResponse, error) {
+	slog.Info("Received export request", "repository", req.Repository, "ref", req.Ref, "path", req.Path, "contract", req.ContractName)
+
+	start := time.Now()
+	files, err := h.syncUseCase.ExportContracts(req.Repository, req.Ref, req.Path, req.ContractName)
+	if err != nil {
+		slog.Error("Export contracts failed", "error", err)
+		syncmetrics.RecordSync(h.metricsEnabled, syncmetrics.OutcomeResponseError, time.Since(start))
+		return &pb.ExportContractsResponse{Error: err.Error()}, nil
+	}
+	syncmetrics.RecordSync(h.metricsEnabled, syncmetrics.OutcomeOK, time.Since(start))
+
+	var out []*pb.ExportContractFile
+	for i := range files {
+		f := files[i]
+		out = append(out, &pb.ExportContractFile{
+			ContractName: f.ContractName,
+			SourcePath:   f.SourcePath,
+			Content:      f.Content,
+		})
+	}
+	return &pb.ExportContractsResponse{Files: out}, nil
+}

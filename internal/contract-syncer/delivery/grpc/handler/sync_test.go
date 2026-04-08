@@ -11,12 +11,18 @@ import (
 )
 
 type fakeSyncUC struct {
-	err   error
-	snaps []sharedgit.ContractSnapshot
+	err    error
+	snaps  []sharedgit.ContractSnapshot
+	export []sharedgit.ExportedContractFile
+	expErr error
 }
 
 func (f *fakeSyncUC) Sync(string, string, string) ([]sharedgit.ContractSnapshot, error) {
 	return f.snaps, f.err
+}
+
+func (f *fakeSyncUC) ExportContracts(string, string, string, string) ([]sharedgit.ExportedContractFile, error) {
+	return f.export, f.expErr
 }
 
 var _ interfaces.SyncUseCase = (*fakeSyncUC)(nil)

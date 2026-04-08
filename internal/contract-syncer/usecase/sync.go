@@ -38,3 +38,15 @@ func (u *SyncUseCase) Sync(repository, ref, path string) ([]sharedgit.ContractSn
 
 	return snapshots, nil
 }
+
+func (u *SyncUseCase) ExportContracts(repository, ref, path, contractName string) ([]sharedgit.ExportedContractFile, error) {
+	slog.Info("Exporting contracts", "repository", repository, "ref", ref, "path", path, "contract", contractName)
+	start := time.Now()
+	files, err := u.gitManager.ExportContractFiles(repository, ref, path, contractName)
+	if err != nil {
+		syncmetrics.RecordGitSyncDuration(u.metricsEnabled, syncmetrics.GitResultError, time.Since(start))
+		return nil, err
+	}
+	syncmetrics.RecordGitSyncDuration(u.metricsEnabled, syncmetrics.GitResultOK, time.Since(start))
+	return files, nil
+}
