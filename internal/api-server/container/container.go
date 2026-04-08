@@ -33,6 +33,8 @@ type Container struct {
 
 	JWTHandler *httphandler.JWTHandler
 
+	ContractsExportHandler *httphandler.ContractsExportHandler
+
 	ControllerRegistryHandler *grpchandler.ControllerRegistryHandler
 }
 
@@ -123,6 +125,8 @@ func (c *Container) initUseCases() error {
 
 func (c *Container) initHandlers() {
 	c.JWTHandler = httphandler.NewJWTHandler(c.JWTUseCase, c.Config.MetricsHTTP.Enabled)
+	exportUC := usecase.NewContractExportUseCase(c.Config.ContractSyncer.Address, c.Config.GRPCContractSyncerClient)
+	c.ContractsExportHandler = httphandler.NewContractsExportHandler(exportUC)
 	c.ControllerRegistryHandler = grpchandler.NewControllerRegistryHandler(c.ControllerRegistryUseCase)
 
 	slog.Info("handlers initialized")

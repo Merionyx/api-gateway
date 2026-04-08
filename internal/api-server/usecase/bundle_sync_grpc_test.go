@@ -124,7 +124,7 @@ func TestBundleSyncUseCase_SyncBundle_RejectedResponse(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	if !errors.Is(err, errContractSyncerRejected) {
-		t.Fatalf("want errContractSyncerRejected, got %v", err)
+	if !errors.Is(err, ErrContractSyncerRejected) {
+		t.Fatalf("want ErrContractSyncerRejected, got %v", err)
 	}
 }

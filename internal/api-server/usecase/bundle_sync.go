@@ -18,11 +18,10 @@ import (
 	pb "merionyx/api-gateway/pkg/api/contract_syncer/v1"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/keepalive"
 )
 
-// errContractSyncerRejected marks a non-transient failure from the syncer (invalid bundle, etc.); do not gRPC-retry.
-var errContractSyncerRejected = errors.New("contract syncer rejected sync")
+// ErrContractSyncerRejected marks a non-transient failure from the syncer (invalid bundle, etc.); do not gRPC-retry.
+var ErrContractSyncerRejected = errors.New("contract syncer rejected sync")
 
 type BundleSyncUseCase struct {
 	snapshotRepo       interfaces.SnapshotRepository
@@ -55,17 +54,7 @@ func NewBundleSyncUseCase(
 }
 
 func (uc *BundleSyncUseCase) grpcDialOptions() ([]grpc.DialOption, error) {
-	tlsOpts, err := grpcobs.DialOptions(uc.contractSyncerTLS)
-	if err != nil {
-		return nil, err
-	}
-	return append(tlsOpts,
-		grpc.WithKeepaliveParams(keepalive.ClientParameters{
-			Time:                20 * time.Second,
-			Timeout:             10 * time.Second,
-			PermitWithoutStream: true,
-		}),
-	), nil
+	return ContractSyncerDialOptions(uc.contractSyncerTLS)
 }
 
 // SyncBundle pulls schemas from Contract Syncer (with transient gRPC retries), writes API Server etcd, notifies controllers.
@@ -95,7 +84,7 @@ func (uc *BundleSyncUseCase) SyncBundle(ctx context.Context, bundle models.Bundl
 			apimetrics.RecordBundleSyncDuration(uc.metricsEnabled, time.Since(start))
 			return snapshots, nil
 		}
-		if errors.Is(err, errContractSyncerRejected) {
+		if errors.Is(err, ErrContractSyncerRejected) {
 			apimetrics.RecordBundleSyncOutcome(uc.metricsEnabled, apimetrics.BundleOutcomeRejected)
 			return nil, err
 		}
@@ -137,7 +126,7 @@ func (uc *BundleSyncUseCase) syncBundleOnce(ctx context.Context, bundle models.B
 	}
 	if resp.Error != "" {
 		apimetrics.RecordBundleSyncAttempt(uc.metricsEnabled, apimetrics.BundleAttemptResponseError)
-		return nil, fmt.Errorf("%w: %s", errContractSyncerRejected, resp.Error)
+		return nil, fmt.Errorf("%w: %s", ErrContractSyncerRejected, resp.Error)
 	}
 
 	var snapshots []sharedgit.ContractSnapshot

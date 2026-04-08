@@ -72,4 +72,5 @@ func setupRoutes(app *fiber.App, c *container.Container) {
 	api := app.Group("/api/v1")
 	api.Post("/tokens", c.JWTHandler.GenerateToken)
 	api.Get("/keys", c.JWTHandler.GetSigningKeys)
+	api.Post("/contracts/export", c.ContractsExportHandler.Export)
 }
