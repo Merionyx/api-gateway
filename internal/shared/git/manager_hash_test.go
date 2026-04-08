@@ -10,7 +10,7 @@ func TestIsCommitHash(t *testing.T) {
 	if isCommitHash("short") {
 		t.Fatal("short ref is not commit hash")
 	}
-	if isCommitHash(valid+"0") {
+	if isCommitHash(valid + "0") {
 		t.Fatal("41 chars should not match")
 	}
 	if isCommitHash("gaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {

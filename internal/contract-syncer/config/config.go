@@ -39,18 +39,18 @@ type APIServerConfig struct {
 }
 
 type RepositoryConfig struct {
-	Name   string         `mapstructure:"name"`
-	Source string         `mapstructure:"source"`
-	URL    string         `mapstructure:"url"`
-	Path   string         `mapstructure:"path"`
-	Auth   AuthConfig     `mapstructure:"auth"`
+	Name   string     `mapstructure:"name"`
+	Source string     `mapstructure:"source"`
+	URL    string     `mapstructure:"url"`
+	Path   string     `mapstructure:"path"`
+	Auth   AuthConfig `mapstructure:"auth"`
 }
 
 type AuthConfig struct {
-	Type     string `mapstructure:"type"`
-	SSHKeyPath   string `mapstructure:"ssh_key_path"`
-	SSHKeyEnv    string `mapstructure:"ssh_key_env"`
-	TokenEnv     string `mapstructure:"token_env"`
+	Type       string `mapstructure:"type"`
+	SSHKeyPath string `mapstructure:"ssh_key_path"`
+	SSHKeyEnv  string `mapstructure:"ssh_key_env"`
+	TokenEnv   string `mapstructure:"token_env"`
 }
 
 func LoadConfig(configPath string) (*Config, error) {

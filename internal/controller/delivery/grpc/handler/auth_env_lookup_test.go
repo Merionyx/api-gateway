@@ -17,8 +17,9 @@ type stubMem struct {
 	envs map[string]*models.Environment
 }
 
-func (s *stubMem) SetDependencies(*xdscache.SnapshotManager, interfaces.XDSBuilder, interfaces.SchemaRepository) {}
-func (s *stubMem) Initialize(*config.Config) error                                                               { return nil }
+func (s *stubMem) SetDependencies(*xdscache.SnapshotManager, interfaces.XDSBuilder, interfaces.SchemaRepository) {
+}
+func (s *stubMem) Initialize(*config.Config) error { return nil }
 func (s *stubMem) GetEnvironment(ctx context.Context, name string) (*models.Environment, error) {
 	e, ok := s.envs[name]
 	if !ok {

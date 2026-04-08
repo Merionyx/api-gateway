@@ -22,7 +22,9 @@ func (noopEnvUC) SetDependencies(interfaces.EnvironmentRepository, interfaces.Sc
 func (noopEnvUC) CreateEnvironment(context.Context, *models.CreateEnvironmentRequest) (*models.Environment, error) {
 	return &models.Environment{Name: "x"}, nil
 }
-func (noopEnvUC) GetEnvironment(context.Context, string) (*models.Environment, error) { return nil, nil }
+func (noopEnvUC) GetEnvironment(context.Context, string) (*models.Environment, error) {
+	return nil, nil
+}
 func (noopEnvUC) ListEnvironments(context.Context) (map[string]*models.Environment, error) {
 	return nil, nil
 }
@@ -35,7 +37,7 @@ var _ interfaces.EnvironmentsUseCase = noopEnvUC{}
 
 type followerGate struct{}
 
-func (followerGate) IsLeader() bool                { return false }
+func (followerGate) IsLeader() bool                 { return false }
 func (followerGate) LeaderChanged() <-chan struct{} { return nil }
 
 func TestEnvironmentsHandler_CreateEnvironment_NotLeader(t *testing.T) {

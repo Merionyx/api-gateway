@@ -6,13 +6,13 @@ import (
 )
 
 const (
-	SyncCloseDialError  = "dial_error"
-	SyncCloseSendError  = "send_error"
-	SyncCloseRecvError  = "recv_error"
-	SyncCloseOK         = "ok"
-	SyncMsgInitial      = "initial"
-	SyncMsgUpdate       = "update"
-	SyncMsgHeartbeat    = "heartbeat"
+	SyncCloseDialError = "dial_error"
+	SyncCloseSendError = "send_error"
+	SyncCloseRecvError = "recv_error"
+	SyncCloseOK        = "ok"
+	SyncMsgInitial     = "initial"
+	SyncMsgUpdate      = "update"
+	SyncMsgHeartbeat   = "heartbeat"
 )
 
 var (

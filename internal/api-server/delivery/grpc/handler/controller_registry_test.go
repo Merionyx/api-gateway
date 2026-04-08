@@ -16,7 +16,7 @@ func (noopRegistryUC) StreamSnapshots(context.Context, string, interfaces.Snapsh
 	return nil
 }
 func (noopRegistryUC) Heartbeat(context.Context, string, []models.EnvironmentInfo) error { return nil }
-func (noopRegistryUC) StartEtcdWatch(context.Context) {}
+func (noopRegistryUC) StartEtcdWatch(context.Context)                                    {}
 
 func TestControllerRegistryHandler_RegisterController_Success(t *testing.T) {
 	h := NewControllerRegistryHandler(noopRegistryUC{})

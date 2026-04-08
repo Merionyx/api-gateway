@@ -10,8 +10,8 @@ import (
 )
 
 type SyncUseCase struct {
-	gitManager       *sharedgit.RepositoryManager
-	metricsEnabled   bool
+	gitManager     *sharedgit.RepositoryManager
+	metricsEnabled bool
 }
 
 func NewSyncUseCase(gitManager *sharedgit.RepositoryManager, metricsEnabled bool) *SyncUseCase {

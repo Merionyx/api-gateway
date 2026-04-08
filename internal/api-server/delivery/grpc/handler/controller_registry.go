@@ -101,7 +101,7 @@ func (h *ControllerRegistryHandler) StreamSnapshots(req *pb.StreamSnapshotsReque
 	slog.Info("Starting snapshot stream", "controller_id", req.ControllerId)
 
 	wrapper := &snapshotStreamWrapper{stream: stream}
-	
+
 	if err := h.registryUseCase.StreamSnapshots(stream.Context(), req.ControllerId, wrapper); err != nil {
 		slog.Error("Stream error", "error", err)
 		return err

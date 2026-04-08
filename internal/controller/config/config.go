@@ -35,8 +35,8 @@ type Config struct {
 
 // GRPCServerSection groups server TLS and observability for one gRPC listener.
 type GRPCServerSection struct {
-	TLS           grpcobs.ServerTLSConfig      `mapstructure:"tls" json:"tls"`
-	Observability grpcobs.ObservabilityConfig  `mapstructure:"observability" json:"observability"`
+	TLS           grpcobs.ServerTLSConfig     `mapstructure:"tls" json:"tls"`
+	Observability grpcobs.ObservabilityConfig `mapstructure:"observability" json:"observability"`
 }
 
 // KubernetesDiscoveryConfig enables building environments from gateway.merionyx.io CRs and annotated Services.

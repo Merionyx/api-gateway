@@ -20,13 +20,13 @@ type LeaderElectionSpec struct {
 
 // PodWorkloadSpec is common deployment configuration.
 type PodWorkloadSpec struct {
-	Image            string                       `json:"image"`
-	ImagePullPolicy  corev1.PullPolicy            `json:"imagePullPolicy,omitempty"`
+	Image            string                        `json:"image"`
+	ImagePullPolicy  corev1.PullPolicy             `json:"imagePullPolicy,omitempty"`
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
-	Replicas         *int32                       `json:"replicas,omitempty"`
-	Resources        corev1.ResourceRequirements `json:"resources,omitempty"`
-	ServiceAccount   string                       `json:"serviceAccountName,omitempty"`
-	Affinity         *corev1.Affinity             `json:"affinity,omitempty"`
+	Replicas         *int32                        `json:"replicas,omitempty"`
+	Resources        corev1.ResourceRequirements   `json:"resources,omitempty"`
+	ServiceAccount   string                        `json:"serviceAccountName,omitempty"`
+	Affinity         *corev1.Affinity              `json:"affinity,omitempty"`
 	// EnablePodDisruptionBudget creates a PDB when replicas > 1.
 	EnablePodDisruptionBudget bool `json:"enablePodDisruptionBudget,omitempty"`
 }

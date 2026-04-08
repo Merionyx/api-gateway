@@ -115,7 +115,9 @@ func (f snapFakeGet) GetEnvironment(context.Context, string) (*models.Environmen
 func (snapFakeGet) CreateEnvironment(context.Context, *models.CreateEnvironmentRequest) (*models.Environment, error) {
 	return nil, nil
 }
-func (snapFakeGet) ListEnvironments(context.Context) (map[string]*models.Environment, error) { return nil, nil }
+func (snapFakeGet) ListEnvironments(context.Context) (map[string]*models.Environment, error) {
+	return nil, nil
+}
 func (snapFakeGet) UpdateEnvironment(context.Context, *models.UpdateEnvironmentRequest) (*models.Environment, error) {
 	return nil, nil
 }

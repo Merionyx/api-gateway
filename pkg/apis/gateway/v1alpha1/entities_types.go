@@ -24,9 +24,9 @@ type EnvironmentSpec struct {
 }
 
 type EnvironmentStatus struct {
-	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
-	Conditions         []metav1.Condition `json:"conditions,omitempty"`
-	ResolvedLogicalName string            `json:"resolvedLogicalName,omitempty"`
+	ObservedGeneration  int64              `json:"observedGeneration,omitempty"`
+	Conditions          []metav1.Condition `json:"conditions,omitempty"`
+	ResolvedLogicalName string             `json:"resolvedLogicalName,omitempty"`
 }
 
 // ContractBundle binds a repository ref to an environment.
@@ -74,10 +74,10 @@ type ContractRepository struct {
 
 type ContractRepositorySpec struct {
 	// Source is one of: git, local-git, local-dir
-	Source string `json:"source"`
-	URL    string `json:"url,omitempty"`
-	Path   string `json:"path,omitempty"`
-	Auth   ContractRepositoryAuth   `json:"auth,omitempty"`
+	Source string                 `json:"source"`
+	URL    string                 `json:"url,omitempty"`
+	Path   string                 `json:"path,omitempty"`
+	Auth   ContractRepositoryAuth `json:"auth,omitempty"`
 }
 
 type ContractRepositoryAuth struct {

@@ -137,11 +137,11 @@ type EnvoyGateway struct {
 type EnvoyGatewaySpec struct {
 	Replicas *int32 `json:"replicas,omitempty"`
 
-	EnvoyImage     string                      `json:"envoyImage"`
-	AuthSidecarImage string                    `json:"authSidecarImage"`
-	ImagePullPolicy corev1.PullPolicy          `json:"imagePullPolicy,omitempty"`
+	EnvoyImage       string                        `json:"envoyImage"`
+	AuthSidecarImage string                        `json:"authSidecarImage"`
+	ImagePullPolicy  corev1.PullPolicy             `json:"imagePullPolicy,omitempty"`
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
-	Resources        corev1.ResourceRequirements `json:"resources,omitempty"`
+	Resources        corev1.ResourceRequirements   `json:"resources,omitempty"`
 
 	// ControllerGRPCAddress is host:port for Envoy xDS (controller xds_port).
 	ControllerGRPCAddress string `json:"controllerGrpcAddress"`

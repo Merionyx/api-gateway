@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	AnnEnvironmentID = "gateway.merionyx.io/environment-id"
+	AnnEnvironmentID   = "gateway.merionyx.io/environment-id"
 	AnnServiceName     = "gateway.merionyx.io/service-name"
 	AnnUpstream        = "gateway.merionyx.io/upstream"
 	AnnPort            = "gateway.merionyx.io/port"

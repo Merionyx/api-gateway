@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"merionyx/api-gateway/internal/api-server/domain/models"
-	"merionyx/api-gateway/internal/shared/grpcobs"
 	sharedgit "merionyx/api-gateway/internal/shared/git"
+	"merionyx/api-gateway/internal/shared/grpcobs"
 	contractv1 "merionyx/api-gateway/pkg/api/contract/v1"
 	pb "merionyx/api-gateway/pkg/api/contract_syncer/v1"
 
