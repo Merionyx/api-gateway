@@ -1,4 +1,4 @@
-.PHONY: run build test clean certs deps start lint fmt docker-build docker-run test-coverage test-coverage-ci help docker-up-dev-ha docker-down-dev-ha test-integration
+.PHONY: run build build-agwctl test clean certs deps start lint fmt docker-build docker-run test-coverage test-coverage-ci help docker-up-dev-ha docker-down-dev-ha test-integration
 
 # Variables
 BINARY_NAME=universal-server
@@ -14,6 +14,10 @@ run: ## Run the server
 build: ## Build binary
 	mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o $(BUILD_DIR)/$(BINARY_NAME) cmd/controller/main.go
+
+build-cli: ## Build agwctl CLI
+	mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=0 go build -o $(BUILD_DIR)/agwctl ./cmd/cli
 
 test: ## Run all tests
 	go test -v ./...
