@@ -31,7 +31,7 @@ RUN chown -R app:app /controller
 
 USER app
 
-LABEL org.opencontainers.image.title="API Gateway — Contract Syncer" \
+LABEL org.opencontainers.image.title="Merionyx API Gateway — Contract Syncer" \
       org.opencontainers.image.source="https://github.com/merionyx/api-gateway" \
       org.opencontainers.image.url="https://github.com/merionyx/api-gateway" \
       org.opencontainers.image.documentation="https://github.com/merionyx/api-gateway-control-plane#readme" \

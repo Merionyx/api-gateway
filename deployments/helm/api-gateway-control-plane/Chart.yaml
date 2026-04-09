@@ -1,6 +1,6 @@
 apiVersion: v2
 name: api-gateway-control-plane
-description: API Gateway control plane (Controller, API Server, Contract Syncer)
+description: Merionyx API Gateway control plane (Controller, API Server, Contract Syncer)
 type: application
 version: latest
 appVersion: latest

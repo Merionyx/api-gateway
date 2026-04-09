@@ -30,7 +30,7 @@ RUN chown -R app:app /api-server
 
 USER app
 
-LABEL org.opencontainers.image.title="API Gateway — API Server" \
+LABEL org.opencontainers.image.title="Merionyx API Gateway — API Server" \
       org.opencontainers.image.source="https://github.com/merionyx/api-gateway" \
       org.opencontainers.image.url="https://github.com/merionyx/api-gateway" \
       org.opencontainers.image.documentation="https://github.com/merionyx/api-gateway-control-plane#readme" \

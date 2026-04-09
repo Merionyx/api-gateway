@@ -1,4 +1,4 @@
-API Gateway control plane (release {{ .Release.Name }})
+Merionyx API Gateway control plane (release {{ .Release.Name }})
 
 {{- if .Values.components.controller.enabled }}
 Controller Service: {{ include "agwcp.svc.controller" . }}.{{ .Release.Namespace }}.svc.cluster.local

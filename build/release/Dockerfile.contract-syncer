@@ -32,7 +32,7 @@ USER app
 
 EXPOSE 8080 8443 8444
 
-LABEL org.opencontainers.image.title="API Gateway — Contract Syncer" \
+LABEL org.opencontainers.image.title="Merionyx API Gateway — Contract Syncer" \
       org.opencontainers.image.source="https://github.com/merionyx/api-gateway" \
       org.opencontainers.image.url="https://github.com/merionyx/api-gateway" \
       org.opencontainers.image.documentation="https://github.com/merionyx/api-gateway-control-plane#readme" \

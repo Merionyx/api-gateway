@@ -17,7 +17,7 @@ WORKDIR /root/
 
 COPY --from=builder /mock-service .
 
-LABEL org.opencontainers.image.title="API Gateway — Mock Service" \
+LABEL org.opencontainers.image.title="Merionyx API Gateway — Mock Service" \
       org.opencontainers.image.source="https://github.com/merionyx/api-gateway" \
       org.opencontainers.image.url="https://github.com/merionyx/api-gateway" \
       org.opencontainers.image.documentation="https://github.com/merionyx/api-gateway-control-plane#readme" \

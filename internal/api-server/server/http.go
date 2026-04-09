@@ -16,7 +16,7 @@ import (
 // RunHTTPServer runs Fiber until ctx is cancelled, then Shutdown().
 func RunHTTPServer(ctx context.Context, c *container.Container) error {
 	app := fiber.New(fiber.Config{
-		AppName: "API Gateway - API Server",
+		AppName: "Merionyx API Gateway - API Server",
 		ErrorHandler: func(ctx fiber.Ctx, err error) error {
 			code := fiber.StatusInternalServerError
 			if e, ok := err.(*fiber.Error); ok {
