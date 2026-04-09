@@ -87,7 +87,7 @@ builds:
 
 archives:
 - id: api-server
-  builds:
+  ids:
   - api-server
   formats:
   - tar.gz
@@ -96,11 +96,9 @@ archives:
     formats:
     - zip
   name_template: "api-server_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
-  files:
-  - none*
 
 - id: contract-syncer
-  builds:
+  ids:
   - contract-syncer
   formats:
   - tar.gz
@@ -109,11 +107,9 @@ archives:
     formats:
     - zip
   name_template: "contract-syncer_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
-  files:
-  - none*
 
 - id: controller
-  builds:
+  ids:
   - controller
   formats:
   - tar.gz
@@ -122,11 +118,9 @@ archives:
     formats:
     - zip
   name_template: "controller_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
-  files:
-  - none*
 
 - id: auth-sidecar
-  builds:
+  ids:
   - auth-sidecar
   formats:
   - tar.gz
@@ -135,11 +129,9 @@ archives:
     formats:
     - zip
   name_template: "auth-sidecar_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
-  files:
-  - none*
 
 - id: agwctl
-  builds:
+  ids:
   - agwctl
   formats:
   - tar.gz
@@ -148,8 +140,6 @@ archives:
     formats:
     - zip
   name_template: "agwctl_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
-  files:
-  - none*
 
 checksum:
   name_template: checksums.txt
@@ -162,7 +152,7 @@ changelog:
 release:
   prerelease: auto
   footer: |
-    ### Container images (tag `{{ .Tag }}`)
+    ### Container images (git tag `{{ .Tag }}`)
 
     **Docker Hub**
     ```
@@ -174,17 +164,15 @@ release:
 
     **GitHub Container Registry** (mirror)
     ```
-    docker pull ghcr.io/merionyx/api-gateway/api-server:{{ .Tag }}
-    docker pull ghcr.io/merionyx/api-gateway/auth-sidecar:{{ .Tag }}
-    docker pull ghcr.io/merionyx/api-gateway/contract-syncer:{{ .Tag }}
-    docker pull ghcr.io/merionyx/api-gateway/controller:{{ .Tag }}
+    docker pull ghcr.io/merionyx/api-gateway-api-server:{{ .Tag }}
+    docker pull ghcr.io/merionyx/api-gateway-auth-sidecar:{{ .Tag }}
+    docker pull ghcr.io/merionyx/api-gateway-contract-syncer:{{ .Tag }}
+    docker pull ghcr.io/merionyx/api-gateway-controller:{{ .Tag }}
     ```
 
     ### Helm (OCI)
 
-    Chart version is the git tag **without** the leading `v` (for `{{ .Tag }}` that is `{{ trimPrefix "v" .Tag }}`).
-
     ```
-    helm pull oci://ghcr.io/merionyx/charts/api-gateway-control-plane --version {{ trimPrefix "v" .Tag }}
-    helm pull oci://ghcr.io/merionyx/charts/api-gateway-edge --version {{ trimPrefix "v" .Tag }}
+    helm pull oci://ghcr.io/merionyx/charts/api-gateway-control-plane --version {{ .Version }}
+    helm pull oci://ghcr.io/merionyx/charts/api-gateway-edge --version {{ .Version }}
     ```
