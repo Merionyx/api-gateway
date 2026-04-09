@@ -109,7 +109,6 @@ jobs:
           -u "$DOCKERHUB_USERNAME" \
           --password-stdin
 
-    # Без Cosign/Syft: публикация OCI + SLSA provenance через GitHub (как для Docker-образов).
     - name: Package and push (api-gateway-control-plane)
       env:
         CHART_VERSION: ${{ steps.chart.outputs.chart_version }}
