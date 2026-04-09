@@ -1,5 +1,9 @@
 name: Publish Docker images to Docker Hub
 
+permissions:
+  contents: read
+  packages: write
+
 on:
   workflow_call:
     inputs:
@@ -53,15 +57,6 @@ jobs:
     with:
       component: controller
       dockerfile: build/release/Dockerfile.controller
-      checkout_ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || inputs.checkout_ref }}
-      version: ${{ inputs.version || 'latest' }}
-    secrets: inherit
-
-  mock-service:
-    uses: ./.github/workflows/docker-publish-component.yml
-    with:
-      component: mock-service
-      dockerfile: build/dev/Dockerfile.mock-service
       checkout_ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || inputs.checkout_ref }}
       version: ${{ inputs.version || 'latest' }}
     secrets: inherit

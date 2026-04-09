@@ -1,5 +1,9 @@
 name: Publish one Docker image (multi-arch)
 
+permissions:
+  contents: read
+  packages: write
+
 on:
   workflow_call:
     inputs:
@@ -22,6 +26,8 @@ on:
 
 env:
   IMAGE_PREFIX: merionyx/api-gateway
+  # Mirror to GHCR (same path after ghcr.io as docker.io)
+  GHCR_IMAGE_PREFIX: ghcr.io/merionyx/api-gateway
 
 jobs:
   build:
@@ -96,7 +102,7 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Multi-arch manifest
+    - name: Multi-arch manifest (Docker Hub)
       run: |
         AMD=$(tr -d '\n' < "digests/${COMPONENT}-amd64.txt")
         ARM=$(tr -d '\n' < "digests/${COMPONENT}-arm64.txt")
@@ -106,5 +112,31 @@ jobs:
           "${IMAGE_PREFIX}-${COMPONENT}@${ARM}"
       env:
         IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
+        COMPONENT: ${{ inputs.component }}
+        VERSION: ${{ inputs.version }}
+
+    - name: Install crane
+      env:
+        CRANE_VERSION: v0.20.3
+      run: |
+        curl -fsSL "https://github.com/google/go-containerregistry/releases/download/${CRANE_VERSION}/go-containerregistry_Linux_x86_64.tar.gz" -o /tmp/crane.tgz
+        tar -xzf /tmp/crane.tgz -C /tmp
+        sudo mv /tmp/crane /usr/local/bin/
+
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Mirror multi-arch image to GHCR
+      run: |
+        crane copy \
+          "docker.io/${IMAGE_PREFIX}-${COMPONENT}:${VERSION}" \
+          "${GHCR_IMAGE_PREFIX}-${COMPONENT}:${VERSION}"
+      env:
+        IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
+        GHCR_IMAGE_PREFIX: ${{ env.GHCR_IMAGE_PREFIX }}
         COMPONENT: ${{ inputs.component }}
         VERSION: ${{ inputs.version }}

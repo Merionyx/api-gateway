@@ -1,0 +1,50 @@
+name: CI — Release
+
+on:
+  push:
+    tags:
+    - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version-file: go.mod
+        cache: true
+
+    - name: Run GoReleaser
+      uses: goreleaser/goreleaser-action@v6
+      with:
+        distribution: goreleaser
+        version: '~> v2'
+        args: release --clean
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docker-publish:
+    needs: goreleaser
+    uses: ./.github/workflows/docker-publish.yml
+    with:
+      version: ${{ github.ref_name }}
+      checkout_ref: ${{ github.ref_name }}
+    secrets: inherit
+
+  helm-publish:
+    needs: goreleaser
+    uses: ./.github/workflows/helm-publish.yml
+    with:
+      version: ${{ github.ref_name }}
+      checkout_ref: ${{ github.ref_name }}
+    secrets: inherit

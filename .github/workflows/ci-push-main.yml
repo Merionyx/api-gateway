@@ -1,5 +1,9 @@
 name: CI — Push to main
 
+permissions:
+  contents: read
+  packages: write
+
 on:
   push:
     branches: [ main ]
@@ -22,5 +26,15 @@ jobs:
     uses: ./.github/workflows/docker-publish.yml
     with:
       version: latest
+      checkout_ref: ${{ github.sha }}
+    secrets: inherit
+
+  # Chart version: unique prerelease per workflow run; appVersion stays "latest" for snapshot installs.
+  helm-publish:
+    needs: [ lint, unit, integration ]
+    uses: ./.github/workflows/helm-publish.yml
+    with:
+      version: 0.0.0-${{ github.run_id }}
+      app_version: latest
       checkout_ref: ${{ github.sha }}
     secrets: inherit
