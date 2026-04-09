@@ -51,11 +51,11 @@ lint: ## Lint code
 
 # Docker commands
 docker-build: ## Build Docker image
-	@docker build -t $(DOCKER_REPO)/api-gateway-controller:$(DOCKER_TAG) -f build/release/Dockerfile.controller .
-	@docker build -t $(DOCKER_REPO)/api-gateway-api-server:$(DOCKER_TAG) -f build/release/Dockerfile.api-server .
-	@docker build -t $(DOCKER_REPO)/api-gateway-contract-syncer:$(DOCKER_TAG) -f build/release/Dockerfile.contract-syncer .
-	@docker build -t $(DOCKER_REPO)/api-gateway-auth-sidecar:$(DOCKER_TAG) -f build/release/Dockerfile.auth-sidecar .
-	@docker build -t $(DOCKER_REPO)/api-gateway-mock-service:$(DOCKER_TAG) -f build/dev/Dockerfile.mock-service .
+	@DOCKER_BUILDKIT=1 docker build -t $(DOCKER_REPO)/api-gateway-controller:$(DOCKER_TAG) -f build/release/Dockerfile.controller .
+	@DOCKER_BUILDKIT=1 docker build -t $(DOCKER_REPO)/api-gateway-api-server:$(DOCKER_TAG) -f build/release/Dockerfile.api-server .
+	@DOCKER_BUILDKIT=1 docker build -t $(DOCKER_REPO)/api-gateway-contract-syncer:$(DOCKER_TAG) -f build/release/Dockerfile.contract-syncer .
+	@DOCKER_BUILDKIT=1 docker build -t $(DOCKER_REPO)/api-gateway-auth-sidecar:$(DOCKER_TAG) -f build/release/Dockerfile.auth-sidecar .
+	@DOCKER_BUILDKIT=1 docker build -t $(DOCKER_REPO)/api-gateway-mock-service:$(DOCKER_TAG) -f build/dev/Dockerfile.mock-service .
 
 docker-push: ## Push Docker image
 	@docker push $(DOCKER_REPO)/api-gateway-controller:$(DOCKER_TAG)
