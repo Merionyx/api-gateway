@@ -26,7 +26,7 @@ on:
 
 env:
   IMAGE_PREFIX: merionyx/api-gateway
-  # Mirror to GHCR (hyphen style, same as primary Docker Hub name)
+  # Mirror to GHCR (same path after ghcr.io as docker.io)
   GHCR_IMAGE_PREFIX: ghcr.io/merionyx/api-gateway
 
 jobs:
@@ -67,9 +67,9 @@ jobs:
         platforms: ${{ matrix.platform }}
         provenance: false
         sbom: false
-        outputs: type=image,name=${{ env.IMAGE_PREFIX }}-${{ inputs.component }},push-by-digest=true,push=true
-        cache-from: type=gha,scope=build-${{ inputs.component }}-${{ matrix.arch_short }}
-        cache-to: type=gha,scope=build-${{ inputs.component }}-${{ matrix.arch_short }},mode=max
+        outputs: type=image,name=${{ env.IMAGE_PREFIX }}/${{ inputs.component }},push-by-digest=true,push=true
+        cache-from: type=gha,scope=build-${{ inputs.component }}/${{ matrix.arch_short }}
+        cache-to: type=gha,scope=build-${{ inputs.component }}/${{ matrix.arch_short }},mode=max
 
     - name: Write digest file
       run: echo "${{ steps.build.outputs.digest }}" > "${{ inputs.component }}-${{ matrix.arch_short }}.txt"
@@ -108,8 +108,8 @@ jobs:
         ARM=$(tr -d '\n' < "digests/${COMPONENT}-arm64.txt")
         docker buildx imagetools create \
           -t "${IMAGE_PREFIX}-${COMPONENT}:${VERSION}" \
-          "${IMAGE_PREFIX}-${COMPONENT}@${AMD}" \
-          "${IMAGE_PREFIX}-${COMPONENT}@${ARM}"
+          "${IMAGE_PREFIX}/${COMPONENT}@${AMD}" \
+          "${IMAGE_PREFIX}/${COMPONENT}@${ARM}"
       env:
         IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
         COMPONENT: ${{ inputs.component }}
@@ -123,26 +123,6 @@ jobs:
         tar -xzf /tmp/crane.tgz -C /tmp
         sudo mv /tmp/crane /usr/local/bin/
 
-    - name: Crane auth (Docker Hub)
-      run: |
-        echo "${DOCKERHUB_TOKEN}" | crane auth login docker.io \
-          -u "${DOCKERHUB_USERNAME}" \
-          --password-stdin
-      env:
-        DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-        DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-
-    # Test. Duplicate on Docker Hub (nested path merionyx/api-gateway/<component>)
-    - name: Duplicate on Docker Hub (nested path merionyx/api-gateway/<component>)
-      run: |
-        crane copy \
-          "docker.io/${IMAGE_PREFIX}-${COMPONENT}:${VERSION}" \
-          "docker.io/${IMAGE_PREFIX}/${COMPONENT}:${VERSION}"
-      env:
-        IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
-        COMPONENT: ${{ inputs.component }}
-        VERSION: ${{ inputs.version }}
-
     - name: Login to GitHub Container Registry
       uses: docker/login-action@v4
       with:
@@ -153,8 +133,8 @@ jobs:
     - name: Mirror multi-arch image to GHCR
       run: |
         crane copy \
-          "docker.io/${IMAGE_PREFIX}-${COMPONENT}:${VERSION}" \
-          "${GHCR_IMAGE_PREFIX}-${COMPONENT}:${VERSION}"
+          "docker.io/${IMAGE_PREFIX}/${COMPONENT}:${VERSION}" \
+          "${GHCR_IMAGE_PREFIX}/${COMPONENT}:${VERSION}"
       env:
         IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
         GHCR_IMAGE_PREFIX: ${{ env.GHCR_IMAGE_PREFIX }}
