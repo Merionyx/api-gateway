@@ -1,0 +1,99 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-be-service-01-dev
+  namespace: default
+  labels:
+    app.kubernetes.io/name: mock-be-service-01-dev
+    app.kubernetes.io/part-of: api-gateway-dev
+    gateway.merionyx.com/team: demo
+  annotations:
+    gateway.merionyx.com/environment-id: dev
+    gateway.merionyx.com/service-name: be-service-01
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: mock-be-service-01-dev
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-be-service-02-dev
+  namespace: default
+  labels:
+    app.kubernetes.io/name: mock-be-service-02-dev
+    app.kubernetes.io/part-of: api-gateway-dev
+    gateway.merionyx.com/team: demo
+  annotations:
+    gateway.merionyx.com/environment-id: dev
+    gateway.merionyx.com/service-name: be-service-02
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: mock-be-service-02-dev
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-be-service-01-dyn-qa
+  namespace: default
+  labels:
+    app.kubernetes.io/name: mock-be-service-01-dyn-qa
+    app.kubernetes.io/part-of: api-gateway-dev
+    gateway.merionyx.com/team: demo
+  annotations:
+    gateway.merionyx.com/environment-id: dyn-qa
+    gateway.merionyx.com/service-name: be-service-01
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: mock-be-service-01-dyn-qa
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-be-service-02-dyn-qa
+  namespace: default
+  labels:
+    app.kubernetes.io/name: mock-be-service-02-dyn-qa
+    app.kubernetes.io/part-of: api-gateway-dev
+    gateway.merionyx.com/team: demo
+  annotations:
+    gateway.merionyx.com/environment-id: dyn-qa
+    gateway.merionyx.com/service-name: be-service-02
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: mock-be-service-02-dyn-qa
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-be-service-03
+  namespace: default
+  labels:
+    app.kubernetes.io/name: be-service-03
+    app.kubernetes.io/part-of: api-gateway-dev
+spec:
+  selector:
+    app.kubernetes.io/name: mock-be-service-03
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http

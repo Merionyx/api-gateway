@@ -1,0 +1,225 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-be-service-01-dev
+  namespace: default
+  labels:
+    app.kubernetes.io/name: mock-be-service-01-dev
+    app.kubernetes.io/part-of: api-gateway-dev
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mock-be-service-01-dev
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mock-be-service-01-dev
+    spec:
+      containers:
+      - name: mock
+        image: merionyx/api-gateway-mock-service:latest
+        imagePullPolicy: Never
+        env:
+        - name: SERVICE_NAME
+          value: be-service-01
+        - name: ENVIRONMENT
+          value: dev
+        - name: PORT
+          value: "8080"
+        ports:
+        - name: http
+          containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 3
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 20
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-be-service-02-dev
+  namespace: default
+  labels:
+    app.kubernetes.io/name: mock-be-service-02-dev
+    app.kubernetes.io/part-of: api-gateway-dev
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mock-be-service-02-dev
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mock-be-service-02-dev
+    spec:
+      containers:
+      - name: mock
+        image: merionyx/api-gateway-mock-service:latest
+        imagePullPolicy: Never
+        env:
+        - name: SERVICE_NAME
+          value: be-service-02
+        - name: ENVIRONMENT
+          value: dev
+        - name: PORT
+          value: "8080"
+        ports:
+        - name: http
+          containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 3
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 20
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-be-service-03
+  namespace: default
+  labels:
+    app.kubernetes.io/name: mock-be-service-03
+    app.kubernetes.io/part-of: api-gateway-dev
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mock-be-service-03
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mock-be-service-03
+    spec:
+      containers:
+      - name: mock
+        image: merionyx/api-gateway-mock-service:latest
+        imagePullPolicy: Never
+        env:
+        - name: SERVICE_NAME
+          value: be-service-03
+        - name: ENVIRONMENT
+          value: global
+        - name: PORT
+          value: "8080"
+        ports:
+        - name: http
+          containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 3
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 20
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-be-service-01-dyn-qa
+  namespace: default
+  labels:
+    app.kubernetes.io/name: mock-be-service-01-dyn-qa
+    app.kubernetes.io/part-of: api-gateway-dev
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mock-be-service-01-dyn-qa
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mock-be-service-01-dyn-qa
+    spec:
+      containers:
+      - name: mock
+        image: merionyx/api-gateway-mock-service:latest
+        imagePullPolicy: Never
+        env:
+        - name: SERVICE_NAME
+          value: be-service-01
+        - name: ENVIRONMENT
+          value: dyn-qa
+        - name: PORT
+          value: "8080"
+        ports:
+        - name: http
+          containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 3
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 20
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-be-service-02-dyn-qa
+  namespace: default
+  labels:
+    app.kubernetes.io/name: mock-be-service-02-dyn-qa
+    app.kubernetes.io/part-of: api-gateway-dev
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mock-be-service-02-dyn-qa
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mock-be-service-02-dyn-qa
+    spec:
+      containers:
+      - name: mock
+        image: merionyx/api-gateway-mock-service:latest
+        imagePullPolicy: Never
+        env:
+        - name: SERVICE_NAME
+          value: be-service-02
+        - name: ENVIRONMENT
+          value: dyn-qa
+        - name: PORT
+          value: "8080"
+        ports:
+        - name: http
+          containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 3
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 20
