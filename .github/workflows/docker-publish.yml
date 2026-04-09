@@ -3,6 +3,7 @@ name: Publish Docker images to Docker Hub
 permissions:
   contents: read
   packages: write
+  attestations: write
   id-token: write
 
 on:

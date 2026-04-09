@@ -3,6 +3,7 @@ name: Publish one Docker image (multi-arch)
 permissions:
   contents: read
   packages: write
+  attestations: write
   id-token: write
 
 on:
@@ -29,7 +30,6 @@ env:
   IMAGE_PREFIX: merionyx/api-gateway
   # Mirror to GHCR (same path after ghcr.io as docker.io)
   GHCR_IMAGE_PREFIX: ghcr.io/merionyx/api-gateway
-  SYFT_VERSION: v1.20.0
 
 jobs:
   build:
@@ -67,8 +67,8 @@ jobs:
         context: .
         file: ${{ inputs.dockerfile }}
         platforms: ${{ matrix.platform }}
-        provenance: false
-        sbom: false
+        provenance: mode=max
+        sbom: true
         outputs: type=image,name=${{ env.IMAGE_PREFIX }}-${{ inputs.component }},push-by-digest=true,push=true
         cache-from: type=gha,scope=build-${{ inputs.component }}-${{ matrix.arch_short }}
         cache-to: type=gha,scope=build-${{ inputs.component }}-${{ matrix.arch_short }},mode=max
@@ -98,9 +98,17 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v4
 
-    - name: Login to Docker Hub
+    - name: Login to Docker Hub (docker.io)
       uses: docker/login-action@v4
       with:
+        registry: docker.io
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Login to Docker Hub (registry-1.docker.io)
+      uses: docker/login-action@v4
+      with:
+        registry: registry-1.docker.io
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
@@ -143,36 +151,27 @@ jobs:
         COMPONENT: ${{ inputs.component }}
         VERSION: ${{ inputs.version }}
 
-    - name: Install Syft
+    # BuildKit уже записал provenance/SBOM для каждого per-arch digest; здесь — SLSA build provenance от GitHub для итогового multi-arch манифеста (один digest в обоих registry).
+    - name: Resolve merged image digest
+      id: merged
       run: |
-        curl -fsSL "https://github.com/anchore/syft/releases/download/${SYFT_VERSION}/syft_${SYFT_VERSION#v}_linux_amd64.tar.gz" -o /tmp/syft.tgz
-        tar -xzf /tmp/syft.tgz -C /tmp
-        sudo mv /tmp/syft /usr/local/bin/
-      env:
-        SYFT_VERSION: ${{ env.SYFT_VERSION }}
-
-    - name: Install Cosign
-      uses: sigstore/cosign-installer@v3
-
-    - name: SBOM (Syft), sign and attest (Cosign keyless)
-      run: |
-        set -euo pipefail
-        SRC="docker.io/${IMAGE_PREFIX}-${COMPONENT}:${VERSION}"
-        GHCR_REF="${GHCR_IMAGE_PREFIX}-${COMPONENT}:${VERSION}"
-
-        syft "${SRC}" -o "cyclonedx-json=/tmp/sbom-${COMPONENT}.cdx.json"
-
-        DIGEST="$(crane digest "${SRC}")"
-
-        cosign sign --yes "docker.io/${IMAGE_PREFIX}-${COMPONENT}@${DIGEST}"
-        cosign sign --yes "${GHCR_IMAGE_PREFIX}-${COMPONENT}@${DIGEST}"
-
-        cosign attest --yes --predicate "/tmp/sbom-${COMPONENT}.cdx.json" --type cyclonedx \
-          "docker.io/${IMAGE_PREFIX}-${COMPONENT}@${DIGEST}"
-        cosign attest --yes --predicate "/tmp/sbom-${COMPONENT}.cdx.json" --type cyclonedx \
-          "${GHCR_IMAGE_PREFIX}-${COMPONENT}@${DIGEST}"
+        DIGEST="$(crane digest "docker.io/${IMAGE_PREFIX}-${COMPONENT}:${VERSION}")"
+        echo "digest=${DIGEST}" >> "${GITHUB_OUTPUT}"
       env:
         IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
-        GHCR_IMAGE_PREFIX: ${{ env.GHCR_IMAGE_PREFIX }}
         COMPONENT: ${{ inputs.component }}
         VERSION: ${{ inputs.version }}
+
+    - name: Attest build provenance (Docker Hub → registry + GitHub)
+      uses: actions/attest-build-provenance@v2
+      with:
+        subject-name: index.docker.io/merionyx/api-gateway-${{ inputs.component }}
+        subject-digest: ${{ steps.merged.outputs.digest }}
+        push-to-registry: true
+
+    - name: Attest build provenance (GHCR → registry + GitHub)
+      uses: actions/attest-build-provenance@v2
+      with:
+        subject-name: ghcr.io/merionyx/api-gateway-${{ inputs.component }}
+        subject-digest: ${{ steps.merged.outputs.digest }}
+        push-to-registry: true
