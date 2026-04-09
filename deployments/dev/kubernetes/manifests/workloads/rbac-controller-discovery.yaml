@@ -1,4 +1,4 @@
-# RBAC for kubernetes_discovery in controller: list namespaces, CR gateway.merionyx.io, Services.
+# RBAC for kubernetes_discovery in controller: list namespaces, CR gateway.merionyx.com, Services.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -21,7 +21,7 @@ rules:
 - apiGroups: [ "" ]
   resources: [ "services" ]
   verbs: [ "list", "get", "watch" ]
-- apiGroups: [ "gateway.merionyx.io" ]
+- apiGroups: [ "gateway.merionyx.com" ]
   resources: [ "environments", "contractbundles", "gatewayupstreams" ]
   verbs: [ "list", "get", "watch" ]
 ---

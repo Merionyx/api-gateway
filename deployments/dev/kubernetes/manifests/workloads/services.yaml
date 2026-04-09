@@ -202,10 +202,10 @@ metadata:
   labels:
     app.kubernetes.io/name: mock-be-service-01-dev
     app.kubernetes.io/part-of: api-gateway-dev
-    gateway.merionyx.io/team: demo
+    gateway.merionyx.com/team: demo
   annotations:
-    gateway.merionyx.io/environment-id: dev
-    gateway.merionyx.io/service-name: be-service-01
+    gateway.merionyx.com/environment-id: dev
+    gateway.merionyx.com/service-name: be-service-01
 spec:
   clusterIP: None
   selector:
@@ -223,10 +223,10 @@ metadata:
   labels:
     app.kubernetes.io/name: mock-be-service-02-dev
     app.kubernetes.io/part-of: api-gateway-dev
-    gateway.merionyx.io/team: demo
+    gateway.merionyx.com/team: demo
   annotations:
-    gateway.merionyx.io/environment-id: dev
-    gateway.merionyx.io/service-name: be-service-02
+    gateway.merionyx.com/environment-id: dev
+    gateway.merionyx.com/service-name: be-service-02
 spec:
   clusterIP: None
   selector:

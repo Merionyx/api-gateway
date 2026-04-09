@@ -82,7 +82,7 @@ data:
     kubernetes_discovery:
       enabled: true
       resource_label_selector:
-        gateway.merionyx.io/team: demo
+        gateway.merionyx.com/team: demo
 
   api-server.yaml: |
     server:
