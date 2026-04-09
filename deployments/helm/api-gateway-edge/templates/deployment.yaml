@@ -57,7 +57,7 @@ spec:
           {{- toYaml . | nindent 10 }}
         {{- end }}
       - name: auth-sidecar
-        image: {{ printf "%s:%s" .Values.authSidecar.image.repository .Values.authSidecar.image.tag | quote }}
+        image: {{ include "agwedge.authSidecarImage" . | quote }}
         imagePullPolicy: {{ .Values.authSidecar.image.pullPolicy }}
         env:
         - name: CONFIG_PATH

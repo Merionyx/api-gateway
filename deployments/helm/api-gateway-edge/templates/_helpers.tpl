@@ -28,6 +28,15 @@ app.kubernetes.io/name: {{ include "agwedge.fullname" . }}-edge
 app.kubernetes.io/component: edge
 {{- end }}
 
+{{/*
+  Merionyx auth-sidecar image. Пустой tag → Chart.AppVersion (как в api-gateway-control-plane).
+  Envoy — отдельный апстрим; тег только из .Values.envoy.image.tag.
+*/}}
+{{- define "agwedge.authSidecarImage" -}}
+{{- $tag := .Values.authSidecar.image.tag | default .Chart.AppVersion -}}
+{{- printf "%s:%s" .Values.authSidecar.image.repository $tag -}}
+{{- end }}
+
 {{- define "agwedge.secret.internalCA" -}}
 {{- if .Values.tls.internalCASecret -}}
 {{- .Values.tls.internalCASecret -}}

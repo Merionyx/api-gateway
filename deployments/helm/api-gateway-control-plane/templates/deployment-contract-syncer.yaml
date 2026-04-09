@@ -27,7 +27,7 @@ spec:
         fsGroup: 1001
       containers:
       - name: contract-syncer
-        image: {{ printf "%s:%s" .Values.components.contractSyncer.image.repository .Values.components.contractSyncer.image.tag | quote }}
+        image: {{ include "agwcp.imageRef" (list . "contractSyncer") | quote }}
         imagePullPolicy: {{ .Values.components.contractSyncer.image.pullPolicy }}
         env:
         - name: CONFIG_PATH

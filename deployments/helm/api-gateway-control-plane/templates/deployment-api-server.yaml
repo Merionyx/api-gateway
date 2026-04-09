@@ -27,7 +27,7 @@ spec:
         fsGroup: 1001
       containers:
       - name: api-server
-        image: {{ printf "%s:%s" .Values.components.apiServer.image.repository .Values.components.apiServer.image.tag | quote }}
+        image: {{ include "agwcp.imageRef" (list . "apiServer") | quote }}
         imagePullPolicy: {{ .Values.components.apiServer.image.pullPolicy }}
         env:
         - name: CONFIG_PATH
