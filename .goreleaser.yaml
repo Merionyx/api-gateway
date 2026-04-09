@@ -2,154 +2,154 @@ version: 2
 
 before:
   hooks:
-    - go mod tidy
+  - go mod tidy
 
 builds:
-  - id: api-server
-    binary: api-server
-    main: ./cmd/api-server
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - darwin
-      - windows
-    goarch:
-      - amd64
-      - arm64
-    ignore:
-      - goos: windows
-        goarch: arm64
+- id: api-server
+  binary: api-server
+  main: ./cmd/api-server
+  env:
+  - CGO_ENABLED=0
+  goos:
+  - linux
+  - darwin
+  - windows
+  goarch:
+  - amd64
+  - arm64
+  ignore:
+  - goos: windows
+    goarch: arm64
 
-  - id: contract-syncer
-    binary: contract-syncer
-    main: ./cmd/contract-syncer
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - darwin
-      - windows
-    goarch:
-      - amd64
-      - arm64
-    ignore:
-      - goos: windows
-        goarch: arm64
+- id: contract-syncer
+  binary: contract-syncer
+  main: ./cmd/contract-syncer
+  env:
+  - CGO_ENABLED=0
+  goos:
+  - linux
+  - darwin
+  - windows
+  goarch:
+  - amd64
+  - arm64
+  ignore:
+  - goos: windows
+    goarch: arm64
 
-  - id: controller
-    binary: controller
-    main: ./cmd/controller
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - darwin
-      - windows
-    goarch:
-      - amd64
-      - arm64
-    ignore:
-      - goos: windows
-        goarch: arm64
+- id: controller
+  binary: controller
+  main: ./cmd/controller
+  env:
+  - CGO_ENABLED=0
+  goos:
+  - linux
+  - darwin
+  - windows
+  goarch:
+  - amd64
+  - arm64
+  ignore:
+  - goos: windows
+    goarch: arm64
 
-  - id: auth-sidecar
-    binary: auth-sidecar
-    main: ./cmd/auth-sidecar
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - darwin
-      - windows
-    goarch:
-      - amd64
-      - arm64
-    ignore:
-      - goos: windows
-        goarch: arm64
+- id: auth-sidecar
+  binary: auth-sidecar
+  main: ./cmd/auth-sidecar
+  env:
+  - CGO_ENABLED=0
+  goos:
+  - linux
+  - darwin
+  - windows
+  goarch:
+  - amd64
+  - arm64
+  ignore:
+  - goos: windows
+    goarch: arm64
 
-  - id: agwctl
-    binary: agwctl
-    main: ./cmd/cli
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - darwin
-      - windows
-    goarch:
-      - amd64
-      - arm64
-    ignore:
-      - goos: windows
-        goarch: arm64
+- id: agwctl
+  binary: agwctl
+  main: ./cmd/cli
+  env:
+  - CGO_ENABLED=0
+  goos:
+  - linux
+  - darwin
+  - windows
+  goarch:
+  - amd64
+  - arm64
+  ignore:
+  - goos: windows
+    goarch: arm64
 
 archives:
-  - id: api-server
-    builds:
-      - api-server
+- id: api-server
+  builds:
+  - api-server
+  formats:
+  - tar.gz
+  format_overrides:
+  - goos: windows
     formats:
-      - tar.gz
-    format_overrides:
-      - goos: windows
-        formats:
-          - zip
-    name_template: "api-server_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
-    files:
-      - none*
+    - zip
+  name_template: "api-server_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
+  files:
+  - none*
 
-  - id: contract-syncer
-    builds:
-      - contract-syncer
+- id: contract-syncer
+  builds:
+  - contract-syncer
+  formats:
+  - tar.gz
+  format_overrides:
+  - goos: windows
     formats:
-      - tar.gz
-    format_overrides:
-      - goos: windows
-        formats:
-          - zip
-    name_template: "contract-syncer_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
-    files:
-      - none*
+    - zip
+  name_template: "contract-syncer_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
+  files:
+  - none*
 
-  - id: controller
-    builds:
-      - controller
+- id: controller
+  builds:
+  - controller
+  formats:
+  - tar.gz
+  format_overrides:
+  - goos: windows
     formats:
-      - tar.gz
-    format_overrides:
-      - goos: windows
-        formats:
-          - zip
-    name_template: "controller_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
-    files:
-      - none*
+    - zip
+  name_template: "controller_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
+  files:
+  - none*
 
-  - id: auth-sidecar
-    builds:
-      - auth-sidecar
+- id: auth-sidecar
+  builds:
+  - auth-sidecar
+  formats:
+  - tar.gz
+  format_overrides:
+  - goos: windows
     formats:
-      - tar.gz
-    format_overrides:
-      - goos: windows
-        formats:
-          - zip
-    name_template: "auth-sidecar_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
-    files:
-      - none*
+    - zip
+  name_template: "auth-sidecar_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
+  files:
+  - none*
 
-  - id: agwctl
-    builds:
-      - agwctl
+- id: agwctl
+  builds:
+  - agwctl
+  formats:
+  - tar.gz
+  format_overrides:
+  - goos: windows
     formats:
-      - tar.gz
-    format_overrides:
-      - goos: windows
-        formats:
-          - zip
-    name_template: "agwctl_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
-    files:
-      - none*
+    - zip
+  name_template: "agwctl_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
+  files:
+  - none*
 
 checksum:
   name_template: checksums.txt
@@ -174,10 +174,10 @@ release:
 
     **GitHub Container Registry** (mirror)
     ```
-    docker pull ghcr.io/merionyx/api-gateway-api-server:{{ .Tag }}
-    docker pull ghcr.io/merionyx/api-gateway-auth-sidecar:{{ .Tag }}
-    docker pull ghcr.io/merionyx/api-gateway-contract-syncer:{{ .Tag }}
-    docker pull ghcr.io/merionyx/api-gateway-controller:{{ .Tag }}
+    docker pull ghcr.io/merionyx/api-gateway/api-server:{{ .Tag }}
+    docker pull ghcr.io/merionyx/api-gateway/auth-sidecar:{{ .Tag }}
+    docker pull ghcr.io/merionyx/api-gateway/contract-syncer:{{ .Tag }}
+    docker pull ghcr.io/merionyx/api-gateway/controller:{{ .Tag }}
     ```
 
     ### Helm (OCI)
