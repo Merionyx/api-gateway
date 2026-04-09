@@ -2,7 +2,7 @@ apiVersion: v2
 name: api-gateway-edge
 description: API Gateway edge (Envoy + Auth Sidecar)
 type: application
-version: latest
+version: 0.0.0
 appVersion: latest
 icon: https://avatars.githubusercontent.com/u/208366109?s=512
 sources:

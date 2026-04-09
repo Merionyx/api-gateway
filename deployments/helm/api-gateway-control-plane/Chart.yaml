@@ -2,7 +2,7 @@ apiVersion: v2
 name: api-gateway-control-plane
 description: API Gateway control plane (Controller, API Server, Contract Syncer)
 type: application
-version: latest
+version: 0.0.0
 appVersion: latest
 icon: https://avatars.githubusercontent.com/u/208366109?s=512
 sources:

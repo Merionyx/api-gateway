@@ -34,7 +34,7 @@ jobs:
     needs: [ lint, unit, integration ]
     uses: ./.github/workflows/helm-publish.yml
     with:
-      version: 0.0.0-${{ github.run_id }}
+      version: 0.0.0
       app_version: latest
       checkout_ref: ${{ github.sha }}
     secrets: inherit
