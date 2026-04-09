@@ -6,14 +6,17 @@ WORKDIR /api-server
 
 COPY go.mod go.sum ./
 
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
 COPY pkg/ pkg/
 COPY cmd/api-server/ cmd/api-server/
 COPY internal/shared/ internal/shared/
 COPY internal/api-server/ internal/api-server/
 
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main cmd/api-server/main.go
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux go build -o main cmd/api-server/main.go
 
 FROM alpine:3.19
 

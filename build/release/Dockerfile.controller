@@ -6,7 +6,8 @@ WORKDIR /controller
 
 COPY go.mod go.sum ./
 
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
 # Layer cache: only this component + shared deps (not api-server / sidecar / syncer).
 COPY pkg/ pkg/
@@ -14,7 +15,9 @@ COPY cmd/controller/ cmd/controller/
 COPY internal/shared/ internal/shared/
 COPY internal/controller/ internal/controller/
 
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main cmd/controller/main.go
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux go build -o main cmd/controller/main.go
 
 FROM alpine:3.19
 
