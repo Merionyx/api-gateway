@@ -241,13 +241,13 @@ jobs:
     - name: Attest build provenance (Docker Hub — Alpine)
       uses: actions/attest-build-provenance@v2
       with:
-        subject-name: index.docker.io/merionyx/api-gateway-${{ inputs.component }}-alpine
+        subject-name: index.docker.io/merionyx/api-gateway-${{ inputs.component }}
         subject-digest: ${{ steps.merged-alpine.outputs.digest }}
         push-to-registry: true
 
     - name: Attest build provenance (GHCR — Alpine)
       uses: actions/attest-build-provenance@v2
       with:
-        subject-name: ghcr.io/merionyx/api-gateway-${{ inputs.component }}-alpine
+        subject-name: ghcr.io/merionyx/api-gateway-${{ inputs.component }}
         subject-digest: ${{ steps.merged-alpine.outputs.digest }}
         push-to-registry: true
