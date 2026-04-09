@@ -51,7 +51,7 @@ type ContractBundleSpec struct {
 
 	// EnvironmentRef points to an Environment CR.
 	EnvironmentRef *corev1.ObjectReference `json:"environmentRef,omitempty"`
-	// EnvironmentID is an alternative to EnvironmentRef (label gateway.merionyx.io/environment-id may also be used).
+	// EnvironmentID is an alternative to EnvironmentRef (label gateway.merionyx.com/environment-id may also be used).
 	EnvironmentID string `json:"environmentId,omitempty"`
 }
 

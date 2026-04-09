@@ -10,10 +10,6 @@ func Resource(resource string) schema.GroupResource {
 
 func init() {
 	SchemeBuilder.Register(
-		&APIServer{}, &APIServerList{},
-		&GatewayController{}, &GatewayControllerList{},
-		&ContractSyncer{}, &ContractSyncerList{},
-		&EnvoyGateway{}, &EnvoyGatewayList{},
 		&Environment{}, &EnvironmentList{},
 		&ContractBundle{}, &ContractBundleList{},
 		&ContractRepository{}, &ContractRepositoryList{},
