@@ -1,0 +1,162 @@
+{{- if and .Values.certManager.createCertificates .Values.certManager.issuerRef.name }}
+{{- if .Values.certManager.useNamespaceCAChain }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "agwcp.fullname" . }}-grpc-ca
+  labels:
+    {{- include "agwcp.labels" . | nindent 4 }}
+spec:
+  isCA: true
+  commonName: {{ printf "%s-grpc-ca" (include "agwcp.fullname" .) | quote }}
+  secretName: {{ include "agwcp.secret.grpcInternalCA" . }}
+  duration: {{ .Values.certManager.duration }}
+  renewBefore: {{ .Values.certManager.renewBefore }}
+  privateKey:
+    {{- toYaml .Values.certManager.privateKey | nindent 4 }}
+  issuerRef:
+{{- if and .Values.certManager.bootstrapIssuerRef .Values.certManager.bootstrapIssuerRef.name }}
+{{- toYaml .Values.certManager.bootstrapIssuerRef | nindent 4 }}
+{{- else }}
+{{- toYaml .Values.certManager.issuerRef | nindent 4 }}
+{{- end }}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ printf "%s-grpc-ca-issuer" (include "agwcp.fullname" .) }}
+  labels:
+    {{- include "agwcp.labels" . | nindent 4 }}
+spec:
+  ca:
+    secretName: {{ include "agwcp.secret.grpcInternalCA" . }}
+---
+{{- end }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "agwcp.fullname" . }}-controller-grpc
+  labels:
+    {{- include "agwcp.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "agwcp.secret.controllerGrpcServer" . }}
+  duration: {{ .Values.certManager.duration }}
+  renewBefore: {{ .Values.certManager.renewBefore }}
+  privateKey:
+    {{- toYaml .Values.certManager.privateKey | nindent 4 }}
+  dnsNames:
+  - {{ include "agwcp.svc.controller" . | quote }}
+  - {{ include "agwcp.dns.controller" . | quote }}
+  {{- range .Values.certManager.additionalDnsNames }}
+  - {{ . | quote }}
+  {{- end }}
+  issuerRef:
+{{- if .Values.certManager.useNamespaceCAChain }}
+    kind: Issuer
+    name: {{ printf "%s-grpc-ca-issuer" (include "agwcp.fullname" .) }}
+{{- else }}
+{{- toYaml .Values.certManager.issuerRef | nindent 4 }}
+{{- end }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "agwcp.fullname" . }}-api-server-grpc
+  labels:
+    {{- include "agwcp.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "agwcp.secret.apiServerGrpcServer" . }}
+  duration: {{ .Values.certManager.duration }}
+  renewBefore: {{ .Values.certManager.renewBefore }}
+  privateKey:
+    {{- toYaml .Values.certManager.privateKey | nindent 4 }}
+  dnsNames:
+  - {{ include "agwcp.svc.apiServer" . | quote }}
+  - {{ include "agwcp.dns.apiServer" . | quote }}
+  {{- range .Values.certManager.additionalDnsNames }}
+  - {{ . | quote }}
+  {{- end }}
+  issuerRef:
+{{- if .Values.certManager.useNamespaceCAChain }}
+    kind: Issuer
+    name: {{ printf "%s-grpc-ca-issuer" (include "agwcp.fullname" .) }}
+{{- else }}
+{{- toYaml .Values.certManager.issuerRef | nindent 4 }}
+{{- end }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "agwcp.fullname" . }}-contract-syncer-grpc
+  labels:
+    {{- include "agwcp.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "agwcp.secret.contractSyncerGrpcServer" . }}
+  duration: {{ .Values.certManager.duration }}
+  renewBefore: {{ .Values.certManager.renewBefore }}
+  privateKey:
+    {{- toYaml .Values.certManager.privateKey | nindent 4 }}
+  dnsNames:
+  - {{ include "agwcp.svc.contractSyncer" . | quote }}
+  - {{ include "agwcp.dns.contractSyncer" . | quote }}
+  {{- range .Values.certManager.additionalDnsNames }}
+  - {{ . | quote }}
+  {{- end }}
+  issuerRef:
+{{- if .Values.certManager.useNamespaceCAChain }}
+    kind: Issuer
+    name: {{ printf "%s-grpc-ca-issuer" (include "agwcp.fullname" .) }}
+{{- else }}
+{{- toYaml .Values.certManager.issuerRef | nindent 4 }}
+{{- end }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "agwcp.fullname" . }}-grpc-client-controller
+  labels:
+    {{- include "agwcp.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "agwcp.secret.grpcClientController" . }}
+  commonName: {{ printf "%s-grpc-client-controller" (include "agwcp.fullname" .) | trunc 63 | quote }}
+  duration: {{ .Values.certManager.duration }}
+  renewBefore: {{ .Values.certManager.renewBefore }}
+  privateKey:
+    {{- toYaml .Values.certManager.privateKey | nindent 4 }}
+  usages:
+  - digital signature
+  - key encipherment
+  - client auth
+  issuerRef:
+{{- if .Values.certManager.useNamespaceCAChain }}
+    kind: Issuer
+    name: {{ printf "%s-grpc-ca-issuer" (include "agwcp.fullname" .) }}
+{{- else }}
+{{- toYaml .Values.certManager.issuerRef | nindent 4 }}
+{{- end }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "agwcp.fullname" . }}-grpc-client-api-server
+  labels:
+    {{- include "agwcp.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "agwcp.secret.grpcClientApiServer" . }}
+  commonName: {{ printf "%s-grpc-client-api-server" (include "agwcp.fullname" .) | trunc 63 | quote }}
+  duration: {{ .Values.certManager.duration }}
+  renewBefore: {{ .Values.certManager.renewBefore }}
+  privateKey:
+    {{- toYaml .Values.certManager.privateKey | nindent 4 }}
+  usages:
+  - digital signature
+  - key encipherment
+  - client auth
+  issuerRef:
+{{- if .Values.certManager.useNamespaceCAChain }}
+    kind: Issuer
+    name: {{ printf "%s-grpc-ca-issuer" (include "agwcp.fullname" .) }}
+{{- else }}
+{{- toYaml .Values.certManager.issuerRef | nindent 4 }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,74 @@
+namespace: api-gateway
+
+createNamespace: false
+
+nameOverride: ""
+fullnameOverride: ""
+
+global:
+  imagePullSecrets: []
+
+replicaCount: 1
+
+defaultPodAntiAffinity: true
+defaultTopologySpreadConstraints: true
+
+envoy:
+  image:
+    repository: envoyproxy/envoy
+    tag: v1.33-latest
+    pullPolicy: IfNotPresent
+  resources: {}
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  topologySpreadConstraints: []
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+authSidecar:
+  image:
+    repository: merionyx/api-gateway-auth-sidecar
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources: {}
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  topologySpreadConstraints: []
+  hostAliases: []
+  config: {}
+
+# Explicit connectivity (set to your control-plane Services / cross-cluster DNS)
+connectivity:
+  controllerGrpcAddress: ""
+  controllerServerName: ""
+  jwksUrl: ""
+  environment: ""
+  tenant: cluster-default
+  xdsHost: ""
+  xdsPort: 19091
+  xdsSni: ""
+  envoyNodeId: ""
+  envoyCluster: ""
+
+certManager:
+  createCertificates: false
+  issuerRef:
+    kind: ClusterIssuer
+    name: ""
+  additionalDnsNames: []
+  duration: 8760h
+  renewBefore: 720h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+
+tls:
+  internalCASecret: ""
+  authSidecarGrpcServerSecret: ""
+  grpcClientAuthSidecarSecret: ""
+  grpcClientEnvoySecret: ""

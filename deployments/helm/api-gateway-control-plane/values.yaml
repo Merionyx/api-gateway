@@ -1,0 +1,119 @@
+# Default namespace for documentation; use: helm install -n api-gateway
+namespace: api-gateway
+
+createNamespace: false
+
+nameOverride: ""
+fullnameOverride: ""
+
+global:
+  imagePullSecrets: []
+
+defaultPodAntiAffinity: true
+defaultTopologySpreadConstraints: true
+
+etcd:
+  endpoints: []
+  tls:
+    existingSecret: ""
+
+certManager:
+  createCertificates: false
+  # If true: CA Certificate (bootstrapIssuerRef) → namespaced Issuer (CA) → all gRPC leaf certs.
+  # Produces Secret ...-grpc-internal-ca-tls trusted by all components (same pattern as dev/grpc-certificates.yaml).
+  # If false: all Certificates use issuerRef directly; you must create ...-grpc-internal-ca-tls yourself (e.g. from leaf ca.crt).
+  useNamespaceCAChain: false
+  # Optional; when useNamespaceCAChain, CA cert is issued by this ref (defaults to issuerRef).
+  bootstrapIssuerRef: {}
+  issuerRef:
+    kind: ClusterIssuer
+    name: ""
+  additionalDnsNames: []
+  duration: 8760h
+  renewBefore: 720h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+
+# When certManager.createCertificates is false, set explicit secret names (empty = derived from fullname)
+tls:
+  internalCASecret: ""
+  controller:
+    grpcServerSecret: ""
+    clientToApiServerSecret: ""
+  apiServer:
+    grpcServerSecret: ""
+    clientToContractSyncerSecret: ""
+  contractSyncer:
+    grpcServerSecret: ""
+
+components:
+  controller:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: merionyx/api-gateway-controller
+      tag: latest
+      pullPolicy: IfNotPresent
+    resources: {}
+    podAnnotations: {}
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+    topologySpreadConstraints: []
+    pdb:
+      enabled: true
+      minAvailable: 1
+    kubernetesDiscovery:
+      enabled: true
+      resourceLabelSelector:
+        gateway.merionyx.com/team: demo
+    tenant: cluster-default
+    config: {}
+
+  apiServer:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: merionyx/api-gateway-api-server
+      tag: latest
+      pullPolicy: IfNotPresent
+    resources: {}
+    podAnnotations: {}
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+    topologySpreadConstraints: []
+    pdb:
+      enabled: true
+      minAvailable: 1
+    jwt:
+      existingSecret: ""
+    config: {}
+
+  contractSyncer:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: merionyx/api-gateway-contract-syncer
+      tag: latest
+      pullPolicy: IfNotPresent
+    resources: {}
+    podAnnotations: {}
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+    topologySpreadConstraints: []
+    pdb:
+      enabled: true
+      minAvailable: 1
+    # Optional: one Secret with many keys (e.g. GITHUB_ACCESS_TOKEN) for all repos.
+    envFromSecret: ""
+    # Optional: per-repo tokens as env vars from separate Secrets (avoids one huge envFrom Secret).
+    # Each envName must match repositories[].auth.token_env in contractSyncer.config.
+    # repositoryTokens:
+    #   - envName: GIT_TOKEN_SCHEMAS
+    #     secretName: git-token-schemas
+    #     secretKey: token
+    repositoryTokens: []
+    config: {}

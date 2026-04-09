@@ -1,0 +1,13 @@
+{{- if and .Values.components.apiServer.enabled .Values.components.apiServer.pdb.enabled (gt (int .Values.components.apiServer.replicaCount) 1) }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "agwcp.fullname" . }}-api-server
+  labels:
+    {{- include "agwcp.componentLabels" (list "apiServer" .) | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.components.apiServer.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "agwcp.selectorLabels" (list "apiServer" .) | nindent 6 }}
+{{- end }}

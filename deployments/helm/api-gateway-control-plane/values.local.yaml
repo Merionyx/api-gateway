@@ -1,0 +1,73 @@
+# Local test of control plane.
+# Example installation (release local-cp, NS api-gateway):
+#   helm upgrade --install local-cp ./deployments/helm/api-gateway-control-plane -n api-gateway --create-namespace -f values.local.yaml
+#
+# Important: Secrets are mounted only from the SAME namespace as the release (here api-gateway).
+# If etcd-client-tls is in another namespace (e.g. etcd), copy it to api-gateway:
+# kubectl get secret etcd-client-tls -n default -o yaml \
+#   | sed '/^  uid:/d;/^  resourceVersion:/d;/^  creationTimestamp:/d' \
+#   | sed 's/^  namespace: etcd$/  namespace: api-gateway/' \
+#   | kubectl apply -f -
+# (substitute etcd with the namespace where the original Secret is located)
+#
+# Also in api-gateway must be: api-gateway-jwt-keys, api-gateway-contract-syncer (if used below).
+
+namespace: api-gateway
+
+# Convenient for images from docker load / kind load:
+global:
+  imagePullSecrets: []
+
+certManager:
+  createCertificates: true
+  # CA → Issuer in namespace → leaf certs; creates Secret ...-grpc-internal-ca-tls for mTLS.
+  useNamespaceCAChain: true
+  issuerRef:
+    kind: ClusterIssuer
+    name: selfsigned
+
+components:
+  controller:
+    image:
+      pullPolicy: IfNotPresent
+    tenant: dev-cluster
+
+  apiServer:
+    image:
+      pullPolicy: IfNotPresent
+    jwt:
+      # Secret with JWKS keys (create before install or rename):
+      existingSecret: api-gateway-jwt-keys
+
+  contractSyncer:
+    image:
+      pullPolicy: IfNotPresent
+    # A: one Secret with all keys (as now).
+    # envFromSecret: api-gateway-contract-syncer
+    # B: one Secret per repository — set repositoryTokens and remove/clear envFromSecret.
+    # In config.repositories[].auth.token_env, use the same name as envName:
+    # repositoryTokens:
+    #   - envName: GIT_TOKEN_SCHEMAS
+    #     secretName: git-token-<repository-name>
+    #     secretKey: token
+    repositoryTokens:
+    - envName: GITHUB_ACCESS_TOKEN
+      secretName: git-token
+      secretKey: token
+    config:
+      repositories:
+      - name: api-gateway-schemas-https
+        source: git
+        url: "https://github.com/MikhailMinaev/api-gateway-schemas.git"
+        auth:
+          type: token
+          token_env: GITHUB_ACCESS_TOKEN
+
+etcd:
+  endpoints:
+  # Example for etcd in the same namespace (substitute with your Service/host:port):
+  - "https://etcd-0.etcd.default.svc.cluster.local:2379"
+  - "https://etcd-1.etcd.default.svc.cluster.local:2379"
+  - "https://etcd-2.etcd.default.svc.cluster.local:2379"
+  tls:
+    existingSecret: etcd-client-tls

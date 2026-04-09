@@ -1,0 +1,18 @@
+{{- if .Values.components.controller.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "agwcp.fullname" . }}-discovery
+  labels:
+    {{- include "agwcp.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["list", "get", "watch"]
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["list", "get", "watch"]
+- apiGroups: ["gateway.merionyx.com"]
+  resources: ["environments", "contractbundles", "gatewayupstreams"]
+  verbs: ["list", "get", "watch"]
+{{- end }}

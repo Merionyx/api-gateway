@@ -1,0 +1,129 @@
+{{- if .Values.components.apiServer.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "agwcp.fullname" . }}-api-server
+  labels:
+    {{- include "agwcp.componentLabels" (list "apiServer" .) | nindent 4 }}
+spec:
+  replicas: {{ .Values.components.apiServer.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "agwcp.selectorLabels" (list "apiServer" .) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "agwcp.selectorLabels" (list "apiServer" .) | nindent 8 }}
+      {{- with .Values.components.apiServer.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        fsGroup: 1001
+      containers:
+      - name: api-server
+        image: {{ printf "%s:%s" .Values.components.apiServer.image.repository .Values.components.apiServer.image.tag | quote }}
+        imagePullPolicy: {{ .Values.components.apiServer.image.pullPolicy }}
+        env:
+        - name: CONFIG_PATH
+          value: /api-server/config/k8s.yaml
+        ports:
+        - name: http
+          containerPort: 8080
+        - name: grpc
+          containerPort: 19093
+        - name: metrics
+          containerPort: 9090
+        volumeMounts:
+        - name: app-config
+          mountPath: /api-server/config/k8s.yaml
+          subPath: api-server.yaml
+          readOnly: true
+        {{- if .Values.etcd.tls.existingSecret }}
+        - name: etcd-tls
+          mountPath: /etc/etcd-tls
+          readOnly: true
+        {{- end }}
+        - name: grpc-server-tls
+          mountPath: /etc/grpc-server-tls
+          readOnly: true
+        - name: grpc-internal-ca
+          mountPath: /etc/grpc-internal-ca
+          readOnly: true
+        - name: grpc-client-contract-syncer-tls
+          mountPath: /etc/grpc-client-contract-syncer
+          readOnly: true
+        - name: jwt-keys
+          mountPath: /api-server/secrets/api-server/keys/jwt
+        readinessProbe:
+          httpGet:
+            path: /.well-known/jwks.json
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 15
+          periodSeconds: 30
+        {{- with .Values.components.apiServer.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1001
+          runAsGroup: 1001
+      volumes:
+      - name: app-config
+        configMap:
+          name: {{ include "agwcp.fullname" . }}-apps-config
+      {{- if .Values.etcd.tls.existingSecret }}
+      - name: etcd-tls
+        secret:
+          secretName: {{ .Values.etcd.tls.existingSecret }}
+      {{- end }}
+      - name: grpc-server-tls
+        secret:
+          secretName: {{ include "agwcp.secret.apiServerGrpcServer" . }}
+      - name: grpc-internal-ca
+        secret:
+          secretName: {{ include "agwcp.secret.grpcInternalCA" . }}
+      - name: grpc-client-contract-syncer-tls
+        secret:
+          secretName: {{ include "agwcp.secret.grpcClientApiServer" . }}
+      - name: jwt-keys
+        secret:
+          secretName: {{ include "agwcp.secret.jwtKeys" . }}
+      {{- with .Values.components.apiServer.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.components.apiServer.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if or .Values.components.apiServer.affinity (and .Values.defaultPodAntiAffinity (gt (int .Values.components.apiServer.replicaCount) 1)) }}
+      affinity:
+        {{- if .Values.components.apiServer.affinity }}
+        {{- toYaml .Values.components.apiServer.affinity | nindent 8 }}
+        {{- else }}
+        {{- include "agwcp.defaultAntiAffinity" (list "apiServer" .) | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      {{- if or .Values.components.apiServer.topologySpreadConstraints (and .Values.defaultTopologySpreadConstraints (gt (int .Values.components.apiServer.replicaCount) 1)) }}
+      topologySpreadConstraints:
+        {{- if .Values.components.apiServer.topologySpreadConstraints }}
+        {{- toYaml .Values.components.apiServer.topologySpreadConstraints | nindent 8 }}
+        {{- else }}
+        {{- include "agwcp.defaultTopologySpread" (list "apiServer" .) | nindent 8 }}
+        {{- end }}
+      {{- end }}
+{{- end }}

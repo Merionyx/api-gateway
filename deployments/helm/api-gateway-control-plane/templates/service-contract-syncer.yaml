@@ -1,0 +1,19 @@
+{{- if .Values.components.contractSyncer.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "agwcp.svc.contractSyncer" . }}
+  labels:
+    {{- include "agwcp.componentLabels" (list "contractSyncer" .) | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "agwcp.selectorLabels" (list "contractSyncer" .) | nindent 4 }}
+  ports:
+  - name: grpc
+    port: 19092
+    targetPort: grpc
+  - name: metrics
+    port: 9090
+    targetPort: metrics
+{{- end }}

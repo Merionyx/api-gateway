@@ -1,0 +1,17 @@
+API Gateway control plane (release {{ .Release.Name }})
+
+{{- if .Values.components.controller.enabled }}
+Controller Service: {{ include "agwcp.svc.controller" . }}.{{ .Release.Namespace }}.svc.cluster.local
+{{- end }}
+{{- if .Values.components.apiServer.enabled }}
+API Server Service: {{ include "agwcp.svc.apiServer" . }}.{{ .Release.Namespace }}.svc.cluster.local
+{{- end }}
+{{- if .Values.components.contractSyncer.enabled }}
+Contract Syncer Service: {{ include "agwcp.svc.contractSyncer" . }}.{{ .Release.Namespace }}.svc.cluster.local
+{{- end }}
+
+Prerequisites:
+- etcd endpoints and (if TLS) Secret referenced by etcd.tls.existingSecret
+- TLS Secrets for gRPC / internal CA (or enable certManager.createCertificates with a ClusterIssuer)
+- JWT keys Secret for API Server (components.apiServer.jwt.existingSecret)
+- Optional: Secret for contract syncer token (components.contractSyncer.envFromSecret)

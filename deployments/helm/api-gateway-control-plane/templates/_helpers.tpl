@@ -1,0 +1,315 @@
+{{- define "agwcp.name" -}}
+{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
+{{- end }}
+
+{{- define "agwcp.fullname" -}}
+{{- if .Values.fullnameOverride -}}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- printf "%s-%s" .Release.Name (include "agwcp.name" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end }}
+
+{{- define "agwcp.chart" -}}
+{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" -}}
+{{- end }}
+
+{{- define "agwcp.labels" -}}
+helm.sh/chart: {{ include "agwcp.chart" . }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/part-of: api-gateway
+{{- end }}
+
+{{- define "agwcp.componentSlug" -}}
+{{- $c := index . 0 -}}
+{{- if eq $c "apiServer" -}}api-server
+{{- else if eq $c "contractSyncer" -}}contract-syncer
+{{- else -}}{{- $c -}}
+{{- end -}}
+{{- end }}
+
+{{- define "agwcp.componentLabels" -}}
+{{- $component := index . 0 -}}
+{{- $root := index . 1 -}}
+{{- $slug := include "agwcp.componentSlug" (list $component) -}}
+{{ include "agwcp.labels" $root }}
+app.kubernetes.io/name: {{ include "agwcp.fullname" $root }}-{{ $slug }}
+app.kubernetes.io/component: {{ $slug }}
+{{- end }}
+
+{{- define "agwcp.selectorLabels" -}}
+{{- $component := index . 0 -}}
+{{- $root := index . 1 -}}
+{{- $slug := include "agwcp.componentSlug" (list $component) -}}
+app.kubernetes.io/instance: {{ $root.Release.Name }}
+app.kubernetes.io/component: {{ $slug }}
+app.kubernetes.io/name: {{ include "agwcp.fullname" $root }}-{{ $slug }}
+{{- end }}
+
+{{- define "agwcp.serviceAccountName" -}}
+{{- printf "%s-controller" (include "agwcp.fullname" .) -}}
+{{- end }}
+
+{{- define "agwcp.svc.controller" -}}
+{{- printf "%s-controller" (include "agwcp.fullname" .) -}}
+{{- end }}
+{{- define "agwcp.svc.apiServer" -}}
+{{- printf "%s-api-server" (include "agwcp.fullname" .) -}}
+{{- end }}
+{{- define "agwcp.svc.contractSyncer" -}}
+{{- printf "%s-contract-syncer" (include "agwcp.fullname" .) -}}
+{{- end }}
+
+{{- define "agwcp.dns.apiServer" -}}
+{{- printf "%s.%s.svc.cluster.local" (include "agwcp.svc.apiServer" .) .Release.Namespace -}}
+{{- end }}
+{{- define "agwcp.dns.contractSyncer" -}}
+{{- printf "%s.%s.svc.cluster.local" (include "agwcp.svc.contractSyncer" .) .Release.Namespace -}}
+{{- end }}
+{{- define "agwcp.dns.controller" -}}
+{{- printf "%s.%s.svc.cluster.local" (include "agwcp.svc.controller" .) .Release.Namespace -}}
+{{- end }}
+
+{{- define "agwcp.secret.grpcInternalCA" -}}
+{{- if .Values.tls.internalCASecret -}}
+{{- .Values.tls.internalCASecret -}}
+{{- else -}}
+{{- printf "%s-grpc-internal-ca-tls" (include "agwcp.fullname" .) -}}
+{{- end -}}
+{{- end }}
+
+{{- define "agwcp.secret.controllerGrpcServer" -}}
+{{- if .Values.tls.controller.grpcServerSecret -}}
+{{- .Values.tls.controller.grpcServerSecret -}}
+{{- else -}}
+{{- printf "%s-controller-grpc-tls" (include "agwcp.fullname" .) -}}
+{{- end -}}
+{{- end }}
+
+{{- define "agwcp.secret.grpcClientController" -}}
+{{- if .Values.tls.controller.clientToApiServerSecret -}}
+{{- .Values.tls.controller.clientToApiServerSecret -}}
+{{- else -}}
+{{- printf "%s-grpc-client-controller-tls" (include "agwcp.fullname" .) -}}
+{{- end -}}
+{{- end }}
+
+{{- define "agwcp.secret.apiServerGrpcServer" -}}
+{{- if .Values.tls.apiServer.grpcServerSecret -}}
+{{- .Values.tls.apiServer.grpcServerSecret -}}
+{{- else -}}
+{{- printf "%s-api-server-grpc-tls" (include "agwcp.fullname" .) -}}
+{{- end -}}
+{{- end }}
+
+{{- define "agwcp.secret.grpcClientApiServer" -}}
+{{- if .Values.tls.apiServer.clientToContractSyncerSecret -}}
+{{- .Values.tls.apiServer.clientToContractSyncerSecret -}}
+{{- else -}}
+{{- printf "%s-grpc-client-api-server-tls" (include "agwcp.fullname" .) -}}
+{{- end -}}
+{{- end }}
+
+{{- define "agwcp.secret.contractSyncerGrpcServer" -}}
+{{- if .Values.tls.contractSyncer.grpcServerSecret -}}
+{{- .Values.tls.contractSyncer.grpcServerSecret -}}
+{{- else -}}
+{{- printf "%s-contract-syncer-grpc-tls" (include "agwcp.fullname" .) -}}
+{{- end -}}
+{{- end }}
+
+{{- define "agwcp.secret.jwtKeys" -}}
+{{- if .Values.components.apiServer.jwt.existingSecret -}}
+{{- .Values.components.apiServer.jwt.existingSecret -}}
+{{- else -}}
+{{- printf "%s-jwt-keys" (include "agwcp.fullname" .) -}}
+{{- end -}}
+{{- end }}
+
+{{- define "agwcp.defaultAntiAffinity" -}}
+{{- $component := index . 0 -}}
+{{- $root := index . 1 -}}
+{{- $cfg := index $root.Values.components $component -}}
+{{- if and $root.Values.defaultPodAntiAffinity (gt (int ($cfg.replicaCount | default 1)) 1) }}
+podAntiAffinity:
+  preferredDuringSchedulingIgnoredDuringExecution:
+  - weight: 100
+    podAffinityTerm:
+      labelSelector:
+        matchLabels:
+          {{- include "agwcp.selectorLabels" (list $component $root) | nindent 10 }}
+      topologyKey: kubernetes.io/hostname
+{{- end }}
+{{- end }}
+
+{{- define "agwcp.defaultTopologySpread" -}}
+{{- $component := index . 0 -}}
+{{- $root := index . 1 -}}
+{{- $cfg := index $root.Values.components $component -}}
+{{- if and $root.Values.defaultTopologySpreadConstraints (gt (int ($cfg.replicaCount | default 1)) 1) }}
+- maxSkew: 1
+  topologyKey: topology.kubernetes.io/zone
+  whenUnsatisfiable: ScheduleAnyway
+  labelSelector:
+    matchLabels:
+      {{- include "agwcp.selectorLabels" (list $component $root) | nindent 6 }}
+{{- end }}
+{{- end }}
+
+{{- define "agwcp.controller.config.defaults" -}}
+server:
+  http1_port: "8080"
+  http2_port: "8443"
+  grpc_port: "19090"
+  xds_port: "19091"
+  host: "0.0.0.0"
+etcd:
+  endpoints:
+{{- range .Values.etcd.endpoints }}
+  - {{ . | quote }}
+{{- end }}
+  dial_timeout: "5s"
+  tls:
+    enabled: true
+    cert_file: "/etc/etcd-tls/tls.crt"
+    key_file: "/etc/etcd-tls/tls.key"
+    ca_file: "/etc/etcd-tls/ca.crt"
+tenant: {{ .Values.components.controller.tenant | quote }}
+ha:
+  controller_id: {{ printf "%s-controller" (include "agwcp.fullname" .) | quote }}
+leader_election:
+  enabled: true
+  key_prefix: {{ printf "/api-gateway/controller/election/%s" .Release.Name | quote }}
+  identity: ""
+  session_ttl_seconds: 5
+api_server:
+  address: {{ printf "%s:19093" (include "agwcp.svc.apiServer" .) | quote }}
+grpc_control_plane:
+  tls:
+    enabled: true
+    cert_file: /etc/grpc-control-plane-tls/tls.crt
+    key_file: /etc/grpc-control-plane-tls/tls.key
+    client_ca_file: /etc/grpc-internal-ca/tls.crt
+  observability:
+    reflection_enabled: true
+    log_requests: false
+grpc_xds:
+  tls:
+    enabled: true
+    cert_file: /etc/grpc-control-plane-tls/tls.crt
+    key_file: /etc/grpc-control-plane-tls/tls.key
+    client_ca_file: /etc/grpc-internal-ca/tls.crt
+  observability:
+    reflection_enabled: true
+    log_requests: false
+grpc_api_server_client:
+  enabled: true
+  ca_file: /etc/grpc-internal-ca/tls.crt
+  cert_file: /etc/grpc-client-api-server/tls.crt
+  key_file: /etc/grpc-client-api-server/tls.key
+  server_name: {{ include "agwcp.dns.apiServer" . | quote }}
+metrics_http:
+  enabled: true
+  host: "0.0.0.0"
+  port: "9090"
+  path: "/metrics"
+environments: []
+services:
+  static: []
+kubernetes_discovery:
+  enabled: {{ .Values.components.controller.kubernetesDiscovery.enabled }}
+  resource_label_selector:
+{{- range $k, $v := .Values.components.controller.kubernetesDiscovery.resourceLabelSelector }}
+    {{ $k }}: {{ $v | quote }}
+{{- end }}
+{{- end }}
+
+{{- define "agwcp.apiServer.config.defaults" -}}
+server:
+  http_port: "8080"
+  grpc_port: "19093"
+  host: "0.0.0.0"
+etcd:
+  endpoints:
+{{- range .Values.etcd.endpoints }}
+  - {{ . | quote }}
+{{- end }}
+  dial_timeout: "5s"
+  tls:
+    enabled: true
+    cert_file: "/etc/etcd-tls/tls.crt"
+    key_file: "/etc/etcd-tls/tls.key"
+    ca_file: "/etc/etcd-tls/ca.crt"
+jwt:
+  keys_dir: "/api-server/secrets/api-server/keys/jwt"
+  issuer: "api-gateway-api-server"
+contract_syncer:
+  address: {{ printf "%s:19092" (include "agwcp.svc.contractSyncer" .) | quote }}
+leader_election:
+  enabled: true
+  key_prefix: {{ printf "/api-gateway/api-server/election/%s" .Release.Name | quote }}
+  identity: ""
+  session_ttl_seconds: 5
+grpc_registry:
+  tls:
+    enabled: true
+    cert_file: /etc/grpc-server-tls/tls.crt
+    key_file: /etc/grpc-server-tls/tls.key
+    client_ca_file: /etc/grpc-internal-ca/tls.crt
+  observability:
+    reflection_enabled: true
+    log_requests: false
+grpc_contract_syncer_client:
+  enabled: true
+  ca_file: /etc/grpc-internal-ca/tls.crt
+  cert_file: /etc/grpc-client-contract-syncer/tls.crt
+  key_file: /etc/grpc-client-contract-syncer/tls.key
+  server_name: {{ include "agwcp.dns.contractSyncer" . | quote }}
+metrics_http:
+  enabled: true
+  host: "0.0.0.0"
+  port: "9090"
+  path: "/metrics"
+{{- end }}
+
+{{- define "agwcp.contractSyncer.config.defaults" -}}
+server:
+  grpc_port: "19092"
+  host: "0.0.0.0"
+  grpc:
+    tls:
+      enabled: true
+      cert_file: /etc/grpc-server-tls/tls.crt
+      key_file: /etc/grpc-server-tls/tls.key
+      client_ca_file: /etc/grpc-internal-ca/tls.crt
+    observability:
+      reflection_enabled: true
+      log_requests: false
+metrics_http:
+  enabled: true
+  host: "0.0.0.0"
+  port: "9090"
+  path: "/metrics"
+repositories: []
+api_server:
+  address: {{ printf "%s:19093" (include "agwcp.svc.apiServer" .) | quote }}
+{{- end }}
+
+{{- define "agwcp.controller.config.merged" -}}
+{{- $def := fromYaml (include "agwcp.controller.config.defaults" .) -}}
+{{- $usr := .Values.components.controller.config | default dict -}}
+{{- toYaml (mergeOverwrite $def $usr) -}}
+{{- end }}
+
+{{- define "agwcp.apiServer.config.merged" -}}
+{{- $def := fromYaml (include "agwcp.apiServer.config.defaults" .) -}}
+{{- $usr := .Values.components.apiServer.config | default dict -}}
+{{- toYaml (mergeOverwrite $def $usr) -}}
+{{- end }}
+
+{{- define "agwcp.contractSyncer.config.merged" -}}
+{{- $def := fromYaml (include "agwcp.contractSyncer.config.defaults" .) -}}
+{{- $usr := .Values.components.contractSyncer.config | default dict -}}
+{{- toYaml (mergeOverwrite $def $usr) -}}
+{{- end }}

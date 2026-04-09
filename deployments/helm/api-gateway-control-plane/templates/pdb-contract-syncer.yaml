@@ -1,0 +1,13 @@
+{{- if and .Values.components.contractSyncer.enabled .Values.components.contractSyncer.pdb.enabled (gt (int .Values.components.contractSyncer.replicaCount) 1) }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "agwcp.fullname" . }}-contract-syncer
+  labels:
+    {{- include "agwcp.componentLabels" (list "contractSyncer" .) | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.components.contractSyncer.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "agwcp.selectorLabels" (list "contractSyncer" .) | nindent 6 }}
+{{- end }}

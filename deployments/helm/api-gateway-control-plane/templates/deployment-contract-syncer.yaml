@@ -1,0 +1,106 @@
+{{- if .Values.components.contractSyncer.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "agwcp.fullname" . }}-contract-syncer
+  labels:
+    {{- include "agwcp.componentLabels" (list "contractSyncer" .) | nindent 4 }}
+spec:
+  replicas: {{ .Values.components.contractSyncer.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "agwcp.selectorLabels" (list "contractSyncer" .) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "agwcp.selectorLabels" (list "contractSyncer" .) | nindent 8 }}
+      {{- with .Values.components.contractSyncer.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        fsGroup: 1001
+      containers:
+      - name: contract-syncer
+        image: {{ printf "%s:%s" .Values.components.contractSyncer.image.repository .Values.components.contractSyncer.image.tag | quote }}
+        imagePullPolicy: {{ .Values.components.contractSyncer.image.pullPolicy }}
+        env:
+        - name: CONFIG_PATH
+          value: /contract-syncer/config/k8s.yaml
+        {{- range .Values.components.contractSyncer.repositoryTokens }}
+        - name: {{ .envName | quote }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .secretName | quote }}
+              key: {{ .secretKey | quote }}
+        {{- end }}
+        {{- if .Values.components.contractSyncer.envFromSecret }}
+        envFrom:
+        - secretRef:
+            name: {{ .Values.components.contractSyncer.envFromSecret }}
+        {{- end }}
+        ports:
+        - name: grpc
+          containerPort: 19092
+        - name: metrics
+          containerPort: 9090
+        volumeMounts:
+        - name: app-config
+          mountPath: /contract-syncer/config/k8s.yaml
+          subPath: contract-syncer.yaml
+          readOnly: true
+        - name: grpc-server-tls
+          mountPath: /etc/grpc-server-tls
+          readOnly: true
+        - name: grpc-internal-ca
+          mountPath: /etc/grpc-internal-ca
+          readOnly: true
+        {{- with .Values.components.contractSyncer.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1001
+          runAsGroup: 1001
+      volumes:
+      - name: app-config
+        configMap:
+          name: {{ include "agwcp.fullname" . }}-apps-config
+      - name: grpc-server-tls
+        secret:
+          secretName: {{ include "agwcp.secret.contractSyncerGrpcServer" . }}
+      - name: grpc-internal-ca
+        secret:
+          secretName: {{ include "agwcp.secret.grpcInternalCA" . }}
+      {{- with .Values.components.contractSyncer.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.components.contractSyncer.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if or .Values.components.contractSyncer.affinity (and .Values.defaultPodAntiAffinity (gt (int .Values.components.contractSyncer.replicaCount) 1)) }}
+      affinity:
+        {{- if .Values.components.contractSyncer.affinity }}
+        {{- toYaml .Values.components.contractSyncer.affinity | nindent 8 }}
+        {{- else }}
+        {{- include "agwcp.defaultAntiAffinity" (list "contractSyncer" .) | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      {{- if or .Values.components.contractSyncer.topologySpreadConstraints (and .Values.defaultTopologySpreadConstraints (gt (int .Values.components.contractSyncer.replicaCount) 1)) }}
+      topologySpreadConstraints:
+        {{- if .Values.components.contractSyncer.topologySpreadConstraints }}
+        {{- toYaml .Values.components.contractSyncer.topologySpreadConstraints | nindent 8 }}
+        {{- else }}
+        {{- include "agwcp.defaultTopologySpread" (list "contractSyncer" .) | nindent 8 }}
+        {{- end }}
+      {{- end }}
+{{- end }}

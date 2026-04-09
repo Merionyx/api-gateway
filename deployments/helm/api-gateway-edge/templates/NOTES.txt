@@ -1,0 +1,6 @@
+API Gateway edge (release {{ .Release.Name }})
+
+Service: {{ include "agwedge.fullname" . }}-gateway.{{ .Release.Namespace }}.svc.cluster.local
+
+Set connectivity.* and TLS Secrets (or certManager.createCertificates) before traffic.
+The internal CA Secret (tls.internalCASecret) must match the trust anchor used by the control-plane release if mTLS is enabled.

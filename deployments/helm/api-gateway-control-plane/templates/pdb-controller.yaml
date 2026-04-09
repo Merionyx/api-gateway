@@ -1,0 +1,13 @@
+{{- if and .Values.components.controller.enabled .Values.components.controller.pdb.enabled (gt (int .Values.components.controller.replicaCount) 1) }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "agwcp.fullname" . }}-controller
+  labels:
+    {{- include "agwcp.componentLabels" (list "controller" .) | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.components.controller.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "agwcp.selectorLabels" (list "controller" .) | nindent 6 }}
+{{- end }}

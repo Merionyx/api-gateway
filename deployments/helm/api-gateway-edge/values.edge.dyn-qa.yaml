@@ -1,0 +1,27 @@
+connectivity:
+  envoyNodeId: envoy-dyn-qa
+  controllerGrpcAddress: local-cp-api-gateway-control-plane-controller:19090
+  controllerServerName: local-cp-api-gateway-control-plane-controller.api-gateway.svc.cluster.local
+  jwksUrl: http://local-cp-api-gateway-control-plane-api-server:8080/.well-known/jwks.json
+  environment: dyn-qa
+  tenant: dev-cluster
+  xdsHost: local-cp-api-gateway-control-plane-controller
+  xdsPort: 19091
+  xdsSni: local-cp-api-gateway-control-plane-controller.api-gateway.svc.cluster.local
+
+tls:
+  internalCASecret: local-cp-api-gateway-control-plane-grpc-internal-ca-tls
+
+certManager:
+  createCertificates: true
+  issuerRef:
+    kind: Issuer
+    name: local-cp-api-gateway-control-plane-grpc-ca-issuer
+
+envoy:
+  image:
+    pullPolicy: IfNotPresent
+
+authSidecar:
+  image:
+    pullPolicy: IfNotPresent

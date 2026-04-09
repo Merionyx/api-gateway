@@ -1,0 +1,64 @@
+{{- if and .Values.certManager.createCertificates .Values.certManager.issuerRef.name }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "agwedge.fullname" . }}-auth-sidecar-grpc
+  labels:
+    {{- include "agwedge.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "agwedge.secret.authSidecarGrpc" . }}
+  duration: {{ .Values.certManager.duration }}
+  renewBefore: {{ .Values.certManager.renewBefore }}
+  privateKey:
+    {{- toYaml .Values.certManager.privateKey | nindent 4 }}
+  dnsNames:
+  - auth-sidecar
+  - localhost
+  ipAddresses:
+  - 127.0.0.1
+  {{- range .Values.certManager.additionalDnsNames }}
+  - {{ . | quote }}
+  {{- end }}
+  issuerRef:
+    {{- toYaml .Values.certManager.issuerRef | nindent 4 }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "agwedge.fullname" . }}-grpc-client-auth-sidecar
+  labels:
+    {{- include "agwedge.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "agwedge.secret.grpcClientAuthSidecar" . }}
+  commonName: grpc-client-auth-sidecar
+  duration: {{ .Values.certManager.duration }}
+  renewBefore: {{ .Values.certManager.renewBefore }}
+  privateKey:
+    {{- toYaml .Values.certManager.privateKey | nindent 4 }}
+  usages:
+  - digital signature
+  - key encipherment
+  - client auth
+  issuerRef:
+    {{- toYaml .Values.certManager.issuerRef | nindent 4 }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "agwedge.fullname" . }}-grpc-client-envoy
+  labels:
+    {{- include "agwedge.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "agwedge.secret.grpcClientEnvoy" . }}
+  commonName: grpc-client-envoy
+  duration: {{ .Values.certManager.duration }}
+  renewBefore: {{ .Values.certManager.renewBefore }}
+  privateKey:
+    {{- toYaml .Values.certManager.privateKey | nindent 4 }}
+  usages:
+  - digital signature
+  - key encipherment
+  - client auth
+  issuerRef:
+    {{- toYaml .Values.certManager.issuerRef | nindent 4 }}
+{{- end }}

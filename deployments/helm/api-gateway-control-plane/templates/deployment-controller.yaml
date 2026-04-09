@@ -1,0 +1,129 @@
+{{- if .Values.components.controller.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "agwcp.fullname" . }}-controller
+  labels:
+    {{- include "agwcp.componentLabels" (list "controller" .) | nindent 4 }}
+spec:
+  replicas: {{ .Values.components.controller.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "agwcp.selectorLabels" (list "controller" .) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "agwcp.selectorLabels" (list "controller" .) | nindent 8 }}
+      {{- with .Values.components.controller.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "agwcp.serviceAccountName" . }}
+      securityContext:
+        fsGroup: 1001
+      containers:
+      - name: controller
+        image: {{ printf "%s:%s" .Values.components.controller.image.repository .Values.components.controller.image.tag | quote }}
+        imagePullPolicy: {{ .Values.components.controller.image.pullPolicy }}
+        env:
+        - name: CONFIG_PATH
+          value: /controller/config/k8s.yaml
+        ports:
+        - name: http
+          containerPort: 8080
+        - name: https
+          containerPort: 8443
+        - name: grpc
+          containerPort: 19090
+        - name: xds
+          containerPort: 19091
+        - name: metrics
+          containerPort: 9090
+        volumeMounts:
+        - name: app-config
+          mountPath: /controller/config/k8s.yaml
+          subPath: controller.yaml
+          readOnly: true
+        {{- if .Values.etcd.tls.existingSecret }}
+        - name: etcd-tls
+          mountPath: /etc/etcd-tls
+          readOnly: true
+        {{- end }}
+        - name: grpc-control-plane-tls
+          mountPath: /etc/grpc-control-plane-tls
+          readOnly: true
+        - name: grpc-client-api-server-tls
+          mountPath: /etc/grpc-client-api-server
+          readOnly: true
+        - name: grpc-internal-ca
+          mountPath: /etc/grpc-internal-ca
+          readOnly: true
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 20
+          periodSeconds: 30
+        {{- with .Values.components.controller.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1001
+          runAsGroup: 1001
+      volumes:
+      - name: app-config
+        configMap:
+          name: {{ include "agwcp.fullname" . }}-apps-config
+      {{- if .Values.etcd.tls.existingSecret }}
+      - name: etcd-tls
+        secret:
+          secretName: {{ .Values.etcd.tls.existingSecret }}
+      {{- end }}
+      - name: grpc-control-plane-tls
+        secret:
+          secretName: {{ include "agwcp.secret.controllerGrpcServer" . }}
+      - name: grpc-client-api-server-tls
+        secret:
+          secretName: {{ include "agwcp.secret.grpcClientController" . }}
+      - name: grpc-internal-ca
+        secret:
+          secretName: {{ include "agwcp.secret.grpcInternalCA" . }}
+      {{- with .Values.components.controller.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.components.controller.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if or .Values.components.controller.affinity (and .Values.defaultPodAntiAffinity (gt (int .Values.components.controller.replicaCount) 1)) }}
+      affinity:
+        {{- if .Values.components.controller.affinity }}
+        {{- toYaml .Values.components.controller.affinity | nindent 8 }}
+        {{- else }}
+        {{- include "agwcp.defaultAntiAffinity" (list "controller" .) | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      {{- if or .Values.components.controller.topologySpreadConstraints (and .Values.defaultTopologySpreadConstraints (gt (int .Values.components.controller.replicaCount) 1)) }}
+      topologySpreadConstraints:
+        {{- if .Values.components.controller.topologySpreadConstraints }}
+        {{- toYaml .Values.components.controller.topologySpreadConstraints | nindent 8 }}
+        {{- else }}
+        {{- include "agwcp.defaultTopologySpread" (list "controller" .) | nindent 8 }}
+        {{- end }}
+      {{- end }}
+{{- end }}

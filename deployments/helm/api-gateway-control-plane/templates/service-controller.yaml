@@ -1,0 +1,28 @@
+{{- if .Values.components.controller.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "agwcp.svc.controller" . }}
+  labels:
+    {{- include "agwcp.componentLabels" (list "controller" .) | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "agwcp.selectorLabels" (list "controller" .) | nindent 4 }}
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+  - name: https
+    port: 8443
+    targetPort: https
+  - name: grpc
+    port: 19090
+    targetPort: grpc
+  - name: xds
+    port: 19091
+    targetPort: xds
+  - name: metrics
+    port: 9090
+    targetPort: metrics
+{{- end }}

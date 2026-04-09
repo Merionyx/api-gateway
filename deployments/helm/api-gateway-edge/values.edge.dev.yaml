@@ -1,0 +1,37 @@
+# Edge — dev. Default control plane is the same as dev (release local-cp), only environment/tenant is different.
+# If you need a separate CP (release dev-cp), substitute the prefix local-cp-api-gateway-control-plane with dev-cp-api-gateway-control-plane
+# and the Issuer name with dev-cp-api-gateway-control-plane-grpc-ca-issuer.
+#
+# Requires: control plane with useNamespaceCAChain already installed, Issuer and CA Secret exist.
+#
+#   helm upgrade --install edge-dev ./deployments/helm/api-gateway-edge -n api-gateway \
+#     -f ./deployments/helm/api-gateway-edge/values.edge.dev.yaml
+
+connectivity:
+  envoyNodeId: envoy-dev
+  controllerGrpcAddress: local-cp-api-gateway-control-plane-controller:19090
+  controllerServerName: local-cp-api-gateway-control-plane-controller.api-gateway.svc.cluster.local
+  jwksUrl: http://local-cp-api-gateway-control-plane-api-server:8080/.well-known/jwks.json
+  environment: dev
+  tenant: dev-cluster
+  xdsHost: local-cp-api-gateway-control-plane-controller
+  xdsPort: 19091
+  xdsSni: local-cp-api-gateway-control-plane-controller.api-gateway.svc.cluster.local
+
+tls:
+  internalCASecret: local-cp-api-gateway-control-plane-grpc-internal-ca-tls
+
+# Envoy / auth-sidecar certs are signed by the same CA Issuer as the control plane (mTLS).
+certManager:
+  createCertificates: true
+  issuerRef:
+    kind: Issuer
+    name: local-cp-api-gateway-control-plane-grpc-ca-issuer
+
+envoy:
+  image:
+    pullPolicy: IfNotPresent
+
+authSidecar:
+  image:
+    pullPolicy: IfNotPresent

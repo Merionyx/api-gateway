@@ -1,0 +1,21 @@
+{{- if or .Values.components.controller.enabled .Values.components.apiServer.enabled .Values.components.contractSyncer.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "agwcp.fullname" . }}-apps-config
+  labels:
+    {{- include "agwcp.labels" . | nindent 4 }}
+data:
+{{- if .Values.components.controller.enabled }}
+  controller.yaml: |
+{{ include "agwcp.controller.config.merged" . | nindent 4 }}
+{{- end }}
+{{- if .Values.components.apiServer.enabled }}
+  api-server.yaml: |
+{{ include "agwcp.apiServer.config.merged" . | nindent 4 }}
+{{- end }}
+{{- if .Values.components.contractSyncer.enabled }}
+  contract-syncer.yaml: |
+{{ include "agwcp.contractSyncer.config.merged" . | nindent 4 }}
+{{- end }}
+{{- end }}
