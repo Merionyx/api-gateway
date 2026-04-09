@@ -266,11 +266,11 @@ $(CONTROLLER_GEN):
 	@mkdir -p $(LOCALBIN)
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
 
-.PHONY: generate-crds
-generate-crds: controller-gen-bin ## DeepCopy + CRD YAML into ./dist/crd
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./pkg/api/gateway/v1alpha1/..."
-	@mkdir -p ./dist/crd
-	$(CONTROLLER_GEN) crd paths="./pkg/api/gateway/v1alpha1/..." output:crd:artifacts:config=./dist/crd
+.PHONY: apis-generate
+apis-generate: controller-gen-bin ## DeepCopy + CRD YAML into ../api-gateway-operator/config/crd/bases
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./pkg/apis/gateway/v1alpha1/..."
+	@mkdir -p ../api-gateway-operator/config/crd/bases
+	$(CONTROLLER_GEN) crd paths="./pkg/apis/gateway/v1alpha1/..." output:crd:artifacts:config=../api-gateway-operator/config/crd/bases
 
 # Help
 help: ## Show help
