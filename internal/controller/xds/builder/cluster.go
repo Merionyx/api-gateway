@@ -71,13 +71,10 @@ func buildAuthSidecarCluster() (*clusterv3.Cluster, error) {
 		Name:           "auth_sidecar",
 		ConnectTimeout: durationpb.New(1 * time.Second),
 
-		// Use LOGICAL_DNS for hostname resolution
+		// Envoy and auth-sidecar run in the same pod (edge chart): gRPC ext_authz to loopback, not a K8s Service name.
 		ClusterDiscoveryType: &clusterv3.Cluster_Type{
-			Type: clusterv3.Cluster_STRICT_DNS,
+			Type: clusterv3.Cluster_STATIC,
 		},
-
-		// DNS lookup only for IPv4
-		DnsLookupFamily: clusterv3.Cluster_V4_ONLY,
 
 		LoadAssignment: &endpointv3.ClusterLoadAssignment{
 			ClusterName: "auth_sidecar",
@@ -88,7 +85,7 @@ func buildAuthSidecarCluster() (*clusterv3.Cluster, error) {
 							Address: &corev3.Address{
 								Address: &corev3.Address_SocketAddress{
 									SocketAddress: &corev3.SocketAddress{
-										Address: "auth-sidecar", // Hostname (will be resolved via DNS)
+										Address: "127.0.0.1",
 										PortSpecifier: &corev3.SocketAddress_PortValue{
 											PortValue: 9001,
 										},
