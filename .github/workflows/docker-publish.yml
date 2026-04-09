@@ -9,7 +9,7 @@ on:
         type: string
         default: latest
       checkout_ref:
-        description: Git ref (SHA) для checkout
+        description: Git ref (SHA) for checkout
         required: true
         type: string
   workflow_dispatch:

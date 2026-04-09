@@ -26,7 +26,7 @@ test-coverage: ## Run tests with coverage
 	go test -v -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
 
-test-coverage-ci: ## Unit tests + coverage gate (см. .coverage-min; без merionyx/api-gateway/pkg/*)
+test-coverage-ci: ## Unit tests + coverage gate (see .coverage-min; without merionyx/api-gateway/pkg/*)
 	bash scripts/ci/check-coverage.sh
 
 test-integration: ## Run integration tests (starts etcd in Docker via scripts/dev/run-integration-tests.sh)
@@ -267,10 +267,10 @@ $(CONTROLLER_GEN):
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
 
 .PHONY: apis-generate
-apis-generate: controller-gen-bin ## DeepCopy + CRD YAML into ../api-gateway-operator/config/crd/bases
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./pkg/apis/gateway/v1alpha1/..."
-	@mkdir -p ../api-gateway-operator/config/crd/bases
-	$(CONTROLLER_GEN) crd paths="./pkg/apis/gateway/v1alpha1/..." output:crd:artifacts:config=../api-gateway-operator/config/crd/bases
+generate-crds: controller-gen-bin ## DeepCopy + CRD YAML into ../dist/crds
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./pkg/api/gateway/v1alpha1/..."
+	@mkdir -p ./dist/crds
+	$(CONTROLLER_GEN) crd paths="./pkg/api/gateway/v1alpha1/..." output:crd:artifacts:config=./dist/crds
 
 # Help
 help: ## Show help
