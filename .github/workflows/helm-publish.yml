@@ -82,7 +82,7 @@ jobs:
           --app-version "${APP_VERSION}" \
           -d /tmp/helm-out
         PKG=$(ls /tmp/helm-out/api-gateway-control-plane-*.tgz)
-        helm push "${PKG}" oci://ghcr.io/merionyx/charts
+        helm push "${PKG}" oci://ghcr.io/merionyx/api-gateway/charts
       env:
         CHART_VERSION: ${{ steps.chart.outputs.chart_version }}
         APP_VERSION: ${{ steps.ver.outputs.app_version }}
@@ -94,7 +94,7 @@ jobs:
           --app-version "${APP_VERSION}" \
           -d /tmp/helm-out
         PKG=$(ls /tmp/helm-out/api-gateway-edge-*.tgz)
-        helm push "${PKG}" oci://ghcr.io/merionyx/charts
+        helm push "${PKG}" oci://ghcr.io/merionyx/api-gateway/charts
       env:
         CHART_VERSION: ${{ steps.chart.outputs.chart_version }}
         APP_VERSION: ${{ steps.ver.outputs.app_version }}
