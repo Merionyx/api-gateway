@@ -134,7 +134,7 @@ jobs:
       run: |
         crane copy \
           "docker.io/${IMAGE_PREFIX}-${COMPONENT}:${VERSION}" \
-          "${GHCR_IMAGE_PREFIX}/${COMPONENT}:${VERSION}"
+          "${GHCR_IMAGE_PREFIX}-${COMPONENT}:${VERSION}"
       env:
         IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
         GHCR_IMAGE_PREFIX: ${{ env.GHCR_IMAGE_PREFIX }}
