@@ -1,6 +1,6 @@
 apiVersion: v2
 name: api-gateway-edge
-description: Merionyx API Gateway edge (Envoy + Auth Sidecar)
+description: API Gateway edge (Envoy + Auth Sidecar)
 type: application
 version: latest
 appVersion: latest
