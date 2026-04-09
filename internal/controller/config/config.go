@@ -39,7 +39,7 @@ type GRPCServerSection struct {
 	Observability grpcobs.ObservabilityConfig `mapstructure:"observability" json:"observability"`
 }
 
-// KubernetesDiscoveryConfig enables building environments from gateway.merionyx.io CRs and annotated Services.
+// KubernetesDiscoveryConfig enables building environments from gateway.merionyx.com CRs and annotated Services.
 type KubernetesDiscoveryConfig struct {
 	Enabled                bool              `mapstructure:"enabled" json:"enabled"`
 	NamespaceLabelSelector map[string]string `mapstructure:"namespace_label_selector" json:"namespace_label_selector"`
@@ -186,7 +186,7 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	return &config, nil
 }
 
-// patchViperKubernetesDiscoverySelectors fixes YAML where dotted label keys (e.g. gateway.merionyx.io/team)
+// patchViperKubernetesDiscoverySelectors fixes YAML where dotted label keys (e.g. gateway.merionyx.com/team)
 // were parsed as nested maps; viper/mapstructure then cannot decode into map[string]string.
 func patchViperKubernetesDiscoverySelectors(v *viper.Viper, configPath string) error {
 	data, err := os.ReadFile(configPath)

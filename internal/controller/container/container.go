@@ -260,7 +260,7 @@ func (c *Container) startWatchers() {
 	}()
 }
 
-// StartKubernetesDiscovery runs a background sync from gateway.merionyx.io CRs (cluster-wide).
+// StartKubernetesDiscovery runs a background sync from gateway.merionyx.com CRs (cluster-wide).
 func (c *Container) StartKubernetesDiscovery(ctx context.Context) {
 	if c.Config.KubernetesDiscovery == nil || !c.Config.KubernetesDiscovery.Enabled {
 		return

@@ -13,7 +13,7 @@ import (
 	"merionyx/api-gateway/internal/controller/config"
 	"merionyx/api-gateway/internal/controller/domain/interfaces"
 	"merionyx/api-gateway/internal/controller/domain/models"
-	gwv1alpha1 "merionyx/api-gateway/pkg/apis/gateway/v1alpha1"
+	gwv1alpha1 "merionyx/api-gateway/pkg/api/gateway/v1alpha1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -25,11 +25,11 @@ import (
 )
 
 const (
-	AnnEnvironmentID   = "gateway.merionyx.io/environment-id"
-	AnnServiceName     = "gateway.merionyx.io/service-name"
-	AnnUpstream        = "gateway.merionyx.io/upstream"
-	AnnPort            = "gateway.merionyx.io/port"
-	LabelEnvironmentID = "gateway.merionyx.io/environment-id"
+	AnnEnvironmentID   = "gateway.merionyx.com/environment-id"
+	AnnServiceName     = "gateway.merionyx.com/service-name"
+	AnnUpstream        = "gateway.merionyx.com/upstream"
+	AnnPort            = "gateway.merionyx.com/port"
+	LabelEnvironmentID = "gateway.merionyx.com/environment-id"
 )
 
 // Runner periodically lists Kubernetes resources and pushes a snapshot into in-memory repositories.
