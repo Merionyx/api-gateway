@@ -29,6 +29,17 @@ app.kubernetes.io/part-of: api-gateway
 {{- end -}}
 {{- end }}
 
+{{/*
+  Full image ref repository:tag. If image.tag is empty, uses Chart.AppVersion (set via helm package --app-version on release).
+*/}}
+{{- define "agwcp.imageRef" -}}
+{{- $root := index . 0 -}}
+{{- $comp := index . 1 -}}
+{{- $cfg := index $root.Values.components $comp -}}
+{{- $tag := $cfg.image.tag | default $root.Chart.AppVersion -}}
+{{- printf "%s:%s" $cfg.image.repository $tag -}}
+{{- end }}
+
 {{- define "agwcp.componentLabels" -}}
 {{- $component := index . 0 -}}
 {{- $root := index . 1 -}}

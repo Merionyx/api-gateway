@@ -53,7 +53,8 @@ components:
     replicaCount: 1
     image:
       repository: merionyx/api-gateway-controller
-      tag: latest
+      # Пусто = тег из Chart.appVersion (релиз: helm package --app-version v1.0.0). Явный тег, напр. latest, переопределяет.
+      tag: ""
       pullPolicy: IfNotPresent
     resources: {}
     podAnnotations: {}
@@ -76,7 +77,7 @@ components:
     replicaCount: 1
     image:
       repository: merionyx/api-gateway-api-server
-      tag: latest
+      tag: ""
       pullPolicy: IfNotPresent
     resources: {}
     podAnnotations: {}
@@ -96,7 +97,7 @@ components:
     replicaCount: 1
     image:
       repository: merionyx/api-gateway-contract-syncer
-      tag: latest
+      tag: ""
       pullPolicy: IfNotPresent
     resources: {}
     podAnnotations: {}

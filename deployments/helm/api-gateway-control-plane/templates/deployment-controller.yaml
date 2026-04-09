@@ -28,7 +28,7 @@ spec:
         fsGroup: 1001
       containers:
       - name: controller
-        image: {{ printf "%s:%s" .Values.components.controller.image.repository .Values.components.controller.image.tag | quote }}
+        image: {{ include "agwcp.imageRef" (list . "controller") | quote }}
         imagePullPolicy: {{ .Values.components.controller.image.pullPolicy }}
         env:
         - name: CONFIG_PATH
