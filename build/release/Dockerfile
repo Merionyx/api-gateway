@@ -59,7 +59,9 @@ FROM alpine:3.23 AS runtime-alpine
 ARG SERVICE
 ARG OCI_NAME
 
-RUN apk add --no-cache ca-certificates \
+RUN apk update \
+    && apk upgrade --no-cache \
+    && apk add --no-cache ca-certificates \
     && addgroup -g 1001 app \
     && adduser -u 1001 -G app -s /bin/sh -D app
 
