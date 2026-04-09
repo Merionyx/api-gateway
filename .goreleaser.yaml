@@ -12,14 +12,9 @@ builds:
   - CGO_ENABLED=0
   goos:
   - linux
-  - darwin
-  - windows
   goarch:
   - amd64
   - arm64
-  ignore:
-  - goos: windows
-    goarch: arm64
 
 - id: contract-syncer
   binary: contract-syncer
@@ -28,14 +23,9 @@ builds:
   - CGO_ENABLED=0
   goos:
   - linux
-  - darwin
-  - windows
   goarch:
   - amd64
   - arm64
-  ignore:
-  - goos: windows
-    goarch: arm64
 
 - id: controller
   binary: controller
@@ -44,14 +34,9 @@ builds:
   - CGO_ENABLED=0
   goos:
   - linux
-  - darwin
-  - windows
   goarch:
   - amd64
   - arm64
-  ignore:
-  - goos: windows
-    goarch: arm64
 
 - id: auth-sidecar
   binary: auth-sidecar
@@ -60,14 +45,9 @@ builds:
   - CGO_ENABLED=0
   goos:
   - linux
-  - darwin
-  - windows
   goarch:
   - amd64
   - arm64
-  ignore:
-  - goos: windows
-    goarch: arm64
 
 - id: agwctl
   binary: agwctl
