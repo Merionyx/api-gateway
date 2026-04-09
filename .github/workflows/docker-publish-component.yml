@@ -67,9 +67,9 @@ jobs:
         platforms: ${{ matrix.platform }}
         provenance: false
         sbom: false
-        outputs: type=image,name=${{ env.IMAGE_PREFIX }}/${{ inputs.component }},push-by-digest=true,push=true
-        cache-from: type=gha,scope=build-${{ inputs.component }}/${{ matrix.arch_short }}
-        cache-to: type=gha,scope=build-${{ inputs.component }}/${{ matrix.arch_short }},mode=max
+        outputs: type=image,name=${{ env.IMAGE_PREFIX }}-${{ inputs.component }},push-by-digest=true,push=true
+        cache-from: type=gha,scope=build-${{ inputs.component }}-${{ matrix.arch_short }}
+        cache-to: type=gha,scope=build-${{ inputs.component }}-${{ matrix.arch_short }},mode=max
 
     - name: Write digest file
       run: echo "${{ steps.build.outputs.digest }}" > "${{ inputs.component }}-${{ matrix.arch_short }}.txt"
@@ -108,8 +108,8 @@ jobs:
         ARM=$(tr -d '\n' < "digests/${COMPONENT}-arm64.txt")
         docker buildx imagetools create \
           -t "${IMAGE_PREFIX}-${COMPONENT}:${VERSION}" \
-          "${IMAGE_PREFIX}/${COMPONENT}@${AMD}" \
-          "${IMAGE_PREFIX}/${COMPONENT}@${ARM}"
+          "${IMAGE_PREFIX}-${COMPONENT}@${AMD}" \
+          "${IMAGE_PREFIX}-${COMPONENT}@${ARM}"
       env:
         IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
         COMPONENT: ${{ inputs.component }}
@@ -133,7 +133,7 @@ jobs:
     - name: Mirror multi-arch image to GHCR
       run: |
         crane copy \
-          "docker.io/${IMAGE_PREFIX}/${COMPONENT}:${VERSION}" \
+          "docker.io/${IMAGE_PREFIX}-${COMPONENT}:${VERSION}" \
           "${GHCR_IMAGE_PREFIX}/${COMPONENT}:${VERSION}"
       env:
         IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
