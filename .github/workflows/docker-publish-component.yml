@@ -123,6 +123,15 @@ jobs:
         tar -xzf /tmp/crane.tgz -C /tmp
         sudo mv /tmp/crane /usr/local/bin/
 
+    - name: Crane auth (Docker Hub)
+      run: |
+        echo "${DOCKERHUB_TOKEN}" | crane auth login docker.io \
+          -u "${DOCKERHUB_USERNAME}" \
+          --password-stdin
+      env:
+        DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
     # Test. Duplicate on Docker Hub (nested path merionyx/api-gateway/<component>)
     - name: Duplicate on Docker Hub (nested path merionyx/api-gateway/<component>)
       run: |
