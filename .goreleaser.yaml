@@ -152,7 +152,14 @@ release:
 
     ### Helm (OCI)
 
+    **GitHub Container Registry**
     ```
-    helm pull oci://ghcr.io/merionyx/charts/api-gateway-control-plane --version {{ .Version }}
-    helm pull oci://ghcr.io/merionyx/charts/api-gateway-edge --version {{ .Version }}
+    helm pull oci://ghcr.io/merionyx/api-gateway/charts/api-gateway-control-plane --version {{ .Version }}
+    helm pull oci://ghcr.io/merionyx/api-gateway/charts/api-gateway-edge --version {{ .Version }}
+    ```
+
+    **Docker Hub**
+    ```
+    helm pull oci://registry-1.docker.io/merionyx/api-gateway-control-plane --version {{ .Version }}
+    helm pull oci://registry-1.docker.io/merionyx/api-gateway-edge --version {{ .Version }}
     ```

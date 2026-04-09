@@ -1,8 +1,9 @@
-name: Publish Helm charts to GHCR (OCI)
+name: Publish Helm charts to GHCR and Docker Hub (OCI)
 
 permissions:
   contents: read
   packages: write
+  id-token: write
 
 on:
   workflow_call:
@@ -37,6 +38,10 @@ on:
         type: string
         default: ""
 
+env:
+  SYFT_VERSION: v1.20.0
+  CRANE_VERSION: v0.20.3
+
 jobs:
   push-charts:
     runs-on: ubuntu-latest
@@ -67,6 +72,21 @@ jobs:
       with:
         version: v3.16.3
 
+    - name: Install crane
+      run: |
+        curl -fsSL "https://github.com/google/go-containerregistry/releases/download/${CRANE_VERSION}/go-containerregistry_Linux_x86_64.tar.gz" -o /tmp/crane.tgz
+        tar -xzf /tmp/crane.tgz -C /tmp
+        sudo mv /tmp/crane /usr/local/bin/
+
+    - name: Install Syft
+      run: |
+        curl -fsSL "https://github.com/anchore/syft/releases/download/${SYFT_VERSION}/syft_${SYFT_VERSION#v}_linux_amd64.tar.gz" -o /tmp/syft.tgz
+        tar -xzf /tmp/syft.tgz -C /tmp
+        sudo mv /tmp/syft /usr/local/bin/
+
+    - name: Install Cosign
+      uses: sigstore/cosign-installer@v3
+
     - name: Login to GitHub Container Registry
       uses: docker/login-action@v4
       with:
@@ -74,27 +94,77 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Package and push api-gateway-control-plane
-      run: |
-        mkdir -p /tmp/helm-out
-        helm package deployments/helm/api-gateway-control-plane \
-          --version "${CHART_VERSION}" \
-          --app-version "${APP_VERSION}" \
-          -d /tmp/helm-out
-        PKG=$(ls /tmp/helm-out/api-gateway-control-plane-*.tgz)
-        helm push "${PKG}" oci://ghcr.io/merionyx/api-gateway/charts
-      env:
-        CHART_VERSION: ${{ steps.chart.outputs.chart_version }}
-        APP_VERSION: ${{ steps.ver.outputs.app_version }}
+    - name: Login to Docker Hub
+      uses: docker/login-action@v4
+      with:
+        registry: registry-1.docker.io
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Package and push api-gateway-edge
-      run: |
-        helm package deployments/helm/api-gateway-edge \
-          --version "${CHART_VERSION}" \
-          --app-version "${APP_VERSION}" \
-          -d /tmp/helm-out
-        PKG=$(ls /tmp/helm-out/api-gateway-edge-*.tgz)
-        helm push "${PKG}" oci://ghcr.io/merionyx/api-gateway/charts
+    - name: Package, push, SBOM, sign (api-gateway-control-plane)
       env:
         CHART_VERSION: ${{ steps.chart.outputs.chart_version }}
         APP_VERSION: ${{ steps.ver.outputs.app_version }}
+        CHART_NAME: api-gateway-control-plane
+        CHART_DIR: deployments/helm/api-gateway-control-plane
+      run: |
+        set -euo pipefail
+        mkdir -p /tmp/helm-out
+        helm package "${CHART_DIR}" \
+          --version "${CHART_VERSION}" \
+          --app-version "${APP_VERSION}" \
+          -d /tmp/helm-out
+        PKG=$(ls "/tmp/helm-out/${CHART_NAME}"-*.tgz)
+
+        syft "${PKG}" -o "cyclonedx-json=/tmp/sbom-${CHART_NAME}.cdx.json"
+
+        helm push "${PKG}" "oci://ghcr.io/merionyx/api-gateway/charts"
+        helm push "${PKG}" "oci://registry-1.docker.io/merionyx"
+
+        GHCR_REF="ghcr.io/merionyx/api-gateway/charts/${CHART_NAME}:${CHART_VERSION}"
+        DH_REF="registry-1.docker.io/merionyx/${CHART_NAME}:${CHART_VERSION}"
+
+        GHCR_DIGEST="$(crane digest "${GHCR_REF}")"
+        DH_DIGEST="$(crane digest "${DH_REF}")"
+
+        cosign sign --yes "ghcr.io/merionyx/api-gateway/charts/${CHART_NAME}@${GHCR_DIGEST}"
+        cosign sign --yes "registry-1.docker.io/merionyx/${CHART_NAME}@${DH_DIGEST}"
+
+        cosign attest --yes --predicate "/tmp/sbom-${CHART_NAME}.cdx.json" --type cyclonedx \
+          "ghcr.io/merionyx/api-gateway/charts/${CHART_NAME}@${GHCR_DIGEST}"
+        cosign attest --yes --predicate "/tmp/sbom-${CHART_NAME}.cdx.json" --type cyclonedx \
+          "registry-1.docker.io/merionyx/${CHART_NAME}@${DH_DIGEST}"
+
+    - name: Package, push, SBOM, sign (api-gateway-edge)
+      env:
+        CHART_VERSION: ${{ steps.chart.outputs.chart_version }}
+        APP_VERSION: ${{ steps.ver.outputs.app_version }}
+        CHART_NAME: api-gateway-edge
+        CHART_DIR: deployments/helm/api-gateway-edge
+      run: |
+        set -euo pipefail
+        mkdir -p /tmp/helm-out
+        helm package "${CHART_DIR}" \
+          --version "${CHART_VERSION}" \
+          --app-version "${APP_VERSION}" \
+          -d /tmp/helm-out
+        PKG=$(ls "/tmp/helm-out/${CHART_NAME}"-*.tgz)
+
+        syft "${PKG}" -o "cyclonedx-json=/tmp/sbom-${CHART_NAME}.cdx.json"
+
+        helm push "${PKG}" "oci://ghcr.io/merionyx/api-gateway/charts"
+        helm push "${PKG}" "oci://registry-1.docker.io/merionyx"
+
+        GHCR_REF="ghcr.io/merionyx/api-gateway/charts/${CHART_NAME}:${CHART_VERSION}"
+        DH_REF="registry-1.docker.io/merionyx/${CHART_NAME}:${CHART_VERSION}"
+
+        GHCR_DIGEST="$(crane digest "${GHCR_REF}")"
+        DH_DIGEST="$(crane digest "${DH_REF}")"
+
+        cosign sign --yes "ghcr.io/merionyx/api-gateway/charts/${CHART_NAME}@${GHCR_DIGEST}"
+        cosign sign --yes "registry-1.docker.io/merionyx/${CHART_NAME}@${DH_DIGEST}"
+
+        cosign attest --yes --predicate "/tmp/sbom-${CHART_NAME}.cdx.json" --type cyclonedx \
+          "ghcr.io/merionyx/api-gateway/charts/${CHART_NAME}@${GHCR_DIGEST}"
+        cosign attest --yes --predicate "/tmp/sbom-${CHART_NAME}.cdx.json" --type cyclonedx \
+          "registry-1.docker.io/merionyx/${CHART_NAME}@${DH_DIGEST}"

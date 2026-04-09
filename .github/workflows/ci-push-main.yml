@@ -3,6 +3,7 @@ name: CI — Push to main
 permissions:
   contents: read
   packages: write
+  id-token: write
 
 on:
   push:
