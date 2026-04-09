@@ -3,6 +3,7 @@ name: Publish one Docker image (multi-arch)
 permissions:
   contents: read
   packages: write
+  id-token: write
 
 on:
   workflow_call:
@@ -28,6 +29,7 @@ env:
   IMAGE_PREFIX: merionyx/api-gateway
   # Mirror to GHCR (same path after ghcr.io as docker.io)
   GHCR_IMAGE_PREFIX: ghcr.io/merionyx/api-gateway
+  SYFT_VERSION: v1.20.0
 
 jobs:
   build:
@@ -135,6 +137,40 @@ jobs:
         crane copy \
           "docker.io/${IMAGE_PREFIX}-${COMPONENT}:${VERSION}" \
           "${GHCR_IMAGE_PREFIX}-${COMPONENT}:${VERSION}"
+      env:
+        IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
+        GHCR_IMAGE_PREFIX: ${{ env.GHCR_IMAGE_PREFIX }}
+        COMPONENT: ${{ inputs.component }}
+        VERSION: ${{ inputs.version }}
+
+    - name: Install Syft
+      run: |
+        curl -fsSL "https://github.com/anchore/syft/releases/download/${SYFT_VERSION}/syft_${SYFT_VERSION#v}_linux_amd64.tar.gz" -o /tmp/syft.tgz
+        tar -xzf /tmp/syft.tgz -C /tmp
+        sudo mv /tmp/syft /usr/local/bin/
+      env:
+        SYFT_VERSION: ${{ env.SYFT_VERSION }}
+
+    - name: Install Cosign
+      uses: sigstore/cosign-installer@v3
+
+    - name: SBOM (Syft), sign and attest (Cosign keyless)
+      run: |
+        set -euo pipefail
+        SRC="docker.io/${IMAGE_PREFIX}-${COMPONENT}:${VERSION}"
+        GHCR_REF="${GHCR_IMAGE_PREFIX}-${COMPONENT}:${VERSION}"
+
+        syft "${SRC}" -o "cyclonedx-json=/tmp/sbom-${COMPONENT}.cdx.json"
+
+        DIGEST="$(crane digest "${SRC}")"
+
+        cosign sign --yes "docker.io/${IMAGE_PREFIX}-${COMPONENT}@${DIGEST}"
+        cosign sign --yes "${GHCR_IMAGE_PREFIX}-${COMPONENT}@${DIGEST}"
+
+        cosign attest --yes --predicate "/tmp/sbom-${COMPONENT}.cdx.json" --type cyclonedx \
+          "docker.io/${IMAGE_PREFIX}-${COMPONENT}@${DIGEST}"
+        cosign attest --yes --predicate "/tmp/sbom-${COMPONENT}.cdx.json" --type cyclonedx \
+          "${GHCR_IMAGE_PREFIX}-${COMPONENT}@${DIGEST}"
       env:
         IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
         GHCR_IMAGE_PREFIX: ${{ env.GHCR_IMAGE_PREFIX }}
