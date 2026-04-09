@@ -1,9 +1,19 @@
-apiVersion: gateway.merionyx.io/v1alpha1
+apiVersion: gateway.merionyx.com/v1alpha1
 kind: Environment
 metadata:
   name: dev
   namespace: default
   labels:
-    gateway.merionyx.io/team: demo
+    gateway.merionyx.com/team: demo
 spec:
   logicalName: dev
+---
+apiVersion: gateway.merionyx.com/v1alpha1
+kind: Environment
+metadata:
+  name: dyn-qa
+  namespace: default
+  labels:
+    gateway.merionyx.com/team: demo
+spec:
+  logicalName: dyn-qa

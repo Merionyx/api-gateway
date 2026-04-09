@@ -1,10 +1,10 @@
-apiVersion: gateway.merionyx.io/v1alpha1
+apiVersion: gateway.merionyx.com/v1alpha1
 kind: ContractBundle
 metadata:
   name: schemas-bundle-dev
   namespace: default
   labels:
-    gateway.merionyx.io/team: demo
+    gateway.merionyx.com/team: demo
 spec:
   name: api-gateway-schemas
   repository: api-gateway-schemas-https
@@ -12,4 +12,20 @@ spec:
   path: openapi
   environmentRef:
     name: dev
+    namespace: default
+---
+apiVersion: gateway.merionyx.com/v1alpha1
+kind: ContractBundle
+metadata:
+  name: schemas-bundle-dyn-qa
+  namespace: default
+  labels:
+    gateway.merionyx.com/team: demo
+spec:
+  name: api-gateway-schemas
+  repository: api-gateway-schemas-https
+  ref: remotes/origin/master
+  path: openapi
+  environmentRef:
+    name: dyn-qa
     namespace: default
