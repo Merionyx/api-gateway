@@ -6,7 +6,10 @@ services:
         container_name: merionyx-api-gateway-controller-dev
         build:
             context: ../../..
-            dockerfile: build/release/Dockerfile.controller
+            dockerfile: build/release/Dockerfile
+            args:
+                SERVICE: controller
+                OCI_NAME: Controller
         environment:
             - CONFIG_PATH=./configs/controller/config.dev.yaml
             - SSH_KNOWN_HOSTS=/app/secrets/known_hosts
@@ -27,7 +30,10 @@ services:
         container_name: merionyx-api-gateway-controller-prod
         build:
             context: ../../..
-            dockerfile: build/release/Dockerfile.controller
+            dockerfile: build/release/Dockerfile
+            args:
+                SERVICE: controller
+                OCI_NAME: Controller
         environment:
             - CONFIG_PATH=./configs/controller/config.prod.yaml
             - SSH_KNOWN_HOSTS=/app/secrets/known_hosts
@@ -48,7 +54,10 @@ services:
         container_name: merionyx-api-gateway-api-server
         build:
             context: ../../..
-            dockerfile: build/release/Dockerfile.api-server
+            dockerfile: build/release/Dockerfile
+            args:
+                SERVICE: api-server
+                OCI_NAME: "API Server"
         environment:
             - CONFIG_PATH=./configs/api-server/config.yaml
             - SSH_KNOWN_HOSTS=/app/secrets/known_hosts
@@ -73,7 +82,10 @@ services:
         container_name: merionyx-api-gateway-contract-syncer
         build:
             context: ../../..
-            dockerfile: build/release/Dockerfile.contract-syncer
+            dockerfile: build/release/Dockerfile
+            args:
+                SERVICE: contract-syncer
+                OCI_NAME: "Contract Syncer"
         environment:
             - CONFIG_PATH=./configs/contract-syncer/config.yaml
             - SSH_KNOWN_HOSTS=/app/secrets/known_hosts

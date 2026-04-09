@@ -31,7 +31,7 @@ jobs:
     uses: ./.github/workflows/docker-publish-component.yml
     with:
       component: api-server
-      dockerfile: build/release/Dockerfile.api-server
+      dockerfile: build/release/Dockerfile
       checkout_ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || inputs.checkout_ref }}
       version: ${{ inputs.version || 'latest' }}
     secrets: inherit
@@ -40,7 +40,7 @@ jobs:
     uses: ./.github/workflows/docker-publish-component.yml
     with:
       component: auth-sidecar
-      dockerfile: build/release/Dockerfile.auth-sidecar
+      dockerfile: build/release/Dockerfile
       checkout_ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || inputs.checkout_ref }}
       version: ${{ inputs.version || 'latest' }}
     secrets: inherit
@@ -49,7 +49,7 @@ jobs:
     uses: ./.github/workflows/docker-publish-component.yml
     with:
       component: contract-syncer
-      dockerfile: build/release/Dockerfile.contract-syncer
+      dockerfile: build/release/Dockerfile
       checkout_ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || inputs.checkout_ref }}
       version: ${{ inputs.version || 'latest' }}
     secrets: inherit
@@ -58,7 +58,7 @@ jobs:
     uses: ./.github/workflows/docker-publish-component.yml
     with:
       component: controller
-      dockerfile: build/release/Dockerfile.controller
+      dockerfile: build/release/Dockerfile
       checkout_ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || inputs.checkout_ref }}
       version: ${{ inputs.version || 'latest' }}
     secrets: inherit

@@ -6,6 +6,8 @@ BUILD_DIR=./bin
 DOCKER_REPO=merionyx
 DOCKER_IMAGE=merionyx-universal-server
 DOCKER_TAG=latest
+# Release Dockerfiles: runtime-alpine (shell, wget healthcheck) | runtime-distroless (production)
+DOCKER_BUILD_TARGET?=runtime-alpine
 
 # Main commands
 run: ## Run the server
@@ -50,11 +52,11 @@ lint: ## Lint code
 	golangci-lint run ./...
 
 # Docker commands
-docker-build: ## Build Docker image
-	@DOCKER_BUILDKIT=1 docker build -t $(DOCKER_REPO)/api-gateway-controller:$(DOCKER_TAG) -f build/release/Dockerfile.controller .
-	@DOCKER_BUILDKIT=1 docker build -t $(DOCKER_REPO)/api-gateway-api-server:$(DOCKER_TAG) -f build/release/Dockerfile.api-server .
-	@DOCKER_BUILDKIT=1 docker build -t $(DOCKER_REPO)/api-gateway-contract-syncer:$(DOCKER_TAG) -f build/release/Dockerfile.contract-syncer .
-	@DOCKER_BUILDKIT=1 docker build -t $(DOCKER_REPO)/api-gateway-auth-sidecar:$(DOCKER_TAG) -f build/release/Dockerfile.auth-sidecar .
+docker-build: ## Build Docker images (default target: Alpine; set DOCKER_BUILD_TARGET=runtime-distroless for distroless)
+	@DOCKER_BUILDKIT=1 docker build --target $(DOCKER_BUILD_TARGET) --build-arg SERVICE=controller      --build-arg OCI_NAME=Controller        -t $(DOCKER_REPO)/api-gateway-controller:$(DOCKER_TAG) -f build/release/Dockerfile .
+	@DOCKER_BUILDKIT=1 docker build --target $(DOCKER_BUILD_TARGET) --build-arg SERVICE=api-server      --build-arg OCI_NAME='API Server'      -t $(DOCKER_REPO)/api-gateway-api-server:$(DOCKER_TAG) -f build/release/Dockerfile .
+	@DOCKER_BUILDKIT=1 docker build --target $(DOCKER_BUILD_TARGET) --build-arg SERVICE=contract-syncer --build-arg OCI_NAME='Contract Syncer' -t $(DOCKER_REPO)/api-gateway-contract-syncer:$(DOCKER_TAG) -f build/release/Dockerfile .
+	@DOCKER_BUILDKIT=1 docker build --target $(DOCKER_BUILD_TARGET) --build-arg SERVICE=auth-sidecar    --build-arg OCI_NAME='Auth Sidecar'    -t $(DOCKER_REPO)/api-gateway-auth-sidecar:$(DOCKER_TAG) -f build/release/Dockerfile .
 	@DOCKER_BUILDKIT=1 docker build -t $(DOCKER_REPO)/api-gateway-mock-service:$(DOCKER_TAG) -f build/dev/Dockerfile.mock-service .
 
 docker-push: ## Push Docker image

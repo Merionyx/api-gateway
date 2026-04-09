@@ -41,9 +41,23 @@ jobs:
         - platform: linux/amd64
           runner: ubuntu-latest
           arch_short: amd64
+          runtime: distroless
+          target: runtime-distroless
         - platform: linux/arm64
           runner: ubuntu-24.04-arm
           arch_short: arm64
+          runtime: distroless
+          target: runtime-distroless
+        - platform: linux/amd64
+          runner: ubuntu-latest
+          arch_short: amd64
+          runtime: alpine
+          target: runtime-alpine
+        - platform: linux/arm64
+          runner: ubuntu-24.04-arm
+          arch_short: arm64
+          runtime: alpine
+          target: runtime-alpine
 
     steps:
     - name: Checkout
@@ -53,6 +67,17 @@ jobs:
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v4
+
+    - name: OCI display name for image labels
+      id: oci
+      run: |
+        case "${{ inputs.component }}" in
+          api-server) echo 'name=API Server' >> "$GITHUB_OUTPUT" ;;
+          controller) echo 'name=Controller' >> "$GITHUB_OUTPUT" ;;
+          auth-sidecar) echo 'name=Auth Sidecar' >> "$GITHUB_OUTPUT" ;;
+          contract-syncer) echo 'name=Contract Syncer' >> "$GITHUB_OUTPUT" ;;
+          *) echo "Unknown component: ${{ inputs.component }}"; exit 1 ;;
+        esac
 
     - name: Login to Docker Hub
       uses: docker/login-action@v4
@@ -66,21 +91,25 @@ jobs:
       with:
         context: .
         file: ${{ inputs.dockerfile }}
+        target: ${{ matrix.target }}
+        build-args: |
+          SERVICE=${{ inputs.component }}
+          OCI_NAME=${{ steps.oci.outputs.name }}
         platforms: ${{ matrix.platform }}
         provenance: mode=max
         sbom: true
         outputs: type=image,name=${{ env.IMAGE_PREFIX }}-${{ inputs.component }},push-by-digest=true,push=true
-        cache-from: type=gha,scope=build-${{ inputs.component }}-${{ matrix.arch_short }}
-        cache-to: type=gha,scope=build-${{ inputs.component }}-${{ matrix.arch_short }},mode=max
+        cache-from: type=gha,scope=build-${{ inputs.component }}-${{ matrix.arch_short }}-${{ matrix.runtime }}
+        cache-to: type=gha,scope=build-${{ inputs.component }}-${{ matrix.arch_short }}-${{ matrix.runtime }},mode=max
 
     - name: Write digest file
-      run: echo "${{ steps.build.outputs.digest }}" > "${{ inputs.component }}-${{ matrix.arch_short }}.txt"
+      run: echo "${{ steps.build.outputs.digest }}" > "${{ inputs.component }}-${{ matrix.arch_short }}-${{ matrix.runtime }}.txt"
 
     - name: Upload digest
       uses: actions/upload-artifact@v7
       with:
-        name: digest-${{ inputs.component }}-${{ matrix.arch_short }}
-        path: ${{ inputs.component }}-${{ matrix.arch_short }}.txt
+        name: digest-${{ inputs.component }}-${{ matrix.arch_short }}-${{ matrix.runtime }}
+        path: ${{ inputs.component }}-${{ matrix.arch_short }}-${{ matrix.runtime }}.txt
         if-no-files-found: error
 
   merge-manifests:
@@ -112,10 +141,13 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Multi-arch manifest (Docker Hub)
+    - name: Multi-arch manifest — distroless (default tag)
       run: |
-        AMD=$(tr -d '\n' < "digests/${COMPONENT}-amd64.txt")
-        ARM=$(tr -d '\n' < "digests/${COMPONENT}-arm64.txt")
+        set -euo pipefail
+        amd_file=$(find digests -name "${COMPONENT}-amd64-distroless.txt" | head -n1)
+        arm_file=$(find digests -name "${COMPONENT}-arm64-distroless.txt" | head -n1)
+        AMD=$(tr -d '\n' < "${amd_file}")
+        ARM=$(tr -d '\n' < "${arm_file}")
         docker buildx imagetools create \
           -t "${IMAGE_PREFIX}-${COMPONENT}:${VERSION}" \
           "${IMAGE_PREFIX}-${COMPONENT}@${AMD}" \
@@ -124,6 +156,23 @@ jobs:
         IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
         COMPONENT: ${{ inputs.component }}
         VERSION: ${{ inputs.version }}
+
+    - name: Multi-arch manifest — Alpine (${VERSION}-alpine)
+      run: |
+        set -euo pipefail
+        amd_file=$(find digests -name "${COMPONENT}-amd64-alpine.txt" | head -n1)
+        arm_file=$(find digests -name "${COMPONENT}-arm64-alpine.txt" | head -n1)
+        AMD=$(tr -d '\n' < "${amd_file}")
+        ARM=$(tr -d '\n' < "${arm_file}")
+        docker buildx imagetools create \
+          -t "${IMAGE_PREFIX}-${COMPONENT}:${ALPINE_TAG}" \
+          "${IMAGE_PREFIX}-${COMPONENT}@${AMD}" \
+          "${IMAGE_PREFIX}-${COMPONENT}@${ARM}"
+      env:
+        IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
+        COMPONENT: ${{ inputs.component }}
+        VERSION: ${{ inputs.version }}
+        ALPINE_TAG: ${{ inputs.version }}-alpine
 
     - name: Install crane
       env:
@@ -140,20 +189,23 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Mirror multi-arch image to GHCR
+    - name: Mirror multi-arch images to GHCR
       run: |
         crane copy \
           "docker.io/${IMAGE_PREFIX}-${COMPONENT}:${VERSION}" \
           "${GHCR_IMAGE_PREFIX}-${COMPONENT}:${VERSION}"
+        crane copy \
+          "docker.io/${IMAGE_PREFIX}-${COMPONENT}:${ALPINE_TAG}" \
+          "${GHCR_IMAGE_PREFIX}-${COMPONENT}:${ALPINE_TAG}"
       env:
         IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
         GHCR_IMAGE_PREFIX: ${{ env.GHCR_IMAGE_PREFIX }}
         COMPONENT: ${{ inputs.component }}
         VERSION: ${{ inputs.version }}
+        ALPINE_TAG: ${{ inputs.version }}-alpine
 
-    # BuildKit уже записал provenance/SBOM для каждого per-arch digest; здесь — SLSA build provenance от GitHub для итогового multi-arch манифеста (один digest в обоих registry).
-    - name: Resolve merged image digest
-      id: merged
+    - name: Resolve merged image digest (distroless)
+      id: merged-distroless
       run: |
         DIGEST="$(crane digest "docker.io/${IMAGE_PREFIX}-${COMPONENT}:${VERSION}")"
         echo "digest=${DIGEST}" >> "${GITHUB_OUTPUT}"
@@ -162,16 +214,40 @@ jobs:
         COMPONENT: ${{ inputs.component }}
         VERSION: ${{ inputs.version }}
 
-    - name: Attest build provenance (Docker Hub → registry + GitHub)
+    - name: Resolve merged image digest (Alpine)
+      id: merged-alpine
+      run: |
+        DIGEST="$(crane digest "docker.io/${IMAGE_PREFIX}-${COMPONENT}:${ALPINE_TAG}")"
+        echo "digest=${DIGEST}" >> "${GITHUB_OUTPUT}"
+      env:
+        IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
+        COMPONENT: ${{ inputs.component }}
+        ALPINE_TAG: ${{ inputs.version }}-alpine
+
+    - name: Attest build provenance (Docker Hub — distroless)
       uses: actions/attest-build-provenance@v2
       with:
         subject-name: index.docker.io/merionyx/api-gateway-${{ inputs.component }}
-        subject-digest: ${{ steps.merged.outputs.digest }}
+        subject-digest: ${{ steps.merged-distroless.outputs.digest }}
         push-to-registry: true
 
-    - name: Attest build provenance (GHCR → registry + GitHub)
+    - name: Attest build provenance (GHCR — distroless)
       uses: actions/attest-build-provenance@v2
       with:
         subject-name: ghcr.io/merionyx/api-gateway-${{ inputs.component }}
-        subject-digest: ${{ steps.merged.outputs.digest }}
+        subject-digest: ${{ steps.merged-distroless.outputs.digest }}
+        push-to-registry: true
+
+    - name: Attest build provenance (Docker Hub — Alpine)
+      uses: actions/attest-build-provenance@v2
+      with:
+        subject-name: index.docker.io/merionyx/api-gateway-${{ inputs.component }}-alpine
+        subject-digest: ${{ steps.merged-alpine.outputs.digest }}
+        push-to-registry: true
+
+    - name: Attest build provenance (GHCR — Alpine)
+      uses: actions/attest-build-provenance@v2
+      with:
+        subject-name: ghcr.io/merionyx/api-gateway-${{ inputs.component }}-alpine
+        subject-digest: ${{ steps.merged-alpine.outputs.digest }}
         push-to-registry: true
