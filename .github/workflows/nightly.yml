@@ -2,25 +2,26 @@ name: Nightly
 
 on:
   schedule:
-    - cron: "0 3 * * *"
+  - cron: "0 3 * * *"
   workflow_dispatch:
+
 
 jobs:
   govulncheck:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+    - uses: actions/checkout@v6
 
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
+    - uses: actions/setup-go@v6
+      with:
+        go-version-file: go.mod
+        cache: true
 
-      - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+    - name: Install govulncheck
+      run: go install golang.org/x/vuln/cmd/govulncheck@latest
 
-      - name: govulncheck
-        run: govulncheck ./...
+    - name: govulncheck
+      run: govulncheck ./...
 
   trivy-fs:
     runs-on: ubuntu-latest
@@ -29,12 +30,21 @@ jobs:
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
-      - uses: actions/checkout@v6
+    - uses: actions/checkout@v6
 
-      - name: Trivy filesystem scan
-        uses: aquasecurity/trivy-action@v0.35.0
-        with:
-          scan-type: fs
-          scan-ref: .
-          severity: CRITICAL,HIGH
-          exit-code: "0"
+    - name: Trivy filesystem scan
+      uses: aquasecurity/trivy-action@v0.35.0
+      with:
+        scan-type: fs
+        scan-ref: .
+        severity: CRITICAL,HIGH
+        exit-code: "0"
+
+  alpine-base:
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    uses: ./.github/workflows/docker-publish-alpine-base.yml
+    secrets: inherit

@@ -29,8 +29,8 @@ app.kubernetes.io/component: edge
 {{- end }}
 
 {{/*
-  Merionyx auth-sidecar image. Пустой tag → Chart.AppVersion (как в api-gateway-control-plane).
-  Envoy — отдельный апстрим; тег только из .Values.envoy.image.tag.
+  Merionyx auth-sidecar image. Empty tag → Chart.AppVersion (like in api-gateway-control-plane).
+  Envoy — separate stream; tag only from .Values.envoy.image.tag.
 */}}
 {{- define "agwedge.authSidecarImage" -}}
 {{- $tag := .Values.authSidecar.image.tag | default .Chart.AppVersion -}}

@@ -1,0 +1,18 @@
+FROM alpine:3.23
+
+RUN apk update \
+    && apk upgrade --no-cache \
+    && apk add --no-cache ca-certificates \
+    && addgroup -g 1001 app \
+    && adduser -u 1001 -G app -s /bin/sh -D app
+
+LABEL org.opencontainers.image.title="Merionyx Alpine base" \
+      org.opencontainers.image.description="Alpine with updated packages and user app (uid 1001) for API Gateway images" \
+      org.opencontainers.image.source="https://github.com/merionyx/api-gateway" \
+      org.opencontainers.image.url="https://github.com/merionyx/api-gateway" \
+      org.opencontainers.image.documentation="https://github.com/merionyx/api-gateway-control-plane#readme" \
+      org.opencontainers.image.vendor="Merionyx" \
+      org.opencontainers.image.version="3.23" \
+      org.opencontainers.image.logo="https://avatars.githubusercontent.com/u/208366109?s=512" \
+      com.docker.extension.icon="https://avatars.githubusercontent.com/u/208366109?s=512" \
+      dev.orbstack.icon="https://avatars.githubusercontent.com/u/208366109?s=512"

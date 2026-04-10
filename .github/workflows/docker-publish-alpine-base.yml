@@ -1,0 +1,151 @@
+name: Publish Alpine base image (multi-arch)
+
+permissions:
+  contents: read
+  packages: write
+  attestations: write
+  id-token: write
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+
+env:
+  IMAGE_NAME: merionyx/alpine
+  GHCR_IMAGE: ghcr.io/merionyx/alpine
+  ALPINE_TAG: "3.23"
+
+jobs:
+  build:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - platform: linux/amd64
+          runner: ubuntu-latest
+          arch_short: amd64
+        - platform: linux/arm64
+          runner: ubuntu-24.04-arm
+          arch_short: arm64
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - uses: docker/setup-buildx-action@v4
+
+    - uses: docker/login-action@v4
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Build and push (by digest)
+      id: build
+      uses: docker/build-push-action@v7
+      with:
+        context: ./build/base
+        file: ./build/base/Dockerfile.alpine
+        platforms: ${{ matrix.platform }}
+        provenance: mode=max
+        sbom: true
+        no-cache: true
+        outputs: type=image,name=${{ env.IMAGE_NAME }},push-by-digest=true,push=true
+
+    - name: Write digest file
+      run: echo "${{ steps.build.outputs.digest }}" > "alpine-base-${{ matrix.arch_short }}.txt"
+
+    - name: Upload digest
+      uses: actions/upload-artifact@v7
+      with:
+        name: digest-alpine-base-${{ matrix.arch_short }}
+        path: alpine-base-${{ matrix.arch_short }}.txt
+        if-no-files-found: error
+
+  merge-manifests:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Download digests
+      uses: actions/download-artifact@v8
+      with:
+        pattern: digest-alpine-base-*
+        path: digests
+        merge-multiple: true
+
+    - uses: docker/setup-buildx-action@v4
+
+    - uses: docker/login-action@v4
+      with:
+        registry: docker.io
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - uses: docker/login-action@v4
+      with:
+        registry: registry-1.docker.io
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Multi-arch manifest
+      run: |
+        set -euo pipefail
+        amd_file=$(find digests -name "alpine-base-amd64.txt" | head -n1)
+        arm_file=$(find digests -name "alpine-base-arm64.txt" | head -n1)
+        AMD=$(tr -d '\n' < "${amd_file}")
+        ARM=$(tr -d '\n' < "${arm_file}")
+        docker buildx imagetools create \
+          -t "${IMAGE_NAME}:${ALPINE_TAG}" \
+          "${IMAGE_NAME}@${AMD}" \
+          "${IMAGE_NAME}@${ARM}"
+      env:
+        IMAGE_NAME: ${{ env.IMAGE_NAME }}
+        ALPINE_TAG: ${{ env.ALPINE_TAG }}
+
+    - name: Install crane
+      env:
+        CRANE_VERSION: v0.20.3
+      run: |
+        curl -fsSL "https://github.com/google/go-containerregistry/releases/download/${CRANE_VERSION}/go-containerregistry_Linux_x86_64.tar.gz" -o /tmp/crane.tgz
+        tar -xzf /tmp/crane.tgz -C /tmp
+        sudo mv /tmp/crane /usr/local/bin/
+
+    - uses: docker/login-action@v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Mirror to GHCR
+      run: |
+        crane copy \
+          "docker.io/${IMAGE_NAME}:${ALPINE_TAG}" \
+          "${GHCR_IMAGE}:${ALPINE_TAG}"
+      env:
+        IMAGE_NAME: ${{ env.IMAGE_NAME }}
+        GHCR_IMAGE: ${{ env.GHCR_IMAGE }}
+        ALPINE_TAG: ${{ env.ALPINE_TAG }}
+
+    - name: Resolve merged image digest
+      id: merged
+      run: |
+        DIGEST="$(crane digest "docker.io/${IMAGE_NAME}:${ALPINE_TAG}")"
+        echo "digest=${DIGEST}" >> "${GITHUB_OUTPUT}"
+      env:
+        IMAGE_NAME: ${{ env.IMAGE_NAME }}
+        ALPINE_TAG: ${{ env.ALPINE_TAG }}
+
+    - name: Attest build provenance (Docker Hub)
+      uses: actions/attest-build-provenance@v2
+      with:
+        subject-name: index.docker.io/merionyx/alpine
+        subject-digest: ${{ steps.merged.outputs.digest }}
+        push-to-registry: true
+
+    - name: Attest build provenance (GHCR)
+      uses: actions/attest-build-provenance@v2
+      with:
+        subject-name: ghcr.io/merionyx/alpine
+        subject-digest: ${{ steps.merged.outputs.digest }}
+        push-to-registry: true

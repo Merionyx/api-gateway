@@ -31,7 +31,6 @@ envoy:
 authSidecar:
   image:
     repository: merionyx/api-gateway-auth-sidecar
-    # Пусто = тег из Chart.appVersion. Envoy — см. envoy.image.tag (версия upstream, не релиза приложения).
     tag: ""
     pullPolicy: IfNotPresent
   resources: {}
