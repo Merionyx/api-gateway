@@ -19,7 +19,7 @@ build: ## Build binary
 
 build-cli: ## Build agwctl CLI
 	mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=0 go build -o $(BUILD_DIR)/agwctl ./cmd/cli
+	CGO_ENABLED=0 go build -o $(BUILD_DIR)/agwctl ./cmd/agwctl
 
 test: ## Run all tests
 	go test -v ./...

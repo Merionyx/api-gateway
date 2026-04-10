@@ -51,7 +51,7 @@ builds:
 
 - id: agwctl
   binary: agwctl
-  main: ./cmd/cli
+  main: ./cmd/agwctl
   env:
   - CGO_ENABLED=0
   goos:
