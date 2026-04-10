@@ -29,6 +29,7 @@ jobs:
     with:
       version: latest
       checkout_ref: ${{ github.sha }}
+      include_mock_service: true
     secrets: inherit
 
   # Chart version: unique prerelease per workflow run; appVersion stays "latest" for snapshot installs.

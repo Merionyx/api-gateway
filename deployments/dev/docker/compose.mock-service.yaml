@@ -6,7 +6,11 @@ services:
   mock-be-service-01-dev:
     build:
       context: ../../..
-      dockerfile: build/dev/Dockerfile.mock-service
+      dockerfile: build/release/Dockerfile
+      target: runtime-alpine
+      args:
+        SERVICE: mock-service
+        OCI_NAME: Mock Service
     container_name: mock-be-service-01-dev
     environment:
       - SERVICE_NAME=be-service-01
@@ -33,7 +37,11 @@ services:
   mock-be-service-02-dev:
     build:
       context: ../../..
-      dockerfile: build/dev/Dockerfile.mock-service
+      dockerfile: build/release/Dockerfile
+      target: runtime-alpine
+      args:
+        SERVICE: mock-service
+        OCI_NAME: Mock Service
     container_name: mock-be-service-02-dev
     environment:
       - SERVICE_NAME=be-service-02
@@ -61,7 +69,11 @@ services:
   mock-be-service-01-prod:
     build:
       context: ../../..
-      dockerfile: build/dev/Dockerfile.mock-service
+      dockerfile: build/release/Dockerfile
+      target: runtime-alpine
+      args:
+        SERVICE: mock-service
+        OCI_NAME: Mock Service
     container_name: mock-be-service-01-prod
     environment:
       - SERVICE_NAME=be-service-01
@@ -88,7 +100,11 @@ services:
   mock-be-service-02-prod:
     build:
       context: ../../..
-      dockerfile: build/dev/Dockerfile.mock-service
+      dockerfile: build/release/Dockerfile
+      target: runtime-alpine
+      args:
+        SERVICE: mock-service
+        OCI_NAME: Mock Service
     container_name: mock-be-service-02-prod
     environment:
       - SERVICE_NAME=be-service-02
@@ -115,7 +131,11 @@ services:
   mock-be-service-03:
     build:
       context: ../../..
-      dockerfile: build/dev/Dockerfile.mock-service
+      dockerfile: build/release/Dockerfile
+      target: runtime-alpine
+      args:
+        SERVICE: mock-service
+        OCI_NAME: Mock Service
     container_name: mock-be-service-03
     environment:
       - SERVICE_NAME=be-service-03

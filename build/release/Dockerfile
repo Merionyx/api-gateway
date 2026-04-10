@@ -1,5 +1,5 @@
 # Build any Go service in the monorepo. Required build-args:
-#   SERVICE   — directory name: api-server | controller | auth-sidecar | contract-syncer
+#   SERVICE   — directory name: api-server | controller | auth-sidecar | contract-syncer | mock-service
 #   OCI_NAME  — short name for org.opencontainers.image.title (e.g. "API Server")
 #
 # Examples:
@@ -59,12 +59,6 @@ FROM merionyx/alpine:3.23 AS runtime-alpine
 ARG SERVICE
 ARG OCI_NAME
 
-RUN apk update \
-    && apk upgrade --no-cache \
-    && apk add --no-cache ca-certificates \
-    && addgroup -g 1001 app \
-    && adduser -u 1001 -G app -s /bin/sh -D app
-
 WORKDIR /${SERVICE}
 
 COPY --from=builder --chown=1001:1001 /${SERVICE}/main ./main
@@ -79,7 +73,5 @@ LABEL org.opencontainers.image.title="Merionyx API Gateway — ${OCI_NAME} (Alpi
       org.opencontainers.image.logo="https://avatars.githubusercontent.com/u/208366109?s=512" \
       com.docker.extension.icon="https://avatars.githubusercontent.com/u/208366109?s=512" \
       dev.orbstack.icon="https://avatars.githubusercontent.com/u/208366109?s=512"
-
-EXPOSE 8080 8443 8444
 
 CMD ["./main"]
