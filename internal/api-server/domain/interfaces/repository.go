@@ -2,8 +2,9 @@ package interfaces
 
 import (
 	"context"
-	"merionyx/api-gateway/internal/api-server/domain/models"
-	sharedgit "merionyx/api-gateway/internal/shared/git"
+
+	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
+	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 )
 
 type SnapshotRepository interface {

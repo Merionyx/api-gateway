@@ -1,0 +1,103 @@
+syntax = "proto3";
+
+package merionyx.gateway.environments.v1;
+
+import "merionyx/gateway/common/v1/contract_types.proto";
+
+option go_package = "github.com/merionyx/api-gateway/pkg/grpc/environments/v1;environmentsv1";
+
+// Environment represents an environment
+message Environment {
+  string name = 1;
+  string type = 2;
+  EnvironmentBundleConfig bundles = 3;
+  EnvironmentServiceConfig services = 4;
+  repeated merionyx.gateway.common.v1.ContractSnapshot snapshots = 5;
+}
+
+// EnvironmentContractConfig represents the contract configuration for an environment
+message EnvironmentBundleConfig {
+  repeated StaticBundleConfig static = 1;
+}
+
+// StaticContractConfig represents a static contract configuration
+message StaticBundleConfig {
+  string name = 1;
+  string repository = 2;
+  string ref = 3;
+  string path = 4;
+}
+
+// EnvironmentServiceConfig represents the service configuration for an environment
+message EnvironmentServiceConfig {
+  repeated StaticServiceConfig static = 1;
+}
+
+// StaticServiceConfig represents a static service configuration
+message StaticServiceConfig {
+  string name = 1;
+  string upstream = 2;
+}
+
+// Requests & Responses
+
+// CreateEnvironmentRequest represents a request to create an environment
+message CreateEnvironmentRequest {
+  string name = 1;
+  EnvironmentBundleConfig bundles = 2;
+  EnvironmentServiceConfig services = 3;
+}
+
+// CreateEnvironmentResponse represents a response to create an environment
+message CreateEnvironmentResponse {
+  Environment environment = 1;
+}
+
+// GetEnvironmentRequest represents a request to get an environment
+message GetEnvironmentRequest {
+  string name = 1;
+}
+
+// GetEnvironmentResponse represents a response to get an environment
+message GetEnvironmentResponse {
+  Environment environment = 1;
+}
+
+// ListEnvironmentsRequest represents a request to list environments
+message ListEnvironmentsRequest {}
+
+// ListEnvironmentsResponse represents a response to list environments
+message ListEnvironmentsResponse {
+  repeated Environment environments = 1;
+}
+
+// UpdateEnvironmentRequest represents a request to update an environment
+message UpdateEnvironmentRequest {
+  string name = 1;
+  EnvironmentBundleConfig bundles = 2;
+  EnvironmentServiceConfig services = 3;
+}
+
+// UpdateEnvironmentResponse represents a response to update an environment
+message UpdateEnvironmentResponse {
+  Environment environment = 1;
+}
+
+// DeleteEnvironmentRequest represents a request to delete an environment
+message DeleteEnvironmentRequest {
+  string name = 1;
+}
+
+// DeleteEnvironmentResponse represents a response to delete an environment
+message DeleteEnvironmentResponse {
+  bool success = 1;
+}
+
+// EnvironmentsService is the service for managing environments
+service EnvironmentsService {
+  rpc CreateEnvironment(CreateEnvironmentRequest) returns (CreateEnvironmentResponse);
+  rpc GetEnvironment(GetEnvironmentRequest) returns (GetEnvironmentResponse);
+  rpc ListEnvironments(ListEnvironmentsRequest) returns (ListEnvironmentsResponse);
+  rpc UpdateEnvironment(UpdateEnvironmentRequest) returns (UpdateEnvironmentResponse);
+  rpc DeleteEnvironment(DeleteEnvironmentRequest) returns (DeleteEnvironmentResponse);
+}

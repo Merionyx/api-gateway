@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	"merionyx/api-gateway/internal/controller/domain/interfaces"
-	"merionyx/api-gateway/internal/controller/domain/models"
-	"merionyx/api-gateway/internal/controller/xds/cache"
-	"merionyx/api-gateway/internal/controller/xds/snapshot"
+	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
+	"github.com/merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/controller/xds/cache"
+	"github.com/merionyx/api-gateway/internal/controller/xds/snapshot"
 
 	xdsResource "github.com/envoyproxy/go-control-plane/pkg/resource/v3"
 )

@@ -3,7 +3,7 @@ package cache
 import (
 	"testing"
 
-	"merionyx/api-gateway/internal/controller/repository/etcd"
+	"github.com/merionyx/api-gateway/internal/controller/repository/etcd"
 )
 
 func TestParseEnvironmentNameFromConfigKey(t *testing.T) {

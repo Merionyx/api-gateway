@@ -3,8 +3,8 @@ package memory
 import (
 	"testing"
 
-	"merionyx/api-gateway/internal/controller/config"
-	"merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/controller/config"
+	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 )
 
 func TestServiceRepository_Initialize_Get_List(t *testing.T) {

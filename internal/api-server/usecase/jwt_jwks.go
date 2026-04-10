@@ -8,7 +8,7 @@ import (
 	"math/big"
 	"sort"
 
-	"merionyx/api-gateway/internal/api-server/domain/models"
+	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 )
 
 // GetJWKS returns a JSON Web Key Set with all public keys.

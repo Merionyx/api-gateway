@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"merionyx/api-gateway/internal/shared/etcd"
-	"merionyx/api-gateway/internal/shared/grpcobs"
-	"merionyx/api-gateway/internal/shared/metricshttp"
+	"github.com/merionyx/api-gateway/internal/shared/etcd"
+	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
+	"github.com/merionyx/api-gateway/internal/shared/metricshttp"
 
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"

@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"merionyx/api-gateway/internal/shared/grpcobs"
-	sharedgit "merionyx/api-gateway/internal/shared/git"
-	pb "merionyx/api-gateway/pkg/api/contract_syncer/v1"
+	pb "github.com/merionyx/api-gateway/pkg/grpc/contract_syncer/v1"
+
+	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
+	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
 
 	"google.golang.org/grpc"
 )

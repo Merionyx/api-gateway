@@ -4,7 +4,7 @@ import (
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	endpointv3 "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
 
-	"merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 )
 
 func (b *xdsBuilder) BuildEndpoints(env *models.Environment) ([]*endpointv3.ClusterLoadAssignment, error) {

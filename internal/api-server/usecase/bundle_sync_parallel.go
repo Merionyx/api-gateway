@@ -3,7 +3,7 @@ package usecase
 import (
 	"context"
 
-	"merionyx/api-gateway/internal/api-server/domain/models"
+	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"

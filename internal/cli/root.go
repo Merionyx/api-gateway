@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"merionyx/api-gateway/internal/cli/command"
-	"merionyx/api-gateway/internal/cli/config"
+	"github.com/merionyx/api-gateway/internal/cli/command"
+	"github.com/merionyx/api-gateway/internal/cli/config"
 
 	"github.com/spf13/cobra"
 )

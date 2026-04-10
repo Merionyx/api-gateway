@@ -3,8 +3,8 @@ package cache
 import (
 	"strings"
 
-	"merionyx/api-gateway/internal/controller/repository/etcd"
-	"merionyx/api-gateway/internal/shared/bundlekey"
+	"github.com/merionyx/api-gateway/internal/controller/repository/etcd"
+	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
 )
 
 // ParseSchemaContractEtcdKey extracts repository, ref, and bundle path from a contract snapshot key.

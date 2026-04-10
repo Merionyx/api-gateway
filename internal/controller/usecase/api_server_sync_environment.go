@@ -6,12 +6,13 @@ import (
 	"log/slog"
 	"sort"
 
-	"merionyx/api-gateway/internal/controller/domain/models"
-	"merionyx/api-gateway/internal/controller/repository/memory"
-	xdssnapshot "merionyx/api-gateway/internal/controller/xds/snapshot"
-	"merionyx/api-gateway/internal/shared/bundlekey"
-	sharedgit "merionyx/api-gateway/internal/shared/git"
-	pb "merionyx/api-gateway/pkg/api/controller_registry/v1"
+	pb "github.com/merionyx/api-gateway/pkg/grpc/controller_registry/v1"
+
+	"github.com/merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/controller/repository/memory"
+	xdssnapshot "github.com/merionyx/api-gateway/internal/controller/xds/snapshot"
+	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
+	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 )
 
 func (uc *APIServerSyncUseCase) saveSnapshotsToEtcd(ctx context.Context, bundleKey string, snapshots []sharedgit.ContractSnapshot) error {

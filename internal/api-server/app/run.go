@@ -10,11 +10,11 @@ import (
 	"sync"
 	"syscall"
 
-	"merionyx/api-gateway/internal/api-server/config"
-	"merionyx/api-gateway/internal/api-server/container"
-	"merionyx/api-gateway/internal/api-server/server"
-	"merionyx/api-gateway/internal/shared/metricshttp"
-	"merionyx/api-gateway/internal/shared/serviceapp"
+	"github.com/merionyx/api-gateway/internal/api-server/config"
+	"github.com/merionyx/api-gateway/internal/api-server/container"
+	"github.com/merionyx/api-gateway/internal/api-server/server"
+	"github.com/merionyx/api-gateway/internal/shared/metricshttp"
+	"github.com/merionyx/api-gateway/internal/shared/serviceapp"
 )
 
 func Run() error {

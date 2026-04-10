@@ -7,9 +7,9 @@ import (
 	"sort"
 	"sync"
 
-	"merionyx/api-gateway/internal/controller/domain/interfaces"
-	"merionyx/api-gateway/internal/controller/domain/models"
-	"merionyx/api-gateway/internal/shared/bundlekey"
+	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
+	"github.com/merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
 )
 
 // Index maps bundle keys (repository/escapedRef/escapedPath) to environment names that reference the bundle.

@@ -1,7 +1,7 @@
 // Package builder constructs Envoy xDS resources from domain models.
 package builder
 
-import "merionyx/api-gateway/internal/controller/domain/interfaces"
+import "github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
 
 type xdsBuilder struct {
 	inMemoryServiceRepository interfaces.InMemoryServiceRepository

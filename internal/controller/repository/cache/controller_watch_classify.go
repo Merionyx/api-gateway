@@ -3,7 +3,7 @@ package cache
 import (
 	"strings"
 
-	"merionyx/api-gateway/internal/controller/repository/etcd"
+	"github.com/merionyx/api-gateway/internal/controller/repository/etcd"
 )
 
 // ControllerEtcdKeyEffect describes how one etcd key under the controller prefix should be handled for xDS/auth watchers.

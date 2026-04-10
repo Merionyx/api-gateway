@@ -1,7 +1,7 @@
 package interfaces
 
 import (
-	sharedgit "merionyx/api-gateway/internal/shared/git"
+	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 )
 
 type SyncUseCase interface {

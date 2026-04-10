@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"merionyx/api-gateway/internal/api-server/domain/interfaces"
-	"merionyx/api-gateway/internal/api-server/domain/models"
-	"merionyx/api-gateway/internal/shared/bundlekey"
-	sharedgit "merionyx/api-gateway/internal/shared/git"
+	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
+	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
+	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
+	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )

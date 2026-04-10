@@ -3,7 +3,7 @@ package usecase
 import (
 	"time"
 
-	"merionyx/api-gateway/internal/shared/grpcobs"
+	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"

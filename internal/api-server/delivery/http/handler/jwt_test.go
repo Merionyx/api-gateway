@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"merionyx/api-gateway/internal/api-server/usecase"
+	"github.com/merionyx/api-gateway/internal/api-server/usecase"
 
 	"github.com/gofiber/fiber/v3"
 )

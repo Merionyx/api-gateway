@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"time"
 
-	"merionyx/api-gateway/internal/api-server/domain/models"
+	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )

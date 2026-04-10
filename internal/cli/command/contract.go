@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"os"
 
-	"merionyx/api-gateway/internal/cli/apiclient"
-	"merionyx/api-gateway/internal/cli/outfiles"
+	"github.com/merionyx/api-gateway/internal/cli/apiclient"
+	"github.com/merionyx/api-gateway/internal/cli/outfiles"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"

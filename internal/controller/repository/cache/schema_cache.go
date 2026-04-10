@@ -4,10 +4,10 @@ import (
 	"context"
 	"sync"
 
-	"merionyx/api-gateway/internal/controller/domain/interfaces"
-	"merionyx/api-gateway/internal/controller/domain/models"
-	ctrlmetrics "merionyx/api-gateway/internal/controller/metrics"
-	"merionyx/api-gateway/internal/shared/bundlekey"
+	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
+	"github.com/merionyx/api-gateway/internal/controller/domain/models"
+	ctrlmetrics "github.com/merionyx/api-gateway/internal/controller/metrics"
+	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )

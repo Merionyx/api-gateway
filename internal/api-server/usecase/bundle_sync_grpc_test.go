@@ -7,11 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"merionyx/api-gateway/internal/api-server/domain/models"
-	sharedgit "merionyx/api-gateway/internal/shared/git"
-	"merionyx/api-gateway/internal/shared/grpcobs"
-	contractv1 "merionyx/api-gateway/pkg/api/contract/v1"
-	pb "merionyx/api-gateway/pkg/api/contract_syncer/v1"
+	commonv1 "github.com/merionyx/api-gateway/pkg/grpc/common/v1"
+	pb "github.com/merionyx/api-gateway/pkg/grpc/contract_syncer/v1"
+
+	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
+	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
+	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
 
 	"google.golang.org/grpc"
 )
@@ -36,7 +37,7 @@ func (f *fakeSnapshotRepo) ListBundleKeys(context.Context) ([]string, error) { r
 type grpcContractSyncerMock struct {
 	pb.UnimplementedContractSyncerServiceServer
 	errMsg string
-	snaps  []*contractv1.ContractSnapshot
+	snaps  []*commonv1.ContractSnapshot
 }
 
 func (m *grpcContractSyncerMock) Sync(context.Context, *pb.SyncRequest) (*pb.SyncResponse, error) {
@@ -74,16 +75,16 @@ func TestBundleSyncUseCase_SyncBundle_ContextCanceled(t *testing.T) {
 
 func TestBundleSyncUseCase_SyncBundle_Success(t *testing.T) {
 	mock := &grpcContractSyncerMock{
-		snaps: []*contractv1.ContractSnapshot{
+		snaps: []*commonv1.ContractSnapshot{
 			{
 				Name:   "c1",
 				Prefix: "/api/",
-				Upstream: &contractv1.ContractUpstream{
+				Upstream: &commonv1.ContractUpstream{
 					Name: "upstream-svc",
 				},
-				Access: &contractv1.Access{
+				Access: &commonv1.Access{
 					Secure: true,
-					Apps: []*contractv1.App{
+					Apps: []*commonv1.App{
 						{AppId: "a1", Environments: []string{"dev"}},
 					},
 				},

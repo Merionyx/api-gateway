@@ -3,7 +3,7 @@ package snapshot
 import (
 	"testing"
 
-	"merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 
 	clusterv3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	endpointv3 "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"

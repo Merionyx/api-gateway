@@ -7,14 +7,15 @@ import (
 	"sync"
 	"time"
 
-	"merionyx/api-gateway/internal/controller/domain/interfaces"
-	"merionyx/api-gateway/internal/controller/domain/models"
-	"merionyx/api-gateway/internal/controller/index/bundleenv"
-	ctrlmetrics "merionyx/api-gateway/internal/controller/metrics"
-	"merionyx/api-gateway/internal/controller/repository/cache"
-	"merionyx/api-gateway/internal/controller/repository/etcd"
-	"merionyx/api-gateway/internal/shared/utils"
-	authv1 "merionyx/api-gateway/pkg/api/auth/v1"
+	authv1 "github.com/merionyx/api-gateway/pkg/grpc/auth/v1"
+
+	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
+	"github.com/merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/controller/index/bundleenv"
+	ctrlmetrics "github.com/merionyx/api-gateway/internal/controller/metrics"
+	"github.com/merionyx/api-gateway/internal/controller/repository/cache"
+	"github.com/merionyx/api-gateway/internal/controller/repository/etcd"
+	"github.com/merionyx/api-gateway/internal/shared/utils"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
@@ -145,8 +146,12 @@ func (h *AuthHandler) SyncAccess(stream authv1.AuthService_SyncAccessServer) err
 }
 
 // GetAccessConfig get the current configuration (unary)
-func (h *AuthHandler) GetAccessConfig(ctx context.Context, req *authv1.GetAccessConfigRequest) (*authv1.AccessConfig, error) {
-	return h.buildAccessConfig(ctx, req.Environment)
+func (h *AuthHandler) GetAccessConfig(ctx context.Context, req *authv1.GetAccessConfigRequest) (*authv1.GetAccessConfigResponse, error) {
+	cfg, err := h.buildAccessConfig(ctx, req.Environment)
+	if err != nil {
+		return nil, err
+	}
+	return &authv1.GetAccessConfigResponse{Config: cfg}, nil
 }
 
 func (h *AuthHandler) buildAccessConfig(ctx context.Context, environment string) (*authv1.AccessConfig, error) {

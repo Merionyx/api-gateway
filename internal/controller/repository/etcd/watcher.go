@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )

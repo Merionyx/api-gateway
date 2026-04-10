@@ -18,7 +18,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"merionyx/api-gateway/internal/shared/serviceapp"
+	"github.com/merionyx/api-gateway/internal/shared/serviceapp"
 )
 
 var registerDefaults sync.Once

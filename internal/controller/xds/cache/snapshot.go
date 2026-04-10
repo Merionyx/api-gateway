@@ -7,7 +7,7 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	res "github.com/envoyproxy/go-control-plane/pkg/resource/v3"
 
-	ctrlmetrics "merionyx/api-gateway/internal/controller/metrics"
+	ctrlmetrics "github.com/merionyx/api-gateway/internal/controller/metrics"
 )
 
 type SnapshotManager struct {

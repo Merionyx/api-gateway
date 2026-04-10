@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"merionyx/api-gateway/internal/controller/repository/etcd"
-	"merionyx/api-gateway/internal/shared/bundlekey"
+	"github.com/merionyx/api-gateway/internal/controller/repository/etcd"
+	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
 )
 
 func TestClassifyControllerEtcdWatchKey(t *testing.T) {

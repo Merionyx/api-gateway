@@ -8,7 +8,7 @@ import (
 	discoveryv3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/server/v3"
 
-	ctrlmetrics "merionyx/api-gateway/internal/controller/metrics"
+	ctrlmetrics "github.com/merionyx/api-gateway/internal/controller/metrics"
 )
 
 // Callbacks implements go-control-plane server callbacks with Prometheus metrics.

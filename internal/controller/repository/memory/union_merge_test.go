@@ -3,7 +3,7 @@ package memory
 import (
 	"testing"
 
-	"merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 )
 
 func TestUnionStaticContractBundles(t *testing.T) {

@@ -4,14 +4,16 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"merionyx/api-gateway/internal/controller/container"
-	"merionyx/api-gateway/internal/shared/grpcobs"
-	"merionyx/api-gateway/internal/shared/serviceapp"
-	authv1 "merionyx/api-gateway/pkg/api/auth/v1"
-	environmentsv1 "merionyx/api-gateway/pkg/api/environments/v1"
-	schemasv1 "merionyx/api-gateway/pkg/api/schemas/v1"
-	snapshotsv1 "merionyx/api-gateway/pkg/api/snapshots/v1"
 	"net"
+
+	authv1 "github.com/merionyx/api-gateway/pkg/grpc/auth/v1"
+	environmentsv1 "github.com/merionyx/api-gateway/pkg/grpc/environments/v1"
+	schemasv1 "github.com/merionyx/api-gateway/pkg/grpc/schemas/v1"
+	snapshotsv1 "github.com/merionyx/api-gateway/pkg/grpc/snapshots/v1"
+
+	"github.com/merionyx/api-gateway/internal/controller/container"
+	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
+	"github.com/merionyx/api-gateway/internal/shared/serviceapp"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
