@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"testing"
 
-	"merionyx/api-gateway/internal/controller/domain/models"
-	"merionyx/api-gateway/internal/controller/repository/cache"
-	ctrlrepoetcd "merionyx/api-gateway/internal/controller/repository/etcd"
-	"merionyx/api-gateway/internal/shared/bundlekey"
+	"github.com/merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/controller/repository/cache"
+	ctrlrepoetcd "github.com/merionyx/api-gateway/internal/controller/repository/etcd"
+	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
