@@ -8,12 +8,15 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/merionyx/api-gateway/internal/cli/apiclient"
 	"github.com/merionyx/api-gateway/internal/cli/contractdiff"
+	"github.com/merionyx/api-gateway/internal/cli/contractfmt"
 	"github.com/merionyx/api-gateway/internal/cli/outfiles"
 	"github.com/merionyx/api-gateway/internal/cli/style"
+	"github.com/merionyx/api-gateway/internal/cli/validate"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -30,8 +33,86 @@ func NewContractCommand(resolveServer func() (string, error)) *cobra.Command {
 		newExportBatchCmd(resolveServer),
 		newDiffCmd(resolveServer),
 		newDiffBatchCmd(resolveServer),
+		newFmtCmd(),
 	)
 	return cmd
+}
+
+func newFmtCmd() *cobra.Command {
+	var write bool
+	var format string
+	c := &cobra.Command{
+		Use:   "fmt PATH",
+		Short: "Canonicalize contract YAML/JSON (OpenAPI 3.x via kin-openapi, x-api-gateway v1 with fixed field order)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			target := args[0]
+			fi, err := os.Stat(filepath.Clean(target))
+			if err != nil {
+				return err
+			}
+			if fi.IsDir() && !write {
+				return fmt.Errorf("formatting a directory requires --write")
+			}
+
+			paths, err := validate.CollectFiles(target)
+			if err != nil {
+				return err
+			}
+			if len(paths) == 0 {
+				return fmt.Errorf("no .yaml/.yml/.json files under %s", target)
+			}
+
+			out := cmd.OutOrStdout()
+			logErr := func(format string, a ...any) { fmt.Fprintf(cmd.ErrOrStderr(), format+"\n", a...) }
+			var nwrite, nfail int
+			for _, p := range paths {
+				data, err := os.ReadFile(p)
+				if err != nil {
+					logErr("%s: read: %v", p, err)
+					nfail++
+					continue
+				}
+				ext := filepath.Ext(p)
+				formatted, err := contractfmt.FormatBytes(data, ext, format)
+				if err != nil {
+					logErr("%s: %v", p, err)
+					nfail++
+					continue
+				}
+				if write {
+					if err := os.WriteFile(p, formatted, 0o644); err != nil {
+						logErr("%s: write: %v", p, err)
+						nfail++
+						continue
+					}
+					nwrite++
+					continue
+				}
+				if len(paths) > 1 {
+					fmt.Fprintf(out, "# %s\n", p)
+				}
+				if _, err := out.Write(formatted); err != nil {
+					return err
+				}
+				if len(paths) > 1 {
+					fmt.Fprintln(out)
+				}
+			}
+			if write && fi.IsDir() {
+				out := cmd.OutOrStdout()
+				fmt.Fprintln(out)
+				fmt.Fprintf(out, "%s %s %d file(s) %s %s\n", style.S(style.UseColorFor(out), style.Green, markOK), style.S(style.UseColorFor(out), style.Dim, "formated"), nwrite, style.S(style.UseColorFor(out), style.Dim, "under"), target)
+			}
+			if nfail > 0 {
+				return fmt.Errorf("format failed for %d file(s)", nfail)
+			}
+			return nil
+		},
+	}
+	c.Flags().BoolVarP(&write, "write", "w", false, "write result to source file(s) instead of stdout")
+	c.Flags().StringVar(&format, "format", "yaml", "output: yaml or json")
+	return c
 }
 
 func newExportCmd(resolveServer func() (string, error)) *cobra.Command {
