@@ -79,7 +79,7 @@ func newFmtCmd() *cobra.Command {
 			}
 
 			out := cmd.OutOrStdout()
-			logErr := func(format string, a ...any) { fmt.Fprintf(cmd.ErrOrStderr(), format+"\n", a...) }
+			logErr := func(format string, a ...any) { _, _ = fmt.Fprintf(cmd.ErrOrStderr(), format+"\n", a...) }
 			var nwrite, nfail int
 			var needsFormat, okPaths, failedPaths []string
 			for _, p := range paths {
@@ -116,22 +116,22 @@ func newFmtCmd() *cobra.Command {
 					continue
 				}
 				if len(paths) > 1 {
-					fmt.Fprintf(out, "# %s\n", p)
+					_, _ = fmt.Fprintf(out, "# %s\n", p)
 				}
 				if _, err := out.Write(formatted); err != nil {
 					return err
 				}
 				if len(paths) > 1 {
-					fmt.Fprintln(out)
+					_, _ = fmt.Fprintln(out)
 				}
 			}
 			if check {
 				color := style.UseColorFor(out)
-				fmt.Fprintln(out)
-				fmt.Fprintln(out, style.S(color, style.Bold, "Format check"))
-				fmt.Fprintln(out)
-				fmt.Fprintf(out, "%s %s\n", style.S(color, style.Dim, "Target:"), style.S(color, style.Bold, target))
-				fmt.Fprintln(out)
+				_, _ = fmt.Fprintln(out)
+				_, _ = fmt.Fprintln(out, style.S(color, style.Bold, "Format check"))
+				_, _ = fmt.Fprintln(out)
+				_, _ = fmt.Fprintf(out, "%s %s\n", style.S(color, style.Dim, "Target:"), style.S(color, style.Bold, target))
+				_, _ = fmt.Fprintln(out)
 
 				sort.Strings(paths)
 				needSet := make(map[string]struct{}, len(needsFormat))
@@ -145,21 +145,21 @@ func newFmtCmd() *cobra.Command {
 				for _, p := range paths {
 					switch {
 					case containsStrSet(failSet, p):
-						fmt.Fprintf(out, "%s %s %s %s\n",
+						_, _ = fmt.Fprintf(out, "%s %s %s %s\n",
 							style.S(color, style.Red, markFail),
 							style.S(color, style.Dim, "File:"),
 							style.S(color, style.Bold, p),
 							style.S(color, style.Red, "[failed]"),
 						)
 					case containsStrSet(needSet, p):
-						fmt.Fprintf(out, "%s %s %s %s\n",
+						_, _ = fmt.Fprintf(out, "%s %s %s %s\n",
 							style.S(color, style.Yellow, "!"),
 							style.S(color, style.Dim, "File:"),
 							style.S(color, style.Bold, p),
 							style.S(color, style.Yellow, "[needs formatting]"),
 						)
 					default:
-						fmt.Fprintf(out, "%s %s %s %s\n",
+						_, _ = fmt.Fprintf(out, "%s %s %s %s\n",
 							style.S(color, style.Green, markOK),
 							style.S(color, style.Dim, "File:"),
 							style.S(color, style.Bold, p),
@@ -167,18 +167,18 @@ func newFmtCmd() *cobra.Command {
 						)
 					}
 				}
-				fmt.Fprintln(out)
-				fmt.Fprintln(out, fmtCheckSummaryLine(len(okPaths), len(needsFormat), len(failedPaths), color))
+				_, _ = fmt.Fprintln(out)
+				_, _ = fmt.Fprintln(out, fmtCheckSummaryLine(len(okPaths), len(needsFormat), len(failedPaths), color))
 				if nfail > 0 || len(needsFormat) > 0 {
-					fmt.Fprintln(out)
+					_, _ = fmt.Fprintln(out)
 					return ErrFmtCheck
 				}
 				return nil
 			}
 			if write && fi.IsDir() {
 				out := cmd.OutOrStdout()
-				fmt.Fprintln(out)
-				fmt.Fprintf(out, "%s %s %d file(s) %s %s\n", style.S(style.UseColorFor(out), style.Green, markOK), style.S(style.UseColorFor(out), style.Dim, "formated"), nwrite, style.S(style.UseColorFor(out), style.Dim, "under"), target)
+				_, _ = fmt.Fprintln(out)
+				_, _ = fmt.Fprintf(out, "%s %s %d file(s) %s %s\n", style.S(style.UseColorFor(out), style.Green, markOK), style.S(style.UseColorFor(out), style.Dim, "formatted"), nwrite, style.S(style.UseColorFor(out), style.Dim, "under"), target)
 			}
 			if nfail > 0 {
 				return fmt.Errorf("format failed for %d file(s)", nfail)
@@ -274,7 +274,7 @@ func newExportBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 			stdout := cmd.OutOrStdout()
 			color := style.UseColorFor(stdout)
 			var printed bool
-			fmt.Fprintln(stdout)
+			_, _ = fmt.Fprintln(stdout)
 			for i, it := range items {
 				if it.Repository == "" || it.Ref == "" {
 					logf("batch[%d]: skip (missing repository or ref)", i)
@@ -297,10 +297,10 @@ func newExportBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 					continue
 				}
 				if printed {
-					fmt.Fprintln(stdout)
+					_, _ = fmt.Fprintln(stdout)
 				}
 				printed = true
-				fmt.Fprintf(stdout, "%s %s @ %s → %s\n",
+				_, _ = fmt.Fprintf(stdout, "%s %s @ %s → %s\n",
 					style.S(color, style.Dim, fmt.Sprintf("batch[%d]", i)),
 					it.Repository, it.Ref, dest)
 				printExportContractsReport(stdout, color, req, dest, files)
@@ -401,10 +401,10 @@ func newDiffBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 				}
 				itemTarget := batchItemDest(target, it)
 				if printed {
-					fmt.Fprintln(out)
+					_, _ = fmt.Fprintln(out)
 				}
 				printed = true
-				fmt.Fprintf(out, "%s %s @ %s → %s\n",
+				_, _ = fmt.Fprintf(out, "%s %s @ %s → %s\n",
 					style.S(color, style.Dim, fmt.Sprintf("batch[%d]", i)),
 					it.Repository, it.Ref, itemTarget)
 				_, err := contractdiff.Compare(context.Background(), contractdiff.Options{
@@ -486,7 +486,7 @@ func batchItemDest(globalDest string, it batchItem) string {
 }
 
 func printExportKV(w io.Writer, color bool, k, v string) {
-	fmt.Fprintf(w, "%s %s\n", style.S(color, style.Dim, k+":"), style.S(color, style.Bold, v))
+	_, _ = fmt.Fprintf(w, "%s %s\n", style.S(color, style.Dim, k+":"), style.S(color, style.Bold, v))
 }
 
 // printExportContractsReport prints a diff-style report after a successful export (stdout).
@@ -494,10 +494,10 @@ func printExportContractsReport(w io.Writer, color bool, req apiclient.ExportReq
 	sorted := append([]apiclient.ExportFile(nil), files...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].ContractName < sorted[j].ContractName })
 
-	fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w)
 
 	for _, f := range sorted {
-		fmt.Fprintf(w, "%s %s %s\n",
+		_, _ = fmt.Fprintf(w, "%s %s %s\n",
 			style.S(color, style.Green, markOK),
 			style.S(color, style.Dim, "Contract:"),
 			style.S(color, style.Bold, f.ContractName),

@@ -81,7 +81,7 @@ func Compare(ctx context.Context, o Options) (Summary, error) {
 			return Summary{}, fmt.Errorf("contract %s: %w", f.ContractName, err)
 		}
 		if metaName, err := ContractNameFromDoc(doc); err == nil && metaName != f.ContractName {
-			fmt.Fprintf(o.Out, "%s metadata contract.name %q differs from export name %q (using export name as key)\n",
+			_, _ = fmt.Fprintf(o.Out, "%s metadata contract.name %q differs from export name %q (using export name as key)\n",
 				style.S(o.Color, style.Dim, "note:"), metaName, f.ContractName)
 		}
 		remote[f.ContractName] = remoteEntry{File: f, Doc: doc}
@@ -90,9 +90,9 @@ func Compare(ctx context.Context, o Options) (Summary, error) {
 	var sum Summary
 	names := unionKeys(local, remote)
 
-	fmt.Fprintln(o.Out)
-	fmt.Fprintln(o.Out, style.S(o.Color, style.Bold, "Diff contracts"))
-	fmt.Fprintln(o.Out)
+	_, _ = fmt.Fprintln(o.Out)
+	_, _ = fmt.Fprintln(o.Out, style.S(o.Color, style.Bold, "Diff contracts"))
+	_, _ = fmt.Fprintln(o.Out)
 	printKV(o.Out, o.Color, "Repository", o.Request.Repository)
 	printKV(o.Out, o.Color, "Ref", o.Request.Ref)
 	if strings.TrimSpace(o.Request.Path) != "" {
@@ -102,7 +102,7 @@ func Compare(ctx context.Context, o Options) (Summary, error) {
 		printKV(o.Out, o.Color, "Contract", o.Request.ContractName)
 	}
 	printKV(o.Out, o.Color, "Target", o.Target)
-	fmt.Fprintln(o.Out)
+	_, _ = fmt.Fprintln(o.Out)
 
 	for _, name := range names {
 		lc, lok := local[name]
@@ -111,7 +111,7 @@ func Compare(ctx context.Context, o Options) (Summary, error) {
 		case lok && rok:
 			if reflect.DeepEqual(lc.Doc, re.Doc) {
 				sum.Unchanged++
-				fmt.Fprintf(o.Out, "%s %s %s %s\n",
+				_, _ = fmt.Fprintf(o.Out, "%s %s %s %s\n",
 					style.S(o.Color, style.Green, "✓"),
 					style.S(o.Color, style.Dim, "Contract:"),
 					style.S(o.Color, style.Bold, name),
@@ -120,7 +120,7 @@ func Compare(ctx context.Context, o Options) (Summary, error) {
 				continue
 			}
 			sum.Changed++
-			fmt.Fprintf(o.Out, "%s %s %s %s\n",
+			_, _ = fmt.Fprintf(o.Out, "%s %s %s %s\n",
 				style.S(o.Color, style.Yellow, "!"),
 				style.S(o.Color, style.Dim, "Contract:"),
 				style.S(o.Color, style.Bold, name),
@@ -143,38 +143,38 @@ func Compare(ctx context.Context, o Options) (Summary, error) {
 				"\n",
 			)
 			printIndentedDiff(o.Out, o.Color, text)
-			fmt.Fprintln(o.Out)
+			_, _ = fmt.Fprintln(o.Out)
 		case lok && !rok:
 			sum.OnlyLocal++
-			fmt.Fprintf(o.Out, "%s %s %s %s\n",
+			_, _ = fmt.Fprintf(o.Out, "%s %s %s %s\n",
 				style.S(o.Color, style.Yellow, "!"),
 				style.S(o.Color, style.Dim, "Contract:"),
 				style.S(o.Color, style.Bold, name),
 				style.S(o.Color, style.Yellow, "[only local, not in export]"),
 			)
-			fmt.Fprintf(o.Out, "    %s\n", style.S(o.Color, style.Dim, lc.Path))
-			fmt.Fprintln(o.Out)
+			_, _ = fmt.Fprintf(o.Out, "    %s\n", style.S(o.Color, style.Dim, lc.Path))
+			_, _ = fmt.Fprintln(o.Out)
 		case !lok && rok:
 			sum.OnlyRemote++
-			fmt.Fprintf(o.Out, "%s %s %s %s\n",
+			_, _ = fmt.Fprintf(o.Out, "%s %s %s %s\n",
 				style.S(o.Color, style.Yellow, "!"),
 				style.S(o.Color, style.Dim, "Contract:"),
 				style.S(o.Color, style.Bold, name),
 				style.S(o.Color, style.Yellow, "[only remote, missing locally]"),
 			)
-			fmt.Fprintf(o.Out, "    %s %s\n",
+			_, _ = fmt.Fprintf(o.Out, "    %s %s\n",
 				style.S(o.Color, style.Dim, "source_path:"),
 				style.S(o.Color, style.Dim, re.File.SourcePath),
 			)
-			fmt.Fprintln(o.Out)
+			_, _ = fmt.Fprintln(o.Out)
 		}
 	}
 
-	fmt.Fprintln(o.Out)
-	fmt.Fprintln(o.Out, summaryLine(sum, o.Color))
+	_, _ = fmt.Fprintln(o.Out)
+	_, _ = fmt.Fprintln(o.Out, summaryLine(sum, o.Color))
 
 	if sum.HasWork() {
-		fmt.Fprintln(o.Out)
+		_, _ = fmt.Fprintln(o.Out)
 		return sum, ErrChanges
 	}
 	return sum, nil
@@ -197,7 +197,7 @@ func unionKeys(local map[string]LocalContract, remote map[string]remoteEntry) []
 }
 
 func printKV(out io.Writer, color bool, k, v string) {
-	fmt.Fprintf(out, "%s %s\n", style.S(color, style.Dim, k+":"), style.S(color, style.Bold, v))
+	_, _ = fmt.Fprintf(out, "%s %s\n", style.S(color, style.Dim, k+":"), style.S(color, style.Bold, v))
 }
 
 func summaryLine(s Summary, color bool) string {
@@ -234,7 +234,7 @@ func printIndentedDiff(out io.Writer, color bool, unified string) {
 			continue
 		}
 		if strings.HasPrefix(line, "---") && !beforeFirstMinusMinus {
-			fmt.Fprintln(out)
+			_, _ = fmt.Fprintln(out)
 			beforeFirstMinusMinus = true
 		}
 		var colored string
@@ -248,12 +248,12 @@ func printIndentedDiff(out io.Writer, color bool, unified string) {
 		default:
 			colored = style.S(color, style.Dim, line)
 		}
-		fmt.Fprintf(out, "    %s\n", colored)
+		_, _ = fmt.Fprintf(out, "    %s\n", colored)
 		if strings.HasPrefix(line, "+++") {
-			fmt.Fprintln(out)
+			_, _ = fmt.Fprintln(out)
 		}
 		if strings.HasPrefix(line, "@@") {
-			fmt.Fprintln(out)
+			_, _ = fmt.Fprintln(out)
 		}
 	}
 }

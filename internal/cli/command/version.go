@@ -15,8 +15,8 @@ func NewVersionCommand() *cobra.Command {
 		Short: "Print agwctl version and build metadata",
 		Run: func(cmd *cobra.Command, _ []string) {
 			out := cmd.OutOrStdout()
-			fmt.Fprintln(out)
-			fmt.Fprintln(out, version.Details())
+			_, _ = fmt.Fprintln(out)
+			_, _ = fmt.Fprintln(out, version.Details())
 		},
 	}
 }

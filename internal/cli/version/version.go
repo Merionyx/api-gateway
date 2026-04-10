@@ -37,13 +37,13 @@ func Details() string {
 	if v == "" {
 		v = "dev"
 	}
-	fmt.Fprintf(&b, "agwctl %s\n", v)
+	_, _ = fmt.Fprintf(&b, "agwctl %s\n", v)
 	if c := strings.TrimSpace(Commit); c != "" {
-		fmt.Fprintf(&b, "commit: %s\n", c)
+		_, _ = fmt.Fprintf(&b, "commit: %s\n", c)
 	}
 	if t := strings.TrimSpace(BuildTime); t != "" {
-		fmt.Fprintf(&b, "build: %s\n", t)
+		_, _ = fmt.Fprintf(&b, "build: %s\n", t)
 	}
-	fmt.Fprintf(&b, "go: %s\n", runtime.Version())
+	_, _ = fmt.Fprintf(&b, "go: %s\n", runtime.Version())
 	return strings.TrimSuffix(b.String(), "\n")
 }
