@@ -28,9 +28,10 @@ func Execute() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:          "agwctl",
-	Short:        "Merionyx API Gateway control CLI",
-	SilenceUsage: true,
+	Use:           "agwctl",
+	Short:         "Merionyx API Gateway control CLI",
+	SilenceUsage:  true,
+	SilenceErrors: true, // print errors only once in Execute (stderr), not again as "Error:" from cobra
 }
 
 func init() {
@@ -48,4 +49,5 @@ func init() {
 	rootCmd.AddCommand(command.NewPingCommand(resolveServer))
 	rootCmd.AddCommand(command.NewConfigCommand())
 	rootCmd.AddCommand(command.NewVersionCommand())
+	rootCmd.AddCommand(command.NewValidateCommand())
 }
