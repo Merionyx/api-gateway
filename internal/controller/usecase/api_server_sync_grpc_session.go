@@ -7,9 +7,9 @@ import (
 	"log/slog"
 	"time"
 
-	pb "merionyx/api-gateway/pkg/api/controller_registry/v1"
+	pb "github.com/merionyx/api-gateway/pkg/grpc/controller_registry/v1"
 
-	"merionyx/api-gateway/internal/shared/grpcobs"
+	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"

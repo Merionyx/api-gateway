@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"merionyx/api-gateway/internal/shared/etcd"
+	"github.com/merionyx/api-gateway/internal/shared/etcd"
 )
 
 func TestConnectEtcd_NoEndpoints(t *testing.T) {

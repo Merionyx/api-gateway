@@ -4,11 +4,12 @@ import (
 	"context"
 	"testing"
 
-	"merionyx/api-gateway/internal/controller/domain/interfaces"
-	"merionyx/api-gateway/internal/controller/domain/models"
-	"merionyx/api-gateway/internal/controller/index/bundleenv"
-	xdscache "merionyx/api-gateway/internal/controller/xds/cache"
-	environmentsv1 "merionyx/api-gateway/pkg/api/environments/v1"
+	environmentsv1 "github.com/merionyx/api-gateway/pkg/grpc/environments/v1"
+
+	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
+	"github.com/merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/controller/index/bundleenv"
+	xdscache "github.com/merionyx/api-gateway/internal/controller/xds/cache"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

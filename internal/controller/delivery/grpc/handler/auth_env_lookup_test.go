@@ -5,12 +5,12 @@ import (
 	"errors"
 	"testing"
 
-	"merionyx/api-gateway/internal/controller/config"
-	"merionyx/api-gateway/internal/controller/domain/interfaces"
-	"merionyx/api-gateway/internal/controller/domain/models"
-	"merionyx/api-gateway/internal/controller/index/bundleenv"
-	xdscache "merionyx/api-gateway/internal/controller/xds/cache"
-	"merionyx/api-gateway/internal/shared/bundlekey"
+	"github.com/merionyx/api-gateway/internal/controller/config"
+	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
+	"github.com/merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/controller/index/bundleenv"
+	xdscache "github.com/merionyx/api-gateway/internal/controller/xds/cache"
+	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
 )
 
 type stubMem struct {

@@ -7,15 +7,16 @@ import (
 	"log/slog"
 	"time"
 
-	"merionyx/api-gateway/internal/api-server/domain/interfaces"
-	"merionyx/api-gateway/internal/api-server/domain/models"
-	apimetrics "merionyx/api-gateway/internal/api-server/metrics"
-	"merionyx/api-gateway/internal/shared/bundlekey"
-	"merionyx/api-gateway/internal/shared/election"
-	sharedgit "merionyx/api-gateway/internal/shared/git"
-	"merionyx/api-gateway/internal/shared/grpcobs"
-	"merionyx/api-gateway/internal/shared/grpcutil"
-	pb "merionyx/api-gateway/pkg/api/contract_syncer/v1"
+	pb "github.com/merionyx/api-gateway/pkg/grpc/contract_syncer/v1"
+
+	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
+	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
+	apimetrics "github.com/merionyx/api-gateway/internal/api-server/metrics"
+	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
+	"github.com/merionyx/api-gateway/internal/shared/election"
+	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
+	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
+	"github.com/merionyx/api-gateway/internal/shared/grpcutil"
 
 	"google.golang.org/grpc"
 )

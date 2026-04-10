@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	xdspkg "merionyx/api-gateway/internal/controller/xds"
-	"merionyx/api-gateway/internal/shared/serviceapp"
 	"net"
+
+	xdspkg "github.com/merionyx/api-gateway/internal/controller/xds"
+	"github.com/merionyx/api-gateway/internal/shared/serviceapp"
 
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/server/v3"

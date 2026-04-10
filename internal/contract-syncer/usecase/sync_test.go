@@ -3,7 +3,7 @@ package usecase
 import (
 	"testing"
 
-	sharedgit "merionyx/api-gateway/internal/shared/git"
+	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 )
 
 func TestSyncUseCase_Sync_UnknownRepo(t *testing.T) {

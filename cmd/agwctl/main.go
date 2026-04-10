@@ -13,7 +13,7 @@
 
 package main
 
-import "merionyx/api-gateway/internal/cli"
+import "github.com/merionyx/api-gateway/internal/cli"
 
 func main() {
 	cli.Execute()

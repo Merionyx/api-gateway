@@ -7,9 +7,9 @@ import (
 	"net"
 	"net/http"
 
-	"merionyx/api-gateway/internal/controller/container"
-	"merionyx/api-gateway/internal/controller/delivery/http"
-	"merionyx/api-gateway/internal/shared/serviceapp"
+	"github.com/merionyx/api-gateway/internal/controller/container"
+	httpdelivery "github.com/merionyx/api-gateway/internal/controller/delivery/http"
+	"github.com/merionyx/api-gateway/internal/shared/serviceapp"
 )
 
 // RunHTTPServer serves the probe mux until ctx is cancelled.

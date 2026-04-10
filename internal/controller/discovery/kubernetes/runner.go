@@ -10,10 +10,11 @@ import (
 	"strconv"
 	"time"
 
-	"merionyx/api-gateway/internal/controller/config"
-	"merionyx/api-gateway/internal/controller/domain/interfaces"
-	"merionyx/api-gateway/internal/controller/domain/models"
-	gwv1alpha1 "merionyx/api-gateway/pkg/api/gateway/v1alpha1"
+	gwv1alpha1 "github.com/merionyx/api-gateway/pkg/apis/crd/v1alpha1"
+
+	"github.com/merionyx/api-gateway/internal/controller/config"
+	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
+	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"

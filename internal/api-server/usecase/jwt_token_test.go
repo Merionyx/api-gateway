@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"merionyx/api-gateway/internal/api-server/domain/models"
+	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 )
 
 func TestJWTUseCase_GenerateToken(t *testing.T) {

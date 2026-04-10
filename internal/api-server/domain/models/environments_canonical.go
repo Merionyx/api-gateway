@@ -3,7 +3,7 @@ package models
 import (
 	"sort"
 
-	"merionyx/api-gateway/internal/shared/bundlekey"
+	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
 )
 
 // CanonicalEnvironmentsForStorage returns a copy with stable ordering so JSON in etcd

@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"os"
 
-	"merionyx/api-gateway/internal/controller/app"
+	"github.com/merionyx/api-gateway/internal/controller/app"
 )
 
 func main() {

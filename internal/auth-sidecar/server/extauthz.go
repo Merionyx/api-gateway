@@ -16,11 +16,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
 
-	"merionyx/api-gateway/internal/auth-sidecar/container"
-	authmetrics "merionyx/api-gateway/internal/auth-sidecar/metrics"
-	"merionyx/api-gateway/internal/shared/grpcobs"
-	"merionyx/api-gateway/internal/shared/serviceapp"
-	"merionyx/api-gateway/internal/shared/utils"
+	"github.com/merionyx/api-gateway/internal/auth-sidecar/container"
+	authmetrics "github.com/merionyx/api-gateway/internal/auth-sidecar/metrics"
+	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
+	"github.com/merionyx/api-gateway/internal/shared/serviceapp"
+	"github.com/merionyx/api-gateway/internal/shared/utils"
 )
 
 type ExtAuthzServer struct {

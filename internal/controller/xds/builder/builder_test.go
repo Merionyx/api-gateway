@@ -3,9 +3,9 @@ package builder
 import (
 	"testing"
 
-	"merionyx/api-gateway/internal/controller/config"
-	"merionyx/api-gateway/internal/controller/domain/models"
-	"merionyx/api-gateway/internal/controller/repository/memory"
+	"github.com/merionyx/api-gateway/internal/controller/config"
+	"github.com/merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/controller/repository/memory"
 )
 
 func TestXDSBuilder_BuildAll_RealisticEnvironment(t *testing.T) {

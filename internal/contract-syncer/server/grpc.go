@@ -6,10 +6,11 @@ import (
 	"log/slog"
 	"net"
 
-	"merionyx/api-gateway/internal/contract-syncer/container"
-	"merionyx/api-gateway/internal/shared/grpcobs"
-	"merionyx/api-gateway/internal/shared/serviceapp"
-	pb "merionyx/api-gateway/pkg/api/contract_syncer/v1"
+	pb "github.com/merionyx/api-gateway/pkg/grpc/contract_syncer/v1"
+
+	"github.com/merionyx/api-gateway/internal/contract-syncer/container"
+	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
+	"github.com/merionyx/api-gateway/internal/shared/serviceapp"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"

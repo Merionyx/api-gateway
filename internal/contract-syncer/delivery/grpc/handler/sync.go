@@ -5,10 +5,11 @@ import (
 	"log/slog"
 	"time"
 
-	"merionyx/api-gateway/internal/contract-syncer/domain/interfaces"
-	syncmetrics "merionyx/api-gateway/internal/contract-syncer/metrics"
-	contractv1 "merionyx/api-gateway/pkg/api/contract/v1"
-	pb "merionyx/api-gateway/pkg/api/contract_syncer/v1"
+	commonv1 "github.com/merionyx/api-gateway/pkg/grpc/common/v1"
+	pb "github.com/merionyx/api-gateway/pkg/grpc/contract_syncer/v1"
+
+	"github.com/merionyx/api-gateway/internal/contract-syncer/domain/interfaces"
+	syncmetrics "github.com/merionyx/api-gateway/internal/contract-syncer/metrics"
 )
 
 type SyncHandler struct {
@@ -39,24 +40,24 @@ func (h *SyncHandler) Sync(ctx context.Context, req *pb.SyncRequest) (*pb.SyncRe
 	}
 	syncmetrics.RecordSync(h.metricsEnabled, syncmetrics.OutcomeOK, time.Since(start))
 
-	var pbSnapshots []*contractv1.ContractSnapshot
+	var pbSnapshots []*commonv1.ContractSnapshot
 	for _, snapshot := range snapshots {
-		var pbApps []*contractv1.App
+		var pbApps []*commonv1.App
 		for _, app := range snapshot.Access.Apps {
-			pbApps = append(pbApps, &contractv1.App{
+			pbApps = append(pbApps, &commonv1.App{
 				AppId:        app.AppID,
 				Environments: app.Environments,
 			})
 		}
 
-		pbSnapshots = append(pbSnapshots, &contractv1.ContractSnapshot{
+		pbSnapshots = append(pbSnapshots, &commonv1.ContractSnapshot{
 			Name:   snapshot.Name,
 			Prefix: snapshot.Prefix,
-			Upstream: &contractv1.ContractUpstream{
+			Upstream: &commonv1.ContractUpstream{
 				Name: snapshot.Upstream.Name,
 			},
 			AllowUndefinedMethods: snapshot.AllowUndefinedMethods,
-			Access: &contractv1.Access{
+			Access: &commonv1.Access{
 				Secure: snapshot.Access.Secure,
 				Apps:   pbApps,
 			},

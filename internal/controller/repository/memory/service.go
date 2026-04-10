@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"sync"
 
-	"merionyx/api-gateway/internal/controller/config"
-	"merionyx/api-gateway/internal/controller/domain/interfaces"
-	"merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/controller/config"
+	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
+	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 )
 
 type ServiceRepository struct {

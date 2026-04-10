@@ -3,7 +3,7 @@ package usecase
 import (
 	"testing"
 
-	"merionyx/api-gateway/internal/shared/grpcobs"
+	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
 )
 
 func TestBundleSyncUseCase_grpcDialOptions_Insecure(t *testing.T) {

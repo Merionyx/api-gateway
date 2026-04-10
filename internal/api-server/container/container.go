@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"log/slog"
 
-	"merionyx/api-gateway/internal/api-server/config"
-	grpchandler "merionyx/api-gateway/internal/api-server/delivery/grpc/handler"
-	httphandler "merionyx/api-gateway/internal/api-server/delivery/http/handler"
-	"merionyx/api-gateway/internal/api-server/domain/interfaces"
-	"merionyx/api-gateway/internal/api-server/repository/etcd"
-	"merionyx/api-gateway/internal/api-server/usecase"
-	"merionyx/api-gateway/internal/shared/bootstrap"
-	"merionyx/api-gateway/internal/shared/election"
+	"github.com/merionyx/api-gateway/internal/api-server/config"
+	grpchandler "github.com/merionyx/api-gateway/internal/api-server/delivery/grpc/handler"
+	httphandler "github.com/merionyx/api-gateway/internal/api-server/delivery/http/handler"
+	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
+	"github.com/merionyx/api-gateway/internal/api-server/repository/etcd"
+	"github.com/merionyx/api-gateway/internal/api-server/usecase"
+	"github.com/merionyx/api-gateway/internal/shared/bootstrap"
+	"github.com/merionyx/api-gateway/internal/shared/election"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )

@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"merionyx/api-gateway/internal/cli/apiclient"
-	"merionyx/api-gateway/internal/cli/convertfmt"
+	"github.com/merionyx/api-gateway/internal/cli/apiclient"
+	"github.com/merionyx/api-gateway/internal/cli/convertfmt"
 )
 
 func sanitizeBase(name string) string {

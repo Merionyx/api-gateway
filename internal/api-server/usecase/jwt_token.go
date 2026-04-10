@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"merionyx/api-gateway/internal/api-server/domain/models"
+	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"

@@ -3,8 +3,8 @@ package usecase
 import (
 	"testing"
 
-	"merionyx/api-gateway/internal/api-server/domain/models"
-	"merionyx/api-gateway/internal/shared/bundlekey"
+	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
+	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
 )
 
 func TestCollectUniqueBundles_dedupesByBundleKey(t *testing.T) {

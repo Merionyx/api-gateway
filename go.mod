@@ -1,4 +1,4 @@
-module merionyx/api-gateway
+module github.com/merionyx/api-gateway
 
 go 1.26.2
 

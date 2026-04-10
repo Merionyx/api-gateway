@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"merionyx/api-gateway/internal/shared/election"
+	"github.com/merionyx/api-gateway/internal/shared/election"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )

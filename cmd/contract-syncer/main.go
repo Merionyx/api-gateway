@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"os"
 
-	syncer "merionyx/api-gateway/internal/contract-syncer/app"
+	syncer "github.com/merionyx/api-gateway/internal/contract-syncer/app"
 )
 
 func main() {

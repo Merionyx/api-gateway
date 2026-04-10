@@ -4,13 +4,14 @@ import (
 	"context"
 	"time"
 
-	"merionyx/api-gateway/internal/controller/domain/interfaces"
-	"merionyx/api-gateway/internal/controller/domain/models"
-	"merionyx/api-gateway/internal/controller/index/bundleenv"
-	ctrlmetrics "merionyx/api-gateway/internal/controller/metrics"
-	"merionyx/api-gateway/internal/shared/election"
-	contractv1 "merionyx/api-gateway/pkg/api/contract/v1"
-	environmentsv1 "merionyx/api-gateway/pkg/api/environments/v1"
+	commonv1 "github.com/merionyx/api-gateway/pkg/grpc/common/v1"
+	environmentsv1 "github.com/merionyx/api-gateway/pkg/grpc/environments/v1"
+
+	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
+	"github.com/merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/controller/index/bundleenv"
+	ctrlmetrics "github.com/merionyx/api-gateway/internal/controller/metrics"
+	"github.com/merionyx/api-gateway/internal/shared/election"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -202,22 +203,22 @@ func modelToProtoServicesConfig(services *models.EnvironmentServiceConfig) *envi
 	}
 }
 
-func modelToProtoSnapshots(snapshots []models.ContractSnapshot) []*contractv1.ContractSnapshot {
-	var result []*contractv1.ContractSnapshot
+func modelToProtoSnapshots(snapshots []models.ContractSnapshot) []*commonv1.ContractSnapshot {
+	var result []*commonv1.ContractSnapshot
 	for _, s := range snapshots {
-		var pbApps []*contractv1.App
+		var pbApps []*commonv1.App
 		for _, app := range s.Access.Apps {
-			pbApps = append(pbApps, &contractv1.App{
+			pbApps = append(pbApps, &commonv1.App{
 				AppId:        app.AppID,
 				Environments: app.Environments,
 			})
 		}
-		result = append(result, &contractv1.ContractSnapshot{
+		result = append(result, &commonv1.ContractSnapshot{
 			Name:                  s.Name,
 			Prefix:                s.Prefix,
-			Upstream:              &contractv1.ContractUpstream{Name: s.Upstream.Name},
+			Upstream:              &commonv1.ContractUpstream{Name: s.Upstream.Name},
 			AllowUndefinedMethods: s.AllowUndefinedMethods,
-			Access: &contractv1.Access{
+			Access: &commonv1.Access{
 				Secure: s.Access.Secure,
 				Apps:   pbApps,
 			},

@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"os"
 
-	"merionyx/api-gateway/internal/auth-sidecar/app"
+	"github.com/merionyx/api-gateway/internal/auth-sidecar/app"
 )
 
 func main() {
