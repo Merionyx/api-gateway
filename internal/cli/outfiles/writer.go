@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/merionyx/api-gateway/internal/cli/apiclient"
+	"github.com/merionyx/api-gateway/internal/cli/contractfmt"
 	"github.com/merionyx/api-gateway/internal/cli/convertfmt"
 )
 
@@ -36,9 +37,9 @@ func WriteExported(files []apiclient.ExportFile, outDir, formatFlag string) erro
 			if tgt == "yml" {
 				tgt = "yaml"
 			}
-			conv, err := convertfmt.Convert(raw, sourceExt, tgt)
+			conv, err := contractfmt.FormatBytes(raw, sourceExt, tgt)
 			if err != nil {
-				return fmt.Errorf("contract %s: convert: %w", f.ContractName, err)
+				return fmt.Errorf("contract %s: format: %w", f.ContractName, err)
 			}
 			data = conv
 			if tgt == "json" {

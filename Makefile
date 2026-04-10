@@ -17,9 +17,14 @@ build: ## Build binary
 	mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o $(BUILD_DIR)/$(BINARY_NAME) cmd/controller/main.go
 
-build-cli: ## Build agwctl CLI
+build-cli: ## Build agwctl CLI (embeds git tag/rev/time via -ldflags when git available)
 	mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=0 go build -o $(BUILD_DIR)/agwctl ./cmd/agwctl
+	CGO_ENABLED=0 go build -o $(BUILD_DIR)/agwctl \
+		-ldflags "-s -w \
+		-X 'github.com/merionyx/api-gateway/internal/cli/version.Version=$(shell git describe --tags --always --dirty 2>/dev/null || echo dev)' \
+		-X 'github.com/merionyx/api-gateway/internal/cli/version.Commit=$(shell git rev-parse --short HEAD 2>/dev/null)' \
+		-X 'github.com/merionyx/api-gateway/internal/cli/version.BuildTime=$(shell date -u +%Y-%m-%dT%H:%M:%SZ)'" \
+		./cmd/agwctl
 
 test: ## Run all tests
 	go test -v ./...
@@ -134,7 +139,7 @@ dev: ## Development mode with hot reload
 
 PROTO_MODULE ?= github.com/merionyx/api-gateway
 PROTO_ROOT ?= apis/proto
-# Исходники: apis/proto/merionyx/gateway/<домен>/v1 — package merionyx.gateway.<домен>.v1 (Buf PACKAGE_DIRECTORY_MATCH).
+# Sources: apis/proto/merionyx/gateway/<domain>/v1 — package merionyx.gateway.<domain>.v1 (Buf PACKAGE_DIRECTORY_MATCH).
 PROTO_FILES := $(shell find $(PROTO_ROOT)/merionyx/gateway -type f -name '*.proto' 2>/dev/null | LC_ALL=C sort)
 
 
@@ -144,7 +149,7 @@ proto-generate: ## Generate protobuf code (writes under pkg/grpc/...; see PROTO_
 		--go-grpc_out=. --go-grpc_opt=module=$(PROTO_MODULE) --go-grpc_opt=paths=import \
 		$(PROTO_FILES)
 
-# Вызывайте make из корня репозитория (как обычно). cd не нужен: buf получает путь к модулю аргументом.
+# Call make from the root repository (as usual). cd is not needed: buf gets the module path as an argument.
 proto-lint: ## Lint .proto (requires buf: https://buf.build/docs/installation)
 	buf lint $(PROTO_ROOT)
 

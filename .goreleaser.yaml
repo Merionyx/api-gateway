@@ -54,6 +54,12 @@ builds:
   main: ./cmd/agwctl
   env:
   - CGO_ENABLED=0
+  ldflags:
+  - -s
+  - -w
+  - -X github.com/merionyx/api-gateway/internal/cli/version.Version={{.Version}}
+  - -X github.com/merionyx/api-gateway/internal/cli/version.Commit={{.ShortCommit}}
+  - -X github.com/merionyx/api-gateway/internal/cli/version.BuildTime={{.Date}}
   goos:
   - linux
   - darwin

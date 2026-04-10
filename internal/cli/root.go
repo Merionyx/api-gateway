@@ -7,6 +7,7 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/cli/command"
 	"github.com/merionyx/api-gateway/internal/cli/config"
+	"github.com/merionyx/api-gateway/internal/cli/version"
 
 	"github.com/spf13/cobra"
 )
@@ -14,6 +15,8 @@ import (
 var (
 	contextName    string
 	serverOverride string
+	tlsInsecure    bool
+	tlsCACert      string
 )
 
 // Execute runs the root cobra command (os.Exit on error).
@@ -25,14 +28,26 @@ func Execute() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "agwctl",
-	Short: "Merionyx API Gateway control CLI",
+	Use:           "agwctl",
+	Short:         "Merionyx API Gateway control CLI",
+	SilenceUsage:  true,
+	SilenceErrors: true, // print errors only once in Execute (stderr), not again as "Error:" from cobra
 }
 
 func init() {
+	rootCmd.Version = version.Line()
+	rootCmd.SetVersionTemplate("{{.Version}}\n")
+
 	rootCmd.PersistentFlags().StringVar(&contextName, "context", "", "config context name (see ~/.config/agwctl/config.yaml)")
 	rootCmd.PersistentFlags().StringVar(&serverOverride, "server", "", "API Server base URL, e.g. http://127.0.0.1:8080 (overrides context)")
-	rootCmd.AddCommand(command.NewContractCommand(func() (string, error) {
+	rootCmd.PersistentFlags().BoolVar(&tlsInsecure, "insecure", false, "skip TLS certificate verification for HTTPS (unsafe; only when you must)")
+	rootCmd.PersistentFlags().StringVar(&tlsCACert, "ca-cert", "", "path to PEM file with extra CA certificate(s) for HTTPS (e.g. corporate CA); not used with --insecure")
+	resolveServer := func() (string, error) {
 		return config.ResolveServerURL(contextName, serverOverride)
-	}))
+	}
+	rootCmd.AddCommand(command.NewContractCommand(resolveServer))
+	rootCmd.AddCommand(command.NewPingCommand(resolveServer))
+	rootCmd.AddCommand(command.NewConfigCommand())
+	rootCmd.AddCommand(command.NewVersionCommand())
+	rootCmd.AddCommand(command.NewValidateCommand())
 }
