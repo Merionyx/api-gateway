@@ -16,3 +16,5 @@ LABEL org.opencontainers.image.title="Merionyx Alpine base" \
       org.opencontainers.image.logo="https://avatars.githubusercontent.com/u/208366109?s=512" \
       com.docker.extension.icon="https://avatars.githubusercontent.com/u/208366109?s=512" \
       dev.orbstack.icon="https://avatars.githubusercontent.com/u/208366109?s=512"
+
+USER app
