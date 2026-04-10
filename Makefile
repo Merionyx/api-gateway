@@ -17,9 +17,14 @@ build: ## Build binary
 	mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o $(BUILD_DIR)/$(BINARY_NAME) cmd/controller/main.go
 
-build-cli: ## Build agwctl CLI
+build-cli: ## Build agwctl CLI (embeds git tag/rev/time via -ldflags when git available)
 	mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=0 go build -o $(BUILD_DIR)/agwctl ./cmd/agwctl
+	CGO_ENABLED=0 go build -o $(BUILD_DIR)/agwctl \
+		-ldflags "-s -w \
+		-X 'github.com/merionyx/api-gateway/internal/cli/version.Version=$(shell git describe --tags --always --dirty 2>/dev/null || echo dev)' \
+		-X 'github.com/merionyx/api-gateway/internal/cli/version.Commit=$(shell git rev-parse --short HEAD 2>/dev/null)' \
+		-X 'github.com/merionyx/api-gateway/internal/cli/version.BuildTime=$(shell date -u +%Y-%m-%dT%H:%M:%SZ)'" \
+		./cmd/agwctl
 
 test: ## Run all tests
 	go test -v ./...

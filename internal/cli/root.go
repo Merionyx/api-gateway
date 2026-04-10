@@ -7,6 +7,7 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/cli/command"
 	"github.com/merionyx/api-gateway/internal/cli/config"
+	"github.com/merionyx/api-gateway/internal/cli/version"
 
 	"github.com/spf13/cobra"
 )
@@ -30,10 +31,14 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
+	rootCmd.Version = version.Line()
+	rootCmd.SetVersionTemplate("{{.Version}}\n")
+
 	rootCmd.PersistentFlags().StringVar(&contextName, "context", "", "config context name (see ~/.config/agwctl/config.yaml)")
 	rootCmd.PersistentFlags().StringVar(&serverOverride, "server", "", "API Server base URL, e.g. http://127.0.0.1:8080 (overrides context)")
 	rootCmd.AddCommand(command.NewContractCommand(func() (string, error) {
 		return config.ResolveServerURL(contextName, serverOverride)
 	}))
 	rootCmd.AddCommand(command.NewConfigCommand())
+	rootCmd.AddCommand(command.NewVersionCommand())
 }
