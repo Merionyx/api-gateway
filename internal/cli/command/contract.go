@@ -2,6 +2,7 @@
 package command
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/merionyx/api-gateway/internal/cli/apiclient"
@@ -21,6 +23,10 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
+
+// ErrFmtCheck is returned when contract fmt --check finds files that still need formatting
+// or could not be read/formatted (see stdout for the styled report).
+var ErrFmtCheck = errors.New("fmt check: not clean")
 
 // NewContractCommand builds `agwctl contract ...`. resolveServer returns the API Server base URL.
 func NewContractCommand(resolveServer func() (string, error)) *cobra.Command {
@@ -40,19 +46,27 @@ func NewContractCommand(resolveServer func() (string, error)) *cobra.Command {
 
 func newFmtCmd() *cobra.Command {
 	var write bool
+	var check bool
 	var format string
 	c := &cobra.Command{
 		Use:   "fmt PATH",
 		Short: "Canonicalize contract YAML/JSON (OpenAPI 3.x via kin-openapi, x-api-gateway v1 with fixed field order)",
-		Args:  cobra.ExactArgs(1),
+		Long: "Without --write, prints the formatted document to stdout (single file only).\n" +
+			"With --write, overwrites source file(s). With --check, compares each file to formatted output " +
+			"and prints a report (same style as contract diff); exits with error if anything would change or failed to read/format. " +
+			"Directories require --write or --check.",
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			target := args[0]
+			if write && check {
+				return fmt.Errorf("--write and --check cannot be used together")
+			}
 			fi, err := os.Stat(filepath.Clean(target))
 			if err != nil {
 				return err
 			}
-			if fi.IsDir() && !write {
-				return fmt.Errorf("formatting a directory requires --write")
+			if fi.IsDir() && !write && !check {
+				return fmt.Errorf("formatting a directory requires --write or --check")
 			}
 
 			paths, err := validate.CollectFiles(target)
@@ -66,10 +80,12 @@ func newFmtCmd() *cobra.Command {
 			out := cmd.OutOrStdout()
 			logErr := func(format string, a ...any) { fmt.Fprintf(cmd.ErrOrStderr(), format+"\n", a...) }
 			var nwrite, nfail int
+			var needsFormat, okPaths, failedPaths []string
 			for _, p := range paths {
 				data, err := os.ReadFile(p)
 				if err != nil {
 					logErr("%s: read: %v", p, err)
+					failedPaths = append(failedPaths, p)
 					nfail++
 					continue
 				}
@@ -77,7 +93,16 @@ func newFmtCmd() *cobra.Command {
 				formatted, err := contractfmt.FormatBytes(data, ext, format)
 				if err != nil {
 					logErr("%s: %v", p, err)
+					failedPaths = append(failedPaths, p)
 					nfail++
+					continue
+				}
+				if check {
+					if !bytes.Equal(data, formatted) {
+						needsFormat = append(needsFormat, p)
+					} else {
+						okPaths = append(okPaths, p)
+					}
 					continue
 				}
 				if write {
@@ -99,6 +124,56 @@ func newFmtCmd() *cobra.Command {
 					fmt.Fprintln(out)
 				}
 			}
+			if check {
+				color := style.UseColorFor(out)
+				fmt.Fprintln(out)
+				fmt.Fprintln(out, style.S(color, style.Bold, "Format check"))
+				fmt.Fprintln(out)
+				fmt.Fprintf(out, "%s %s\n", style.S(color, style.Dim, "Target:"), style.S(color, style.Bold, target))
+				fmt.Fprintln(out)
+
+				sort.Strings(paths)
+				needSet := make(map[string]struct{}, len(needsFormat))
+				for _, p := range needsFormat {
+					needSet[p] = struct{}{}
+				}
+				failSet := make(map[string]struct{}, len(failedPaths))
+				for _, p := range failedPaths {
+					failSet[p] = struct{}{}
+				}
+				for _, p := range paths {
+					switch {
+					case containsStrSet(failSet, p):
+						fmt.Fprintf(out, "%s %s %s %s\n",
+							style.S(color, style.Red, markFail),
+							style.S(color, style.Dim, "File:"),
+							style.S(color, style.Bold, p),
+							style.S(color, style.Red, "[failed]"),
+						)
+					case containsStrSet(needSet, p):
+						fmt.Fprintf(out, "%s %s %s %s\n",
+							style.S(color, style.Yellow, "!"),
+							style.S(color, style.Dim, "File:"),
+							style.S(color, style.Bold, p),
+							style.S(color, style.Yellow, "[needs formatting]"),
+						)
+					default:
+						fmt.Fprintf(out, "%s %s %s %s\n",
+							style.S(color, style.Green, markOK),
+							style.S(color, style.Dim, "File:"),
+							style.S(color, style.Bold, p),
+							style.S(color, style.Green, "[ok]"),
+						)
+					}
+				}
+				fmt.Fprintln(out)
+				fmt.Fprintln(out, fmtCheckSummaryLine(len(okPaths), len(needsFormat), len(failedPaths), color))
+				if nfail > 0 || len(needsFormat) > 0 {
+					fmt.Fprintln(out)
+					return ErrFmtCheck
+				}
+				return nil
+			}
 			if write && fi.IsDir() {
 				out := cmd.OutOrStdout()
 				fmt.Fprintln(out)
@@ -111,6 +186,7 @@ func newFmtCmd() *cobra.Command {
 		},
 	}
 	c.Flags().BoolVarP(&write, "write", "w", false, "write result to source file(s) instead of stdout")
+	c.Flags().BoolVar(&check, "check", false, "verify files are already formatted (styled report like contract diff); exit non-zero if any would change")
 	c.Flags().StringVar(&format, "format", "yaml", "output: yaml or json")
 	return c
 }
@@ -343,6 +419,34 @@ type batchItem struct {
 	Ref        string `json:"ref" yaml:"ref"`
 	Path       string `json:"path,omitempty" yaml:"path,omitempty"`
 	Contract   string `json:"contract,omitempty" yaml:"contract,omitempty"`
+}
+
+func containsStrSet(m map[string]struct{}, k string) bool {
+	_, ok := m[k]
+	return ok
+}
+
+// fmtCheckSummaryLine matches the contract diff footer tone (e.g. "4 files · ok" or "2 ok · 1 need formatting").
+func fmtCheckSummaryLine(nOk, nNeeds, nFail int, color bool) string {
+	dot := style.S(color, style.Dim, "·")
+	if nNeeds == 0 && nFail == 0 {
+		ok := style.S(color, style.Green, "ok")
+		if nOk == 1 {
+			return fmt.Sprintf("1 file %s %s", dot, ok)
+		}
+		return fmt.Sprintf("%d files %s %s", nOk, dot, ok)
+	}
+	var parts []string
+	if nOk > 0 {
+		parts = append(parts, style.S(color, style.Gray, fmt.Sprintf("%d ok", nOk)))
+	}
+	if nNeeds > 0 {
+		parts = append(parts, style.S(color, style.Yellow, fmt.Sprintf("%d need formatting", nNeeds)))
+	}
+	if nFail > 0 {
+		parts = append(parts, style.S(color, style.Red, fmt.Sprintf("%d failed", nFail)))
+	}
+	return strings.Join(parts, fmt.Sprintf(" %s ", dot))
 }
 
 func parseBatchSpec(data []byte) ([]batchItem, error) {
