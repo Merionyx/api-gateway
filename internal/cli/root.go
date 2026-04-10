@@ -28,8 +28,9 @@ func Execute() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "agwctl",
-	Short: "Merionyx API Gateway control CLI",
+	Use:          "agwctl",
+	Short:        "Merionyx API Gateway control CLI",
+	SilenceUsage: true,
 }
 
 func init() {
