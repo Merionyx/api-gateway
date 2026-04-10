@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -211,16 +212,22 @@ func newExportCmd(resolveServer func() (string, error)) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			files, err := apiclient.ExportContracts(context.Background(), httpClient, server, apiclient.ExportRequest{
+			req := apiclient.ExportRequest{
 				Repository:   repo,
 				Ref:          ref,
 				Path:         path,
 				ContractName: contract,
-			})
+			}
+			files, err := apiclient.ExportContracts(context.Background(), httpClient, server, req)
 			if err != nil {
 				return err
 			}
-			return outfiles.WriteExported(files, out, format)
+			if err := outfiles.WriteExported(files, out, format); err != nil {
+				return err
+			}
+			outw := cmd.OutOrStdout()
+			printExportContractsReport(outw, style.UseColorFor(outw), req, out, files)
+			return nil
 		},
 	}
 	c.Flags().String("repo", "", "repository name (as in contract-syncer config)")
@@ -264,30 +271,44 @@ func newExportBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			stdout := cmd.OutOrStdout()
+			color := style.UseColorFor(stdout)
+			var printed bool
+			fmt.Fprintln(stdout)
 			for i, it := range items {
 				if it.Repository == "" || it.Ref == "" {
 					logf("batch[%d]: skip (missing repository or ref)", i)
 					continue
 				}
 				dest := batchItemDest(out, it)
-				files, err := apiclient.ExportContracts(context.Background(), httpClient, server, apiclient.ExportRequest{
+				req := apiclient.ExportRequest{
 					Repository:   it.Repository,
 					Ref:          it.Ref,
 					Path:         it.Path,
-					ContractName: it.Contract,
-				})
+					ContractName: batchItemExportContract(it),
+				}
+				files, err := apiclient.ExportContracts(context.Background(), httpClient, server, req)
 				if err != nil {
 					logf("batch[%d] %s@%s: %v", i, it.Repository, it.Ref, err)
 					continue
 				}
 				if err := outfiles.WriteExported(files, dest, format); err != nil {
 					logf("batch[%d] write: %v", i, err)
+					continue
 				}
+				if printed {
+					fmt.Fprintln(stdout)
+				}
+				printed = true
+				fmt.Fprintf(stdout, "%s %s @ %s → %s\n",
+					style.S(color, style.Dim, fmt.Sprintf("batch[%d]", i)),
+					it.Repository, it.Ref, dest)
+				printExportContractsReport(stdout, color, req, dest, files)
 			}
 			return nil
 		},
 	}
-	c.Flags().String("spec", "", "path to YAML/JSON file with array of {repository, ref, path?, contract?, out?}")
+	c.Flags().String("spec", "", "path to YAML/JSON file with array of {repository, ref, path?, contract or contract_name?, out?}")
 	c.Flags().String("out", "", "output directory for all entries (if omitted, each spec entry must have \"out\")")
 	c.Flags().String("format", "", "optional: yaml or json for all items")
 	_ = c.MarkFlagRequired("spec")
@@ -381,7 +402,6 @@ func newDiffBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 				itemTarget := batchItemDest(target, it)
 				if printed {
 					fmt.Fprintln(out)
-					fmt.Fprintln(out, strings.Repeat("─", 42))
 				}
 				printed = true
 				fmt.Fprintf(out, "%s %s @ %s → %s\n",
@@ -395,7 +415,7 @@ func newDiffBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 						Repository:   it.Repository,
 						Ref:          it.Ref,
 						Path:         it.Path,
-						ContractName: it.Contract,
+						ContractName: batchItemExportContract(it),
 					},
 					Out:   out,
 					Color: color,
@@ -414,7 +434,7 @@ func newDiffBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 			return nil
 		},
 	}
-	c.Flags().String("spec", "", "path to YAML/JSON file with array of {repository, ref, path?, contract?, out?} (same as export-batch)")
+	c.Flags().String("spec", "", "path to YAML/JSON file with array of {repository, ref, path?, contract or contract_name?, out?} (same as export-batch)")
 	c.Flags().String("target", "", "local path for all entries (if omitted, each spec entry must have \"out\")")
 	_ = c.MarkFlagRequired("spec")
 	return c
@@ -424,9 +444,20 @@ type batchItem struct {
 	Repository string `json:"repository" yaml:"repository"`
 	Ref        string `json:"ref" yaml:"ref"`
 	Path       string `json:"path,omitempty" yaml:"path,omitempty"`
-	Contract   string `json:"contract,omitempty" yaml:"contract,omitempty"`
+	// Contract is the short key; ContractName matches the export API JSON field contract_name.
+	Contract     string `json:"contract,omitempty" yaml:"contract,omitempty"`
+	ContractName string `json:"contract_name,omitempty" yaml:"contract_name,omitempty"`
 	// Out is the output directory (export-batch) or compare target (diff-batch) when --out / --target is not set.
 	Out string `json:"out,omitempty" yaml:"out,omitempty"`
+}
+
+// batchItemExportContract returns the optional single-contract filter for export/diff-batch.
+// If both contract and contract_name are set, contract wins.
+func batchItemExportContract(it batchItem) string {
+	if s := strings.TrimSpace(it.Contract); s != "" {
+		return s
+	}
+	return strings.TrimSpace(it.ContractName)
 }
 
 // validateBatchDestOrSpec requires either a non-empty global dest (--out / --target) or a non-empty "out" on every spec item.
@@ -452,6 +483,26 @@ func batchItemDest(globalDest string, it batchItem) string {
 		return g
 	}
 	return strings.TrimSpace(it.Out)
+}
+
+func printExportKV(w io.Writer, color bool, k, v string) {
+	fmt.Fprintf(w, "%s %s\n", style.S(color, style.Dim, k+":"), style.S(color, style.Bold, v))
+}
+
+// printExportContractsReport prints a diff-style report after a successful export (stdout).
+func printExportContractsReport(w io.Writer, color bool, req apiclient.ExportRequest, outDir string, files []apiclient.ExportFile) {
+	sorted := append([]apiclient.ExportFile(nil), files...)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].ContractName < sorted[j].ContractName })
+
+	fmt.Fprintln(w)
+
+	for _, f := range sorted {
+		fmt.Fprintf(w, "%s %s %s\n",
+			style.S(color, style.Green, markOK),
+			style.S(color, style.Dim, "Contract:"),
+			style.S(color, style.Bold, f.ContractName),
+		)
+	}
 }
 
 func containsStrSet(m map[string]struct{}, k string) bool {
