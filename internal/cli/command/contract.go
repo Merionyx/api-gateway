@@ -238,7 +238,7 @@ func newExportCmd(resolveServer func() (string, error)) *cobra.Command {
 func newExportBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "export-batch",
-		Short: "Export multiple repo/ref entries from a YAML or JSON array spec",
+		Short: "Export multiple repo/ref entries from a YAML or JSON array spec (--out or per-entry out)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			server, err := resolveServer()
 			if err != nil {
@@ -256,6 +256,9 @@ func newExportBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if err := validateBatchDestOrSpec(out, items); err != nil {
+				return err
+			}
 			logf := func(format string, a ...any) { fmt.Fprintf(os.Stderr, format+"\n", a...) }
 			httpClient, err := httpClientFromCmd(cmd)
 			if err != nil {
@@ -266,6 +269,7 @@ func newExportBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 					logf("batch[%d]: skip (missing repository or ref)", i)
 					continue
 				}
+				dest := batchItemDest(out, it)
 				files, err := apiclient.ExportContracts(context.Background(), httpClient, server, apiclient.ExportRequest{
 					Repository:   it.Repository,
 					Ref:          it.Ref,
@@ -276,18 +280,17 @@ func newExportBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 					logf("batch[%d] %s@%s: %v", i, it.Repository, it.Ref, err)
 					continue
 				}
-				if err := outfiles.WriteExported(files, out, format); err != nil {
+				if err := outfiles.WriteExported(files, dest, format); err != nil {
 					logf("batch[%d] write: %v", i, err)
 				}
 			}
 			return nil
 		},
 	}
-	c.Flags().String("spec", "", "path to YAML/JSON file with array of {repository, ref, path?, contract?}")
-	c.Flags().String("out", "", "output directory")
+	c.Flags().String("spec", "", "path to YAML/JSON file with array of {repository, ref, path?, contract?, out?}")
+	c.Flags().String("out", "", "output directory for all entries (if omitted, each spec entry must have \"out\")")
 	c.Flags().String("format", "", "optional: yaml or json for all items")
 	_ = c.MarkFlagRequired("spec")
-	_ = c.MarkFlagRequired("out")
 	return c
 }
 
@@ -342,7 +345,7 @@ func newDiffCmd(resolveServer func() (string, error)) *cobra.Command {
 func newDiffBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "diff-batch",
-		Short: "Compare multiple repo/ref entries using the same spec format as export-batch",
+		Short: "Compare multiple repo/ref entries using the same spec as export-batch (--target or per-entry out)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			server, err := resolveServer()
 			if err != nil {
@@ -356,6 +359,9 @@ func newDiffBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 			}
 			items, err := parseBatchSpec(data)
 			if err != nil {
+				return err
+			}
+			if err := validateBatchDestOrSpec(target, items); err != nil {
 				return err
 			}
 			logf := func(format string, a ...any) { fmt.Fprintf(os.Stderr, format+"\n", a...) }
@@ -372,6 +378,7 @@ func newDiffBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 					logf("diff-batch[%d]: skip (missing repository or ref)", i)
 					continue
 				}
+				itemTarget := batchItemDest(target, it)
 				if printed {
 					fmt.Fprintln(out)
 					fmt.Fprintln(out, strings.Repeat("─", 42))
@@ -379,9 +386,9 @@ func newDiffBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 				printed = true
 				fmt.Fprintf(out, "%s %s @ %s → %s\n",
 					style.S(color, style.Dim, fmt.Sprintf("batch[%d]", i)),
-					it.Repository, it.Ref, target)
+					it.Repository, it.Ref, itemTarget)
 				_, err := contractdiff.Compare(context.Background(), contractdiff.Options{
-					Target:     target,
+					Target:     itemTarget,
 					ServerURL:  server,
 					HTTPClient: httpClient,
 					Request: apiclient.ExportRequest{
@@ -407,10 +414,9 @@ func newDiffBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 			return nil
 		},
 	}
-	c.Flags().String("spec", "", "path to YAML/JSON file with array of {repository, ref, path?, contract?} (same as export-batch)")
-	c.Flags().String("target", "", "local file or directory to compare (same role as export-batch --out)")
+	c.Flags().String("spec", "", "path to YAML/JSON file with array of {repository, ref, path?, contract?, out?} (same as export-batch)")
+	c.Flags().String("target", "", "local path for all entries (if omitted, each spec entry must have \"out\")")
 	_ = c.MarkFlagRequired("spec")
-	_ = c.MarkFlagRequired("target")
 	return c
 }
 
@@ -419,6 +425,33 @@ type batchItem struct {
 	Ref        string `json:"ref" yaml:"ref"`
 	Path       string `json:"path,omitempty" yaml:"path,omitempty"`
 	Contract   string `json:"contract,omitempty" yaml:"contract,omitempty"`
+	// Out is the output directory (export-batch) or compare target (diff-batch) when --out / --target is not set.
+	Out string `json:"out,omitempty" yaml:"out,omitempty"`
+}
+
+// validateBatchDestOrSpec requires either a non-empty global dest (--out / --target) or a non-empty "out" on every spec item.
+func validateBatchDestOrSpec(globalDest string, items []batchItem) error {
+	if strings.TrimSpace(globalDest) != "" {
+		return nil
+	}
+	var missing []int
+	for i, it := range items {
+		if strings.TrimSpace(it.Out) == "" {
+			missing = append(missing, i)
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("either set --out/--target, or give a non-empty \"out\" on every spec entry (missing at indices %v)", missing)
+	}
+	return nil
+}
+
+// batchItemDest returns the directory/target for one entry: global flag wins when set, otherwise the item's "out".
+func batchItemDest(globalDest string, it batchItem) string {
+	if g := strings.TrimSpace(globalDest); g != "" {
+		return g
+	}
+	return strings.TrimSpace(it.Out)
 }
 
 func containsStrSet(m map[string]struct{}, k string) bool {
