@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"merionyx/api-gateway/internal/shared/bootstrap"
-	"merionyx/api-gateway/internal/shared/election"
-	"merionyx/api-gateway/internal/shared/etcd"
+	"github.com/merionyx/api-gateway/internal/shared/bootstrap"
+	"github.com/merionyx/api-gateway/internal/shared/election"
+	"github.com/merionyx/api-gateway/internal/shared/etcd"
 )
 
 func TestBootstrap_ConnectEtcd(t *testing.T) {
