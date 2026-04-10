@@ -31,8 +31,6 @@ func NewValidateCommand() *cobra.Command {
 			color := style.UseColorFor(out)
 
 			fmt.Fprintln(out)
-			fmt.Fprintln(out, style.S(color, style.Bold, "Validate contracts"))
-			fmt.Fprintln(out)
 
 			var totalIssues int
 			for _, r := range results {
