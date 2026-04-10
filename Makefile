@@ -139,7 +139,7 @@ dev: ## Development mode with hot reload
 
 PROTO_MODULE ?= github.com/merionyx/api-gateway
 PROTO_ROOT ?= apis/proto
-# Исходники: apis/proto/merionyx/gateway/<домен>/v1 — package merionyx.gateway.<домен>.v1 (Buf PACKAGE_DIRECTORY_MATCH).
+# Sources: apis/proto/merionyx/gateway/<domain>/v1 — package merionyx.gateway.<domain>.v1 (Buf PACKAGE_DIRECTORY_MATCH).
 PROTO_FILES := $(shell find $(PROTO_ROOT)/merionyx/gateway -type f -name '*.proto' 2>/dev/null | LC_ALL=C sort)
 
 
@@ -149,7 +149,7 @@ proto-generate: ## Generate protobuf code (writes under pkg/grpc/...; see PROTO_
 		--go-grpc_out=. --go-grpc_opt=module=$(PROTO_MODULE) --go-grpc_opt=paths=import \
 		$(PROTO_FILES)
 
-# Вызывайте make из корня репозитория (как обычно). cd не нужен: buf получает путь к модулю аргументом.
+# Call make from the root repository (as usual). cd is not needed: buf gets the module path as an argument.
 proto-lint: ## Lint .proto (requires buf: https://buf.build/docs/installation)
 	buf lint $(PROTO_ROOT)
 

@@ -10,7 +10,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 )
 
 // ExportRequest is the JSON body for POST /api/v1/contracts/export.
@@ -37,7 +36,11 @@ type apiErrorBody struct {
 }
 
 // ExportContracts POSTs to the API Server and returns decoded file entries.
-func ExportContracts(ctx context.Context, serverURL string, req ExportRequest) ([]ExportFile, error) {
+// client must be non-nil (use http.DefaultClient or NewHTTPClient).
+func ExportContracts(ctx context.Context, client *http.Client, serverURL string, req ExportRequest) ([]ExportFile, error) {
+	if client == nil {
+		client = http.DefaultClient
+	}
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -49,7 +52,6 @@ func ExportContracts(ctx context.Context, serverURL string, req ExportRequest) (
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 5 * time.Minute}
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, err

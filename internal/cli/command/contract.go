@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
+	"strings"
 
 	"github.com/merionyx/api-gateway/internal/cli/apiclient"
 	"github.com/merionyx/api-gateway/internal/cli/outfiles"
@@ -40,7 +42,11 @@ func newExportCmd(resolveServer func() (string, error)) *cobra.Command {
 			out, _ := cmd.Flags().GetString("out")
 			format, _ := cmd.Flags().GetString("format")
 
-			files, err := apiclient.ExportContracts(context.Background(), server, apiclient.ExportRequest{
+			httpClient, err := httpClientFromCmd(cmd)
+			if err != nil {
+				return err
+			}
+			files, err := apiclient.ExportContracts(context.Background(), httpClient, server, apiclient.ExportRequest{
 				Repository:   repo,
 				Ref:          ref,
 				Path:         path,
@@ -88,12 +94,16 @@ func newExportBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 				}
 			}
 			logf := func(format string, a ...any) { fmt.Fprintf(os.Stderr, format+"\n", a...) }
+			httpClient, err := httpClientFromCmd(cmd)
+			if err != nil {
+				return err
+			}
 			for i, it := range items {
 				if it.Repository == "" || it.Ref == "" {
 					logf("batch[%d]: skip (missing repository or ref)", i)
 					continue
 				}
-				files, err := apiclient.ExportContracts(context.Background(), server, apiclient.ExportRequest{
+				files, err := apiclient.ExportContracts(context.Background(), httpClient, server, apiclient.ExportRequest{
 					Repository:   it.Repository,
 					Ref:          it.Ref,
 					Path:         it.Path,
@@ -123,4 +133,19 @@ type batchItem struct {
 	Ref        string `json:"ref" yaml:"ref"`
 	Path       string `json:"path,omitempty" yaml:"path,omitempty"`
 	Contract   string `json:"contract,omitempty" yaml:"contract,omitempty"`
+}
+
+func httpClientFromCmd(cmd *cobra.Command) (*http.Client, error) {
+	insecure, err := cmd.Flags().GetBool("insecure")
+	if err != nil {
+		return nil, err
+	}
+	caPath, err := cmd.Flags().GetString("ca-cert")
+	if err != nil {
+		return nil, err
+	}
+	return apiclient.NewHTTPClient(apiclient.TLSOptions{
+		Insecure:   insecure,
+		CACertPath: strings.TrimSpace(caPath),
+	})
 }

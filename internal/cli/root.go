@@ -15,6 +15,8 @@ import (
 var (
 	contextName    string
 	serverOverride string
+	tlsInsecure    bool
+	tlsCACert      string
 )
 
 // Execute runs the root cobra command (os.Exit on error).
@@ -36,6 +38,8 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&contextName, "context", "", "config context name (see ~/.config/agwctl/config.yaml)")
 	rootCmd.PersistentFlags().StringVar(&serverOverride, "server", "", "API Server base URL, e.g. http://127.0.0.1:8080 (overrides context)")
+	rootCmd.PersistentFlags().BoolVar(&tlsInsecure, "insecure", false, "skip TLS certificate verification for HTTPS (unsafe; only when you must)")
+	rootCmd.PersistentFlags().StringVar(&tlsCACert, "ca-cert", "", "path to PEM file with extra CA certificate(s) for HTTPS (e.g. corporate CA); not used with --insecure")
 	rootCmd.AddCommand(command.NewContractCommand(func() (string, error) {
 		return config.ResolveServerURL(contextName, serverOverride)
 	}))
