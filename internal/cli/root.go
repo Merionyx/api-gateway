@@ -35,4 +35,5 @@ func init() {
 	rootCmd.AddCommand(command.NewContractCommand(func() (string, error) {
 		return config.ResolveServerURL(contextName, serverOverride)
 	}))
+	rootCmd.AddCommand(command.NewConfigCommand())
 }
