@@ -18,6 +18,11 @@ on:
         description: Git ref (SHA) for checkout
         required: true
         type: string
+      include_mock_service:
+        description: Build and publish mock-service (only for main / latest)
+        required: false
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       version:
@@ -25,6 +30,11 @@ on:
         required: false
         default: latest
         type: string
+      include_mock_service:
+        description: Build and publish mock-service (only for main / latest)
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   api-server:
@@ -58,6 +68,16 @@ jobs:
     uses: ./.github/workflows/docker-publish-component.yml
     with:
       component: controller
+      dockerfile: build/release/Dockerfile
+      checkout_ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || inputs.checkout_ref }}
+      version: ${{ inputs.version || 'latest' }}
+    secrets: inherit
+
+  mock-service:
+    if: ${{ inputs.include_mock_service == true }}
+    uses: ./.github/workflows/docker-publish-component.yml
+    with:
+      component: mock-service
       dockerfile: build/release/Dockerfile
       checkout_ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || inputs.checkout_ref }}
       version: ${{ inputs.version || 'latest' }}

@@ -76,6 +76,7 @@ jobs:
           controller) echo 'name=Controller' >> "$GITHUB_OUTPUT" ;;
           auth-sidecar) echo 'name=Auth Sidecar' >> "$GITHUB_OUTPUT" ;;
           contract-syncer) echo 'name=Contract Syncer' >> "$GITHUB_OUTPUT" ;;
+          mock-service) echo 'name=Mock Service' >> "$GITHUB_OUTPUT" ;;
           *) echo "Unknown component: ${{ inputs.component }}"; exit 1 ;;
         esac
 
