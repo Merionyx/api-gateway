@@ -1,8 +1,8 @@
 package usecase
 
 import (
-	"merionyx/api-gateway/internal/api-server/domain/models"
-	"merionyx/api-gateway/internal/shared/bundlekey"
+	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
+	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
 )
 
 // collectUniqueBundles merges bundles from all registered controllers keyed by bundlekey.Build.

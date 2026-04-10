@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"log/slog"
 
-	"merionyx/api-gateway/internal/contract-syncer/config"
-	"merionyx/api-gateway/internal/contract-syncer/delivery/grpc/handler"
-	"merionyx/api-gateway/internal/contract-syncer/domain/interfaces"
-	"merionyx/api-gateway/internal/contract-syncer/usecase"
-	sharedgit "merionyx/api-gateway/internal/shared/git"
+	"github.com/merionyx/api-gateway/internal/contract-syncer/config"
+	"github.com/merionyx/api-gateway/internal/contract-syncer/delivery/grpc/handler"
+	"github.com/merionyx/api-gateway/internal/contract-syncer/domain/interfaces"
+	"github.com/merionyx/api-gateway/internal/contract-syncer/usecase"
+	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 )
 
 type Container struct {

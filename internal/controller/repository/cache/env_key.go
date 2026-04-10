@@ -3,7 +3,7 @@ package cache
 import (
 	"strings"
 
-	"merionyx/api-gateway/internal/controller/repository/etcd"
+	"github.com/merionyx/api-gateway/internal/controller/repository/etcd"
 )
 
 // ParseEnvironmentNameFromConfigKey parses /api-gateway/controller/environments/{name}/config.

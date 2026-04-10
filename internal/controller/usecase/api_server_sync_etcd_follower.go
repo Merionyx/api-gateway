@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	ctrlmetrics "merionyx/api-gateway/internal/controller/metrics"
-	"merionyx/api-gateway/internal/controller/repository/cache"
-	ctrlrepoetcd "merionyx/api-gateway/internal/controller/repository/etcd"
+	ctrlmetrics "github.com/merionyx/api-gateway/internal/controller/metrics"
+	"github.com/merionyx/api-gateway/internal/controller/repository/cache"
+	ctrlrepoetcd "github.com/merionyx/api-gateway/internal/controller/repository/etcd"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"golang.org/x/sync/semaphore"

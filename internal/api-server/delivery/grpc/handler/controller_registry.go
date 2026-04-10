@@ -4,11 +4,12 @@ import (
 	"context"
 	"log/slog"
 
-	"merionyx/api-gateway/internal/api-server/domain/interfaces"
-	"merionyx/api-gateway/internal/api-server/domain/models"
-	sharedgit "merionyx/api-gateway/internal/shared/git"
-	contractv1 "merionyx/api-gateway/pkg/api/contract/v1"
-	pb "merionyx/api-gateway/pkg/api/controller_registry/v1"
+	commonv1 "github.com/merionyx/api-gateway/pkg/grpc/common/v1"
+	pb "github.com/merionyx/api-gateway/pkg/grpc/controller_registry/v1"
+
+	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
+	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
+	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 )
 
 type ControllerRegistryHandler struct {
@@ -66,24 +67,24 @@ type snapshotStreamWrapper struct {
 }
 
 func (w *snapshotStreamWrapper) Send(environment, bundleKey string, snapshots []sharedgit.ContractSnapshot) error {
-	var pbSnapshots []*contractv1.ContractSnapshot
+	var pbSnapshots []*commonv1.ContractSnapshot
 	for _, snapshot := range snapshots {
-		var pbApps []*contractv1.App
+		var pbApps []*commonv1.App
 		for _, app := range snapshot.Access.Apps {
-			pbApps = append(pbApps, &contractv1.App{
+			pbApps = append(pbApps, &commonv1.App{
 				AppId:        app.AppID,
 				Environments: app.Environments,
 			})
 		}
 
-		pbSnapshots = append(pbSnapshots, &contractv1.ContractSnapshot{
+		pbSnapshots = append(pbSnapshots, &commonv1.ContractSnapshot{
 			Name:   snapshot.Name,
 			Prefix: snapshot.Prefix,
-			Upstream: &contractv1.ContractUpstream{
+			Upstream: &commonv1.ContractUpstream{
 				Name: snapshot.Upstream.Name,
 			},
 			AllowUndefinedMethods: snapshot.AllowUndefinedMethods,
-			Access: &contractv1.Access{
+			Access: &commonv1.Access{
 				Secure: snapshot.Access.Secure,
 				Apps:   pbApps,
 			},

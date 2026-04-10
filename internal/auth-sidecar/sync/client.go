@@ -11,12 +11,13 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
-	"merionyx/api-gateway/internal/auth-sidecar/config"
-	authmetrics "merionyx/api-gateway/internal/auth-sidecar/metrics"
-	"merionyx/api-gateway/internal/auth-sidecar/storage"
-	"merionyx/api-gateway/internal/shared/grpcobs"
-	"merionyx/api-gateway/internal/shared/grpcutil"
-	authv1 "merionyx/api-gateway/pkg/api/auth/v1"
+	authv1 "github.com/merionyx/api-gateway/pkg/grpc/auth/v1"
+
+	"github.com/merionyx/api-gateway/internal/auth-sidecar/config"
+	authmetrics "github.com/merionyx/api-gateway/internal/auth-sidecar/metrics"
+	"github.com/merionyx/api-gateway/internal/auth-sidecar/storage"
+	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
+	"github.com/merionyx/api-gateway/internal/shared/grpcutil"
 )
 
 type SyncClient struct {

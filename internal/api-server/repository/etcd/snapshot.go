@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"strings"
 
-	sharedgit "merionyx/api-gateway/internal/shared/git"
+	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )

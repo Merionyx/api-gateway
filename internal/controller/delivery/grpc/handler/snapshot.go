@@ -3,9 +3,10 @@ package handler
 import (
 	"context"
 
-	"merionyx/api-gateway/internal/controller/domain/interfaces"
-	"merionyx/api-gateway/internal/controller/domain/models"
-	snapshotsv1 "merionyx/api-gateway/pkg/api/snapshots/v1"
+	snapshotsv1 "github.com/merionyx/api-gateway/pkg/grpc/snapshots/v1"
+
+	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
+	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

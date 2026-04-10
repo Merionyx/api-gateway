@@ -3,7 +3,7 @@ package storage
 import (
 	"testing"
 
-	authv1 "merionyx/api-gateway/pkg/api/auth/v1"
+	authv1 "github.com/merionyx/api-gateway/pkg/grpc/auth/v1"
 )
 
 func TestAccessStorage_FindContractByPath_longestPrefixWins(t *testing.T) {

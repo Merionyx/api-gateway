@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"merionyx/api-gateway/internal/auth-sidecar/config"
-	"merionyx/api-gateway/internal/auth-sidecar/storage"
+	"github.com/merionyx/api-gateway/internal/auth-sidecar/config"
+	"github.com/merionyx/api-gateway/internal/auth-sidecar/storage"
 )
 
 func TestNewSyncClient_SidecarID(t *testing.T) {

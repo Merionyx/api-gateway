@@ -1,4 +1,4 @@
-.PHONY: run build build-agwctl test clean certs deps start lint fmt docker-build docker-run test-coverage test-coverage-ci help docker-up-dev-ha docker-down-dev-ha test-integration
+.PHONY: run build build-agwctl test clean certs deps start lint fmt docker-build docker-run test-coverage test-coverage-ci help docker-up-dev-ha docker-down-dev-ha test-integration proto-generate proto-install proto-lint proto-breaking
 
 # Variables
 BINARY_NAME=universal-server
@@ -132,35 +132,24 @@ docker-down-dev-ha: ## Stop HA dev stack
 dev: ## Development mode with hot reload
 	air -c .air.toml
 
-proto-generate: ## Generate protobuf code
-	protoc -I api/proto/v1 \
-		--go_out=. --go_opt=paths=source_relative \
-		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
-		api/proto/v1/*.proto && \
-	mkdir -p ./pkg/api/contract/v1 && \
-	mkdir -p ./pkg/api/snapshots/v1 && \
-	mkdir -p ./pkg/api/schemas/v1 && \
-	mkdir -p ./pkg/api/environments/v1 && \
-	mkdir -p ./pkg/api/auth/v1 && \
-	mkdir -p ./pkg/api/contract_syncer/v1 && \
-	mkdir -p ./pkg/api/controller_registry/v1 && \
-	cp ./contract_types.pb.go ./pkg/api/contract/v1/contract_types.pb.go && \
-	cp ./snapshots_grpc.pb.go ./pkg/api/snapshots/v1/snapshots_grpc.pb.go && \
-	cp ./snapshots.pb.go ./pkg/api/snapshots/v1/snapshots.pb.go && \
-	cp ./schemas_grpc.pb.go ./pkg/api/schemas/v1/schemas_grpc.pb.go && \
-	cp ./schemas.pb.go ./pkg/api/schemas/v1/schemas.pb.go && \
-	cp ./environment_grpc.pb.go ./pkg/api/environments/v1/environment_grpc.pb.go && \
-	cp ./environment.pb.go ./pkg/api/environments/v1/environment.pb.go && \
-	cp ./gateway_auth_grpc.pb.go ./pkg/api/auth/v1/auth_grpc.pb.go && \
-	cp ./gateway_auth.pb.go ./pkg/api/auth/v1/auth.pb.go && \
-	cp ./contract_syncer_grpc.pb.go ./pkg/api/contract_syncer/v1/contract_syncer_grpc.pb.go && \
-	cp ./contract_syncer.pb.go ./pkg/api/contract_syncer/v1/contract_syncer.pb.go && \
-	cp ./controller_registry_grpc.pb.go ./pkg/api/controller_registry/v1/controller_registry_grpc.pb.go && \
-	cp ./controller_registry.pb.go ./pkg/api/controller_registry/v1/controller_registry.pb.go && \
-	rm -f ./contract_types.pb.go ./snapshots_grpc.pb.go ./snapshots.pb.go \
-		./schemas_grpc.pb.go ./schemas.pb.go ./environment_grpc.pb.go ./environment.pb.go \
-		./gateway_auth_grpc.pb.go ./gateway_auth.pb.go ./contract_syncer_grpc.pb.go ./contract_syncer.pb.go \
-		./controller_registry_grpc.pb.go ./controller_registry.pb.go
+PROTO_MODULE ?= github.com/merionyx/api-gateway
+PROTO_ROOT ?= apis/proto
+# Исходники: apis/proto/merionyx/gateway/<домен>/v1 — package merionyx.gateway.<домен>.v1 (Buf PACKAGE_DIRECTORY_MATCH).
+PROTO_FILES := $(shell find $(PROTO_ROOT)/merionyx/gateway -type f -name '*.proto' 2>/dev/null | LC_ALL=C sort)
+
+
+proto-generate: ## Generate protobuf code (writes under pkg/grpc/...; see PROTO_MODULE)
+	protoc -I $(PROTO_ROOT) \
+		--go_out=. --go_opt=module=$(PROTO_MODULE) --go_opt=paths=import \
+		--go-grpc_out=. --go-grpc_opt=module=$(PROTO_MODULE) --go-grpc_opt=paths=import \
+		$(PROTO_FILES)
+
+# Вызывайте make из корня репозитория (как обычно). cd не нужен: buf получает путь к модулю аргументом.
+proto-lint: ## Lint .proto (requires buf: https://buf.build/docs/installation)
+	buf lint $(PROTO_ROOT)
+
+proto-breaking: ## Detect breaking API changes vs main (requires buf + git; cwd = repo root)
+	buf breaking $(PROTO_ROOT) --against ".git#branch=main"
 
 proto-install: ## Install protobuf tools
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
@@ -270,9 +259,9 @@ $(CONTROLLER_GEN):
 
 .PHONY: apis-generate
 generate-crds: controller-gen-bin ## DeepCopy + CRD YAML into ../dist/crds
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./pkg/api/gateway/v1alpha1/..."
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./pkg/apis/crd/v1alpha1/..."
 	@mkdir -p ./dist/crds
-	$(CONTROLLER_GEN) crd paths="./pkg/api/gateway/v1alpha1/..." output:crd:artifacts:config=./dist/crds
+	$(CONTROLLER_GEN) crd paths="./pkg/apis/crd/v1alpha1/..." output:crd:artifacts:config=./dist/crds
 
 # Help
 help: ## Show help

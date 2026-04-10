@@ -3,9 +3,9 @@ package interfaces
 import (
 	"context"
 
-	"merionyx/api-gateway/internal/controller/config"
-	"merionyx/api-gateway/internal/controller/domain/models"
-	xdscache "merionyx/api-gateway/internal/controller/xds/cache"
+	"github.com/merionyx/api-gateway/internal/controller/config"
+	"github.com/merionyx/api-gateway/internal/controller/domain/models"
+	xdscache "github.com/merionyx/api-gateway/internal/controller/xds/cache"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )

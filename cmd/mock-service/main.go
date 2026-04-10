@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"os"
 
-	"merionyx/api-gateway/internal/mock-service/app"
+	"github.com/merionyx/api-gateway/internal/mock-service/app"
 )
 
 func main() {

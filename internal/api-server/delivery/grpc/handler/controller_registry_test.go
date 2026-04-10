@@ -4,9 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"merionyx/api-gateway/internal/api-server/domain/interfaces"
-	"merionyx/api-gateway/internal/api-server/domain/models"
-	pb "merionyx/api-gateway/pkg/api/controller_registry/v1"
+	pb "github.com/merionyx/api-gateway/pkg/grpc/controller_registry/v1"
+
+	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
+	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 )
 
 type noopRegistryUC struct{}

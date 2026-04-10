@@ -3,9 +3,9 @@ package handler
 import (
 	"time"
 
-	"merionyx/api-gateway/internal/api-server/domain/models"
-	apimetrics "merionyx/api-gateway/internal/api-server/metrics"
-	"merionyx/api-gateway/internal/api-server/usecase"
+	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
+	apimetrics "github.com/merionyx/api-gateway/internal/api-server/metrics"
+	"github.com/merionyx/api-gateway/internal/api-server/usecase"
 
 	"github.com/gofiber/fiber/v3"
 )

@@ -5,9 +5,10 @@ import (
 	"errors"
 	"testing"
 
-	"merionyx/api-gateway/internal/contract-syncer/domain/interfaces"
-	sharedgit "merionyx/api-gateway/internal/shared/git"
-	pb "merionyx/api-gateway/pkg/api/contract_syncer/v1"
+	pb "github.com/merionyx/api-gateway/pkg/grpc/contract_syncer/v1"
+
+	"github.com/merionyx/api-gateway/internal/contract-syncer/domain/interfaces"
+	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 )
 
 type fakeSyncUC struct {

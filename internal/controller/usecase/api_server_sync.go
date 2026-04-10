@@ -8,13 +8,13 @@ import (
 	"strings"
 	"time"
 
-	"merionyx/api-gateway/internal/controller/config"
-	"merionyx/api-gateway/internal/controller/domain/interfaces"
-	"merionyx/api-gateway/internal/controller/index/bundleenv"
-	ctrlmetrics "merionyx/api-gateway/internal/controller/metrics"
-	"merionyx/api-gateway/internal/controller/repository/cache"
-	xdscache "merionyx/api-gateway/internal/controller/xds/cache"
-	"merionyx/api-gateway/internal/shared/grpcutil"
+	"github.com/merionyx/api-gateway/internal/controller/config"
+	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
+	"github.com/merionyx/api-gateway/internal/controller/index/bundleenv"
+	ctrlmetrics "github.com/merionyx/api-gateway/internal/controller/metrics"
+	"github.com/merionyx/api-gateway/internal/controller/repository/cache"
+	xdscache "github.com/merionyx/api-gateway/internal/controller/xds/cache"
+	"github.com/merionyx/api-gateway/internal/shared/grpcutil"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )

@@ -3,7 +3,7 @@ package builder
 import (
 	routev3 "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
 
-	"merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 )
 
 func (b *xdsBuilder) BuildRoutes(env *models.Environment) ([]*routev3.RouteConfiguration, error) {

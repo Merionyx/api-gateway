@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	authv1 "merionyx/api-gateway/pkg/api/auth/v1"
+	authv1 "github.com/merionyx/api-gateway/pkg/grpc/auth/v1"
 )
 
 // AccessStorage stores access rights in memory

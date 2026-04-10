@@ -9,8 +9,8 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/logger"
 	"github.com/gofiber/fiber/v3/middleware/recover"
 
-	"merionyx/api-gateway/internal/api-server/container"
-	apimetrics "merionyx/api-gateway/internal/api-server/metrics"
+	"github.com/merionyx/api-gateway/internal/api-server/container"
+	apimetrics "github.com/merionyx/api-gateway/internal/api-server/metrics"
 )
 
 // RunHTTPServer runs Fiber until ctx is cancelled, then Shutdown().

@@ -3,8 +3,8 @@ package config
 import (
 	"log/slog"
 
-	"merionyx/api-gateway/internal/shared/grpcobs"
-	"merionyx/api-gateway/internal/shared/metricshttp"
+	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
+	"github.com/merionyx/api-gateway/internal/shared/metricshttp"
 
 	"github.com/spf13/viper"
 )

@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"time"
 
-	syncmetrics "merionyx/api-gateway/internal/contract-syncer/metrics"
-	sharedgit "merionyx/api-gateway/internal/shared/git"
+	syncmetrics "github.com/merionyx/api-gateway/internal/contract-syncer/metrics"
+	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 )
 
 type SyncUseCase struct {

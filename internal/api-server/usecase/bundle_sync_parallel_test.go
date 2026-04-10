@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"merionyx/api-gateway/internal/api-server/domain/models"
+	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 )
 
 func TestRunParallelForEachBundle_respectsMaxParallel(t *testing.T) {

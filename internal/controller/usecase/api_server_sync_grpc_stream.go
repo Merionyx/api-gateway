@@ -7,8 +7,9 @@ import (
 	"io"
 	"log/slog"
 
-	sharedgit "merionyx/api-gateway/internal/shared/git"
-	pb "merionyx/api-gateway/pkg/api/controller_registry/v1"
+	pb "github.com/merionyx/api-gateway/pkg/grpc/controller_registry/v1"
+
+	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

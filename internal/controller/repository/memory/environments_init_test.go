@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"merionyx/api-gateway/internal/controller/config"
-	"merionyx/api-gateway/internal/controller/xds/builder"
-	xdscache "merionyx/api-gateway/internal/controller/xds/cache"
+	"github.com/merionyx/api-gateway/internal/controller/config"
+	"github.com/merionyx/api-gateway/internal/controller/xds/builder"
+	xdscache "github.com/merionyx/api-gateway/internal/controller/xds/cache"
 )
 
 func TestEnvironmentsRepository_Initialize_RebuildsXDS(t *testing.T) {

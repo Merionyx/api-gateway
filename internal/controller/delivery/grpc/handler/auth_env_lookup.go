@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"merionyx/api-gateway/internal/controller/index/bundleenv"
-	ctrlmetrics "merionyx/api-gateway/internal/controller/metrics"
+	"github.com/merionyx/api-gateway/internal/controller/index/bundleenv"
+	ctrlmetrics "github.com/merionyx/api-gateway/internal/controller/metrics"
 )
 
 // AuthSchemaNotifyPlan is the outcome of resolving which environments to push after a schema (bundle) change.
