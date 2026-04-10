@@ -54,7 +54,7 @@ EXPOSE 8080 8443 8444
 
 CMD ["./main"]
 
-FROM alpine:3.23 AS runtime-alpine
+FROM merionyx/alpine:3.23 AS runtime-alpine
 
 ARG SERVICE
 ARG OCI_NAME
