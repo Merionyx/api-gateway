@@ -97,7 +97,7 @@ func ValidateContextName(name string) error {
 		return fmt.Errorf("context name is empty")
 	}
 	if strings.ContainsAny(s, `/\:`) {
-		return fmt.Errorf("context name must not contain / \\ or :")
+		return fmt.Errorf("context name must not contain / \\ or ':'")
 	}
 	return nil
 }

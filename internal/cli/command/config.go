@@ -39,7 +39,7 @@ func newConfigGetContextsCmd() *cobra.Command {
 			}
 			names := cfg.ContextNames()
 			if len(names) == 0 {
-				fmt.Fprintln(cmd.OutOrStdout(), "No contexts. Use: agwctl config set-context NAME --server URL")
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No contexts. Use: agwctl config set-context NAME --server URL")
 				return nil
 			}
 			w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)

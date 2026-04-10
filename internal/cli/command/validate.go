@@ -30,7 +30,7 @@ func NewValidateCommand() *cobra.Command {
 			out := cmd.OutOrStdout()
 			color := style.UseColorFor(out)
 
-			fmt.Fprintln(out)
+			_, _ = fmt.Fprintln(out)
 
 			var totalIssues int
 			for _, r := range results {
@@ -43,7 +43,7 @@ func NewValidateCommand() *cobra.Command {
 						fileLabel,
 						pathBold,
 					)
-					fmt.Fprintln(out, line)
+					_, _ = fmt.Fprintln(out, line)
 					continue
 				}
 				totalIssues += len(r.Issues)
@@ -53,14 +53,14 @@ func NewValidateCommand() *cobra.Command {
 					pathBold,
 					style.S(color, style.Red, "[failed]"),
 				)
-				fmt.Fprintln(out, line)
+				_, _ = fmt.Fprintln(out, line)
 				for _, msg := range r.Issues {
 					prefix := fmt.Sprintf("      %s ", style.S(color, style.Dim, arrowRight))
-					fmt.Fprintln(out, prefix+style.S(color, style.Dim, msg))
+					_, _ = fmt.Fprintln(out, prefix+style.S(color, style.Dim, msg))
 				}
 			}
 
-			fmt.Fprintln(out)
+			_, _ = fmt.Fprintln(out)
 			var files, status string
 			switch {
 			case len(results) == 0:
@@ -72,10 +72,10 @@ func NewValidateCommand() *cobra.Command {
 				files = fmt.Sprintf("%d files", len(results))
 				status = style.S(color, style.Red, fmt.Sprintf("%d issues", totalIssues))
 			}
-			fmt.Fprintln(out, files, style.S(color, style.Dim, "·"), status)
+			_, _ = fmt.Fprintln(out, files, style.S(color, style.Dim, "·"), status)
 
 			if totalIssues > 0 {
-				fmt.Fprintln(out)
+				_, _ = fmt.Fprintln(out)
 				return errors.New("validation failed")
 			}
 			return nil

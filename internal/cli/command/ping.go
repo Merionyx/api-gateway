@@ -27,8 +27,8 @@ func NewPingCommand(resolveServer func() (string, error)) *cobra.Command {
 				return fmt.Errorf("ping %s: %w", server, err)
 			}
 			out := cmd.OutOrStdout()
-			fmt.Fprintln(out)
-			fmt.Fprintf(out, "ok %s\n", server)
+			_, _ = fmt.Fprintln(out)
+			_, _ = fmt.Fprintf(out, "ok %s\n", server)
 			return nil
 		},
 	}
