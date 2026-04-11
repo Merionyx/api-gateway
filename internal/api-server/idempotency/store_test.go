@@ -1,6 +1,7 @@
 package idempotency
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"sync/atomic"
@@ -26,14 +27,14 @@ func TestExecute_ConflictDifferentBody(t *testing.T) {
 	h1 := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	h2 := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 
-	_, err := s.Execute(key, h1, func() (*HTTPResult, error) {
+	_, err := s.Execute(context.Background(), key, h1, func() (*HTTPResult, error) {
 		return &HTTPResult{StatusCode: 200, ContentType: "application/json", Body: []byte(`{}`)}, nil
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = s.Execute(key, h2, func() (*HTTPResult, error) {
+	_, err = s.Execute(context.Background(), key, h2, func() (*HTTPResult, error) {
 		return nil, errors.New("second body must not run")
 	})
 	if !errors.Is(err, ErrConflict) {
@@ -52,7 +53,7 @@ func TestExecute_ConcurrentDedup(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := s.Execute(key, h, func() (*HTTPResult, error) {
+			_, err := s.Execute(context.Background(), key, h, func() (*HTTPResult, error) {
 				atomic.AddInt32(&run, 1)
 				time.Sleep(30 * time.Millisecond)
 				return &HTTPResult{StatusCode: 200, ContentType: "application/json", Body: []byte(`{}`)}, nil

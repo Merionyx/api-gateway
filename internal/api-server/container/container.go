@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	contractsyncergrpc "github.com/merionyx/api-gateway/internal/api-server/adapter/contractsyncer/grpc"
 	"github.com/merionyx/api-gateway/internal/api-server/adapter/etcd"
@@ -52,8 +53,8 @@ type Container struct {
 
 	ControllerRegistryHandler *grpchandler.ControllerRegistryHandler
 
-	// BundleSyncIdempotency caches POST /api/v1/bundles/sync outcomes when Idempotency-Key is set (process-local).
-	BundleSyncIdempotency *idempotency.Store
+	// BundleSyncIdempotency caches POST /api/v1/bundles/sync outcomes when Idempotency-Key is set (memory or etcd).
+	BundleSyncIdempotency idempotency.Executor
 }
 
 // NewContainer creates and initializes a new DI container
@@ -152,7 +153,15 @@ func (c *Container) initUseCases() error {
 }
 
 func (c *Container) initHandlers() {
-	c.BundleSyncIdempotency = idempotency.NewStore(c.Config.Idempotency.BundleSyncTTL)
+	switch strings.ToLower(strings.TrimSpace(c.Config.Idempotency.Backend)) {
+	case "etcd":
+		pfx := idempotency.ResolveKeyPrefix(c.Config.Idempotency.EtcdKeyPrefix, c.Config.Idempotency.Cluster)
+		c.BundleSyncIdempotency = idempotency.NewEtcdStore(c.EtcdClient, pfx, c.Config.Idempotency.BundleSyncTTL)
+		slog.Info("idempotency backend=etcd", "etcd_key_prefix", pfx)
+	default:
+		c.BundleSyncIdempotency = idempotency.NewStore(c.Config.Idempotency.BundleSyncTTL)
+		slog.Info("idempotency backend=memory")
+	}
 	c.JWTHandler = httphandler.NewJWTHandler(c.JWTUseCase, c.Config.MetricsHTTP.Enabled)
 	exportUC := bundle.NewContractExportUseCase(c.ContractSyncerGRPC)
 	c.ContractsExportHandler = httphandler.NewContractsExportHandler(exportUC)

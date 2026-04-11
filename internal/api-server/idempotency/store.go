@@ -2,6 +2,7 @@
 package idempotency
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
 )
+
+var _ Executor = (*Store)(nil)
 
 // ErrConflict means the Idempotency-Key was already bound to a different request body.
 var ErrConflict = errors.New("idempotency key reused with different request body")
@@ -22,7 +25,7 @@ type HTTPResult struct {
 	Body        []byte
 }
 
-// Store binds an Idempotency-Key to a request fingerprint and caches the first completed outcome until TTL.
+// Store is the in-process idempotency cache (single replica).
 type Store struct {
 	mu      sync.Mutex
 	entries map[string]*entry
@@ -61,12 +64,15 @@ func HashBundleSyncRequest(req apiserver.BundleSyncRequest) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// Execute runs fn once per idempotency key and request hash, or returns a cached outcome / shared fn error.
-func (s *Store) Execute(idempotencyKey, bodyHash string, fn func() (*HTTPResult, error)) (*HTTPResult, error) {
+// Execute implements Executor.
+func (s *Store) Execute(ctx context.Context, idempotencyKey, bodyHash string, fn func() (*HTTPResult, error)) (*HTTPResult, error) {
 	if idempotencyKey == "" || bodyHash == "" {
 		return fn()
 	}
 	for {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		now := time.Now()
 		s.mu.Lock()
 		s.evictExpiredLocked(now)
@@ -89,7 +95,11 @@ func (s *Store) Execute(idempotencyKey, bodyHash string, fn func() (*HTTPResult,
 			}
 			ch := e.wait
 			s.mu.Unlock()
-			<-ch
+			select {
+			case <-ch:
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
 			continue
 		}
 

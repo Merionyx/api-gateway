@@ -285,7 +285,10 @@ metrics_http:
   port: "9090"
   path: "/metrics"
 idempotency:
+  backend: "memory"
   bundle_sync_ttl: "24h"
+  etcd_key_prefix: "/api-gateway/api-server/idempotency/v1"
+  cluster: ""
 {{- end }}
 
 {{- define "agwcp.contractSyncer.config.defaults" -}}

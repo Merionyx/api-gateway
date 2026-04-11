@@ -34,6 +34,9 @@ leader_election:
   identity: ""
   session_ttl_seconds: 5
 
-# Idempotency-Key on POST /api/v1/bundles/sync: cache is in-process only (multiple replicas do not share it).
+# Idempotency-Key on POST /api/v1/bundles/sync: memory (default) or etcd (HA).
 idempotency:
+  backend: "memory"
   bundle_sync_ttl: "24h"
+  etcd_key_prefix: "/api-gateway/api-server/idempotency/v1"
+  cluster: ""

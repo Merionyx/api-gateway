@@ -1,4 +1,4 @@
-.PHONY: run build build-agwctl test clean certs deps start lint fmt docker-build docker-run test-coverage test-coverage-ci help docker-up-dev-ha docker-down-dev-ha test-integration proto-generate proto-install proto-lint proto-breaking
+.PHONY: run build build-agwctl test clean certs deps start lint fmt docker-build docker-run test-coverage test-coverage-ci help docker-up-dev-ha docker-down-dev-ha test-integration openapi-contract proto-generate proto-install proto-lint proto-breaking
 
 # Variables
 BINARY_NAME=universal-server

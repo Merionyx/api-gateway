@@ -29,7 +29,7 @@ type RegistryHandler struct {
 	status      *registry.StatusReadUseCase
 	// readinessRequireContractSyncer enables Contract Syncer in GET /ready (etcd is always required).
 	readinessRequireContractSyncer bool
-	bundleSyncIdempotency          *idempotency.Store
+	bundleSyncIdempotency          idempotency.Executor
 }
 
 func NewRegistryHandler(
@@ -39,7 +39,7 @@ func NewRegistryHandler(
 	sync *bundle.BundleHTTPSyncUseCase,
 	status *registry.StatusReadUseCase,
 	readinessRequireContractSyncer bool,
-	bundleSyncIdempotency *idempotency.Store,
+	bundleSyncIdempotency idempotency.Executor,
 ) *RegistryHandler {
 	return &RegistryHandler{
 		bundles:                        bundles,
@@ -81,7 +81,7 @@ func (h *RegistryHandler) SyncBundle(c fiber.Ctx, params apiserver.SyncBundlePar
 
 	if params.IdempotencyKey != nil && *params.IdempotencyKey != "" && h.bundleSyncIdempotency != nil {
 		if hash := idempotency.HashBundleSyncRequest(req); hash != "" {
-			res, err := h.bundleSyncIdempotency.Execute(*params.IdempotencyKey, hash, func() (*idempotency.HTTPResult, error) {
+			res, err := h.bundleSyncIdempotency.Execute(c.Context(), *params.IdempotencyKey, hash, func() (*idempotency.HTTPResult, error) {
 				return h.syncBundleHTTPResult(c, &req)
 			})
 			if errors.Is(err, idempotency.ErrConflict) {

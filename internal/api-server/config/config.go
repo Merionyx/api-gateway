@@ -28,10 +28,16 @@ type Config struct {
 	Idempotency IdempotencyConfig `mapstructure:"idempotency" json:"idempotency"`
 }
 
-// IdempotencyConfig controls in-memory idempotency (single replica; use a shared store in HA if needed).
+// IdempotencyConfig controls POST /bundles/sync idempotency (memory or etcd).
 type IdempotencyConfig struct {
-	// BundleSyncTTL is how long completed sync outcomes are cached for the same key + body hash.
+	// Backend is "memory" (default) or "etcd" (shared across API Server replicas).
+	Backend string `mapstructure:"backend" json:"backend"`
+	// BundleSyncTTL is how long completed sync outcomes are retained (memory) or etcd lease TTL.
 	BundleSyncTTL time.Duration `mapstructure:"bundle_sync_ttl" json:"bundle_sync_ttl"`
+	// EtcdKeyPrefix is the etcd path prefix for idempotency keys (ignored when backend=memory).
+	EtcdKeyPrefix string `mapstructure:"etcd_key_prefix" json:"etcd_key_prefix"`
+	// Cluster optional segment to isolate keys when several logical envs share one etcd.
+	Cluster string `mapstructure:"cluster" json:"cluster"`
 }
 
 // GRPCRegistrySection groups server TLS and observability for the gRPC registry listener.
@@ -87,7 +93,10 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("metrics_http.port", "9090")
 	v.SetDefault("metrics_http.path", "/metrics")
 	v.SetDefault("readiness.require_contract_syncer", false)
+	v.SetDefault("idempotency.backend", "memory")
 	v.SetDefault("idempotency.bundle_sync_ttl", 24*time.Hour)
+	v.SetDefault("idempotency.etcd_key_prefix", "/api-gateway/api-server/idempotency/v1")
+	v.SetDefault("idempotency.cluster", "")
 
 	v.AutomaticEnv()
 	v.SetEnvPrefix("API_SERVER_")
