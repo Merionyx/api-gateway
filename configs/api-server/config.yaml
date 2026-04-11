@@ -22,6 +22,10 @@ jwt:
 contract_syncer:
   address: "gateway-contract-syncer:19092"
 
+# GET /ready: etcd is always checked; Contract Syncer is optional unless enabled below
+readiness:
+  require_contract_syncer: false
+
 # Single leader runs bundle sync (Contract Syncer gRPC); all replicas watch etcd and push updates
 # to controllers that hold StreamSnapshots on that replica (HAProxy sticky to one API Server per source).
 leader_election:

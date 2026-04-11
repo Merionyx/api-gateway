@@ -15,6 +15,8 @@ type Config struct {
 	Etcd           sharedetcd.EtcdConfig `mapstructure:"etcd" validate:"required" json:"etcd"`
 	JWT            JWTConfig             `mapstructure:"jwt" validate:"required" json:"jwt"`
 	ContractSyncer ContractSyncerConfig  `mapstructure:"contract_syncer" validate:"required" json:"contract_syncer"`
+	// Readiness configures GET /ready (etcd required; Contract Syncer optional unless RequireContractSyncer).
+	Readiness      ReadinessConfig       `mapstructure:"readiness" json:"readiness"`
 	LeaderElection LeaderElectionConfig  `mapstructure:"leader_election" json:"leader_election"`
 	// GRPCRegistry: TLS and observability for the API Server gRPC registry.
 	GRPCRegistry GRPCRegistrySection `mapstructure:"grpc_registry" json:"grpc_registry"`
@@ -39,6 +41,12 @@ type LeaderElectionConfig struct {
 
 type ContractSyncerConfig struct {
 	Address string `mapstructure:"address" validate:"required" json:"address"`
+}
+
+// ReadinessConfig controls GET /ready checks for orchestrators.
+type ReadinessConfig struct {
+	// RequireContractSyncer when true includes Contract Syncer ping in readiness (503 if down).
+	RequireContractSyncer bool `mapstructure:"require_contract_syncer" json:"require_contract_syncer"`
 }
 
 type ServerConfig struct {
@@ -69,6 +77,7 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("metrics_http.host", "0.0.0.0")
 	v.SetDefault("metrics_http.port", "9090")
 	v.SetDefault("metrics_http.path", "/metrics")
+	v.SetDefault("readiness.require_contract_syncer", false)
 
 	v.AutomaticEnv()
 	v.SetEnvPrefix("API_SERVER_")

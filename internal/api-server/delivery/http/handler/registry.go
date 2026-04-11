@@ -24,6 +24,8 @@ type RegistryHandler struct {
 	tenants     *registry.TenantReadUseCase
 	sync        *bundle.BundleHTTPSyncUseCase
 	status      *registry.StatusReadUseCase
+	// readinessRequireContractSyncer enables Contract Syncer in GET /ready (etcd is always required).
+	readinessRequireContractSyncer bool
 }
 
 func NewRegistryHandler(
@@ -32,13 +34,15 @@ func NewRegistryHandler(
 	tenants *registry.TenantReadUseCase,
 	sync *bundle.BundleHTTPSyncUseCase,
 	status *registry.StatusReadUseCase,
+	readinessRequireContractSyncer bool,
 ) *RegistryHandler {
 	return &RegistryHandler{
-		bundles:     bundles,
-		controllers: controllers,
-		tenants:     tenants,
-		sync:        sync,
-		status:      status,
+		bundles:                        bundles,
+		controllers:                    controllers,
+		tenants:                        tenants,
+		sync:                           sync,
+		status:                         status,
+		readinessRequireContractSyncer: readinessRequireContractSyncer,
 	}
 }
 
@@ -195,6 +199,19 @@ func (h *RegistryHandler) GetControllerHeartbeat(c fiber.Ctx, controllerID apise
 		return c.SendStatus(fiber.StatusNotModified)
 	}
 	c.Response().Header.Set("ETag", etag)
+	return c.JSON(body)
+}
+
+func (h *RegistryHandler) GetReady(c fiber.Ctx) error {
+	r := h.status.Readiness(c.Context(), h.readinessRequireContractSyncer)
+	body := apiserver.ReadinessStatus{
+		Status:         r.Status,
+		Etcd:           r.Etcd,
+		ContractSyncer: r.ContractSyncer,
+	}
+	if r.Status != "ok" {
+		return c.Status(http.StatusServiceUnavailable).JSON(body)
+	}
 	return c.JSON(body)
 }
 

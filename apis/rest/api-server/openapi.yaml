@@ -28,7 +28,7 @@ servers:
 
 tags:
 - name: System
-  description: Liveness and aggregate status
+  description: Liveness (`/health`), readiness (`/ready`), and aggregate status (`/api/v1/status`)
 - name: Authentication
   description: JWT issuance, JWKS, signing keys
 - name: Contracts
@@ -161,6 +161,26 @@ components:
         status:
           type: string
           example: ok
+
+    ReadinessStatus:
+      type: object
+      description: |
+        Kubernetes-style readiness: **200** when `status` is `ok`, **503** when `not_ready`.
+        Contract Syncer may be `skipped` when the server is configured not to require it for readiness.
+      required:
+      - status
+      - etcd
+      - contract_syncer
+      properties:
+        status:
+          type: string
+          description: ok if all required dependency checks passed
+        etcd:
+          type: string
+          description: ok after a lightweight read against the API Server etcd prefix
+        contract_syncer:
+          type: string
+          description: ok, error, or skipped
 
     Jwks:
       type: object
@@ -577,7 +597,8 @@ paths:
       operationId: getHealth
       summary: Liveness
       description: |
-        Lightweight liveness probe for load balancers and orchestrators. Returns `{ "status": "ok" }` when the HTTP server is up.
+        **Liveness only:** returns `{ "status": "ok" }` when the process accepts HTTP — does **not** verify etcd or Contract Syncer.
+        For readiness (dependencies), use `GET /ready`.
       responses:
         '200':
           description: Service is running
@@ -585,6 +606,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /ready:
+    get:
+      tags: [ System ]
+      operationId: getReady
+      summary: Readiness
+      description: |
+        **Readiness probe:** verifies **etcd** (required). **Contract Syncer** is included only when the server is configured
+        with `readiness.require_contract_syncer: true` (otherwise reported as `skipped` and not required to pass).
+        Returns **503** when not ready so orchestrators can stop sending traffic.
+      responses:
+        '200':
+          description: Ready to serve traffic
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessStatus'
+        '503':
+          description: Not ready (required dependency check failed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessStatus'
         '400':
           $ref: '#/components/responses/BadRequest'
 
@@ -1021,7 +1067,7 @@ paths:
       operationId: getStatus
       summary: Dependency status for operators
       description: |
-        Aggregate readiness-style snapshot (e.g. API Server self-check, etcd, Contract Syncer). Exact fields may evolve; safe for dashboards and alerting. Conditional GET supported via `ETag` / `If-None-Match`.
+        Rich snapshot for dashboards and alerting (API Server self-check, etcd, Contract Syncer). **Not** a Kubernetes probe — use `GET /ready` for orchestrator readiness. Exact fields may evolve. Conditional GET via `ETag` / `If-None-Match`.
       parameters:
       - $ref: '#/components/parameters/IfNoneMatch'
       responses:

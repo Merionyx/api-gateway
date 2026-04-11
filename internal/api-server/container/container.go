@@ -157,6 +157,7 @@ func (c *Container) initHandlers() {
 		c.TenantReadUseCase,
 		c.BundleHTTPSyncUseCase,
 		c.StatusReadUseCase,
+		c.Config.Readiness.RequireContractSyncer,
 	)
 	c.ControllerRegistryHandler = grpchandler.NewControllerRegistryHandler(c.ControllerRegistryUseCase)
 

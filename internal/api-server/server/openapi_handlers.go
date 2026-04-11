@@ -84,3 +84,7 @@ func (s *OpenAPIServer) CreateToken(c fiber.Ctx) error {
 func (s *OpenAPIServer) GetHealth(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "ok"})
 }
+
+func (s *OpenAPIServer) GetReady(c fiber.Ctx) error {
+	return s.c.RegistryHandler.GetReady(c)
+}
