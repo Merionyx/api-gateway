@@ -68,3 +68,50 @@ func TestExecute_ConcurrentDedup(t *testing.T) {
 		t.Fatalf("want fn once, got %d", run)
 	}
 }
+
+func TestExecute_fnErrorReplayed(t *testing.T) {
+	t.Parallel()
+	s := NewStore(time.Hour)
+	key := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	h := "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+	fnErr := errors.New("pipeline failed")
+	_, err := s.Execute(context.Background(), key, h, func() (*HTTPResult, error) {
+		return nil, fnErr
+	})
+	if err == nil || err.Error() != fnErr.Error() {
+		t.Fatalf("first: %v", err)
+	}
+	var secondRan bool
+	_, err2 := s.Execute(context.Background(), key, h, func() (*HTTPResult, error) {
+		secondRan = true
+		return &HTTPResult{StatusCode: 200}, nil
+	})
+	if secondRan {
+		t.Fatal("second call must not run fn")
+	}
+	if err2 == nil || err2.Error() != fnErr.Error() {
+		t.Fatalf("second: %v", err2)
+	}
+}
+
+func TestExecute_ttlEvictionRunsFnAgain(t *testing.T) {
+	s := NewStore(8 * time.Millisecond)
+	key := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	h := "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+	var runs int32
+	for i := 0; i < 3; i++ {
+		if i > 0 {
+			time.Sleep(10 * time.Millisecond)
+		}
+		_, err := s.Execute(context.Background(), key, h, func() (*HTTPResult, error) {
+			atomic.AddInt32(&runs, 1)
+			return &HTTPResult{StatusCode: 200, ContentType: "application/json", Body: []byte(`{}`)}, nil
+		})
+		if err != nil {
+			t.Fatalf("iter %d: %v", i, err)
+		}
+	}
+	if atomic.LoadInt32(&runs) != 3 {
+		t.Fatalf("want 3 fn runs after eviction, got %d", runs)
+	}
+}

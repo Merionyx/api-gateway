@@ -81,3 +81,22 @@ func TestBuildSnapshotSavePlan_putWhenContentChanges(t *testing.T) {
 		t.Fatalf("decoded %+v", decoded)
 	}
 }
+
+func TestBuildSnapshotSavePlan_twoPutsAndOneDelete(t *testing.T) {
+	existing := map[string][]byte{
+		"orphan": []byte(`{"name":"orphan"}`),
+	}
+	s1 := snap("a", "/1")
+	s2 := snap("b", "/2")
+	puts, dels, err := buildSnapshotSavePlan("bk", existing, []sharedgit.ContractSnapshot{s1, s2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(puts) != 2 || len(dels) != 1 {
+		t.Fatalf("puts=%d dels=%v", len(puts), dels)
+	}
+	wantDel := snapshotPrefix + "bk/contracts/orphan"
+	if dels[0] != wantDel {
+		t.Fatalf("del %q", dels[0])
+	}
+}

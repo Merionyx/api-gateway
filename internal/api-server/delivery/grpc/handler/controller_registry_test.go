@@ -45,7 +45,7 @@ func (errRegistryUC) StreamSnapshots(context.Context, string, interfaces.Snapsho
 	return nil
 }
 func (errRegistryUC) Heartbeat(context.Context, string, []models.EnvironmentInfo) error { return nil }
-func (errRegistryUC) StartEtcdWatch(context.Context) {}
+func (errRegistryUC) StartEtcdWatch(context.Context)                                    {}
 
 func TestControllerRegistryHandler_RegisterController_StatusError(t *testing.T) {
 	h := NewControllerRegistryHandler(errRegistryUC{err: apierrors.JoinStore("register controller", errors.New("etcd down"))}, false)
@@ -62,5 +62,39 @@ func TestControllerRegistryHandler_RegisterController_StatusError(t *testing.T) 
 	}
 	if st.Code() != codes.Unavailable {
 		t.Fatalf("code: %v", st.Code())
+	}
+}
+
+type heartbeatErrUC struct{ err error }
+
+func (heartbeatErrUC) RegisterController(context.Context, models.ControllerInfo) error { return nil }
+func (heartbeatErrUC) StreamSnapshots(context.Context, string, interfaces.SnapshotStream) error {
+	return nil
+}
+func (h heartbeatErrUC) Heartbeat(context.Context, string, []models.EnvironmentInfo) error {
+	return h.err
+}
+func (heartbeatErrUC) StartEtcdWatch(context.Context) {}
+
+func TestControllerRegistryHandler_Heartbeat_Success(t *testing.T) {
+	h := NewControllerRegistryHandler(noopRegistryUC{}, false)
+	resp, err := h.Heartbeat(context.Background(), &pb.HeartbeatRequest{ControllerId: "c1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !resp.Success {
+		t.Fatalf("resp: %+v", resp)
+	}
+}
+
+func TestControllerRegistryHandler_Heartbeat_StatusError(t *testing.T) {
+	h := NewControllerRegistryHandler(heartbeatErrUC{err: apierrors.ErrInvalidInput}, false)
+	_, err := h.Heartbeat(context.Background(), &pb.HeartbeatRequest{ControllerId: "c1"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	st, ok := status.FromError(err)
+	if !ok || st.Code() != codes.InvalidArgument {
+		t.Fatalf("got %v ok=%v", err, ok)
 	}
 }
