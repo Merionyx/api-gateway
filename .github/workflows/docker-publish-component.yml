@@ -80,6 +80,13 @@ jobs:
           *) echo "Unknown component: ${{ inputs.component }}"; exit 1 ;;
         esac
 
+    - name: Go binary metadata (ldflags in build/release/Dockerfile)
+      id: vmeta
+      run: |
+        echo "git_revision=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+        echo "build_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> "$GITHUB_OUTPUT"
+        echo "release_version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+
     - name: Login to Docker Hub
       uses: docker/login-action@v4
       with:
@@ -96,6 +103,9 @@ jobs:
         build-args: |
           SERVICE=${{ inputs.component }}
           OCI_NAME=${{ steps.oci.outputs.name }}
+          GIT_REVISION=${{ steps.vmeta.outputs.git_revision }}
+          BUILD_TIME=${{ steps.vmeta.outputs.build_time }}
+          RELEASE_VERSION=${{ steps.vmeta.outputs.release_version }}
         platforms: ${{ matrix.platform }}
         provenance: mode=max
         sbom: true

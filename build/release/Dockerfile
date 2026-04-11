@@ -5,6 +5,9 @@
 # Examples:
 #   docker build --build-arg SERVICE=controller --build-arg OCI_NAME=Controller \
 #     --target runtime-alpine -f build/release/Dockerfile .
+#
+# CI (.github/workflows/docker-publish-component.yml) passes GIT_REVISION, BUILD_TIME, RELEASE_VERSION
+# so GET /api/v1/version on api-server reflects the build (see internal/api-server/version).
 
 FROM golang:1.26.2-alpine AS builder
 
