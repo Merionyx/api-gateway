@@ -41,6 +41,9 @@ func TestLoadConfig_FromRepoSample(t *testing.T) {
 	if !cfg.LeaderElection.Enabled {
 		t.Fatal("LeaderElection.Enabled expected true")
 	}
+	if cfg.Readiness.RequireContractSyncer {
+		t.Fatal("Readiness.RequireContractSyncer expected false from sample config")
+	}
 }
 
 func TestLoadConfig_NoFile_Defaults(t *testing.T) {
@@ -56,5 +59,8 @@ func TestLoadConfig_NoFile_Defaults(t *testing.T) {
 	}
 	if !cfg.LeaderElection.Enabled {
 		t.Fatal("leader election should default to enabled")
+	}
+	if cfg.Readiness.RequireContractSyncer {
+		t.Fatal("readiness.require_contract_syncer should default to false")
 	}
 }

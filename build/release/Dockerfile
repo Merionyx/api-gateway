@@ -5,6 +5,9 @@
 # Examples:
 #   docker build --build-arg SERVICE=controller --build-arg OCI_NAME=Controller \
 #     --target runtime-alpine -f build/release/Dockerfile .
+#
+# CI (.github/workflows/docker-publish-component.yml) passes GIT_REVISION, BUILD_TIME, RELEASE_VERSION
+# so GET /api/v1/version on api-server reflects the build (see internal/api-server/version).
 
 FROM golang:1.26.2-alpine AS builder
 
@@ -25,10 +28,17 @@ COPY internal/${SERVICE}/ internal/${SERVICE}/
 
 ARG TARGETOS=linux
 ARG TARGETARCH
+ARG GIT_REVISION=unknown
+ARG BUILD_TIME=unknown
+ARG RELEASE_VERSION=dev
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
-    go build -o main cmd/${SERVICE}/main.go
+    go build -trimpath -ldflags "-s -w \
+      -X 'github.com/merionyx/api-gateway/internal/api-server/version.GitRevision=${GIT_REVISION}' \
+      -X 'github.com/merionyx/api-gateway/internal/api-server/version.BuildTime=${BUILD_TIME}' \
+      -X 'github.com/merionyx/api-gateway/internal/api-server/version.Release=${RELEASE_VERSION}'" \
+    -o main cmd/${SERVICE}/main.go
 
 FROM gcr.io/distroless/static-debian12:nonroot AS runtime-distroless
 

@@ -89,6 +89,7 @@ components:
       minAvailable: 1
     jwt:
       existingSecret: ""
+    # Merged over chart defaults (e.g. readiness.require_contract_syncer for GET /ready).
     config: {}
 
   contractSyncer:

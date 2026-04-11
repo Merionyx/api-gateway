@@ -2,18 +2,19 @@ package handler
 
 import (
 	"encoding/base64"
-	"errors"
-
-	"github.com/merionyx/api-gateway/internal/api-server/usecase"
+	"net/http"
 
 	"github.com/gofiber/fiber/v3"
+
+	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/problem"
+	"github.com/merionyx/api-gateway/internal/api-server/usecase/bundle"
 )
 
 type ContractsExportHandler struct {
-	exportUC *usecase.ContractExportUseCase
+	exportUC *bundle.ContractExportUseCase
 }
 
-func NewContractsExportHandler(exportUC *usecase.ContractExportUseCase) *ContractsExportHandler {
+func NewContractsExportHandler(exportUC *bundle.ContractExportUseCase) *ContractsExportHandler {
 	return &ContractsExportHandler{exportUC: exportUC}
 }
 
@@ -38,18 +39,15 @@ type contractsExportResponse struct {
 func (h *ContractsExportHandler) Export(c fiber.Ctx) error {
 	var req contractsExportRequest
 	if err := c.Bind().Body(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidJSONBody, "", problem.DetailInvalidJSONBody))
 	}
 	if req.Repository == "" || req.Ref == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "repository and ref are required"})
+		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeExportRepositoryRefRequired, "", problem.DetailExportRepositoryRefRequired))
 	}
 
 	files, err := h.exportUC.Export(c.Context(), req.Repository, req.Ref, req.Path, req.ContractName)
 	if err != nil {
-		if errors.Is(err, usecase.ErrContractSyncerRejected) {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
-		}
-		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
+		return problem.WriteContractSync(c, err)
 	}
 
 	resp := contractsExportResponse{Files: make([]contractsExportFileJSON, 0, len(files))}

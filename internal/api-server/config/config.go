@@ -2,6 +2,7 @@ package config
 
 import (
 	"log/slog"
+	"time"
 
 	sharedetcd "github.com/merionyx/api-gateway/internal/shared/etcd"
 	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
@@ -15,12 +16,28 @@ type Config struct {
 	Etcd           sharedetcd.EtcdConfig `mapstructure:"etcd" validate:"required" json:"etcd"`
 	JWT            JWTConfig             `mapstructure:"jwt" validate:"required" json:"jwt"`
 	ContractSyncer ContractSyncerConfig  `mapstructure:"contract_syncer" validate:"required" json:"contract_syncer"`
-	LeaderElection LeaderElectionConfig  `mapstructure:"leader_election" json:"leader_election"`
+	// Readiness configures GET /ready (etcd required; Contract Syncer optional unless RequireContractSyncer).
+	Readiness      ReadinessConfig      `mapstructure:"readiness" json:"readiness"`
+	LeaderElection LeaderElectionConfig `mapstructure:"leader_election" json:"leader_election"`
 	// GRPCRegistry: TLS and observability for the API Server gRPC registry.
 	GRPCRegistry GRPCRegistrySection `mapstructure:"grpc_registry" json:"grpc_registry"`
 	// GRPCContractSyncerClient: TLS when dialing Contract Syncer.
 	GRPCContractSyncerClient grpcobs.ClientTLSConfig `mapstructure:"grpc_contract_syncer_client" json:"grpc_contract_syncer_client"`
 	MetricsHTTP              metricshttp.Config      `mapstructure:"metrics_http" json:"metrics_http"`
+	// Idempotency configures POST /api/v1/bundles/sync replay when Idempotency-Key is sent.
+	Idempotency IdempotencyConfig `mapstructure:"idempotency" json:"idempotency"`
+}
+
+// IdempotencyConfig controls POST /bundles/sync idempotency (memory or etcd).
+type IdempotencyConfig struct {
+	// Backend is "memory" (default) or "etcd" (shared across API Server replicas).
+	Backend string `mapstructure:"backend" json:"backend"`
+	// BundleSyncTTL is how long completed sync outcomes are retained (memory) or etcd lease TTL.
+	BundleSyncTTL time.Duration `mapstructure:"bundle_sync_ttl" json:"bundle_sync_ttl"`
+	// EtcdKeyPrefix is the etcd path prefix for idempotency keys (ignored when backend=memory).
+	EtcdKeyPrefix string `mapstructure:"etcd_key_prefix" json:"etcd_key_prefix"`
+	// Cluster optional segment to isolate keys when several logical envs share one etcd.
+	Cluster string `mapstructure:"cluster" json:"cluster"`
 }
 
 // GRPCRegistrySection groups server TLS and observability for the gRPC registry listener.
@@ -39,6 +56,12 @@ type LeaderElectionConfig struct {
 
 type ContractSyncerConfig struct {
 	Address string `mapstructure:"address" validate:"required" json:"address"`
+}
+
+// ReadinessConfig controls GET /ready checks for orchestrators.
+type ReadinessConfig struct {
+	// RequireContractSyncer when true includes Contract Syncer ping in readiness (503 if down).
+	RequireContractSyncer bool `mapstructure:"require_contract_syncer" json:"require_contract_syncer"`
 }
 
 type ServerConfig struct {
@@ -69,6 +92,11 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("metrics_http.host", "0.0.0.0")
 	v.SetDefault("metrics_http.port", "9090")
 	v.SetDefault("metrics_http.path", "/metrics")
+	v.SetDefault("readiness.require_contract_syncer", false)
+	v.SetDefault("idempotency.backend", "memory")
+	v.SetDefault("idempotency.bundle_sync_ttl", 24*time.Hour)
+	v.SetDefault("idempotency.etcd_key_prefix", "/api-gateway/api-server/idempotency/v1")
+	v.SetDefault("idempotency.cluster", "")
 
 	v.AutomaticEnv()
 	v.SetEnvPrefix("API_SERVER_")

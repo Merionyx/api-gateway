@@ -9,11 +9,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// NewPingCommand builds `agwctl ping` (GET /health on the API Server).
+// NewPingCommand builds `agwctl ping` (GET /health — liveness — on the API Server).
 func NewPingCommand(resolveServer func() (string, error)) *cobra.Command {
 	return &cobra.Command{
 		Use:   "ping",
-		Short: "Check connectivity to the API Server (HTTP GET /health)",
+		Short: "Check connectivity to the API Server (HTTP GET /health, liveness)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			server, err := resolveServer()
 			if err != nil {

@@ -207,7 +207,8 @@ func (x *BundleInfo) GetPath() string {
 	return ""
 }
 
-// RegisterControllerResponse response to registration
+// RegisterControllerResponse response to registration.
+// Failures are reported via gRPC status (google.rpc.Status); success=true only when RPC completes with OK.
 type RegisterControllerResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
@@ -421,7 +422,8 @@ func (x *HeartbeatRequest) GetEnvironments() []*EnvironmentInfo {
 	return nil
 }
 
-// HeartbeatResponse response to heartbeat
+// HeartbeatResponse response to heartbeat.
+// Failures are reported via gRPC status; success=true only when RPC completes with OK.
 type HeartbeatResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`

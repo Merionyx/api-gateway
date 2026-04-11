@@ -4,13 +4,18 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
+	contractsyncergrpc "github.com/merionyx/api-gateway/internal/api-server/adapter/contractsyncer/grpc"
+	"github.com/merionyx/api-gateway/internal/api-server/adapter/etcd"
 	"github.com/merionyx/api-gateway/internal/api-server/config"
 	grpchandler "github.com/merionyx/api-gateway/internal/api-server/delivery/grpc/handler"
 	httphandler "github.com/merionyx/api-gateway/internal/api-server/delivery/http/handler"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
-	"github.com/merionyx/api-gateway/internal/api-server/repository/etcd"
-	"github.com/merionyx/api-gateway/internal/api-server/usecase"
+	"github.com/merionyx/api-gateway/internal/api-server/idempotency"
+	"github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
+	"github.com/merionyx/api-gateway/internal/api-server/usecase/bundle"
+	"github.com/merionyx/api-gateway/internal/api-server/usecase/registry"
 	"github.com/merionyx/api-gateway/internal/shared/bootstrap"
 	"github.com/merionyx/api-gateway/internal/shared/election"
 
@@ -27,7 +32,10 @@ type Container struct {
 	SnapshotRepository   interfaces.SnapshotRepository
 	ControllerRepository interfaces.ControllerRepository
 
-	JWTUseCase                *usecase.JWTUseCase
+	// ContractSyncerGRPC is the gRPC adapter for Contract Syncer (sync, export, ping).
+	ContractSyncerGRPC *contractsyncergrpc.Client
+
+	JWTUseCase                *auth.JWTUseCase
 	ControllerRegistryUseCase interfaces.ControllerRegistryUseCase
 	BundleSyncUseCase         interfaces.BundleSyncUseCase
 
@@ -35,7 +43,18 @@ type Container struct {
 
 	ContractsExportHandler *httphandler.ContractsExportHandler
 
+	RegistryHandler *httphandler.RegistryHandler
+
+	BundleReadUseCase     *bundle.BundleReadUseCase
+	ControllerReadUseCase *registry.ControllerReadUseCase
+	TenantReadUseCase     *registry.TenantReadUseCase
+	BundleHTTPSyncUseCase *bundle.BundleHTTPSyncUseCase
+	StatusReadUseCase     *registry.StatusReadUseCase
+
 	ControllerRegistryHandler *grpchandler.ControllerRegistryHandler
+
+	// BundleSyncIdempotency caches POST /api/v1/bundles/sync outcomes when Idempotency-Key is set (memory or etcd).
+	BundleSyncIdempotency idempotency.Executor
 }
 
 // NewContainer creates and initializes a new DI container
@@ -95,7 +114,7 @@ func (c *Container) initRepositories() {
 }
 
 func (c *Container) initUseCases() error {
-	jwtUC, err := usecase.NewJWTUseCase(
+	jwtUC, err := auth.NewJWTUseCase(
 		c.Config.JWT.KeysDir,
 		c.Config.JWT.Issuer,
 	)
@@ -104,19 +123,29 @@ func (c *Container) initUseCases() error {
 	}
 	c.JWTUseCase = jwtUC
 
-	c.ControllerRegistryUseCase = usecase.NewControllerRegistryUseCase(
+	c.ControllerRegistryUseCase = registry.NewControllerRegistryUseCase(
 		c.ControllerRepository,
 		c.SnapshotRepository,
 		c.EtcdClient,
 	)
 
-	c.BundleSyncUseCase = usecase.NewBundleSyncUseCase(
+	c.ContractSyncerGRPC = contractsyncergrpc.NewClient(c.Config.ContractSyncer.Address, c.Config.GRPCContractSyncerClient)
+
+	c.BundleSyncUseCase = bundle.NewBundleSyncUseCase(
 		c.SnapshotRepository,
 		c.ControllerRepository,
-		c.Config.ContractSyncer.Address,
-		c.Config.GRPCContractSyncerClient,
+		c.ContractSyncerGRPC,
 		c.LeaderGate,
 		c.Config.MetricsHTTP.Enabled,
+	)
+
+	c.BundleReadUseCase = bundle.NewBundleReadUseCase(c.SnapshotRepository)
+	c.ControllerReadUseCase = registry.NewControllerReadUseCase(c.ControllerRepository)
+	c.TenantReadUseCase = registry.NewTenantReadUseCase(c.ControllerRepository)
+	c.BundleHTTPSyncUseCase = bundle.NewBundleHTTPSyncUseCase(c.SnapshotRepository, c.BundleSyncUseCase)
+	c.StatusReadUseCase = registry.NewStatusReadUseCase(
+		c.EtcdClient,
+		c.ContractSyncerGRPC,
 	)
 
 	slog.Info("use cases initialized")
@@ -124,10 +153,28 @@ func (c *Container) initUseCases() error {
 }
 
 func (c *Container) initHandlers() {
+	switch strings.ToLower(strings.TrimSpace(c.Config.Idempotency.Backend)) {
+	case "etcd":
+		pfx := idempotency.ResolveKeyPrefix(c.Config.Idempotency.EtcdKeyPrefix, c.Config.Idempotency.Cluster)
+		c.BundleSyncIdempotency = idempotency.NewEtcdStore(c.EtcdClient, pfx, c.Config.Idempotency.BundleSyncTTL)
+		slog.Info("idempotency backend=etcd", "etcd_key_prefix", pfx)
+	default:
+		c.BundleSyncIdempotency = idempotency.NewStore(c.Config.Idempotency.BundleSyncTTL)
+		slog.Info("idempotency backend=memory")
+	}
 	c.JWTHandler = httphandler.NewJWTHandler(c.JWTUseCase, c.Config.MetricsHTTP.Enabled)
-	exportUC := usecase.NewContractExportUseCase(c.Config.ContractSyncer.Address, c.Config.GRPCContractSyncerClient)
+	exportUC := bundle.NewContractExportUseCase(c.ContractSyncerGRPC)
 	c.ContractsExportHandler = httphandler.NewContractsExportHandler(exportUC)
-	c.ControllerRegistryHandler = grpchandler.NewControllerRegistryHandler(c.ControllerRegistryUseCase)
+	c.RegistryHandler = httphandler.NewRegistryHandler(
+		c.BundleReadUseCase,
+		c.ControllerReadUseCase,
+		c.TenantReadUseCase,
+		c.BundleHTTPSyncUseCase,
+		c.StatusReadUseCase,
+		c.Config.Readiness.RequireContractSyncer,
+		c.BundleSyncIdempotency,
+	)
+	c.ControllerRegistryHandler = grpchandler.NewControllerRegistryHandler(c.ControllerRegistryUseCase, c.Config.MetricsHTTP.Enabled)
 
 	slog.Info("handlers initialized")
 }

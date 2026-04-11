@@ -189,7 +189,7 @@ spec:
           mountPath: /api-server/secrets/api-server/keys/jwt
         readinessProbe:
           httpGet:
-            path: /.well-known/jwks.json
+            path: /ready
             port: http
           initialDelaySeconds: 5
           periodSeconds: 10

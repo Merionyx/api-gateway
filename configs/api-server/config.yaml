@@ -22,6 +22,10 @@ jwt:
 contract_syncer:
   address: "gateway-contract-syncer:19092"
 
+# GET /ready: etcd is always checked; Contract Syncer is optional unless enabled below
+readiness:
+  require_contract_syncer: false
+
 # Single leader runs bundle sync (Contract Syncer gRPC); all replicas watch etcd and push updates
 # to controllers that hold StreamSnapshots on that replica (HAProxy sticky to one API Server per source).
 leader_election:
@@ -29,3 +33,10 @@ leader_election:
   key_prefix: "/api-gateway/api-server/election/leader"
   identity: ""
   session_ttl_seconds: 5
+
+# Idempotency-Key on POST /api/v1/bundles/sync: memory (default) or etcd (HA).
+idempotency:
+  backend: "memory"
+  bundle_sync_ttl: "24h"
+  etcd_key_prefix: "/api-gateway/api-server/idempotency/v1"
+  cluster: ""

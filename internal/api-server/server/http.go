@@ -2,14 +2,17 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/gofiber/fiber/v3/middleware/logger"
 	"github.com/gofiber/fiber/v3/middleware/recover"
+	oapimw "github.com/oapi-codegen/fiber-middleware/v2"
 
 	"github.com/merionyx/api-gateway/internal/api-server/container"
+	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
 	apimetrics "github.com/merionyx/api-gateway/internal/api-server/metrics"
 )
 
@@ -39,7 +42,9 @@ func RunHTTPServer(ctx context.Context, c *container.Container) error {
 	}))
 
 	app.Use(apimetrics.HTTPMiddleware(c.Config.MetricsHTTP.Enabled))
-	setupRoutes(app, c)
+	if err := setupRoutes(app, c); err != nil {
+		return err
+	}
 
 	port := ":" + c.Config.Server.HTTPPort
 	slog.Info("HTTP server starting", "port", c.Config.Server.HTTPPort)
@@ -60,17 +65,15 @@ func RunHTTPServer(ctx context.Context, c *container.Container) error {
 	}
 }
 
-func setupRoutes(app *fiber.App, c *container.Container) {
-	app.Get("/health", func(ctx fiber.Ctx) error {
-		return ctx.JSON(fiber.Map{
-			"status": "ok",
-		})
-	})
+func setupRoutes(app *fiber.App, c *container.Container) error {
+	swagger, err := apiserver.GetSwagger()
+	if err != nil {
+		return fmt.Errorf("embedded OpenAPI spec: %w", err)
+	}
+	// Skip matching request Host/scheme to spec servers (same pattern as oapi-codegen petstore examples).
+	swagger.Servers = nil
 
-	app.Get("/.well-known/jwks.json", c.JWTHandler.GetJWKS)
-
-	api := app.Group("/api/v1")
-	api.Post("/tokens", c.JWTHandler.GenerateToken)
-	api.Get("/keys", c.JWTHandler.GetSigningKeys)
-	api.Post("/contracts/export", c.ContractsExportHandler.Export)
+	app.Use(oapimw.OapiRequestValidator(swagger))
+	apiserver.RegisterHandlers(app, NewOpenAPIServer(c))
+	return nil
 }

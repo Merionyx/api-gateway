@@ -1,0 +1,9 @@
+# Regenerate: see doc.go (oapi-codegen with fiber-v3-server).
+# Output path is passed via -o on the go:generate line so it is explicit (not cwd-dependent when using only YAML "output").
+
+package: apiserver
+generate:
+  models: true
+  fiber-v3-server: true
+  strict-server: true
+  embedded-spec: true

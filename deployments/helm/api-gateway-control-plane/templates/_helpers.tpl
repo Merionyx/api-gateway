@@ -257,6 +257,8 @@ jwt:
   issuer: "api-gateway-api-server"
 contract_syncer:
   address: {{ printf "%s:19092" (include "agwcp.svc.contractSyncer" .) | quote }}
+readiness:
+  require_contract_syncer: false
 leader_election:
   enabled: true
   key_prefix: {{ printf "/api-gateway/api-server/election/%s" .Release.Name | quote }}
@@ -282,6 +284,11 @@ metrics_http:
   host: "0.0.0.0"
   port: "9090"
   path: "/metrics"
+idempotency:
+  backend: "memory"
+  bundle_sync_ttl: "24h"
+  etcd_key_prefix: "/api-gateway/api-server/idempotency/v1"
+  cluster: ""
 {{- end }}
 
 {{- define "agwcp.contractSyncer.config.defaults" -}}

@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/merionyx/api-gateway/internal/api-server/usecase"
+	"github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
 
 	"github.com/gofiber/fiber/v3"
 )
 
 func TestJWTHandler_GenerateToken_ValidationAppID(t *testing.T) {
-	uc, err := usecase.NewJWTUseCase(t.TempDir(), "iss")
+	uc, err := auth.NewJWTUseCase(t.TempDir(), "iss")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +34,7 @@ func TestJWTHandler_GenerateToken_ValidationAppID(t *testing.T) {
 }
 
 func TestJWTHandler_GenerateToken_Created(t *testing.T) {
-	uc, err := usecase.NewJWTUseCase(t.TempDir(), "iss")
+	uc, err := auth.NewJWTUseCase(t.TempDir(), "iss")
 	if err != nil {
 		t.Fatal(err)
 	}

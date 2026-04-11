@@ -1,4 +1,4 @@
-.PHONY: run build build-agwctl test clean certs deps start lint fmt docker-build docker-run test-coverage test-coverage-ci help docker-up-dev-ha docker-down-dev-ha test-integration proto-generate proto-install proto-lint proto-breaking
+.PHONY: run build build-agwctl test clean certs deps start lint fmt docker-build docker-run test-coverage test-coverage-ci help docker-up-dev-ha docker-down-dev-ha test-integration openapi-contract proto-generate proto-install proto-lint proto-breaking
 
 # Variables
 BINARY_NAME=universal-server
@@ -8,6 +8,12 @@ DOCKER_IMAGE=merionyx-universal-server
 DOCKER_TAG=latest
 # Release Dockerfiles: runtime-alpine (shell, wget healthcheck) | runtime-distroless (production)
 DOCKER_BUILD_TARGET?=runtime-alpine
+
+# Metadata for build/release/Dockerfile (-ldflags → internal/api-server/version, GET /api/v1/version)
+GIT_REVISION ?= $(shell git rev-parse HEAD 2>/dev/null || echo unknown)
+BUILD_TIME ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+RELEASE_VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+DOCKER_BUILD_METADATA := --build-arg GIT_REVISION=$(GIT_REVISION) --build-arg BUILD_TIME=$(BUILD_TIME) --build-arg RELEASE_VERSION=$(RELEASE_VERSION)
 
 # Main commands
 run: ## Run the server
@@ -58,11 +64,11 @@ lint: ## Lint code
 
 # Docker commands
 docker-build: ## Build Docker images (default target: Alpine; set DOCKER_BUILD_TARGET=runtime-distroless for distroless)
-	@DOCKER_BUILDKIT=1 docker build --target $(DOCKER_BUILD_TARGET) --build-arg SERVICE=controller      --build-arg OCI_NAME=Controller        -t $(DOCKER_REPO)/api-gateway-controller:$(DOCKER_TAG) -f build/release/Dockerfile .
-	@DOCKER_BUILDKIT=1 docker build --target $(DOCKER_BUILD_TARGET) --build-arg SERVICE=api-server      --build-arg OCI_NAME='API Server'      -t $(DOCKER_REPO)/api-gateway-api-server:$(DOCKER_TAG) -f build/release/Dockerfile .
-	@DOCKER_BUILDKIT=1 docker build --target $(DOCKER_BUILD_TARGET) --build-arg SERVICE=contract-syncer --build-arg OCI_NAME='Contract Syncer' -t $(DOCKER_REPO)/api-gateway-contract-syncer:$(DOCKER_TAG) -f build/release/Dockerfile .
-	@DOCKER_BUILDKIT=1 docker build --target $(DOCKER_BUILD_TARGET) --build-arg SERVICE=auth-sidecar    --build-arg OCI_NAME='Auth Sidecar'    -t $(DOCKER_REPO)/api-gateway-auth-sidecar:$(DOCKER_TAG) -f build/release/Dockerfile .
-	@DOCKER_BUILDKIT=1 docker build --target $(DOCKER_BUILD_TARGET) --build-arg SERVICE=mock-service    --build-arg OCI_NAME='Mock Service'    -t $(DOCKER_REPO)/api-gateway-mock-service:$(DOCKER_TAG) -f build/release/Dockerfile .
+	@DOCKER_BUILDKIT=1 docker build --target $(DOCKER_BUILD_TARGET) $(DOCKER_BUILD_METADATA) --build-arg SERVICE=controller      --build-arg OCI_NAME=Controller        -t $(DOCKER_REPO)/api-gateway-controller:$(DOCKER_TAG) -f build/release/Dockerfile .
+	@DOCKER_BUILDKIT=1 docker build --target $(DOCKER_BUILD_TARGET) $(DOCKER_BUILD_METADATA) --build-arg SERVICE=api-server      --build-arg OCI_NAME='API Server'      -t $(DOCKER_REPO)/api-gateway-api-server:$(DOCKER_TAG) -f build/release/Dockerfile .
+	@DOCKER_BUILDKIT=1 docker build --target $(DOCKER_BUILD_TARGET) $(DOCKER_BUILD_METADATA) --build-arg SERVICE=contract-syncer --build-arg OCI_NAME='Contract Syncer' -t $(DOCKER_REPO)/api-gateway-contract-syncer:$(DOCKER_TAG) -f build/release/Dockerfile .
+	@DOCKER_BUILDKIT=1 docker build --target $(DOCKER_BUILD_TARGET) $(DOCKER_BUILD_METADATA) --build-arg SERVICE=auth-sidecar    --build-arg OCI_NAME='Auth Sidecar'    -t $(DOCKER_REPO)/api-gateway-auth-sidecar:$(DOCKER_TAG) -f build/release/Dockerfile .
+	@DOCKER_BUILDKIT=1 docker build --target $(DOCKER_BUILD_TARGET) $(DOCKER_BUILD_METADATA) --build-arg SERVICE=mock-service    --build-arg OCI_NAME='Mock Service'    -t $(DOCKER_REPO)/api-gateway-mock-service:$(DOCKER_TAG) -f build/release/Dockerfile .
 
 docker-push: ## Push Docker image
 	@docker push $(DOCKER_REPO)/api-gateway-controller:$(DOCKER_TAG)
