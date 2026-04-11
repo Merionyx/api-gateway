@@ -18,12 +18,6 @@ func NewOpenAPIServer(c *container.Container) apiserver.ServerInterface {
 	return &OpenAPIServer{c: c}
 }
 
-func notImplemented(c fiber.Ctx) error {
-	return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{
-		"error": "not implemented",
-	})
-}
-
 func (s *OpenAPIServer) GetJwks(c fiber.Ctx, _ apiserver.GetJwksParams) error {
 	return s.c.JWTHandler.GetJWKS(c)
 }
