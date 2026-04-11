@@ -7,6 +7,7 @@ import (
 	commonv1 "github.com/merionyx/api-gateway/pkg/grpc/common/v1"
 	pb "github.com/merionyx/api-gateway/pkg/grpc/controller_registry/v1"
 
+	"github.com/merionyx/api-gateway/internal/api-server/delivery/grpc/grpcerr"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
@@ -51,15 +52,10 @@ func (h *ControllerRegistryHandler) RegisterController(ctx context.Context, req 
 
 	if err := h.registryUseCase.RegisterController(ctx, info); err != nil {
 		slog.Error("Failed to register controller", "error", err)
-		return &pb.RegisterControllerResponse{
-			Success: false,
-			Error:   err.Error(),
-		}, nil
+		return nil, grpcerr.Status(err)
 	}
 
-	return &pb.RegisterControllerResponse{
-		Success: true,
-	}, nil
+	return &pb.RegisterControllerResponse{Success: true}, nil
 }
 
 type snapshotStreamWrapper struct {
@@ -105,7 +101,7 @@ func (h *ControllerRegistryHandler) StreamSnapshots(req *pb.StreamSnapshotsReque
 
 	if err := h.registryUseCase.StreamSnapshots(stream.Context(), req.ControllerId, wrapper); err != nil {
 		slog.Error("Stream error", "error", err)
-		return err
+		return grpcerr.Status(err)
 	}
 
 	return nil
@@ -133,12 +129,8 @@ func (h *ControllerRegistryHandler) Heartbeat(ctx context.Context, req *pb.Heart
 
 	if err := h.registryUseCase.Heartbeat(ctx, req.ControllerId, environments); err != nil {
 		slog.Error("Failed to process heartbeat", "error", err)
-		return &pb.HeartbeatResponse{
-			Success: false,
-		}, nil
+		return nil, grpcerr.Status(err)
 	}
 
-	return &pb.HeartbeatResponse{
-		Success: true,
-	}, nil
+	return &pb.HeartbeatResponse{Success: true}, nil
 }

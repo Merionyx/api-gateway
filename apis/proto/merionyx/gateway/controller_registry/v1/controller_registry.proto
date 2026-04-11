@@ -29,7 +29,8 @@ message BundleInfo {
   string path = 4;
 }
 
-// RegisterControllerResponse response to registration
+// RegisterControllerResponse response to registration.
+// Failures are reported via gRPC status (google.rpc.Status); success=true only when RPC completes with OK.
 message RegisterControllerResponse {
   bool success = 1;
   string error = 2;
@@ -55,7 +56,8 @@ message HeartbeatRequest {
   repeated EnvironmentInfo environments = 2;
 }
 
-// HeartbeatResponse response to heartbeat
+// HeartbeatResponse response to heartbeat.
+// Failures are reported via gRPC status; success=true only when RPC completes with OK.
 message HeartbeatResponse {
   bool success = 1;
 }

@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -14,9 +13,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 )
-
-// errRegistrationRejected is returned when the API Server responds with Success=false.
-var errRegistrationRejected = errors.New("registration rejected by API server")
 
 func (uc *APIServerSyncUseCase) grpcDialOptions() ([]grpc.DialOption, error) {
 	tlsOpts, err := grpcobs.DialOptions(uc.config.GRPCAPIServerClient)
@@ -72,17 +68,13 @@ func (uc *APIServerSyncUseCase) registerController(ctx context.Context, client p
 		return err
 	}
 
-	resp, err := client.RegisterController(ctx, &pb.RegisterControllerRequest{
+	_, err = client.RegisterController(ctx, &pb.RegisterControllerRequest{
 		ControllerId: uc.controllerID,
 		Tenant:       uc.config.Tenant,
 		Environments: environments,
 	})
 	if err != nil {
 		return err
-	}
-
-	if !resp.Success {
-		return fmt.Errorf("%w: %s", errRegistrationRejected, resp.Error)
 	}
 
 	slog.Info("registered with API server", "controller_id", uc.controllerID, "environments_count", len(environments))

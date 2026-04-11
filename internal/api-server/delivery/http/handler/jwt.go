@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"net/http"
 	"time"
 
+	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/problem"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 	apimetrics "github.com/merionyx/api-gateway/internal/api-server/metrics"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
@@ -25,48 +27,35 @@ func (h *JWTHandler) GenerateToken(c fiber.Ctx) error {
 	var req models.GenerateTokenRequest
 	if err := c.Bind().Body(&req); err != nil {
 		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationBind)
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
+		return problem.Write(c, http.StatusBadRequest, problem.BadRequest("", "invalid request body"))
 	}
 
-	// Validation
 	if req.AppID == "" {
 		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationAppID)
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "app_id is required",
-		})
+		return problem.Write(c, http.StatusBadRequest, problem.BadRequest("", "app_id is required"))
 	}
 
 	if len(req.Environments) == 0 {
 		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationEnvironments)
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "environments are required",
-		})
+		return problem.Write(c, http.StatusBadRequest, problem.BadRequest("", "environments are required"))
 	}
 
 	for _, environment := range req.Environments {
 		if environment == "" {
 			apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationEmptyEnv)
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "environment is required",
-			})
+			return problem.Write(c, http.StatusBadRequest, problem.BadRequest("", "environment is required"))
 		}
 	}
 
 	if req.ExpiresAt.Before(time.Now()) {
 		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationExpiresAt)
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "expires_at must be in the future",
-		})
+		return problem.Write(c, http.StatusBadRequest, problem.BadRequest("", "expires_at must be in the future"))
 	}
 
 	token, err := h.jwtUseCase.GenerateToken(&req)
 	if err != nil {
 		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultInternalError)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return problem.WriteInternal(c, err)
 	}
 
 	apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultCreated)
@@ -78,9 +67,7 @@ func (h *JWTHandler) GenerateToken(c fiber.Ctx) error {
 func (h *JWTHandler) GetJWKS(c fiber.Ctx) error {
 	jwks, err := h.jwtUseCase.GetJWKS()
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return problem.WriteInternal(c, err)
 	}
 
 	return c.JSON(jwks)
