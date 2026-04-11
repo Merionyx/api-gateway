@@ -130,21 +130,34 @@ components:
   schemas:
     Problem:
       type: object
-      description: RFC 7807 / RFC 9457 Problem Details.
+      description: |
+        RFC 7807 / RFC 9457 Problem Details.
+
+        **Localization:** use `code` (stable `UPPER_SNAKE_CASE`) as the i18n message key, e.g. `problem.NOT_FOUND`
+        or `errors.api.NOT_FOUND`. `title` and `detail` are default English text for debugging and optional
+        display; do not rely on them as the only source for UI copy in translated apps.
+
+        **Security:** low-level causes (stack traces, etcd/syncer diagnostics) must be logged server-side only;
+        the API returns `code` plus a neutral `detail` suitable for operators or an optional “technical details” panel.
       properties:
         type:
           type: string
           format: uri
-          description: URI reference identifying the problem type.
+          description: |
+            URI identifying this class of problem (stable per `code`). Clients may use `code` alone for i18n.
+        code:
+          type: string
+          description: Stable machine-readable problem code for localization and client branching.
+          example: NOT_FOUND
         title:
           type: string
-          description: Short, human-readable summary.
+          description: Short human-readable summary (default locale; optional for UI when i18n is used).
         status:
           type: integer
           description: HTTP status code.
         detail:
           type: string
-          description: Human-readable explanation for this occurrence.
+          description: Human-readable explanation for this occurrence (default locale).
         instance:
           type: string
           format: uri

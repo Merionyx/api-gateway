@@ -67,16 +67,15 @@ func (h *RegistryHandler) ListBundleKeys(c fiber.Ctx, params apiserver.ListBundl
 func (h *RegistryHandler) SyncBundle(c fiber.Ctx, _ apiserver.SyncBundleParams) error {
 	var req apiserver.BundleSyncRequest
 	if err := c.Bind().Body(&req); err != nil {
-		return problem.Write(c, http.StatusBadRequest, problem.BadRequest("", "invalid request body"))
+		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidJSONBody, "", problem.DetailInvalidJSONBody))
 	}
 	if req.Repository == "" || req.Ref == "" || req.Bundle == "" {
-		return problem.Write(c, http.StatusBadRequest, problem.BadRequest("", "repository, ref, and bundle are required"))
+		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeSyncBundleParamsRequired, "", problem.DetailSyncBundleParamsRequired))
 	}
 	force := req.Force != nil && *req.Force
 	fromCache, snaps, err := h.sync.Sync(c.Context(), req.Repository, req.Ref, req.Bundle, force)
 	if err != nil {
-		st, p := problem.FromContractSyncPipeline(err)
-		return problem.Write(c, st, p)
+		return problem.WriteContractSync(c, err)
 	}
 	apiSnaps, err := snapshotsToAPI(snaps)
 	if err != nil {
@@ -91,7 +90,7 @@ func (h *RegistryHandler) SyncBundle(c fiber.Ctx, _ apiserver.SyncBundleParams) 
 func (h *RegistryHandler) ListContractsInBundle(c fiber.Ctx, bundleKey apiserver.BundleKey, params apiserver.ListContractsInBundleParams) error {
 	bk, err := url.PathUnescape(string(bundleKey))
 	if err != nil {
-		return problem.Write(c, http.StatusBadRequest, problem.BadRequest("", "invalid bundle_key"))
+		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidBundleKeyPath, "", problem.DetailInvalidBundleKeyPath))
 	}
 	items, next, hasMore, err := h.bundles.ListContractNames(c.Context(), bk, params.Limit, params.Cursor)
 	if err != nil {
@@ -113,16 +112,16 @@ func (h *RegistryHandler) ListContractsInBundle(c fiber.Ctx, bundleKey apiserver
 func (h *RegistryHandler) GetContractInBundle(c fiber.Ctx, bundleKey apiserver.BundleKey, contractName apiserver.ContractName, params apiserver.GetContractInBundleParams) error {
 	bk, err := url.PathUnescape(string(bundleKey))
 	if err != nil {
-		return problem.Write(c, http.StatusBadRequest, problem.BadRequest("", "invalid bundle_key"))
+		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidBundleKeyPath, "", problem.DetailInvalidBundleKeyPath))
 	}
 	cn, err := url.PathUnescape(string(contractName))
 	if err != nil {
-		return problem.Write(c, http.StatusBadRequest, problem.BadRequest("", "invalid contract_name"))
+		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidContractNamePath, "", problem.DetailInvalidContractNamePath))
 	}
 	doc, err := h.bundles.GetContractDocument(c.Context(), bk, cn)
 	if err != nil {
 		if errors.Is(err, apierrors.ErrNotFound) {
-			return problem.Write(c, http.StatusNotFound, problem.NotFound("", "contract not found in bundle"))
+			return problem.Write(c, http.StatusNotFound, problem.NotFound(problem.CodeContractNotInBundle, "", problem.DetailContractNotInBundle))
 		}
 		return problem.RespondError(c, err)
 	}
@@ -164,7 +163,7 @@ func (h *RegistryHandler) GetController(c fiber.Ctx, controllerID apiserver.Cont
 	info, err := h.controllers.GetController(c.Context(), string(controllerID))
 	if err != nil {
 		if errors.Is(err, apierrors.ErrNotFound) {
-			return problem.Write(c, http.StatusNotFound, problem.NotFound("", "controller not found"))
+			return problem.Write(c, http.StatusNotFound, problem.NotFound(problem.CodeControllerNotFound, "", problem.DetailControllerNotFound))
 		}
 		return problem.RespondError(c, err)
 	}
@@ -185,7 +184,7 @@ func (h *RegistryHandler) GetControllerHeartbeat(c fiber.Ctx, controllerID apise
 	ts, err := h.controllers.GetHeartbeat(c.Context(), string(controllerID))
 	if err != nil {
 		if errors.Is(err, apierrors.ErrNotFound) {
-			return problem.Write(c, http.StatusNotFound, problem.NotFound("", "controller heartbeat not found"))
+			return problem.Write(c, http.StatusNotFound, problem.NotFound(problem.CodeControllerHeartbeatNotFound, "", problem.DetailControllerHeartbeatNotFound))
 		}
 		return problem.RespondError(c, err)
 	}

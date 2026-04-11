@@ -27,29 +27,29 @@ func (h *JWTHandler) GenerateToken(c fiber.Ctx) error {
 	var req models.GenerateTokenRequest
 	if err := c.Bind().Body(&req); err != nil {
 		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationBind)
-		return problem.Write(c, http.StatusBadRequest, problem.BadRequest("", "invalid request body"))
+		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidJSONBody, "", problem.DetailInvalidJSONBody))
 	}
 
 	if req.AppID == "" {
 		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationAppID)
-		return problem.Write(c, http.StatusBadRequest, problem.BadRequest("", "app_id is required"))
+		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeTokenAppIDRequired, "", problem.DetailTokenAppIDRequired))
 	}
 
 	if len(req.Environments) == 0 {
 		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationEnvironments)
-		return problem.Write(c, http.StatusBadRequest, problem.BadRequest("", "environments are required"))
+		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeTokenEnvironmentsRequired, "", problem.DetailTokenEnvironmentsRequired))
 	}
 
 	for _, environment := range req.Environments {
 		if environment == "" {
 			apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationEmptyEnv)
-			return problem.Write(c, http.StatusBadRequest, problem.BadRequest("", "environment is required"))
+			return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeTokenEnvironmentEmpty, "", problem.DetailTokenEnvironmentEmpty))
 		}
 	}
 
 	if req.ExpiresAt.Before(time.Now()) {
 		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationExpiresAt)
-		return problem.Write(c, http.StatusBadRequest, problem.BadRequest("", "expires_at must be in the future"))
+		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeTokenExpiresAtPast, "", problem.DetailTokenExpiresAtPast))
 	}
 
 	token, err := h.jwtUseCase.GenerateToken(&req)

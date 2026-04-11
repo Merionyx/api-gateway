@@ -2,6 +2,7 @@
 package problem
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/gofiber/fiber/v3"
@@ -19,55 +20,62 @@ func strPtr(s string) *string {
 	return &s
 }
 
-// BadRequest builds a 400 Problem.
-func BadRequest(title, detail string) apiserver.Problem {
+// WithCode builds a Problem with stable `code` and `type` URI (for i18n keys and documentation).
+// Pass empty `title` to use the default title for `httpStatus`.
+func WithCode(httpStatus int, code, title, detail string) apiserver.Problem {
 	if title == "" {
-		title = "Bad Request"
+		title = defaultHTTPtitle(httpStatus)
 	}
+	tu := TypeURI(code)
 	return apiserver.Problem{
+		Type:   strPtr(tu),
+		Code:   strPtr(code),
 		Title:  title,
-		Status: http.StatusBadRequest,
+		Status: httpStatus,
 		Detail: strPtr(detail),
 	}
 }
 
-// NotFound builds a 404 Problem.
-func NotFound(title, detail string) apiserver.Problem {
-	if title == "" {
-		title = "Not Found"
-	}
-	return apiserver.Problem{
-		Title:  title,
-		Status: http.StatusNotFound,
-		Detail: strPtr(detail),
-	}
-}
-
-// Internal builds a 500 Problem.
-func Internal(detail string) apiserver.Problem {
-	return apiserver.Problem{
-		Title:  "Internal Server Error",
-		Status: http.StatusInternalServerError,
-		Detail: strPtr(detail),
+func defaultHTTPtitle(st int) string {
+	switch st {
+	case http.StatusBadRequest:
+		return "Bad Request"
+	case http.StatusNotFound:
+		return "Not Found"
+	case http.StatusBadGateway:
+		return "Bad Gateway"
+	case http.StatusServiceUnavailable:
+		return "Service Unavailable"
+	case http.StatusInternalServerError:
+		return "Internal Server Error"
+	default:
+		return "Error"
 	}
 }
 
-// BadGateway builds a 502 Problem (upstream / Contract Syncer unavailable).
-func BadGateway(detail string) apiserver.Problem {
-	return apiserver.Problem{
-		Title:  "Bad Gateway",
-		Status: http.StatusBadGateway,
-		Detail: strPtr(detail),
-	}
+// BadRequest builds a 400 Problem with stable code.
+func BadRequest(code, title, detail string) apiserver.Problem {
+	return WithCode(http.StatusBadRequest, code, title, detail)
 }
 
-// ServiceUnavailable builds a 503 Problem (e.g. etcd / dependencies down).
-func ServiceUnavailable(detail string) apiserver.Problem {
-	return apiserver.Problem{
-		Title:  "Service Unavailable",
-		Status: http.StatusServiceUnavailable,
-		Detail: strPtr(detail),
-	}
+// NotFound builds a 404 Problem with stable code.
+func NotFound(code, title, detail string) apiserver.Problem {
+	return WithCode(http.StatusNotFound, code, title, detail)
+}
+
+// InternalError builds a 500 Problem with stable code.
+func InternalError(code, title, detail string) apiserver.Problem {
+	return WithCode(http.StatusInternalServerError, code, title, detail)
+}
+
+// BadGateway builds a 502 Problem with stable code.
+func BadGateway(code, title, detail string) apiserver.Problem {
+	return WithCode(http.StatusBadGateway, code, title, detail)
+}
+
+// ServiceUnavailable builds a 503 Problem with stable code.
+func ServiceUnavailable(code, title, detail string) apiserver.Problem {
+	return WithCode(http.StatusServiceUnavailable, code, title, detail)
 }
 
 // Write sends a Problem response with Content-Type application/problem+json.
@@ -76,13 +84,31 @@ func Write(c fiber.Ctx, httpStatus int, p apiserver.Problem) error {
 	return c.Status(httpStatus).JSON(p)
 }
 
-// RespondError maps a domain error to status + Problem and writes the response.
+// RespondError maps a domain error to status + Problem, logs the underlying error, and writes the response.
 func RespondError(c fiber.Ctx, err error) error {
 	st, p := FromDomain(err)
+	logProblemResponse(st, &p, err)
 	return Write(c, st, p)
 }
 
-// WriteInternal writes 500 Internal Server Error with err.Error() as detail.
+func logProblemResponse(st int, p *apiserver.Problem, err error) {
+	code := ""
+	if p != nil && p.Code != nil {
+		code = *p.Code
+	}
+	slog.Error("http problem response", "status", st, "code", code, "err", err)
+}
+
+// WriteInternal writes 500 with a stable code; logs the full error server-side only.
 func WriteInternal(c fiber.Ctx, err error) error {
-	return Write(c, http.StatusInternalServerError, Internal(err.Error()))
+	slog.Error("http internal error", "err", err)
+	p := WithCode(http.StatusInternalServerError, CodeInternalError, "", DetailInternalError)
+	return Write(c, http.StatusInternalServerError, p)
+}
+
+// WriteContractSync maps a Contract Syncer / etcd pipeline error to a Problem, logs the underlying error, and writes the response.
+func WriteContractSync(c fiber.Ctx, err error) error {
+	st, p := FromContractSyncPipeline(err)
+	logProblemResponse(st, &p, err)
+	return Write(c, st, p)
 }

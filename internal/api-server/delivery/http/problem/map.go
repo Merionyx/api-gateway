@@ -15,22 +15,23 @@ func FromDomain(err error) (status int, p apiserver.Problem) {
 	}
 	switch {
 	case errors.Is(err, apierrors.ErrNotFound):
-		return http.StatusNotFound, NotFound("", err.Error())
+		return http.StatusNotFound, NotFound(CodeNotFound, "", DetailNotFound)
 	case errors.Is(err, apierrors.ErrInvalidInput):
-		return http.StatusBadRequest, BadRequest("", err.Error())
+		return http.StatusBadRequest, BadRequest(CodeInvalidInput, "", DetailInvalidInput)
 	case errors.Is(err, apierrors.ErrContractSyncerRejected):
-		return http.StatusBadRequest, BadRequest("", err.Error())
+		return http.StatusBadRequest, BadRequest(CodeContractSyncerRejected, "", DetailContractSyncRejected(err))
 	case errors.Is(err, apierrors.ErrNoActiveSigningKey):
-		return http.StatusServiceUnavailable, ServiceUnavailable(err.Error())
-	case errors.Is(err, apierrors.ErrUnsupportedSigningAlgorithm),
-		errors.Is(err, apierrors.ErrSigningOperationFailed):
-		return http.StatusInternalServerError, Internal(err.Error())
+		return http.StatusServiceUnavailable, ServiceUnavailable(CodeNoActiveSigningKey, "", DetailNoActiveSigningKey)
+	case errors.Is(err, apierrors.ErrUnsupportedSigningAlgorithm):
+		return http.StatusInternalServerError, InternalError(CodeUnsupportedSigningAlgorithm, "", DetailUnsupportedSigningAlgorithm)
+	case errors.Is(err, apierrors.ErrSigningOperationFailed):
+		return http.StatusInternalServerError, InternalError(CodeSigningOperationFailed, "", DetailSigningOperationFailed)
 	case errors.Is(err, apierrors.ErrStoreAccess):
-		return http.StatusServiceUnavailable, ServiceUnavailable(err.Error())
+		return http.StatusServiceUnavailable, ServiceUnavailable(CodeStoreUnavailable, "", DetailStoreUnavailable)
 	case errors.Is(err, apierrors.ErrContractSyncerUnavailable):
-		return http.StatusBadGateway, BadGateway(err.Error())
+		return http.StatusBadGateway, BadGateway(CodeContractSyncerUnavailable, "", DetailContractSyncerUnavailable)
 	default:
-		return http.StatusInternalServerError, Internal(err.Error())
+		return http.StatusInternalServerError, InternalError(CodeInternalError, "", DetailInternalError)
 	}
 }
 
@@ -41,12 +42,12 @@ func FromContractSyncPipeline(err error) (status int, p apiserver.Problem) {
 	}
 	switch {
 	case errors.Is(err, apierrors.ErrContractSyncerRejected):
-		return http.StatusBadRequest, BadRequest("", err.Error())
+		return http.StatusBadRequest, BadRequest(CodeContractSyncerRejected, "", DetailContractSyncRejected(err))
 	case errors.Is(err, apierrors.ErrStoreAccess):
-		return http.StatusServiceUnavailable, ServiceUnavailable(err.Error())
+		return http.StatusServiceUnavailable, ServiceUnavailable(CodeStoreUnavailable, "", DetailStoreUnavailable)
 	case errors.Is(err, apierrors.ErrContractSyncerUnavailable):
-		return http.StatusBadGateway, BadGateway(err.Error())
+		return http.StatusBadGateway, BadGateway(CodeContractSyncerUnavailable, "", DetailContractSyncerUnavailable)
 	default:
-		return http.StatusBadGateway, BadGateway(err.Error())
+		return http.StatusBadGateway, BadGateway(CodeContractSyncPipelineFailed, "", DetailContractSyncPipelineFailed)
 	}
 }
