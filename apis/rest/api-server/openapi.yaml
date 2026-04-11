@@ -28,7 +28,7 @@ servers:
 
 tags:
 - name: System
-  description: Liveness (`/health`), readiness (`/ready`), and aggregate status (`/api/v1/status`)
+  description: Liveness (`/health`), readiness (`/ready`), build metadata (`/api/v1/version`), and aggregate status (`/api/v1/status`)
 - name: Authentication
   description: JWT issuance, JWKS, signing keys
 - name: Contracts
@@ -174,6 +174,30 @@ components:
         status:
           type: string
           example: ok
+
+    VersionResponse:
+      type: object
+      description: Process build metadata and the OpenAPI `info.version` of the HTTP surface served by this binary.
+      required:
+      - api_schema_version
+      - git_revision
+      - build_time
+      properties:
+        api_schema_version:
+          type: string
+          description: Matches OpenAPI `info.version` embedded with this server (HTTP API schema revision).
+          example: "1.0.0"
+        git_revision:
+          type: string
+          description: Git commit baked in at link time; `unknown` when not set (local `go run`).
+        build_time:
+          type: string
+          description: RFC3339 UTC build timestamp when set at link time; `unknown` otherwise.
+          example: "2026-04-11T12:00:00Z"
+        release:
+          type: string
+          description: Optional release or image tag (e.g. semver) from CI.
+          example: "1.2.3"
 
     ReadinessStatus:
       type: object
@@ -646,6 +670,23 @@ paths:
                 $ref: '#/components/schemas/ReadinessStatus'
         '400':
           $ref: '#/components/responses/BadRequest'
+
+  /api/v1/version:
+    get:
+      tags: [ System ]
+      operationId: getVersion
+      summary: Build and API schema version
+      description: |
+        Returns git revision, build time, embedded OpenAPI `info.version`, and optional release tag — useful to see **which binary** answers in multi-replica setups.
+      responses:
+        '200':
+          description: Version metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /.well-known/jwks.json:
     get:

@@ -5,6 +5,7 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/api-server/container"
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
+	"github.com/merionyx/api-gateway/internal/api-server/version"
 )
 
 // OpenAPIServer implements apiserver.ServerInterface by delegating to HTTP handlers from the DI container.
@@ -79,6 +80,19 @@ func (s *OpenAPIServer) ListEnvironmentsByTenant(c fiber.Ctx, tenant apiserver.T
 
 func (s *OpenAPIServer) CreateToken(c fiber.Ctx) error {
 	return s.c.JWTHandler.GenerateToken(c)
+}
+
+func (s *OpenAPIServer) GetVersion(c fiber.Ctx) error {
+	body := apiserver.VersionResponse{
+		ApiSchemaVersion: version.APISchemaVersion(),
+		GitRevision:      version.GitRevision,
+		BuildTime:        version.BuildTime,
+	}
+	if version.Release != "" {
+		r := version.Release
+		body.Release = &r
+	}
+	return c.JSON(body)
 }
 
 func (s *OpenAPIServer) GetHealth(c fiber.Ctx) error {
