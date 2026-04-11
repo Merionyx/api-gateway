@@ -47,6 +47,8 @@ func defaultHTTPtitle(st int) string {
 		return "Bad Gateway"
 	case http.StatusServiceUnavailable:
 		return "Service Unavailable"
+	case http.StatusConflict:
+		return "Conflict"
 	case http.StatusInternalServerError:
 		return "Internal Server Error"
 	default:
@@ -72,6 +74,11 @@ func InternalError(code, title, detail string) apiserver.Problem {
 // BadGateway builds a 502 Problem with stable code.
 func BadGateway(code, title, detail string) apiserver.Problem {
 	return WithCode(http.StatusBadGateway, code, title, detail)
+}
+
+// Conflict builds a 409 Problem with stable code.
+func Conflict(code, title, detail string) apiserver.Problem {
+	return WithCode(http.StatusConflict, code, title, detail)
 }
 
 // ServiceUnavailable builds a 503 Problem with stable code.

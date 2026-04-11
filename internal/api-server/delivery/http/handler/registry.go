@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/url"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
+	"github.com/merionyx/api-gateway/internal/api-server/idempotency"
 	apimetrics "github.com/merionyx/api-gateway/internal/api-server/metrics"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/bundle"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/registry"
@@ -27,6 +29,7 @@ type RegistryHandler struct {
 	status      *registry.StatusReadUseCase
 	// readinessRequireContractSyncer enables Contract Syncer in GET /ready (etcd is always required).
 	readinessRequireContractSyncer bool
+	bundleSyncIdempotency          *idempotency.Store
 }
 
 func NewRegistryHandler(
@@ -36,6 +39,7 @@ func NewRegistryHandler(
 	sync *bundle.BundleHTTPSyncUseCase,
 	status *registry.StatusReadUseCase,
 	readinessRequireContractSyncer bool,
+	bundleSyncIdempotency *idempotency.Store,
 ) *RegistryHandler {
 	return &RegistryHandler{
 		bundles:                        bundles,
@@ -44,6 +48,7 @@ func NewRegistryHandler(
 		sync:                           sync,
 		status:                         status,
 		readinessRequireContractSyncer: readinessRequireContractSyncer,
+		bundleSyncIdempotency:          bundleSyncIdempotency,
 	}
 }
 
@@ -65,7 +70,7 @@ func (h *RegistryHandler) ListBundleKeys(c fiber.Ctx, params apiserver.ListBundl
 	return c.JSON(body)
 }
 
-func (h *RegistryHandler) SyncBundle(c fiber.Ctx, _ apiserver.SyncBundleParams) error {
+func (h *RegistryHandler) SyncBundle(c fiber.Ctx, params apiserver.SyncBundleParams) error {
 	var req apiserver.BundleSyncRequest
 	if err := c.Bind().Body(&req); err != nil {
 		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidJSONBody, "", problem.DetailInvalidJSONBody))
@@ -73,19 +78,71 @@ func (h *RegistryHandler) SyncBundle(c fiber.Ctx, _ apiserver.SyncBundleParams) 
 	if req.Repository == "" || req.Ref == "" || req.Bundle == "" {
 		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeSyncBundleParamsRequired, "", problem.DetailSyncBundleParamsRequired))
 	}
+
+	if params.IdempotencyKey != nil && *params.IdempotencyKey != "" && h.bundleSyncIdempotency != nil {
+		if hash := idempotency.HashBundleSyncRequest(req); hash != "" {
+			res, err := h.bundleSyncIdempotency.Execute(*params.IdempotencyKey, hash, func() (*idempotency.HTTPResult, error) {
+				return h.syncBundleHTTPResult(c, &req)
+			})
+			if errors.Is(err, idempotency.ErrConflict) {
+				return problem.Write(c, http.StatusConflict, problem.Conflict(problem.CodeIdempotencyKeyMismatch, "", problem.DetailIdempotencyKeyMismatch))
+			}
+			if err != nil {
+				return problem.WriteInternal(c, err)
+			}
+			return writeCachedHTTPResult(c, res)
+		}
+	}
+
+	res, err := h.syncBundleHTTPResult(c, &req)
+	if err != nil {
+		return problem.WriteInternal(c, err)
+	}
+	return writeCachedHTTPResult(c, res)
+}
+
+func writeCachedHTTPResult(c fiber.Ctx, res *idempotency.HTTPResult) error {
+	c.Response().Header.Set("Content-Type", res.ContentType)
+	return c.Status(res.StatusCode).Send(res.Body)
+}
+
+func (h *RegistryHandler) syncBundleHTTPResult(c fiber.Ctx, req *apiserver.BundleSyncRequest) (*idempotency.HTTPResult, error) {
 	force := req.Force != nil && *req.Force
 	fromCache, snaps, err := h.sync.Sync(c.Context(), req.Repository, req.Ref, req.Bundle, force)
 	if err != nil {
-		return problem.WriteContractSync(c, err)
+		apimetrics.RecordContractPipelineOutcome(apimetrics.MetricsEnabledFromCtx(c), err)
+		st, p := problem.FromContractSyncPipeline(err)
+		logHTTPProblem(st, &p, err)
+		body, merr := json.Marshal(p)
+		if merr != nil {
+			return nil, merr
+		}
+		return &idempotency.HTTPResult{StatusCode: st, ContentType: problem.ContentType, Body: body}, nil
 	}
 	apiSnaps, err := snapshotsToAPI(snaps)
 	if err != nil {
-		return problem.RespondError(c, err)
+		apimetrics.RecordDomainOutcome(apimetrics.MetricsEnabledFromCtx(c), apimetrics.TransportHTTP, err)
+		st, p := problem.FromDomain(err)
+		logHTTPProblem(st, &p, err)
+		body, merr := json.Marshal(p)
+		if merr != nil {
+			return nil, merr
+		}
+		return &idempotency.HTTPResult{StatusCode: st, ContentType: problem.ContentType, Body: body}, nil
 	}
-	return c.JSON(apiserver.BundleSyncResponse{
-		FromCache: fromCache,
-		Snapshots: apiSnaps,
-	})
+	body, err := json.Marshal(apiserver.BundleSyncResponse{FromCache: fromCache, Snapshots: apiSnaps})
+	if err != nil {
+		return nil, err
+	}
+	return &idempotency.HTTPResult{StatusCode: http.StatusOK, ContentType: "application/json", Body: body}, nil
+}
+
+func logHTTPProblem(st int, p *apiserver.Problem, cause error) {
+	code := ""
+	if p != nil && p.Code != nil {
+		code = *p.Code
+	}
+	slog.Error("http problem response", "status", st, "code", code, "err", cause)
 }
 
 func (h *RegistryHandler) ListContractsInBundle(c fiber.Ctx, bundleKey apiserver.BundleKey, params apiserver.ListContractsInBundleParams) error {

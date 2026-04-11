@@ -2,6 +2,7 @@ package config
 
 import (
 	"log/slog"
+	"time"
 
 	sharedetcd "github.com/merionyx/api-gateway/internal/shared/etcd"
 	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
@@ -16,13 +17,21 @@ type Config struct {
 	JWT            JWTConfig             `mapstructure:"jwt" validate:"required" json:"jwt"`
 	ContractSyncer ContractSyncerConfig  `mapstructure:"contract_syncer" validate:"required" json:"contract_syncer"`
 	// Readiness configures GET /ready (etcd required; Contract Syncer optional unless RequireContractSyncer).
-	Readiness      ReadinessConfig       `mapstructure:"readiness" json:"readiness"`
-	LeaderElection LeaderElectionConfig  `mapstructure:"leader_election" json:"leader_election"`
+	Readiness      ReadinessConfig      `mapstructure:"readiness" json:"readiness"`
+	LeaderElection LeaderElectionConfig `mapstructure:"leader_election" json:"leader_election"`
 	// GRPCRegistry: TLS and observability for the API Server gRPC registry.
 	GRPCRegistry GRPCRegistrySection `mapstructure:"grpc_registry" json:"grpc_registry"`
 	// GRPCContractSyncerClient: TLS when dialing Contract Syncer.
 	GRPCContractSyncerClient grpcobs.ClientTLSConfig `mapstructure:"grpc_contract_syncer_client" json:"grpc_contract_syncer_client"`
 	MetricsHTTP              metricshttp.Config      `mapstructure:"metrics_http" json:"metrics_http"`
+	// Idempotency configures POST /api/v1/bundles/sync replay when Idempotency-Key is sent.
+	Idempotency IdempotencyConfig `mapstructure:"idempotency" json:"idempotency"`
+}
+
+// IdempotencyConfig controls in-memory idempotency (single replica; use a shared store in HA if needed).
+type IdempotencyConfig struct {
+	// BundleSyncTTL is how long completed sync outcomes are cached for the same key + body hash.
+	BundleSyncTTL time.Duration `mapstructure:"bundle_sync_ttl" json:"bundle_sync_ttl"`
 }
 
 // GRPCRegistrySection groups server TLS and observability for the gRPC registry listener.
@@ -78,6 +87,7 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("metrics_http.port", "9090")
 	v.SetDefault("metrics_http.path", "/metrics")
 	v.SetDefault("readiness.require_contract_syncer", false)
+	v.SetDefault("idempotency.bundle_sync_ttl", 24*time.Hour)
 
 	v.AutomaticEnv()
 	v.SetEnvPrefix("API_SERVER_")

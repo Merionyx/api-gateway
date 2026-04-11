@@ -20,6 +20,8 @@ const (
 	CodeTokenExpiresAtPast        = "TOKEN_EXPIRES_AT_PAST"
 
 	CodeExportRepositoryRefRequired = "EXPORT_REPOSITORY_REF_REQUIRED"
+
+	CodeIdempotencyKeyMismatch = "IDEMPOTENCY_KEY_MISMATCH"
 )
 
 // Domain / pipeline codes — single source: errmapping.
@@ -53,6 +55,8 @@ const (
 	DetailTokenExpiresAtPast        = "expires_at must be in the future."
 
 	DetailExportRepositoryRefRequired = "Fields repository and ref are required."
+
+	DetailIdempotencyKeyMismatch = "This Idempotency-Key was already used with a different request body."
 )
 
 // Domain detail strings — re-export for callers that reference problem.DetailNotFound etc.

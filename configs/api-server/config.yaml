@@ -33,3 +33,7 @@ leader_election:
   key_prefix: "/api-gateway/api-server/election/leader"
   identity: ""
   session_ttl_seconds: 5
+
+# Idempotency-Key on POST /api/v1/bundles/sync: cache is in-process only (multiple replicas do not share it).
+idempotency:
+  bundle_sync_ttl: "24h"

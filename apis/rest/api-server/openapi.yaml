@@ -1065,6 +1065,12 @@ paths:
                 $ref: '#/components/schemas/BundleSyncResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Idempotency-Key reused with a different request body
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
         '502':
           description: Upstream failure during sync
           content:

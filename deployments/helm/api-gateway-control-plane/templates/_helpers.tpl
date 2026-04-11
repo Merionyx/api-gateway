@@ -284,6 +284,8 @@ metrics_http:
   host: "0.0.0.0"
   port: "9090"
   path: "/metrics"
+idempotency:
+  bundle_sync_ttl: "24h"
 {{- end }}
 
 {{- define "agwcp.contractSyncer.config.defaults" -}}

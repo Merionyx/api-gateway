@@ -11,6 +11,7 @@ import (
 	grpchandler "github.com/merionyx/api-gateway/internal/api-server/delivery/grpc/handler"
 	httphandler "github.com/merionyx/api-gateway/internal/api-server/delivery/http/handler"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
+	"github.com/merionyx/api-gateway/internal/api-server/idempotency"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/bundle"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/registry"
@@ -43,13 +44,16 @@ type Container struct {
 
 	RegistryHandler *httphandler.RegistryHandler
 
-	BundleReadUseCase      *bundle.BundleReadUseCase
-	ControllerReadUseCase  *registry.ControllerReadUseCase
-	TenantReadUseCase      *registry.TenantReadUseCase
-	BundleHTTPSyncUseCase  *bundle.BundleHTTPSyncUseCase
-	StatusReadUseCase      *registry.StatusReadUseCase
+	BundleReadUseCase     *bundle.BundleReadUseCase
+	ControllerReadUseCase *registry.ControllerReadUseCase
+	TenantReadUseCase     *registry.TenantReadUseCase
+	BundleHTTPSyncUseCase *bundle.BundleHTTPSyncUseCase
+	StatusReadUseCase     *registry.StatusReadUseCase
 
 	ControllerRegistryHandler *grpchandler.ControllerRegistryHandler
+
+	// BundleSyncIdempotency caches POST /api/v1/bundles/sync outcomes when Idempotency-Key is set (process-local).
+	BundleSyncIdempotency *idempotency.Store
 }
 
 // NewContainer creates and initializes a new DI container
@@ -148,6 +152,7 @@ func (c *Container) initUseCases() error {
 }
 
 func (c *Container) initHandlers() {
+	c.BundleSyncIdempotency = idempotency.NewStore(c.Config.Idempotency.BundleSyncTTL)
 	c.JWTHandler = httphandler.NewJWTHandler(c.JWTUseCase, c.Config.MetricsHTTP.Enabled)
 	exportUC := bundle.NewContractExportUseCase(c.ContractSyncerGRPC)
 	c.ContractsExportHandler = httphandler.NewContractsExportHandler(exportUC)
@@ -158,6 +163,7 @@ func (c *Container) initHandlers() {
 		c.BundleHTTPSyncUseCase,
 		c.StatusReadUseCase,
 		c.Config.Readiness.RequireContractSyncer,
+		c.BundleSyncIdempotency,
 	)
 	c.ControllerRegistryHandler = grpchandler.NewControllerRegistryHandler(c.ControllerRegistryUseCase, c.Config.MetricsHTTP.Enabled)
 
