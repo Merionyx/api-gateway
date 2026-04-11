@@ -19,8 +19,17 @@ func Status(err error) error {
 	switch {
 	case errors.Is(err, apierrors.ErrNotFound):
 		return status.Error(codes.NotFound, err.Error())
+	case errors.Is(err, apierrors.ErrInvalidInput):
+		return status.Error(codes.InvalidArgument, err.Error())
 	case errors.Is(err, apierrors.ErrContractSyncerRejected):
 		return status.Error(codes.InvalidArgument, err.Error())
+	case errors.Is(err, apierrors.ErrStoreAccess),
+		errors.Is(err, apierrors.ErrContractSyncerUnavailable),
+		errors.Is(err, apierrors.ErrNoActiveSigningKey):
+		return status.Error(codes.Unavailable, err.Error())
+	case errors.Is(err, apierrors.ErrUnsupportedSigningAlgorithm),
+		errors.Is(err, apierrors.ErrSigningOperationFailed):
+		return status.Error(codes.Internal, err.Error())
 	default:
 		return status.Error(codes.Internal, err.Error())
 	}

@@ -55,7 +55,7 @@ func (h *JWTHandler) GenerateToken(c fiber.Ctx) error {
 	token, err := h.jwtUseCase.GenerateToken(&req)
 	if err != nil {
 		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultInternalError)
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 
 	apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultCreated)
@@ -67,7 +67,7 @@ func (h *JWTHandler) GenerateToken(c fiber.Ctx) error {
 func (h *JWTHandler) GetJWKS(c fiber.Ctx) error {
 	jwks, err := h.jwtUseCase.GetJWKS()
 	if err != nil {
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 
 	return c.JSON(jwks)

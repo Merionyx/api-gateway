@@ -84,7 +84,7 @@ func (uc *BundleSyncUseCase) SyncBundle(ctx context.Context, bundle models.Bundl
 	}
 
 	apimetrics.RecordBundleSyncOutcome(uc.metricsEnabled, apimetrics.BundleOutcomeFailed)
-	return nil, fmt.Errorf("contract syncer after %d attempts: %w", maxAttempts, lastErr)
+	return nil, apierrors.JoinContractSyncer(fmt.Sprintf("syncBundle after %d attempts", maxAttempts), lastErr)
 }
 
 func (uc *BundleSyncUseCase) syncBundleOnce(ctx context.Context, bundle models.BundleInfo) ([]sharedgit.ContractSnapshot, error) {
@@ -102,7 +102,7 @@ func (uc *BundleSyncUseCase) syncBundleOnce(ctx context.Context, bundle models.B
 	written, err := uc.snapshotRepo.SaveSnapshots(ctx, bundleKey, snapshots)
 	if err != nil {
 		apimetrics.RecordBundleSyncAttempt(uc.metricsEnabled, apimetrics.BundleAttemptSaveError)
-		return nil, fmt.Errorf("save snapshots: %w", err)
+		return nil, apierrors.JoinStore("save snapshots after sync", err)
 	}
 	if !written {
 		slog.Debug("API Server: bundle sync finished, no etcd snapshot keys changed", "bundle_key", bundleKey)

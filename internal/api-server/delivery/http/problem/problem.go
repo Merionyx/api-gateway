@@ -61,6 +61,15 @@ func BadGateway(detail string) apiserver.Problem {
 	}
 }
 
+// ServiceUnavailable builds a 503 Problem (e.g. etcd / dependencies down).
+func ServiceUnavailable(detail string) apiserver.Problem {
+	return apiserver.Problem{
+		Title:  "Service Unavailable",
+		Status: http.StatusServiceUnavailable,
+		Detail: strPtr(detail),
+	}
+}
+
 // Write sends a Problem response with Content-Type application/problem+json.
 func Write(c fiber.Ctx, httpStatus int, p apiserver.Problem) error {
 	c.Response().Header.Set("Content-Type", ContentType)

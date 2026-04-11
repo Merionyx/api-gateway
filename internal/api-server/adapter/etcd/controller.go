@@ -40,12 +40,12 @@ func (r *ControllerRepository) RegisterController(ctx context.Context, info mode
 
 	data, err := json.Marshal(info)
 	if err != nil {
-		return fmt.Errorf("failed to marshal controller info: %w", err)
+		return apierrors.JoinStore("marshal controller info", err)
 	}
 
 	_, err = r.client.Put(ctx, key, string(data))
 	if err != nil {
-		return fmt.Errorf("failed to register controller in etcd: %w", err)
+		return apierrors.JoinStore("register controller in etcd", err)
 	}
 
 	heartbeatKey := fmt.Sprintf("%s%s/heartbeat", controllerPrefix, info.ControllerID)
@@ -54,12 +54,12 @@ func (r *ControllerRepository) RegisterController(ctx context.Context, info mode
 		Timestamp: time.Now(),
 	})
 	if err != nil {
-		return fmt.Errorf("failed to marshal heartbeat info: %w", err)
+		return apierrors.JoinStore("marshal heartbeat info", err)
 	}
 
 	_, err = r.client.Put(ctx, heartbeatKey, string(heartbeatData))
 	if err != nil {
-		return fmt.Errorf("failed to save heartbeat: %w", err)
+		return apierrors.JoinStore("save controller heartbeat", err)
 	}
 
 	return nil
@@ -70,7 +70,7 @@ func (r *ControllerRepository) GetController(ctx context.Context, controllerID s
 
 	resp, err := r.client.Get(ctx, key)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get controller from etcd: %w", err)
+		return nil, apierrors.JoinStore("get controller from etcd", err)
 	}
 
 	if len(resp.Kvs) == 0 {
@@ -79,7 +79,7 @@ func (r *ControllerRepository) GetController(ctx context.Context, controllerID s
 
 	var info models.ControllerInfo
 	if err := json.Unmarshal(resp.Kvs[0].Value, &info); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal controller info: %w", err)
+		return nil, apierrors.JoinStore("unmarshal controller info", err)
 	}
 
 	return &info, nil
@@ -88,7 +88,7 @@ func (r *ControllerRepository) GetController(ctx context.Context, controllerID s
 func (r *ControllerRepository) ListControllers(ctx context.Context) ([]models.ControllerInfo, error) {
 	resp, err := r.client.Get(ctx, controllerPrefix, clientv3.WithPrefix())
 	if err != nil {
-		return nil, fmt.Errorf("failed to list controllers from etcd: %w", err)
+		return nil, apierrors.JoinStore("list controllers from etcd", err)
 	}
 
 	var controllers []models.ControllerInfo
@@ -112,7 +112,7 @@ func (r *ControllerRepository) GetHeartbeat(ctx context.Context, controllerID st
 	mainKey := fmt.Sprintf("%s%s", controllerPrefix, controllerID)
 	resp, err := r.client.Get(ctx, mainKey)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("failed to get controller from etcd: %w", err)
+		return time.Time{}, apierrors.JoinStore("get controller from etcd", err)
 	}
 	if len(resp.Kvs) == 0 {
 		return time.Time{}, fmt.Errorf("%w", apierrors.ErrNotFound)
@@ -121,7 +121,7 @@ func (r *ControllerRepository) GetHeartbeat(ctx context.Context, controllerID st
 	heartbeatKey := fmt.Sprintf("%s%s/heartbeat", controllerPrefix, controllerID)
 	hbResp, err := r.client.Get(ctx, heartbeatKey)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("failed to get heartbeat from etcd: %w", err)
+		return time.Time{}, apierrors.JoinStore("get heartbeat from etcd", err)
 	}
 	if len(hbResp.Kvs) == 0 {
 		return time.Time{}, fmt.Errorf("%w", apierrors.ErrNotFound)
@@ -129,7 +129,7 @@ func (r *ControllerRepository) GetHeartbeat(ctx context.Context, controllerID st
 
 	var hi HeartbeatInfo
 	if err := json.Unmarshal(hbResp.Kvs[0].Value, &hi); err != nil {
-		return time.Time{}, fmt.Errorf("failed to unmarshal heartbeat: %w", err)
+		return time.Time{}, apierrors.JoinStore("unmarshal heartbeat", err)
 	}
 	if hi.Timestamp.IsZero() {
 		return time.Time{}, fmt.Errorf("%w", apierrors.ErrNotFound)
@@ -143,18 +143,18 @@ func (r *ControllerRepository) UpdateControllerHeartbeat(ctx context.Context, co
 		Timestamp: time.Now(),
 	})
 	if err != nil {
-		return false, fmt.Errorf("failed to marshal heartbeat info: %w", err)
+		return false, apierrors.JoinStore("marshal heartbeat info", err)
 	}
 
 	_, err = r.client.Put(ctx, heartbeatKey, string(heartbeatData))
 	if err != nil {
-		return false, fmt.Errorf("failed to update heartbeat: %w", err)
+		return false, apierrors.JoinStore("update heartbeat", err)
 	}
 
 	key := fmt.Sprintf("%s%s", controllerPrefix, controllerID)
 	resp, err := r.client.Get(ctx, key)
 	if err != nil {
-		return false, fmt.Errorf("failed to get controller: %w", err)
+		return false, apierrors.JoinStore("get controller for heartbeat update", err)
 	}
 
 	if len(resp.Kvs) == 0 {
@@ -163,14 +163,14 @@ func (r *ControllerRepository) UpdateControllerHeartbeat(ctx context.Context, co
 
 	var info models.ControllerInfo
 	if err := json.Unmarshal(resp.Kvs[0].Value, &info); err != nil {
-		return false, fmt.Errorf("failed to unmarshal controller info: %w", err)
+		return false, apierrors.JoinStore("unmarshal controller info", err)
 	}
 
 	info.Environments = models.CanonicalEnvironmentsForStorage(environments)
 
 	data, err := json.Marshal(info)
 	if err != nil {
-		return false, fmt.Errorf("failed to marshal controller info: %w", err)
+		return false, apierrors.JoinStore("marshal controller info", err)
 	}
 
 	prev := resp.Kvs[0].Value
@@ -181,7 +181,7 @@ func (r *ControllerRepository) UpdateControllerHeartbeat(ctx context.Context, co
 
 	_, err = r.client.Put(ctx, key, string(data))
 	if err != nil {
-		return false, fmt.Errorf("failed to update controller: %w", err)
+		return false, apierrors.JoinStore("update controller", err)
 	}
 
 	return true, nil

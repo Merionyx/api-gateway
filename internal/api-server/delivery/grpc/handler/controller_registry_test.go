@@ -7,6 +7,7 @@ import (
 
 	pb "github.com/merionyx/api-gateway/pkg/grpc/controller_registry/v1"
 
+	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 
@@ -47,7 +48,7 @@ func (errRegistryUC) Heartbeat(context.Context, string, []models.EnvironmentInfo
 func (errRegistryUC) StartEtcdWatch(context.Context) {}
 
 func TestControllerRegistryHandler_RegisterController_StatusError(t *testing.T) {
-	h := NewControllerRegistryHandler(errRegistryUC{err: errors.New("etcd down")})
+	h := NewControllerRegistryHandler(errRegistryUC{err: apierrors.JoinStore("register controller", errors.New("etcd down"))})
 	_, err := h.RegisterController(context.Background(), &pb.RegisterControllerRequest{
 		ControllerId: "c1",
 		Tenant:       "t1",
@@ -59,7 +60,7 @@ func TestControllerRegistryHandler_RegisterController_StatusError(t *testing.T) 
 	if !ok {
 		t.Fatalf("expected status.FromError, got %v", err)
 	}
-	if st.Code() != codes.Internal {
+	if st.Code() != codes.Unavailable {
 		t.Fatalf("code: %v", st.Code())
 	}
 }

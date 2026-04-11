@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -33,11 +34,11 @@ func NewClient(addr string, tls grpcobs.ClientTLSConfig) *Client {
 func (c *Client) FetchContractSnapshots(ctx context.Context, bundle models.BundleInfo) ([]sharedgit.ContractSnapshot, error) {
 	dialOpts, err := DialOptions(c.tls)
 	if err != nil {
-		return nil, fmt.Errorf("contract syncer dial options: %w", err)
+		return nil, apierrors.JoinContractSyncer("contract syncer dial options", err)
 	}
 	conn, err := grpc.NewClient(c.addr, dialOpts...)
 	if err != nil {
-		return nil, fmt.Errorf("dial contract syncer: %w", err)
+		return nil, apierrors.JoinContractSyncer("dial contract syncer", err)
 	}
 	defer func() {
 		if cerr := conn.Close(); cerr != nil {
@@ -52,7 +53,7 @@ func (c *Client) FetchContractSnapshots(ctx context.Context, bundle models.Bundl
 		Path:       bundle.Path,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("sync rpc: %w", err)
+		return nil, apierrors.JoinContractSyncer("sync rpc", err)
 	}
 	if resp.GetError() != "" {
 		return nil, fmt.Errorf("%w: %s", apierrors.ErrContractSyncerRejected, resp.GetError())
@@ -65,11 +66,11 @@ func (c *Client) FetchContractSnapshots(ctx context.Context, bundle models.Bundl
 func (c *Client) ExportContractFiles(ctx context.Context, repository, ref, path, contractName string) ([]sharedgit.ExportedContractFile, error) {
 	opts, err := DialOptions(c.tls)
 	if err != nil {
-		return nil, fmt.Errorf("contract syncer dial options: %w", err)
+		return nil, apierrors.JoinContractSyncer("contract syncer dial options", err)
 	}
 	conn, err := grpc.NewClient(c.addr, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("dial contract syncer: %w", err)
+		return nil, apierrors.JoinContractSyncer("dial contract syncer", err)
 	}
 	defer func() { _ = conn.Close() }()
 
@@ -81,7 +82,7 @@ func (c *Client) ExportContractFiles(ctx context.Context, repository, ref, path,
 		ContractName: contractName,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("export contracts rpc: %w", err)
+		return nil, apierrors.JoinContractSyncer("export contracts rpc", err)
 	}
 	if resp.GetError() != "" {
 		return nil, fmt.Errorf("%w: %s", apierrors.ErrContractSyncerRejected, resp.GetError())
@@ -101,15 +102,15 @@ func (c *Client) ExportContractFiles(ctx context.Context, repository, ref, path,
 // Ping implements interfaces.ContractSyncerReachability.
 func (c *Client) Ping(ctx context.Context) error {
 	if c.addr == "" {
-		return fmt.Errorf("contract syncer address not configured")
+		return fmt.Errorf("%w: contract syncer address not configured", apierrors.ErrInvalidInput)
 	}
 	opts, err := DialOptions(c.tls)
 	if err != nil {
-		return err
+		return apierrors.JoinContractSyncer("contract syncer dial options", err)
 	}
 	conn, err := grpc.NewClient(c.addr, opts...)
 	if err != nil {
-		return err
+		return apierrors.JoinContractSyncer("dial contract syncer", err)
 	}
 	defer func() { _ = conn.Close() }()
 	conn.Connect()
@@ -119,7 +120,7 @@ func (c *Client) Ping(ctx context.Context) error {
 			return nil
 		}
 		if st == connectivity.Shutdown {
-			return fmt.Errorf("connection shutdown")
+			return apierrors.JoinContractSyncer("wait for ready", errors.New("connection shutdown"))
 		}
 		if !conn.WaitForStateChange(ctx, st) {
 			return ctx.Err()

@@ -49,12 +49,12 @@ func NewRegistryHandler(
 func (h *RegistryHandler) ListBundleKeys(c fiber.Ctx, params apiserver.ListBundleKeysParams) error {
 	items, next, hasMore, err := h.bundles.ListBundleKeys(c.Context(), params.Limit, params.Cursor)
 	if err != nil {
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 	body := apiserver.BundleKeyListResponse{Items: items, HasMore: hasMore, NextCursor: next}
 	etag, err := jsonETag(body)
 	if err != nil {
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 	if params.IfNoneMatch != nil && ifNoneMatchMatches(*params.IfNoneMatch, etag) {
 		c.Response().Header.Set("ETag", etag)
@@ -80,7 +80,7 @@ func (h *RegistryHandler) SyncBundle(c fiber.Ctx, _ apiserver.SyncBundleParams) 
 	}
 	apiSnaps, err := snapshotsToAPI(snaps)
 	if err != nil {
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 	return c.JSON(apiserver.BundleSyncResponse{
 		FromCache: fromCache,
@@ -95,12 +95,12 @@ func (h *RegistryHandler) ListContractsInBundle(c fiber.Ctx, bundleKey apiserver
 	}
 	items, next, hasMore, err := h.bundles.ListContractNames(c.Context(), bk, params.Limit, params.Cursor)
 	if err != nil {
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 	body := apiserver.ContractNameListResponse{Items: items, HasMore: hasMore, NextCursor: next}
 	etag, err := jsonETag(body)
 	if err != nil {
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 	if params.IfNoneMatch != nil && ifNoneMatchMatches(*params.IfNoneMatch, etag) {
 		c.Response().Header.Set("ETag", etag)
@@ -124,11 +124,11 @@ func (h *RegistryHandler) GetContractInBundle(c fiber.Ctx, bundleKey apiserver.B
 		if errors.Is(err, apierrors.ErrNotFound) {
 			return problem.Write(c, http.StatusNotFound, problem.NotFound("", "contract not found in bundle"))
 		}
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 	etag, err := jsonETag(doc)
 	if err != nil {
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 	if params.IfNoneMatch != nil && ifNoneMatchMatches(*params.IfNoneMatch, etag) {
 		c.Response().Header.Set("ETag", etag)
@@ -141,7 +141,7 @@ func (h *RegistryHandler) GetContractInBundle(c fiber.Ctx, bundleKey apiserver.B
 func (h *RegistryHandler) ListControllers(c fiber.Ctx, params apiserver.ListControllersParams) error {
 	items, next, hasMore, err := h.controllers.ListControllers(c.Context(), params.Limit, params.Cursor)
 	if err != nil {
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 	apiItems := make([]apiserver.Controller, 0, len(items))
 	for i := range items {
@@ -150,7 +150,7 @@ func (h *RegistryHandler) ListControllers(c fiber.Ctx, params apiserver.ListCont
 	body := apiserver.ControllerListResponse{Items: apiItems, HasMore: hasMore, NextCursor: next}
 	etag, err := jsonETag(body)
 	if err != nil {
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 	if params.IfNoneMatch != nil && ifNoneMatchMatches(*params.IfNoneMatch, etag) {
 		c.Response().Header.Set("ETag", etag)
@@ -166,12 +166,12 @@ func (h *RegistryHandler) GetController(c fiber.Ctx, controllerID apiserver.Cont
 		if errors.Is(err, apierrors.ErrNotFound) {
 			return problem.Write(c, http.StatusNotFound, problem.NotFound("", "controller not found"))
 		}
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 	body := controllerToAPI(*info)
 	etag, err := jsonETag(body)
 	if err != nil {
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 	if params.IfNoneMatch != nil && ifNoneMatchMatches(*params.IfNoneMatch, etag) {
 		c.Response().Header.Set("ETag", etag)
@@ -187,12 +187,12 @@ func (h *RegistryHandler) GetControllerHeartbeat(c fiber.Ctx, controllerID apise
 		if errors.Is(err, apierrors.ErrNotFound) {
 			return problem.Write(c, http.StatusNotFound, problem.NotFound("", "controller heartbeat not found"))
 		}
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 	body := apiserver.ControllerHeartbeat{Timestamp: ts}
 	etag, err := jsonETag(body)
 	if err != nil {
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 	if params.IfNoneMatch != nil && ifNoneMatchMatches(*params.IfNoneMatch, etag) {
 		c.Response().Header.Set("ETag", etag)
@@ -225,7 +225,7 @@ func (h *RegistryHandler) GetStatus(c fiber.Ctx, params apiserver.GetStatusParam
 	}
 	etag, err := jsonETag(body)
 	if err != nil {
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 	if params.IfNoneMatch != nil && ifNoneMatchMatches(*params.IfNoneMatch, etag) {
 		c.Response().Header.Set("ETag", etag)
@@ -238,12 +238,12 @@ func (h *RegistryHandler) GetStatus(c fiber.Ctx, params apiserver.GetStatusParam
 func (h *RegistryHandler) ListTenants(c fiber.Ctx, params apiserver.ListTenantsParams) error {
 	items, next, hasMore, err := h.tenants.ListTenants(c.Context(), params.Limit, params.Cursor)
 	if err != nil {
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 	body := apiserver.TenantListResponse{Items: items, HasMore: hasMore, NextCursor: next}
 	etag, err := jsonETag(body)
 	if err != nil {
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 	if params.IfNoneMatch != nil && ifNoneMatchMatches(*params.IfNoneMatch, etag) {
 		c.Response().Header.Set("ETag", etag)
@@ -256,7 +256,7 @@ func (h *RegistryHandler) ListTenants(c fiber.Ctx, params apiserver.ListTenantsP
 func (h *RegistryHandler) ListBundlesByTenant(c fiber.Ctx, tenant apiserver.Tenant, params apiserver.ListBundlesByTenantParams) error {
 	items, next, hasMore, err := h.tenants.ListBundlesByTenant(c.Context(), string(tenant), params.Limit, params.Cursor)
 	if err != nil {
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 	apiItems := make([]apiserver.Bundle, 0, len(items))
 	for i := range items {
@@ -265,7 +265,7 @@ func (h *RegistryHandler) ListBundlesByTenant(c fiber.Ctx, tenant apiserver.Tena
 	body := apiserver.BundleRefListResponse{Items: apiItems, HasMore: hasMore, NextCursor: next}
 	etag, err := jsonETag(body)
 	if err != nil {
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 	if params.IfNoneMatch != nil && ifNoneMatchMatches(*params.IfNoneMatch, etag) {
 		c.Response().Header.Set("ETag", etag)
@@ -278,7 +278,7 @@ func (h *RegistryHandler) ListBundlesByTenant(c fiber.Ctx, tenant apiserver.Tena
 func (h *RegistryHandler) ListControllersByTenant(c fiber.Ctx, tenant apiserver.Tenant, params apiserver.ListControllersByTenantParams) error {
 	items, next, hasMore, err := h.controllers.ListControllersByTenant(c.Context(), string(tenant), params.Limit, params.Cursor)
 	if err != nil {
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 	apiItems := make([]apiserver.Controller, 0, len(items))
 	for i := range items {
@@ -287,7 +287,7 @@ func (h *RegistryHandler) ListControllersByTenant(c fiber.Ctx, tenant apiserver.
 	body := apiserver.ControllerListResponse{Items: apiItems, HasMore: hasMore, NextCursor: next}
 	etag, err := jsonETag(body)
 	if err != nil {
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 	if params.IfNoneMatch != nil && ifNoneMatchMatches(*params.IfNoneMatch, etag) {
 		c.Response().Header.Set("ETag", etag)
@@ -300,7 +300,7 @@ func (h *RegistryHandler) ListControllersByTenant(c fiber.Ctx, tenant apiserver.
 func (h *RegistryHandler) ListEnvironmentsByTenant(c fiber.Ctx, tenant apiserver.Tenant, params apiserver.ListEnvironmentsByTenantParams) error {
 	items, next, hasMore, err := h.tenants.ListEnvironmentsByTenant(c.Context(), string(tenant), params.Limit, params.Cursor)
 	if err != nil {
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 	apiItems := make([]apiserver.Environment, 0, len(items))
 	for i := range items {
@@ -309,7 +309,7 @@ func (h *RegistryHandler) ListEnvironmentsByTenant(c fiber.Ctx, tenant apiserver
 	body := apiserver.EnvironmentListResponse{Items: apiItems, HasMore: hasMore, NextCursor: next}
 	etag, err := jsonETag(body)
 	if err != nil {
-		return problem.WriteInternal(c, err)
+		return problem.RespondError(c, err)
 	}
 	if params.IfNoneMatch != nil && ifNoneMatchMatches(*params.IfNoneMatch, etag) {
 		c.Response().Header.Set("ETag", etag)

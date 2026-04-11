@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -42,7 +43,7 @@ func buildSnapshotSavePlan(bundleKey string, existingByName map[string][]byte, s
 		key := fmt.Sprintf("%s%s/contracts/%s", snapshotPrefix, bundleKey, snapshot.Name)
 		data, err := json.Marshal(snapshot)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to marshal snapshot: %w", err)
+			return nil, nil, apierrors.JoinStore("marshal snapshot", err)
 		}
 		if prev, ok := existingByName[snapshot.Name]; ok && bytes.Equal(prev, data) {
 			continue
@@ -65,7 +66,7 @@ func (r *SnapshotRepository) SaveSnapshots(ctx context.Context, bundleKey string
 	contractsPrefix := fmt.Sprintf("%s%s/contracts/", snapshotPrefix, bundleKey)
 	listResp, err := r.client.Get(ctx, contractsPrefix, clientv3.WithPrefix())
 	if err != nil {
-		return false, fmt.Errorf("failed to list contract keys: %w", err)
+		return false, apierrors.JoinStore("list contract keys", err)
 	}
 
 	existingByName := make(map[string][]byte)
@@ -101,7 +102,7 @@ func (r *SnapshotRepository) SaveSnapshots(ctx context.Context, bundleKey string
 
 	if len(ops) <= maxSnapshotTxnOps {
 		if _, err := r.client.Txn(ctx).Then(ops...).Commit(); err != nil {
-			return false, fmt.Errorf("etcd txn save snapshots: %w", err)
+			return false, apierrors.JoinStore("etcd txn save snapshots", err)
 		}
 		return true, nil
 	}
@@ -113,7 +114,7 @@ func (r *SnapshotRepository) SaveSnapshots(ctx context.Context, bundleKey string
 		}
 		chunk := ops[i:end]
 		if _, err := r.client.Txn(ctx).Then(chunk...).Commit(); err != nil {
-			return written, fmt.Errorf("etcd txn save snapshots (chunk): %w", err)
+			return written, apierrors.JoinStore("etcd txn save snapshots (chunk)", err)
 		}
 		written = true
 	}
@@ -127,7 +128,7 @@ func (r *SnapshotRepository) GetSnapshots(ctx context.Context, bundleKey string)
 
 	resp, err := r.client.Get(ctx, prefix, clientv3.WithPrefix())
 	if err != nil {
-		return nil, fmt.Errorf("failed to get snapshots from etcd: %w", err)
+		return nil, apierrors.JoinStore("get snapshots from etcd", err)
 	}
 
 	slog.Debug("Got response from etcd", "keys_count", len(resp.Kvs))
@@ -152,7 +153,7 @@ func (r *SnapshotRepository) GetSnapshots(ctx context.Context, bundleKey string)
 func (r *SnapshotRepository) ListBundleKeys(ctx context.Context) ([]string, error) {
 	resp, err := r.client.Get(ctx, snapshotPrefix, clientv3.WithPrefix(), clientv3.WithKeysOnly())
 	if err != nil {
-		return nil, fmt.Errorf("failed to list bundle keys from etcd: %w", err)
+		return nil, apierrors.JoinStore("list bundle keys from etcd", err)
 	}
 
 	bundleKeysMap := make(map[string]bool)
