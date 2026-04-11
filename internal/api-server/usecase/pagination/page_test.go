@@ -1,4 +1,4 @@
-package usecase
+package pagination
 
 import (
 	"testing"

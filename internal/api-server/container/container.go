@@ -11,7 +11,9 @@ import (
 	grpchandler "github.com/merionyx/api-gateway/internal/api-server/delivery/grpc/handler"
 	httphandler "github.com/merionyx/api-gateway/internal/api-server/delivery/http/handler"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
-	"github.com/merionyx/api-gateway/internal/api-server/usecase"
+	"github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
+	"github.com/merionyx/api-gateway/internal/api-server/usecase/bundle"
+	"github.com/merionyx/api-gateway/internal/api-server/usecase/registry"
 	"github.com/merionyx/api-gateway/internal/shared/bootstrap"
 	"github.com/merionyx/api-gateway/internal/shared/election"
 
@@ -31,7 +33,7 @@ type Container struct {
 	// ContractSyncerGRPC is the gRPC adapter for Contract Syncer (sync, export, ping).
 	ContractSyncerGRPC *contractsyncergrpc.Client
 
-	JWTUseCase                *usecase.JWTUseCase
+	JWTUseCase                *auth.JWTUseCase
 	ControllerRegistryUseCase interfaces.ControllerRegistryUseCase
 	BundleSyncUseCase         interfaces.BundleSyncUseCase
 
@@ -41,11 +43,11 @@ type Container struct {
 
 	RegistryHandler *httphandler.RegistryHandler
 
-	BundleReadUseCase      *usecase.BundleReadUseCase
-	ControllerReadUseCase  *usecase.ControllerReadUseCase
-	TenantReadUseCase      *usecase.TenantReadUseCase
-	BundleHTTPSyncUseCase  *usecase.BundleHTTPSyncUseCase
-	StatusReadUseCase      *usecase.StatusReadUseCase
+	BundleReadUseCase      *bundle.BundleReadUseCase
+	ControllerReadUseCase  *registry.ControllerReadUseCase
+	TenantReadUseCase      *registry.TenantReadUseCase
+	BundleHTTPSyncUseCase  *bundle.BundleHTTPSyncUseCase
+	StatusReadUseCase      *registry.StatusReadUseCase
 
 	ControllerRegistryHandler *grpchandler.ControllerRegistryHandler
 }
@@ -107,7 +109,7 @@ func (c *Container) initRepositories() {
 }
 
 func (c *Container) initUseCases() error {
-	jwtUC, err := usecase.NewJWTUseCase(
+	jwtUC, err := auth.NewJWTUseCase(
 		c.Config.JWT.KeysDir,
 		c.Config.JWT.Issuer,
 	)
@@ -116,7 +118,7 @@ func (c *Container) initUseCases() error {
 	}
 	c.JWTUseCase = jwtUC
 
-	c.ControllerRegistryUseCase = usecase.NewControllerRegistryUseCase(
+	c.ControllerRegistryUseCase = registry.NewControllerRegistryUseCase(
 		c.ControllerRepository,
 		c.SnapshotRepository,
 		c.EtcdClient,
@@ -124,7 +126,7 @@ func (c *Container) initUseCases() error {
 
 	c.ContractSyncerGRPC = contractsyncergrpc.NewClient(c.Config.ContractSyncer.Address, c.Config.GRPCContractSyncerClient)
 
-	c.BundleSyncUseCase = usecase.NewBundleSyncUseCase(
+	c.BundleSyncUseCase = bundle.NewBundleSyncUseCase(
 		c.SnapshotRepository,
 		c.ControllerRepository,
 		c.ContractSyncerGRPC,
@@ -132,11 +134,11 @@ func (c *Container) initUseCases() error {
 		c.Config.MetricsHTTP.Enabled,
 	)
 
-	c.BundleReadUseCase = usecase.NewBundleReadUseCase(c.SnapshotRepository)
-	c.ControllerReadUseCase = usecase.NewControllerReadUseCase(c.ControllerRepository)
-	c.TenantReadUseCase = usecase.NewTenantReadUseCase(c.ControllerRepository)
-	c.BundleHTTPSyncUseCase = usecase.NewBundleHTTPSyncUseCase(c.SnapshotRepository, c.BundleSyncUseCase)
-	c.StatusReadUseCase = usecase.NewStatusReadUseCase(
+	c.BundleReadUseCase = bundle.NewBundleReadUseCase(c.SnapshotRepository)
+	c.ControllerReadUseCase = registry.NewControllerReadUseCase(c.ControllerRepository)
+	c.TenantReadUseCase = registry.NewTenantReadUseCase(c.ControllerRepository)
+	c.BundleHTTPSyncUseCase = bundle.NewBundleHTTPSyncUseCase(c.SnapshotRepository, c.BundleSyncUseCase)
+	c.StatusReadUseCase = registry.NewStatusReadUseCase(
 		c.EtcdClient,
 		c.ContractSyncerGRPC,
 	)
@@ -147,7 +149,7 @@ func (c *Container) initUseCases() error {
 
 func (c *Container) initHandlers() {
 	c.JWTHandler = httphandler.NewJWTHandler(c.JWTUseCase, c.Config.MetricsHTTP.Enabled)
-	exportUC := usecase.NewContractExportUseCase(c.ContractSyncerGRPC)
+	exportUC := bundle.NewContractExportUseCase(c.ContractSyncerGRPC)
 	c.ContractsExportHandler = httphandler.NewContractsExportHandler(exportUC)
 	c.RegistryHandler = httphandler.NewRegistryHandler(
 		c.BundleReadUseCase,

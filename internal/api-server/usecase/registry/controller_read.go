@@ -1,4 +1,4 @@
-package usecase
+package registry
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
+	"github.com/merionyx/api-gateway/internal/api-server/usecase/pagination"
 )
 
 // ControllerReadUseCase serves HTTP registry reads for controllers.
@@ -24,8 +25,8 @@ func (u *ControllerReadUseCase) ListControllers(ctx context.Context, limit *int,
 		return nil, nil, false, err
 	}
 	sort.Slice(all, func(i, j int) bool { return all[i].ControllerID < all[j].ControllerID })
-	lim := ResolveLimit(limit)
-	return PageSlice(all, lim, cursor)
+	lim := pagination.ResolveLimit(limit)
+	return pagination.PageSlice(all, lim, cursor)
 }
 
 func (u *ControllerReadUseCase) ListControllersByTenant(ctx context.Context, tenant string, limit *int, cursor *string) ([]models.ControllerInfo, *string, bool, error) {
@@ -40,8 +41,8 @@ func (u *ControllerReadUseCase) ListControllersByTenant(ctx context.Context, ten
 		}
 	}
 	sort.Slice(filtered, func(i, j int) bool { return filtered[i].ControllerID < filtered[j].ControllerID })
-	lim := ResolveLimit(limit)
-	return PageSlice(filtered, lim, cursor)
+	lim := pagination.ResolveLimit(limit)
+	return pagination.PageSlice(filtered, lim, cursor)
 }
 
 func (u *ControllerReadUseCase) GetController(ctx context.Context, controllerID string) (*models.ControllerInfo, error) {

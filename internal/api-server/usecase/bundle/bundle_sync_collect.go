@@ -1,4 +1,4 @@
-package usecase
+package bundle
 
 import (
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"

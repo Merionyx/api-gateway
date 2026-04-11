@@ -5,17 +5,17 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 	apimetrics "github.com/merionyx/api-gateway/internal/api-server/metrics"
-	"github.com/merionyx/api-gateway/internal/api-server/usecase"
+	"github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
 
 	"github.com/gofiber/fiber/v3"
 )
 
 type JWTHandler struct {
-	jwtUseCase     *usecase.JWTUseCase
+	jwtUseCase     *auth.JWTUseCase
 	metricsEnabled bool
 }
 
-func NewJWTHandler(jwtUseCase *usecase.JWTUseCase, metricsEnabled bool) *JWTHandler {
+func NewJWTHandler(jwtUseCase *auth.JWTUseCase, metricsEnabled bool) *JWTHandler {
 	return &JWTHandler{jwtUseCase: jwtUseCase, metricsEnabled: metricsEnabled}
 }
 

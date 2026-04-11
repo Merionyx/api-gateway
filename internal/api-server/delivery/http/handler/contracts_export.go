@@ -5,16 +5,16 @@ import (
 	"errors"
 
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
-	"github.com/merionyx/api-gateway/internal/api-server/usecase"
+	"github.com/merionyx/api-gateway/internal/api-server/usecase/bundle"
 
 	"github.com/gofiber/fiber/v3"
 )
 
 type ContractsExportHandler struct {
-	exportUC *usecase.ContractExportUseCase
+	exportUC *bundle.ContractExportUseCase
 }
 
-func NewContractsExportHandler(exportUC *usecase.ContractExportUseCase) *ContractsExportHandler {
+func NewContractsExportHandler(exportUC *bundle.ContractExportUseCase) *ContractsExportHandler {
 	return &ContractsExportHandler{exportUC: exportUC}
 }
 

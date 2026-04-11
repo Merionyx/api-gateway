@@ -10,25 +10,26 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
-	"github.com/merionyx/api-gateway/internal/api-server/usecase"
+	"github.com/merionyx/api-gateway/internal/api-server/usecase/bundle"
+	"github.com/merionyx/api-gateway/internal/api-server/usecase/registry"
 	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 )
 
 // RegistryHandler implements registry / bundle / tenant HTTP operations from the OpenAPI spec.
 type RegistryHandler struct {
-	bundles     *usecase.BundleReadUseCase
-	controllers *usecase.ControllerReadUseCase
-	tenants     *usecase.TenantReadUseCase
-	sync        *usecase.BundleHTTPSyncUseCase
-	status      *usecase.StatusReadUseCase
+	bundles     *bundle.BundleReadUseCase
+	controllers *registry.ControllerReadUseCase
+	tenants     *registry.TenantReadUseCase
+	sync        *bundle.BundleHTTPSyncUseCase
+	status      *registry.StatusReadUseCase
 }
 
 func NewRegistryHandler(
-	bundles *usecase.BundleReadUseCase,
-	controllers *usecase.ControllerReadUseCase,
-	tenants *usecase.TenantReadUseCase,
-	sync *usecase.BundleHTTPSyncUseCase,
-	status *usecase.StatusReadUseCase,
+	bundles *bundle.BundleReadUseCase,
+	controllers *registry.ControllerReadUseCase,
+	tenants *registry.TenantReadUseCase,
+	sync *bundle.BundleHTTPSyncUseCase,
+	status *registry.StatusReadUseCase,
 ) *RegistryHandler {
 	return &RegistryHandler{
 		bundles:     bundles,

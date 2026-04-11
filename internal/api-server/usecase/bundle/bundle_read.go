@@ -1,4 +1,4 @@
-package usecase
+package bundle
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
+	"github.com/merionyx/api-gateway/internal/api-server/usecase/pagination"
 )
 
 // BundleReadUseCase serves HTTP registry reads for etcd bundle keys and contract snapshots.
@@ -23,8 +24,8 @@ func (u *BundleReadUseCase) ListBundleKeys(ctx context.Context, limit *int, curs
 	if err != nil {
 		return nil, nil, false, err
 	}
-	lim := ResolveLimit(limit)
-	return PageStringSlice(keys, lim, cursor)
+	lim := pagination.ResolveLimit(limit)
+	return pagination.PageStringSlice(keys, lim, cursor)
 }
 
 func (u *BundleReadUseCase) ListContractNames(ctx context.Context, bundleKey string, limit *int, cursor *string) ([]string, *string, bool, error) {
@@ -42,8 +43,8 @@ func (u *BundleReadUseCase) ListContractNames(ctx context.Context, bundleKey str
 		names = append(names, s.Name)
 	}
 	sort.Strings(names)
-	lim := ResolveLimit(limit)
-	return PageStringSlice(names, lim, cursor)
+	lim := pagination.ResolveLimit(limit)
+	return pagination.PageStringSlice(names, lim, cursor)
 }
 
 // GetContractDocument returns the stored snapshot as a generic JSON object (canonical encoding).

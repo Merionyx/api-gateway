@@ -1,4 +1,4 @@
-package usecase
+package registry
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
+	"github.com/merionyx/api-gateway/internal/api-server/usecase/pagination"
 	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
 )
 
@@ -36,8 +37,8 @@ func (u *TenantReadUseCase) ListTenants(ctx context.Context, limit *int, cursor 
 		names = append(names, t)
 	}
 	sort.Strings(names)
-	lim := ResolveLimit(limit)
-	return PageStringSlice(names, lim, cursor)
+	lim := pagination.ResolveLimit(limit)
+	return pagination.PageStringSlice(names, lim, cursor)
 }
 
 // ListEnvironmentsByTenant merges environments for the tenant across controllers (same name → combined bundles, de-duplicated by bundle key).
@@ -73,8 +74,8 @@ func (u *TenantReadUseCase) ListEnvironmentsByTenant(ctx context.Context, tenant
 	for _, n := range names {
 		items = append(items, byName[n])
 	}
-	lim := ResolveLimit(limit)
-	return PageSlice(items, lim, cursor)
+	lim := pagination.ResolveLimit(limit)
+	return pagination.PageSlice(items, lim, cursor)
 }
 
 // ListBundlesByTenant returns distinct static bundle descriptors for the tenant (union across environments and controllers).
@@ -107,8 +108,8 @@ func (u *TenantReadUseCase) ListBundlesByTenant(ctx context.Context, tenant stri
 	for _, k := range keys {
 		out = append(out, seen[k])
 	}
-	lim := ResolveLimit(limit)
-	return PageSlice(out, lim, cursor)
+	lim := pagination.ResolveLimit(limit)
+	return pagination.PageSlice(out, lim, cursor)
 }
 
 func dedupeBundles(in []models.BundleInfo) []models.BundleInfo {
