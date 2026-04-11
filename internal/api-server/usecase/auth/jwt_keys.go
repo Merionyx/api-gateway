@@ -12,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 )
 
 func (uc *JWTUseCase) loadKeys() error {
@@ -62,12 +64,12 @@ func (uc *JWTUseCase) loadKeys() error {
 func (uc *JWTUseCase) loadKeyPair(keyPath string) (*KeyPair, error) {
 	keyData, err := os.ReadFile(keyPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: read key file: %w", apierrors.ErrInvalidInput, err)
 	}
 
 	block, _ := pem.Decode(keyData)
 	if block == nil {
-		return nil, fmt.Errorf("failed to decode PEM block")
+		return nil, fmt.Errorf("%w: no PEM block in key file", apierrors.ErrInvalidInput)
 	}
 
 	var privateKey crypto.PrivateKey
@@ -78,7 +80,7 @@ func (uc *JWTUseCase) loadKeyPair(keyPath string) (*KeyPair, error) {
 	case "PRIVATE KEY":
 		key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w: parse PKCS#8 private key: %w", apierrors.ErrInvalidInput, err)
 		}
 
 		switch k := key.(type) {
@@ -91,20 +93,20 @@ func (uc *JWTUseCase) loadKeyPair(keyPath string) (*KeyPair, error) {
 			publicKey = &k.PublicKey
 			algorithm = AlgorithmRS256
 		default:
-			return nil, fmt.Errorf("unsupported key type: %T", k)
+			return nil, fmt.Errorf("%w: unsupported private key type %T", apierrors.ErrInvalidInput, k)
 		}
 
 	case "RSA PRIVATE KEY":
 		key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w: parse PKCS#1 private key: %w", apierrors.ErrInvalidInput, err)
 		}
 		privateKey = key
 		publicKey = &key.PublicKey
 		algorithm = AlgorithmRS256
 
 	default:
-		return nil, fmt.Errorf("unsupported PEM block type: %s", block.Type)
+		return nil, fmt.Errorf("%w: unsupported PEM block type %q", apierrors.ErrInvalidInput, block.Type)
 	}
 
 	kid := filepath.Base(keyPath)
@@ -112,7 +114,7 @@ func (uc *JWTUseCase) loadKeyPair(keyPath string) (*KeyPair, error) {
 
 	fileInfo, err := os.Stat(keyPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: stat key file: %w", apierrors.ErrInvalidInput, err)
 	}
 
 	return &KeyPair{
@@ -130,12 +132,12 @@ func (uc *JWTUseCase) generateDefaultKey() error {
 
 	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: generate Ed25519 key: %w", apierrors.ErrSigningOperationFailed, err)
 	}
 
 	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: marshal PKCS#8 private key: %w", apierrors.ErrSigningOperationFailed, err)
 	}
 
 	privateKeyPEM := pem.EncodeToMemory(&pem.Block{
@@ -144,7 +146,7 @@ func (uc *JWTUseCase) generateDefaultKey() error {
 	})
 
 	if err := os.WriteFile(keyPath, privateKeyPEM, 0600); err != nil {
-		return err
+		return fmt.Errorf("%w: write generated key file: %w", apierrors.ErrSigningOperationFailed, err)
 	}
 
 	uc.signingKeys[kid] = &KeyPair{

@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 )
 
@@ -28,7 +29,7 @@ func (uc *JWTUseCase) GetJWKS() (*models.JWKS, error) {
 
 		jwk, err := jwtPublicKeyToJWK(keyPair)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert key %s to JWK: %w", kid, err)
+			return nil, fmt.Errorf("kid %s: %w", kid, err)
 		}
 
 		jwks.Keys = append(jwks.Keys, *jwk)
@@ -67,7 +68,7 @@ func jwtPublicKeyToJWK(keyPair *KeyPair) (*models.JWK, error) {
 	case AlgorithmEdDSA:
 		edKey, ok := keyPair.PublicKey.(ed25519.PublicKey)
 		if !ok {
-			return nil, fmt.Errorf("invalid Ed25519 public key")
+			return nil, fmt.Errorf("%w: public key is not Ed25519", apierrors.ErrInvalidInput)
 		}
 
 		jwk.Kty = "OKP"
@@ -78,7 +79,7 @@ func jwtPublicKeyToJWK(keyPair *KeyPair) (*models.JWK, error) {
 	case AlgorithmRS256:
 		rsaKey, ok := keyPair.PublicKey.(*rsa.PublicKey)
 		if !ok {
-			return nil, fmt.Errorf("invalid RSA public key")
+			return nil, fmt.Errorf("%w: public key is not RSA", apierrors.ErrInvalidInput)
 		}
 
 		jwk.Kty = "RSA"
@@ -87,7 +88,7 @@ func jwtPublicKeyToJWK(keyPair *KeyPair) (*models.JWK, error) {
 		jwk.E = base64.RawURLEncoding.EncodeToString(big.NewInt(int64(rsaKey.E)).Bytes())
 
 	default:
-		return nil, fmt.Errorf("unsupported algorithm: %s", keyPair.Algorithm)
+		return nil, fmt.Errorf("%w: algorithm %q", apierrors.ErrUnsupportedSigningAlgorithm, keyPair.Algorithm)
 	}
 
 	return jwk, nil
