@@ -28,60 +28,60 @@ func (s *OpenAPIServer) GetJwks(c fiber.Ctx, _ apiserver.GetJwksParams) error {
 	return s.c.JWTHandler.GetJWKS(c)
 }
 
-func (s *OpenAPIServer) ListBundleKeys(c fiber.Ctx, _ apiserver.ListBundleKeysParams) error {
-	return notImplemented(c)
+func (s *OpenAPIServer) ListBundleKeys(c fiber.Ctx, params apiserver.ListBundleKeysParams) error {
+	return s.c.RegistryHandler.ListBundleKeys(c, params)
 }
 
-func (s *OpenAPIServer) SyncBundle(c fiber.Ctx, _ apiserver.SyncBundleParams) error {
-	return notImplemented(c)
+func (s *OpenAPIServer) SyncBundle(c fiber.Ctx, params apiserver.SyncBundleParams) error {
+	return s.c.RegistryHandler.SyncBundle(c, params)
 }
 
-func (s *OpenAPIServer) ListContractsInBundle(c fiber.Ctx, _ apiserver.BundleKey, _ apiserver.ListContractsInBundleParams) error {
-	return notImplemented(c)
+func (s *OpenAPIServer) ListContractsInBundle(c fiber.Ctx, bundleKey apiserver.BundleKey, params apiserver.ListContractsInBundleParams) error {
+	return s.c.RegistryHandler.ListContractsInBundle(c, bundleKey, params)
 }
 
-func (s *OpenAPIServer) GetContractInBundle(c fiber.Ctx, _ apiserver.BundleKey, _ apiserver.ContractName, _ apiserver.GetContractInBundleParams) error {
-	return notImplemented(c)
+func (s *OpenAPIServer) GetContractInBundle(c fiber.Ctx, bundleKey apiserver.BundleKey, contractName apiserver.ContractName, params apiserver.GetContractInBundleParams) error {
+	return s.c.RegistryHandler.GetContractInBundle(c, bundleKey, contractName, params)
 }
 
 func (s *OpenAPIServer) ExportContracts(c fiber.Ctx) error {
 	return s.c.ContractsExportHandler.Export(c)
 }
 
-func (s *OpenAPIServer) ListControllers(c fiber.Ctx, _ apiserver.ListControllersParams) error {
-	return notImplemented(c)
+func (s *OpenAPIServer) ListControllers(c fiber.Ctx, params apiserver.ListControllersParams) error {
+	return s.c.RegistryHandler.ListControllers(c, params)
 }
 
-func (s *OpenAPIServer) GetController(c fiber.Ctx, _ apiserver.ControllerId, _ apiserver.GetControllerParams) error {
-	return notImplemented(c)
+func (s *OpenAPIServer) GetController(c fiber.Ctx, controllerId apiserver.ControllerId, params apiserver.GetControllerParams) error {
+	return s.c.RegistryHandler.GetController(c, controllerId, params)
 }
 
-func (s *OpenAPIServer) GetControllerHeartbeat(c fiber.Ctx, _ apiserver.ControllerId, _ apiserver.GetControllerHeartbeatParams) error {
-	return notImplemented(c)
+func (s *OpenAPIServer) GetControllerHeartbeat(c fiber.Ctx, controllerId apiserver.ControllerId, params apiserver.GetControllerHeartbeatParams) error {
+	return s.c.RegistryHandler.GetControllerHeartbeat(c, controllerId, params)
 }
 
 func (s *OpenAPIServer) ListSigningKeys(c fiber.Ctx, _ apiserver.ListSigningKeysParams) error {
 	return s.c.JWTHandler.GetSigningKeys(c)
 }
 
-func (s *OpenAPIServer) GetStatus(c fiber.Ctx, _ apiserver.GetStatusParams) error {
-	return notImplemented(c)
+func (s *OpenAPIServer) GetStatus(c fiber.Ctx, params apiserver.GetStatusParams) error {
+	return s.c.RegistryHandler.GetStatus(c, params)
 }
 
-func (s *OpenAPIServer) ListTenants(c fiber.Ctx, _ apiserver.ListTenantsParams) error {
-	return notImplemented(c)
+func (s *OpenAPIServer) ListTenants(c fiber.Ctx, params apiserver.ListTenantsParams) error {
+	return s.c.RegistryHandler.ListTenants(c, params)
 }
 
-func (s *OpenAPIServer) ListBundlesByTenant(c fiber.Ctx, _ apiserver.Tenant, _ apiserver.ListBundlesByTenantParams) error {
-	return notImplemented(c)
+func (s *OpenAPIServer) ListBundlesByTenant(c fiber.Ctx, tenant apiserver.Tenant, params apiserver.ListBundlesByTenantParams) error {
+	return s.c.RegistryHandler.ListBundlesByTenant(c, tenant, params)
 }
 
-func (s *OpenAPIServer) ListControllersByTenant(c fiber.Ctx, _ apiserver.Tenant, _ apiserver.ListControllersByTenantParams) error {
-	return notImplemented(c)
+func (s *OpenAPIServer) ListControllersByTenant(c fiber.Ctx, tenant apiserver.Tenant, params apiserver.ListControllersByTenantParams) error {
+	return s.c.RegistryHandler.ListControllersByTenant(c, tenant, params)
 }
 
-func (s *OpenAPIServer) ListEnvironmentsByTenant(c fiber.Ctx, _ apiserver.Tenant, _ apiserver.ListEnvironmentsByTenantParams) error {
-	return notImplemented(c)
+func (s *OpenAPIServer) ListEnvironmentsByTenant(c fiber.Ctx, tenant apiserver.Tenant, params apiserver.ListEnvironmentsByTenantParams) error {
+	return s.c.RegistryHandler.ListEnvironmentsByTenant(c, tenant, params)
 }
 
 func (s *OpenAPIServer) CreateToken(c fiber.Ctx) error {

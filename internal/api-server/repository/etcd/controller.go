@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -73,7 +74,7 @@ func (r *ControllerRepository) GetController(ctx context.Context, controllerID s
 	}
 
 	if len(resp.Kvs) == 0 {
-		return nil, fmt.Errorf("controller not found")
+		return nil, fmt.Errorf("%w", apierrors.ErrNotFound)
 	}
 
 	var info models.ControllerInfo
@@ -107,6 +108,35 @@ func (r *ControllerRepository) ListControllers(ctx context.Context) ([]models.Co
 	return controllers, nil
 }
 
+func (r *ControllerRepository) GetHeartbeat(ctx context.Context, controllerID string) (time.Time, error) {
+	mainKey := fmt.Sprintf("%s%s", controllerPrefix, controllerID)
+	resp, err := r.client.Get(ctx, mainKey)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to get controller from etcd: %w", err)
+	}
+	if len(resp.Kvs) == 0 {
+		return time.Time{}, fmt.Errorf("%w", apierrors.ErrNotFound)
+	}
+
+	heartbeatKey := fmt.Sprintf("%s%s/heartbeat", controllerPrefix, controllerID)
+	hbResp, err := r.client.Get(ctx, heartbeatKey)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to get heartbeat from etcd: %w", err)
+	}
+	if len(hbResp.Kvs) == 0 {
+		return time.Time{}, fmt.Errorf("%w", apierrors.ErrNotFound)
+	}
+
+	var hi HeartbeatInfo
+	if err := json.Unmarshal(hbResp.Kvs[0].Value, &hi); err != nil {
+		return time.Time{}, fmt.Errorf("failed to unmarshal heartbeat: %w", err)
+	}
+	if hi.Timestamp.IsZero() {
+		return time.Time{}, fmt.Errorf("%w", apierrors.ErrNotFound)
+	}
+	return hi.Timestamp, nil
+}
+
 func (r *ControllerRepository) UpdateControllerHeartbeat(ctx context.Context, controllerID string, environments []models.EnvironmentInfo) (mainKeyUpdated bool, err error) {
 	heartbeatKey := fmt.Sprintf("%s%s/heartbeat", controllerPrefix, controllerID)
 	heartbeatData, err := json.Marshal(HeartbeatInfo{
@@ -128,7 +158,7 @@ func (r *ControllerRepository) UpdateControllerHeartbeat(ctx context.Context, co
 	}
 
 	if len(resp.Kvs) == 0 {
-		return false, fmt.Errorf("controller not found")
+		return false, fmt.Errorf("%w", apierrors.ErrNotFound)
 	}
 
 	var info models.ControllerInfo

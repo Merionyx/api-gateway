@@ -35,6 +35,14 @@ type Container struct {
 
 	ContractsExportHandler *httphandler.ContractsExportHandler
 
+	RegistryHandler *httphandler.RegistryHandler
+
+	BundleReadUseCase      *usecase.BundleReadUseCase
+	ControllerReadUseCase  *usecase.ControllerReadUseCase
+	TenantReadUseCase      *usecase.TenantReadUseCase
+	BundleHTTPSyncUseCase  *usecase.BundleHTTPSyncUseCase
+	StatusReadUseCase      *usecase.StatusReadUseCase
+
 	ControllerRegistryHandler *grpchandler.ControllerRegistryHandler
 }
 
@@ -119,6 +127,16 @@ func (c *Container) initUseCases() error {
 		c.Config.MetricsHTTP.Enabled,
 	)
 
+	c.BundleReadUseCase = usecase.NewBundleReadUseCase(c.SnapshotRepository)
+	c.ControllerReadUseCase = usecase.NewControllerReadUseCase(c.ControllerRepository)
+	c.TenantReadUseCase = usecase.NewTenantReadUseCase(c.ControllerRepository)
+	c.BundleHTTPSyncUseCase = usecase.NewBundleHTTPSyncUseCase(c.SnapshotRepository, c.BundleSyncUseCase)
+	c.StatusReadUseCase = usecase.NewStatusReadUseCase(
+		c.EtcdClient,
+		c.Config.ContractSyncer.Address,
+		c.Config.GRPCContractSyncerClient,
+	)
+
 	slog.Info("use cases initialized")
 	return nil
 }
@@ -127,6 +145,13 @@ func (c *Container) initHandlers() {
 	c.JWTHandler = httphandler.NewJWTHandler(c.JWTUseCase, c.Config.MetricsHTTP.Enabled)
 	exportUC := usecase.NewContractExportUseCase(c.Config.ContractSyncer.Address, c.Config.GRPCContractSyncerClient)
 	c.ContractsExportHandler = httphandler.NewContractsExportHandler(exportUC)
+	c.RegistryHandler = httphandler.NewRegistryHandler(
+		c.BundleReadUseCase,
+		c.ControllerReadUseCase,
+		c.TenantReadUseCase,
+		c.BundleHTTPSyncUseCase,
+		c.StatusReadUseCase,
+	)
 	c.ControllerRegistryHandler = grpchandler.NewControllerRegistryHandler(c.ControllerRegistryUseCase)
 
 	slog.Info("handlers initialized")
