@@ -9,6 +9,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
+// LocalsKeyMetricsHTTP is the Fiber Locals key for MetricsHTTP.Enabled (bool).
+const LocalsKeyMetricsHTTP = "api_server.metrics_http.enabled"
+
 var (
 	httpRequests = promauto.NewCounterVec(
 		prometheus.CounterOpts{
@@ -27,9 +30,17 @@ var (
 	)
 )
 
+// MetricsEnabledFromCtx returns whether HTTP metrics (including domain counters) are enabled.
+func MetricsEnabledFromCtx(c fiber.Ctx) bool {
+	v := c.Locals(LocalsKeyMetricsHTTP)
+	b, _ := v.(bool)
+	return b
+}
+
 // HTTPMiddleware records request counts and latency when enabled.
 func HTTPMiddleware(enabled bool) fiber.Handler {
 	return func(c fiber.Ctx) error {
+		c.Locals(LocalsKeyMetricsHTTP, enabled)
 		if !enabled {
 			return c.Next()
 		}

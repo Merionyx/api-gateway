@@ -8,6 +8,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
+	apimetrics "github.com/merionyx/api-gateway/internal/api-server/metrics"
 )
 
 // ContentType is the media type for Problem Details (RFC 7807).
@@ -86,6 +87,7 @@ func Write(c fiber.Ctx, httpStatus int, p apiserver.Problem) error {
 
 // RespondError maps a domain error to status + Problem, logs the underlying error, and writes the response.
 func RespondError(c fiber.Ctx, err error) error {
+	apimetrics.RecordDomainOutcome(apimetrics.MetricsEnabledFromCtx(c), apimetrics.TransportHTTP, err)
 	st, p := FromDomain(err)
 	logProblemResponse(st, &p, err)
 	return Write(c, st, p)
@@ -108,6 +110,7 @@ func WriteInternal(c fiber.Ctx, err error) error {
 
 // WriteContractSync maps a Contract Syncer / etcd pipeline error to a Problem, logs the underlying error, and writes the response.
 func WriteContractSync(c fiber.Ctx, err error) error {
+	apimetrics.RecordContractPipelineOutcome(apimetrics.MetricsEnabledFromCtx(c), err)
 	st, p := FromContractSyncPipeline(err)
 	logProblemResponse(st, &p, err)
 	return Write(c, st, p)

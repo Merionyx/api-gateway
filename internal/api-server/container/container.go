@@ -159,7 +159,7 @@ func (c *Container) initHandlers() {
 		c.StatusReadUseCase,
 		c.Config.Readiness.RequireContractSyncer,
 	)
-	c.ControllerRegistryHandler = grpchandler.NewControllerRegistryHandler(c.ControllerRegistryUseCase)
+	c.ControllerRegistryHandler = grpchandler.NewControllerRegistryHandler(c.ControllerRegistryUseCase, c.Config.MetricsHTTP.Enabled)
 
 	slog.Info("handlers initialized")
 }

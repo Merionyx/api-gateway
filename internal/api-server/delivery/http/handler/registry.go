@@ -12,6 +12,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
+	apimetrics "github.com/merionyx/api-gateway/internal/api-server/metrics"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/bundle"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/registry"
 	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
@@ -121,6 +122,7 @@ func (h *RegistryHandler) GetContractInBundle(c fiber.Ctx, bundleKey apiserver.B
 	doc, err := h.bundles.GetContractDocument(c.Context(), bk, cn)
 	if err != nil {
 		if errors.Is(err, apierrors.ErrNotFound) {
+			apimetrics.RecordDomainOutcome(apimetrics.MetricsEnabledFromCtx(c), apimetrics.TransportHTTP, err)
 			return problem.Write(c, http.StatusNotFound, problem.NotFound(problem.CodeContractNotInBundle, "", problem.DetailContractNotInBundle))
 		}
 		return problem.RespondError(c, err)
@@ -163,6 +165,7 @@ func (h *RegistryHandler) GetController(c fiber.Ctx, controllerID apiserver.Cont
 	info, err := h.controllers.GetController(c.Context(), string(controllerID))
 	if err != nil {
 		if errors.Is(err, apierrors.ErrNotFound) {
+			apimetrics.RecordDomainOutcome(apimetrics.MetricsEnabledFromCtx(c), apimetrics.TransportHTTP, err)
 			return problem.Write(c, http.StatusNotFound, problem.NotFound(problem.CodeControllerNotFound, "", problem.DetailControllerNotFound))
 		}
 		return problem.RespondError(c, err)
@@ -184,6 +187,7 @@ func (h *RegistryHandler) GetControllerHeartbeat(c fiber.Ctx, controllerID apise
 	ts, err := h.controllers.GetHeartbeat(c.Context(), string(controllerID))
 	if err != nil {
 		if errors.Is(err, apierrors.ErrNotFound) {
+			apimetrics.RecordDomainOutcome(apimetrics.MetricsEnabledFromCtx(c), apimetrics.TransportHTTP, err)
 			return problem.Write(c, http.StatusNotFound, problem.NotFound(problem.CodeControllerHeartbeatNotFound, "", problem.DetailControllerHeartbeatNotFound))
 		}
 		return problem.RespondError(c, err)

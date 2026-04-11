@@ -25,7 +25,7 @@ func (noopRegistryUC) Heartbeat(context.Context, string, []models.EnvironmentInf
 func (noopRegistryUC) StartEtcdWatch(context.Context)                                    {}
 
 func TestControllerRegistryHandler_RegisterController_Success(t *testing.T) {
-	h := NewControllerRegistryHandler(noopRegistryUC{})
+	h := NewControllerRegistryHandler(noopRegistryUC{}, false)
 	resp, err := h.RegisterController(context.Background(), &pb.RegisterControllerRequest{
 		ControllerId: "c1",
 		Tenant:       "t1",
@@ -48,7 +48,7 @@ func (errRegistryUC) Heartbeat(context.Context, string, []models.EnvironmentInfo
 func (errRegistryUC) StartEtcdWatch(context.Context) {}
 
 func TestControllerRegistryHandler_RegisterController_StatusError(t *testing.T) {
-	h := NewControllerRegistryHandler(errRegistryUC{err: apierrors.JoinStore("register controller", errors.New("etcd down"))})
+	h := NewControllerRegistryHandler(errRegistryUC{err: apierrors.JoinStore("register controller", errors.New("etcd down"))}, false)
 	_, err := h.RegisterController(context.Background(), &pb.RegisterControllerRequest{
 		ControllerId: "c1",
 		Tenant:       "t1",

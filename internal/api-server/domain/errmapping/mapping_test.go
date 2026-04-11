@@ -74,6 +74,23 @@ func TestContractPipelineRules_Default(t *testing.T) {
 	}
 }
 
+func TestDomainRuleName(t *testing.T) {
+	t.Parallel()
+	if got := DomainRuleName(fmt.Errorf("%w", apierrors.ErrNotFound)); got != "NotFound" {
+		t.Fatalf("NotFound: got %q", got)
+	}
+	if got := DomainRuleName(errors.New("opaque")); got != "" {
+		t.Fatalf("unmapped: want empty, got %q", got)
+	}
+}
+
+func TestContractPipelineRuleName_DefaultEmpty(t *testing.T) {
+	t.Parallel()
+	if got := ContractPipelineRuleName(errors.New("upstream timeout")); got != "" {
+		t.Fatalf("want empty for default pipeline path, got %q", got)
+	}
+}
+
 func TestGRPCStatus_MatchesProblemDelivery(t *testing.T) {
 	t.Parallel()
 	// Ensures grpcerr.Status uses the same mapping as HTTP Problem detail text.
