@@ -7,8 +7,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
 )
 
-// OpenAPIServer implements apiserver.ServerInterface by delegating to existing HTTP handlers
-// where implemented; other operations return 501 until wired.
+// OpenAPIServer implements apiserver.ServerInterface by delegating to HTTP handlers from the DI container.
 type OpenAPIServer struct {
 	c *container.Container
 }

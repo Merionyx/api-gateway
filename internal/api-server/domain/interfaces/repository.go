@@ -19,7 +19,7 @@ type ControllerRepository interface {
 	RegisterController(ctx context.Context, info models.ControllerInfo) error
 	GetController(ctx context.Context, controllerID string) (*models.ControllerInfo, error)
 	// GetHeartbeat returns the last stored heartbeat timestamp for the controller.
-	// Returns ErrNotFound when the controller or heartbeat record is missing.
+	// Returns a not-found error when the controller or heartbeat record is missing.
 	GetHeartbeat(ctx context.Context, controllerID string) (time.Time, error)
 	ListControllers(ctx context.Context) ([]models.ControllerInfo, error)
 	// UpdateControllerHeartbeat returns true if the main controller record in etcd was rewritten
