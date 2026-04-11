@@ -10,6 +10,8 @@ import (
 	commonv1 "github.com/merionyx/api-gateway/pkg/grpc/common/v1"
 	pb "github.com/merionyx/api-gateway/pkg/grpc/contract_syncer/v1"
 
+	contractsyncergrpc "github.com/merionyx/api-gateway/internal/api-server/adapter/contractsyncer/grpc"
+	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
@@ -64,7 +66,8 @@ func startContractSyncerGRPC(t *testing.T, impl pb.ContractSyncerServiceServer) 
 
 func TestBundleSyncUseCase_SyncBundle_ContextCanceled(t *testing.T) {
 	repo := &fakeSnapshotRepo{}
-	uc := NewBundleSyncUseCase(repo, nil, "127.0.0.1:1", grpcobs.ClientTLSConfig{}, nil, false)
+	client := contractsyncergrpc.NewClient("127.0.0.1:1", grpcobs.ClientTLSConfig{})
+	uc := NewBundleSyncUseCase(repo, nil, client, nil, false)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	_, err := uc.SyncBundle(ctx, models.BundleInfo{Repository: "r", Ref: "main", Path: "p"})
@@ -95,7 +98,8 @@ func TestBundleSyncUseCase_SyncBundle_Success(t *testing.T) {
 	defer stop()
 
 	repo := &fakeSnapshotRepo{}
-	uc := NewBundleSyncUseCase(repo, nil, addr, grpcobs.ClientTLSConfig{}, nil, false)
+	client := contractsyncergrpc.NewClient(addr, grpcobs.ClientTLSConfig{})
+	uc := NewBundleSyncUseCase(repo, nil, client, nil, false)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -117,7 +121,8 @@ func TestBundleSyncUseCase_SyncBundle_RejectedResponse(t *testing.T) {
 	addr, stop := startContractSyncerGRPC(t, mock)
 	defer stop()
 
-	uc := NewBundleSyncUseCase(&fakeSnapshotRepo{}, nil, addr, grpcobs.ClientTLSConfig{}, nil, false)
+	client := contractsyncergrpc.NewClient(addr, grpcobs.ClientTLSConfig{})
+	uc := NewBundleSyncUseCase(&fakeSnapshotRepo{}, nil, client, nil, false)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -125,7 +130,7 @@ func TestBundleSyncUseCase_SyncBundle_RejectedResponse(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	if !errors.Is(err, ErrContractSyncerRejected) {
+	if !errors.Is(err, apierrors.ErrContractSyncerRejected) {
 		t.Fatalf("want ErrContractSyncerRejected, got %v", err)
 	}
 }

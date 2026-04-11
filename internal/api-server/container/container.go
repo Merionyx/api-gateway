@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"log/slog"
 
+	contractsyncergrpc "github.com/merionyx/api-gateway/internal/api-server/adapter/contractsyncer/grpc"
+	"github.com/merionyx/api-gateway/internal/api-server/adapter/etcd"
 	"github.com/merionyx/api-gateway/internal/api-server/config"
 	grpchandler "github.com/merionyx/api-gateway/internal/api-server/delivery/grpc/handler"
 	httphandler "github.com/merionyx/api-gateway/internal/api-server/delivery/http/handler"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
-	"github.com/merionyx/api-gateway/internal/api-server/repository/etcd"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase"
 	"github.com/merionyx/api-gateway/internal/shared/bootstrap"
 	"github.com/merionyx/api-gateway/internal/shared/election"
@@ -26,6 +27,9 @@ type Container struct {
 
 	SnapshotRepository   interfaces.SnapshotRepository
 	ControllerRepository interfaces.ControllerRepository
+
+	// ContractSyncerGRPC is the gRPC adapter for Contract Syncer (sync, export, ping).
+	ContractSyncerGRPC *contractsyncergrpc.Client
 
 	JWTUseCase                *usecase.JWTUseCase
 	ControllerRegistryUseCase interfaces.ControllerRegistryUseCase
@@ -118,11 +122,12 @@ func (c *Container) initUseCases() error {
 		c.EtcdClient,
 	)
 
+	c.ContractSyncerGRPC = contractsyncergrpc.NewClient(c.Config.ContractSyncer.Address, c.Config.GRPCContractSyncerClient)
+
 	c.BundleSyncUseCase = usecase.NewBundleSyncUseCase(
 		c.SnapshotRepository,
 		c.ControllerRepository,
-		c.Config.ContractSyncer.Address,
-		c.Config.GRPCContractSyncerClient,
+		c.ContractSyncerGRPC,
 		c.LeaderGate,
 		c.Config.MetricsHTTP.Enabled,
 	)
@@ -133,8 +138,7 @@ func (c *Container) initUseCases() error {
 	c.BundleHTTPSyncUseCase = usecase.NewBundleHTTPSyncUseCase(c.SnapshotRepository, c.BundleSyncUseCase)
 	c.StatusReadUseCase = usecase.NewStatusReadUseCase(
 		c.EtcdClient,
-		c.Config.ContractSyncer.Address,
-		c.Config.GRPCContractSyncerClient,
+		c.ContractSyncerGRPC,
 	)
 
 	slog.Info("use cases initialized")
@@ -143,7 +147,7 @@ func (c *Container) initUseCases() error {
 
 func (c *Container) initHandlers() {
 	c.JWTHandler = httphandler.NewJWTHandler(c.JWTUseCase, c.Config.MetricsHTTP.Enabled)
-	exportUC := usecase.NewContractExportUseCase(c.Config.ContractSyncer.Address, c.Config.GRPCContractSyncerClient)
+	exportUC := usecase.NewContractExportUseCase(c.ContractSyncerGRPC)
 	c.ContractsExportHandler = httphandler.NewContractsExportHandler(exportUC)
 	c.RegistryHandler = httphandler.NewRegistryHandler(
 		c.BundleReadUseCase,

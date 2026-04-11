@@ -7,37 +7,31 @@ import (
 	"log/slog"
 	"time"
 
-	pb "github.com/merionyx/api-gateway/pkg/grpc/contract_syncer/v1"
-
+	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 	apimetrics "github.com/merionyx/api-gateway/internal/api-server/metrics"
 	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
 	"github.com/merionyx/api-gateway/internal/shared/election"
 	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
-	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
 	"github.com/merionyx/api-gateway/internal/shared/grpcutil"
-
-	"google.golang.org/grpc"
 )
 
-// ErrContractSyncerRejected marks a non-transient failure from the syncer (invalid bundle, etc.); do not gRPC-retry.
-var ErrContractSyncerRejected = errors.New("contract syncer rejected sync")
+// ErrContractSyncerRejected is re-exported for backward compatibility; prefer apierrors.ErrContractSyncerRejected.
+var ErrContractSyncerRejected = apierrors.ErrContractSyncerRejected
 
 type BundleSyncUseCase struct {
-	snapshotRepo       interfaces.SnapshotRepository
-	controllerRepo     interfaces.ControllerRepository
-	contractSyncerAddr string
-	contractSyncerTLS  grpcobs.ClientTLSConfig
-	leader             election.LeaderGate
-	metricsEnabled     bool
+	snapshotRepo   interfaces.SnapshotRepository
+	controllerRepo interfaces.ControllerRepository
+	syncRemote     interfaces.ContractSyncRemote
+	leader         election.LeaderGate
+	metricsEnabled bool
 }
 
 func NewBundleSyncUseCase(
 	snapshotRepo interfaces.SnapshotRepository,
 	controllerRepo interfaces.ControllerRepository,
-	contractSyncerAddr string,
-	contractSyncerTLS grpcobs.ClientTLSConfig,
+	syncRemote interfaces.ContractSyncRemote,
 	leader election.LeaderGate,
 	metricsEnabled bool,
 ) *BundleSyncUseCase {
@@ -45,20 +39,15 @@ func NewBundleSyncUseCase(
 		leader = election.NoopGate{}
 	}
 	return &BundleSyncUseCase{
-		snapshotRepo:       snapshotRepo,
-		controllerRepo:     controllerRepo,
-		contractSyncerAddr: contractSyncerAddr,
-		contractSyncerTLS:  contractSyncerTLS,
-		leader:             leader,
-		metricsEnabled:     metricsEnabled,
+		snapshotRepo:   snapshotRepo,
+		controllerRepo: controllerRepo,
+		syncRemote:     syncRemote,
+		leader:         leader,
+		metricsEnabled: metricsEnabled,
 	}
 }
 
-func (uc *BundleSyncUseCase) grpcDialOptions() ([]grpc.DialOption, error) {
-	return ContractSyncerDialOptions(uc.contractSyncerTLS)
-}
-
-// SyncBundle pulls schemas from Contract Syncer (with transient gRPC retries), writes API Server etcd, notifies controllers.
+// SyncBundle pulls schemas from Contract Syncer (with transient retries), writes API Server etcd, notifies controllers.
 func (uc *BundleSyncUseCase) SyncBundle(ctx context.Context, bundle models.BundleInfo) ([]sharedgit.ContractSnapshot, error) {
 	slog.Info("Syncing bundle", "repository", bundle.Repository, "ref", bundle.Ref, "path", bundle.Path)
 
@@ -85,7 +74,7 @@ func (uc *BundleSyncUseCase) SyncBundle(ctx context.Context, bundle models.Bundl
 			apimetrics.RecordBundleSyncDuration(uc.metricsEnabled, time.Since(start))
 			return snapshots, nil
 		}
-		if errors.Is(err, ErrContractSyncerRejected) {
+		if errors.Is(err, apierrors.ErrContractSyncerRejected) {
 			apimetrics.RecordBundleSyncOutcome(uc.metricsEnabled, apimetrics.BundleOutcomeRejected)
 			return nil, err
 		}
@@ -99,66 +88,14 @@ func (uc *BundleSyncUseCase) SyncBundle(ctx context.Context, bundle models.Bundl
 }
 
 func (uc *BundleSyncUseCase) syncBundleOnce(ctx context.Context, bundle models.BundleInfo) ([]sharedgit.ContractSnapshot, error) {
-	dialOpts, err := uc.grpcDialOptions()
+	snapshots, err := uc.syncRemote.FetchContractSnapshots(ctx, bundle)
 	if err != nil {
-		apimetrics.RecordBundleSyncAttempt(uc.metricsEnabled, apimetrics.BundleAttemptRPCError)
-		return nil, fmt.Errorf("contract syncer dial options: %w", err)
-	}
-	conn, err := grpc.NewClient(uc.contractSyncerAddr, dialOpts...)
-	if err != nil {
-		apimetrics.RecordBundleSyncAttempt(uc.metricsEnabled, apimetrics.BundleAttemptRPCError)
-		return nil, fmt.Errorf("dial contract syncer: %w", err)
-	}
-	defer func() {
-		if cerr := conn.Close(); cerr != nil {
-			slog.Debug("bundle sync: close contract syncer conn", "error", cerr)
+		if errors.Is(err, apierrors.ErrContractSyncerRejected) {
+			apimetrics.RecordBundleSyncAttempt(uc.metricsEnabled, apimetrics.BundleAttemptResponseError)
+		} else {
+			apimetrics.RecordBundleSyncAttempt(uc.metricsEnabled, apimetrics.BundleAttemptRPCError)
 		}
-	}()
-
-	client := pb.NewContractSyncerServiceClient(conn)
-	resp, err := client.Sync(ctx, &pb.SyncRequest{
-		Repository: bundle.Repository,
-		Ref:        bundle.Ref,
-		Path:       bundle.Path,
-	})
-	if err != nil {
-		apimetrics.RecordBundleSyncAttempt(uc.metricsEnabled, apimetrics.BundleAttemptRPCError)
-		return nil, fmt.Errorf("sync rpc: %w", err)
-	}
-	if resp.Error != "" {
-		apimetrics.RecordBundleSyncAttempt(uc.metricsEnabled, apimetrics.BundleAttemptResponseError)
-		return nil, fmt.Errorf("%w: %s", ErrContractSyncerRejected, resp.Error)
-	}
-
-	var snapshots []sharedgit.ContractSnapshot
-	for _, pbSnapshot := range resp.Snapshots {
-		var apps []sharedgit.App
-		if acc := pbSnapshot.GetAccess(); acc != nil {
-			for _, pbApp := range acc.GetApps() {
-				apps = append(apps, sharedgit.App{
-					AppID:        pbApp.GetAppId(),
-					Environments: pbApp.GetEnvironments(),
-				})
-			}
-		}
-		upstreamName := ""
-		if u := pbSnapshot.GetUpstream(); u != nil {
-			upstreamName = u.GetName()
-		}
-		secure := false
-		if acc := pbSnapshot.GetAccess(); acc != nil {
-			secure = acc.GetSecure()
-		}
-		snapshots = append(snapshots, sharedgit.ContractSnapshot{
-			Name:                  pbSnapshot.GetName(),
-			Prefix:                pbSnapshot.GetPrefix(),
-			Upstream:              sharedgit.ContractUpstream{Name: upstreamName},
-			AllowUndefinedMethods: pbSnapshot.GetAllowUndefinedMethods(),
-			Access: sharedgit.Access{
-				Secure: secure,
-				Apps:   apps,
-			},
-		})
+		return nil, err
 	}
 
 	bundleKey := bundlekey.Build(bundle.Repository, bundle.Ref, bundle.Path)
@@ -170,8 +107,6 @@ func (uc *BundleSyncUseCase) syncBundleOnce(ctx context.Context, bundle models.B
 	if !written {
 		slog.Debug("API Server: bundle sync finished, no etcd snapshot keys changed", "bundle_key", bundleKey)
 	}
-
-	// Controllers are notified via etcd watch only when a snapshot key revision changes.
 
 	apimetrics.RecordBundleSyncAttempt(uc.metricsEnabled, apimetrics.BundleAttemptOK)
 	apimetrics.RecordBundleEtcdWrite(uc.metricsEnabled, written)
@@ -195,7 +130,6 @@ func (uc *BundleSyncUseCase) StartBundleWatcher(ctx context.Context) {
 		}()
 	}
 
-	// Initial sync runs once this replica becomes leader (avoids missing the first tick when election is slow).
 	go uc.runInitialSyncWhenLeader(ctx)
 
 	ticker := time.NewTicker(30 * time.Second)

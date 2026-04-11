@@ -6,7 +6,7 @@ import (
 	"context"
 	"testing"
 
-	apiserveretcd "github.com/merionyx/api-gateway/internal/api-server/repository/etcd"
+	apiserveretcd "github.com/merionyx/api-gateway/internal/api-server/adapter/etcd"
 	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 
 	clientv3 "go.etcd.io/etcd/client/v3"

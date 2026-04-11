@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 
+	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase"
 
 	"github.com/gofiber/fiber/v3"
@@ -46,7 +47,7 @@ func (h *ContractsExportHandler) Export(c fiber.Ctx) error {
 
 	files, err := h.exportUC.Export(c.Context(), req.Repository, req.Ref, req.Path, req.ContractName)
 	if err != nil {
-		if errors.Is(err, usecase.ErrContractSyncerRejected) {
+		if errors.Is(err, apierrors.ErrContractSyncerRejected) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 		}
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})

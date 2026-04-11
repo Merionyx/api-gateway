@@ -68,7 +68,7 @@ func (h *RegistryHandler) SyncBundle(c fiber.Ctx, _ apiserver.SyncBundleParams) 
 	force := req.Force != nil && *req.Force
 	fromCache, snaps, err := h.sync.Sync(c.Context(), req.Repository, req.Ref, req.Bundle, force)
 	if err != nil {
-		if errors.Is(err, usecase.ErrContractSyncerRejected) {
+		if errors.Is(err, apierrors.ErrContractSyncerRejected) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 		}
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
