@@ -1,7 +1,8 @@
 package problem
 
-// Stable problem codes (field `code` in Problem JSON) for i18n keys, e.g. "problem.INVALID_JSON_BODY".
-// Titles and Detail* strings are default English for debugging / optional UI fallback — prefer translating by `code`.
+import "github.com/merionyx/api-gateway/internal/api-server/domain/errmapping"
+
+// Stable problem codes for handlers (validation, path params). Domain-mapped codes are re-exported from errmapping.
 const (
 	ProblemsDocBase = "https://gateway.merionyx.com/problems/v1"
 
@@ -19,20 +20,23 @@ const (
 	CodeTokenExpiresAtPast        = "TOKEN_EXPIRES_AT_PAST"
 
 	CodeExportRepositoryRefRequired = "EXPORT_REPOSITORY_REF_REQUIRED"
-
-	CodeNotFound                    = "NOT_FOUND"
-	CodeInvalidInput                = "INVALID_INPUT"
-	CodeContractSyncerRejected      = "CONTRACT_SYNCER_REJECTED"
-	CodeNoActiveSigningKey          = "NO_ACTIVE_SIGNING_KEY"
-	CodeUnsupportedSigningAlgorithm = "UNSUPPORTED_SIGNING_ALGORITHM"
-	CodeSigningOperationFailed      = "SIGNING_OPERATION_FAILED"
-	CodeStoreUnavailable            = "STORE_UNAVAILABLE"
-	CodeContractSyncerUnavailable   = "CONTRACT_SYNCER_UNAVAILABLE"
-	CodeInternalError               = "INTERNAL_ERROR"
-	CodeContractSyncPipelineFailed  = "CONTRACT_SYNC_PIPELINE_FAILED"
 )
 
-// Default English detail lines (optional display; primary UI should use Code for i18n).
+// Domain / pipeline codes — single source: errmapping.
+const (
+	CodeNotFound                    = errmapping.CodeNotFound
+	CodeInvalidInput                = errmapping.CodeInvalidInput
+	CodeContractSyncerRejected      = errmapping.CodeContractSyncerRejected
+	CodeNoActiveSigningKey          = errmapping.CodeNoActiveSigningKey
+	CodeUnsupportedSigningAlgorithm = errmapping.CodeUnsupportedSigningAlgorithm
+	CodeSigningOperationFailed      = errmapping.CodeSigningOperationFailed
+	CodeStoreUnavailable            = errmapping.CodeStoreUnavailable
+	CodeContractSyncerUnavailable   = errmapping.CodeContractSyncerUnavailable
+	CodeInternalError               = errmapping.CodeInternalError
+	CodeContractSyncPipelineFailed  = errmapping.CodeContractSyncPipelineFailed
+)
+
+// Default English detail lines for handler-level validation (i18n fallback).
 const (
 	DetailInvalidJSONBody = "The request body could not be read as valid JSON."
 
@@ -49,17 +53,20 @@ const (
 	DetailTokenExpiresAtPast        = "expires_at must be in the future."
 
 	DetailExportRepositoryRefRequired = "Fields repository and ref are required."
+)
 
-	DetailNotFound                    = "The requested resource was not found."
-	DetailInvalidInput                = "The request parameters are not valid."
-	DetailContractSyncerRejected      = "The contract syncer rejected this request."
-	DetailNoActiveSigningKey          = "No active JWT signing key is configured."
-	DetailUnsupportedSigningAlgorithm = "The configured signing algorithm is not supported."
-	DetailSigningOperationFailed      = "Signing the token failed."
-	DetailStoreUnavailable            = "Required storage is temporarily unavailable."
-	DetailContractSyncerUnavailable   = "The contract sync service is temporarily unavailable."
-	DetailInternalError               = "An unexpected error occurred."
-	DetailContractSyncPipelineFailed  = "The contract sync request could not be completed."
+// Domain detail strings — re-export for callers that reference problem.DetailNotFound etc.
+const (
+	DetailNotFound                    = errmapping.DetailNotFound
+	DetailInvalidInput                = errmapping.DetailInvalidInput
+	DetailContractSyncerRejected      = errmapping.DetailContractSyncerRejected
+	DetailNoActiveSigningKey          = errmapping.DetailNoActiveSigningKey
+	DetailUnsupportedSigningAlgorithm = errmapping.DetailUnsupportedSigningAlgorithm
+	DetailSigningOperationFailed      = errmapping.DetailSigningOperationFailed
+	DetailStoreUnavailable            = errmapping.DetailStoreUnavailable
+	DetailContractSyncerUnavailable   = errmapping.DetailContractSyncerUnavailable
+	DetailInternalError               = errmapping.DetailInternalError
+	DetailContractSyncPipelineFailed  = errmapping.DetailContractSyncPipelineFailed
 )
 
 // TypeURI returns RFC 7807 `type` — stable URI with fragment equal to `code`.

@@ -2,35 +2,17 @@
 package grpcerr
 
 import (
-	"errors"
+	"github.com/merionyx/api-gateway/internal/api-server/domain/errmapping"
 
-	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
-
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-// Status converts a domain error to a gRPC status. Nil error returns nil.
-// Unknown errors use codes.Internal.
+// Status converts a domain error to a gRPC status using the same rules as HTTP Problem (errmapping).
+// Nil error returns nil. Unmapped errors use codes.Internal with err.Error().
 func Status(err error) error {
 	if err == nil {
 		return nil
 	}
-	switch {
-	case errors.Is(err, apierrors.ErrNotFound):
-		return status.Error(codes.NotFound, err.Error())
-	case errors.Is(err, apierrors.ErrInvalidInput):
-		return status.Error(codes.InvalidArgument, err.Error())
-	case errors.Is(err, apierrors.ErrContractSyncerRejected):
-		return status.Error(codes.InvalidArgument, err.Error())
-	case errors.Is(err, apierrors.ErrStoreAccess),
-		errors.Is(err, apierrors.ErrContractSyncerUnavailable),
-		errors.Is(err, apierrors.ErrNoActiveSigningKey):
-		return status.Error(codes.Unavailable, err.Error())
-	case errors.Is(err, apierrors.ErrUnsupportedSigningAlgorithm),
-		errors.Is(err, apierrors.ErrSigningOperationFailed):
-		return status.Error(codes.Internal, err.Error())
-	default:
-		return status.Error(codes.Internal, err.Error())
-	}
+	c, msg := errmapping.GRPCStatus(err)
+	return status.Error(c, msg)
 }
