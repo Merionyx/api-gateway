@@ -1,0 +1,1042 @@
+openapi: 3.0.3
+info:
+  title: API Gateway — API Server HTTP API
+  version: 1.0.0
+  description: |
+    HTTP API for the **API Server** control plane: authentication material (JWT, JWKS), contract export,
+    registry views backed by **etcd** (controllers, tenants, bundles), and operational endpoints.
+
+    **Data model:** registry responses are **read-only snapshots** of stored state. Environment configuration
+    lifecycle is owned by the **Gateway Controller**; this API does not expose CRUD for environments.
+
+    **JSON naming:** request and response bodies use **snake_case** field names unless noted.
+
+    **Errors:** all failed requests use **`application/problem+json`** (RFC 9457 / RFC 7807 Problem Details).
+  contact:
+    name: Merionyx API Gateway
+  license:
+    name: Proprietary
+    url: https://merionyx.com/
+
+servers:
+- url: '{baseUrl}'
+  description: Configurable base URL (set `baseUrl` when using this spec in clients).
+  variables:
+    baseUrl:
+      default: http://127.0.0.1:8080
+      description: API Server origin without trailing slash.
+
+tags:
+- name: System
+  description: Liveness and aggregate status
+- name: Authentication
+  description: JWT issuance, JWKS, signing keys
+- name: Contracts
+  description: Contract export from Git via Contract Syncer
+- name: Registry
+  description: Controllers and tenants (etcd-backed views)
+- name: Bundles
+  description: Bundle keys and contract snapshots stored in etcd
+- name: Operations
+  description: Sync and maintenance actions
+
+security: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Reserved for future use. The current API Server revision does not validate Bearer tokens on these routes.
+
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      description: Maximum number of items to return (cursor pagination).
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 500
+        default: 50
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque cursor from a previous response (`next_cursor`). Omit for the first page.
+      required: false
+      schema:
+        type: string
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      description: |
+        Weak or strong ETag from a prior `GET` response. When it matches the current representation,
+        the server returns `304 Not Modified` with no response body.
+      required: false
+      schema:
+        type: string
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      description: |
+        Optional unique key for safely retrying the same logical request. If the server has already
+        completed a successful operation with this key, it may return the same response without repeating work.
+      required: false
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+    ControllerId:
+      name: controller_id
+      in: path
+      required: true
+      description: Controller identifier as stored in etcd.
+      schema:
+        type: string
+    Tenant:
+      name: tenant
+      in: path
+      required: true
+      description: Tenant name.
+      schema:
+        type: string
+    BundleKey:
+      name: bundle_key
+      in: path
+      required: true
+      description: |
+        Bundle key as used in etcd snapshot paths. **Must be URL-safe:** pass a percent-encoded value
+        if the key contains reserved characters (`/`, `%`, etc.).
+      schema:
+        type: string
+    ContractName:
+      name: contract_name
+      in: path
+      required: true
+      description: Logical contract name within the bundle.
+      schema:
+        type: string
+
+  headers:
+    ETag:
+      description: |
+        Entity tag for the response body (typically a weak ETag, e.g. `W/"..."`), used with `If-None-Match`.
+      schema:
+        type: string
+
+  schemas:
+    Problem:
+      type: object
+      description: RFC 7807 / RFC 9457 Problem Details.
+      properties:
+        type:
+          type: string
+          format: uri
+          description: URI reference identifying the problem type.
+        title:
+          type: string
+          description: Short, human-readable summary.
+        status:
+          type: integer
+          description: HTTP status code.
+        detail:
+          type: string
+          description: Human-readable explanation for this occurrence.
+        instance:
+          type: string
+          format: uri
+          description: URI reference identifying this specific occurrence.
+      required:
+      - title
+      - status
+
+    HealthStatus:
+      type: object
+      required:
+      - status
+      properties:
+        status:
+          type: string
+          example: ok
+
+    Jwks:
+      type: object
+      required:
+      - keys
+      properties:
+        keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/Jwk'
+
+    Jwk:
+      type: object
+      properties:
+        kid:
+          type: string
+        kty:
+          type: string
+        alg:
+          type: string
+        use:
+          type: string
+        n:
+          type: string
+        e:
+          type: string
+        crv:
+          type: string
+        x:
+          type: string
+
+    SigningKey:
+      type: object
+      required:
+      - kid
+      - algorithm
+      - active
+      - created_at
+      properties:
+        kid:
+          type: string
+        algorithm:
+          type: string
+          description: e.g. EdDSA, RS256
+        active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    GenerateTokenRequest:
+      type: object
+      required:
+      - app_id
+      - environments
+      - expires_at
+      properties:
+        app_id:
+          type: string
+        environments:
+          type: array
+          items:
+            type: string
+          minItems: 1
+        expires_at:
+          type: string
+          format: date-time
+
+    GenerateTokenResponse:
+      type: object
+      required:
+      - id
+      - token
+      - app_id
+      - environments
+      - expires_at
+      - created_at
+      properties:
+        id:
+          type: string
+        token:
+          type: string
+          description: Full JWT string (returned only on creation).
+        app_id:
+          type: string
+        environments:
+          type: array
+          items:
+            type: string
+        expires_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    ContractsExportRequest:
+      type: object
+      required:
+      - repository
+      - ref
+      properties:
+        repository:
+          type: string
+        ref:
+          type: string
+        path:
+          type: string
+          description: Path inside the repository; omit for entire repo.
+        contract_name:
+          type: string
+          description: Single contract name; omit for all under path.
+
+    ContractsExportResponse:
+      type: object
+      required:
+      - files
+      properties:
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContractsExportFile'
+
+    ContractsExportFile:
+      type: object
+      required:
+      - contract_name
+      - source_path
+      - content_base64
+      properties:
+        contract_name:
+          type: string
+        source_path:
+          type: string
+        content_base64:
+          type: string
+          description: Base64-encoded file bytes.
+
+    Bundle:
+      type: object
+      properties:
+        name:
+          type: string
+        repository:
+          type: string
+        ref:
+          type: string
+        path:
+          type: string
+
+    Environment:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+        bundles:
+          type: array
+          items:
+            $ref: '#/components/schemas/Bundle'
+
+    Controller:
+      type: object
+      required:
+      - controller_id
+      - tenant
+      properties:
+        controller_id:
+          type: string
+        tenant:
+          type: string
+        environments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Environment'
+
+    ControllerHeartbeat:
+      type: object
+      required:
+      - timestamp
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Last heartbeat time stored for the controller.
+
+    TenantListResponse:
+      type: object
+      required:
+      - items
+      - has_more
+      properties:
+        items:
+          type: array
+          items:
+            type: string
+          description: Distinct tenant names.
+        next_cursor:
+          type: string
+          nullable: true
+          description: Opaque cursor for the next page; null or omitted when there is no next page.
+        has_more:
+          type: boolean
+
+    ControllerListResponse:
+      type: object
+      required:
+      - items
+      - has_more
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Controller'
+        next_cursor:
+          type: string
+          nullable: true
+          description: Opaque cursor for the next page; null or omitted when there is no next page.
+        has_more:
+          type: boolean
+
+    EnvironmentListResponse:
+      type: object
+      required:
+      - items
+      - has_more
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Environment'
+        next_cursor:
+          type: string
+          nullable: true
+          description: Opaque cursor for the next page; null or omitted when there is no next page.
+        has_more:
+          type: boolean
+
+    BundleRefListResponse:
+      type: object
+      required:
+      - items
+      - has_more
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Bundle'
+        next_cursor:
+          type: string
+          nullable: true
+          description: Opaque cursor for the next page; null or omitted when there is no next page.
+        has_more:
+          type: boolean
+
+    BundleKeyListResponse:
+      type: object
+      required:
+      - items
+      - has_more
+      properties:
+        items:
+          type: array
+          items:
+            type: string
+          description: Bundle keys as stored in etcd.
+        next_cursor:
+          type: string
+          nullable: true
+          description: Opaque cursor for the next page; null or omitted when there is no next page.
+        has_more:
+          type: boolean
+
+    ContractNameListResponse:
+      type: object
+      required:
+      - items
+      - has_more
+      properties:
+        items:
+          type: array
+          items:
+            type: string
+        next_cursor:
+          type: string
+          nullable: true
+          description: Opaque cursor for the next page; null or omitted when there is no next page.
+        has_more:
+          type: boolean
+
+    ContractDocument:
+      type: object
+      description: |
+        Parsed contract document as JSON (YAML contracts are exposed as a canonical JSON representation).
+      additionalProperties: true
+
+    ContractUpstream:
+      type: object
+      properties:
+        name:
+          type: string
+
+    App:
+      type: object
+      properties:
+        app_id:
+          type: string
+        environments:
+          type: array
+          items:
+            type: string
+
+    Access:
+      type: object
+      properties:
+        secure:
+          type: boolean
+        apps:
+          type: array
+          items:
+            $ref: '#/components/schemas/App'
+
+    ContractSnapshot:
+      type: object
+      description: Contract routing snapshot (aligns with `merionyx.gateway.common.v1.ContractSnapshot`).
+      properties:
+        name:
+          type: string
+        prefix:
+          type: string
+        upstream:
+          $ref: '#/components/schemas/ContractUpstream'
+        allow_undefined_methods:
+          type: boolean
+        access:
+          $ref: '#/components/schemas/Access'
+
+    BundleSyncRequest:
+      type: object
+      required:
+      - repository
+      - ref
+      - bundle
+      properties:
+        repository:
+          type: string
+        ref:
+          type: string
+        bundle:
+          type: string
+          description: Bundle name / logical bundle identifier (same as Schemas sync RPC).
+        force:
+          type: boolean
+          default: false
+          description: If true, synchronize even when etcd already has materialized snapshots.
+
+    BundleSyncResponse:
+      type: object
+      required:
+      - snapshots
+      - from_cache
+      properties:
+        snapshots:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContractSnapshot'
+        from_cache:
+          type: boolean
+          description: True if snapshots were served from etcd cache without a Git fetch.
+
+    StatusResponse:
+      type: object
+      description: Aggregate health of API Server dependencies (exact fields may evolve).
+      required:
+      - api_server
+      properties:
+        api_server:
+          type: string
+          example: ok
+        etcd:
+          type: string
+          example: ok
+        contract_syncer:
+          type: string
+          example: ok
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotModified:
+      description: Not Modified — representation unchanged (use with `If-None-Match`).
+    InternalError:
+      description: Internal server error
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+paths:
+  /health:
+    get:
+      tags: [ System ]
+      operationId: getHealth
+      summary: Liveness
+      description: |
+        Lightweight liveness probe for load balancers and orchestrators. Returns `{ "status": "ok" }` when the HTTP server is up.
+      responses:
+        '200':
+          description: Service is running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /.well-known/jwks.json:
+    get:
+      tags: [ Authentication ]
+      operationId: getJwks
+      summary: JSON Web Key Set (JWKS)
+      description: |
+        Public keys for verifying JWTs issued by this API Server (`/.well-known/jwks.json`). Supports conditional requests via `ETag` / `If-None-Match` to avoid re-downloading when keys are unchanged.
+      parameters:
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: JWKS document
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Jwks'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/keys:
+    get:
+      tags: [ Authentication ]
+      operationId: listSigningKeys
+      summary: List JWT signing keys (metadata)
+      description: |
+        Returns metadata about configured signing keys (`kid`, algorithm, active flag, creation time). Does not expose private key material. Cache-friendly with `ETag` / `If-None-Match`.
+      parameters:
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Signing keys
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SigningKey'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/tokens:
+    post:
+      tags: [ Authentication ]
+      operationId: createToken
+      summary: Issue application JWT
+      description: |
+        Mints an application JWT bound to `app_id` and allowed `environments`. The raw token string is returned only in this response (`201`); store it securely. `expires_at` must be in the future.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateTokenRequest'
+      responses:
+        '201':
+          description: Token created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateTokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/contracts/export:
+    post:
+      tags: [ Contracts ]
+      operationId: exportContracts
+      summary: Export contract files from Git (via Contract Syncer)
+      description: |
+        Fetches contract YAML/JSON from a Git repository via the Contract Syncer service (not from etcd). Specify `repository` and `ref`; optionally narrow by `path` and/or a single `contract_name`. Response files carry base64-encoded content.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContractsExportRequest'
+      responses:
+        '200':
+          description: Exported files
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractsExportResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          description: Bad gateway (e.g. Contract Syncer unavailable)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/controllers:
+    get:
+      tags: [ Registry ]
+      operationId: listControllers
+      summary: List registered controllers
+      description: |
+        Lists Gateway Controllers registered in etcd (`controller_id`, `tenant`, declared environments and static bundles). Paginated with `limit` / `cursor`. Use `If-None-Match` with the previous `ETag` to obtain `304` when nothing changed.
+      parameters:
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Paginated controllers
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControllerListResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/controllers/{controller_id}:
+    get:
+      tags: [ Registry ]
+      operationId: getController
+      summary: Get controller by ID
+      description: |
+        Returns one controller record by `controller_id`. Supports conditional GET via `If-None-Match` / `ETag`. `404` if the controller is unknown.
+      parameters:
+      - $ref: '#/components/parameters/ControllerId'
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Controller
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Controller'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/controllers/{controller_id}/heartbeat:
+    get:
+      tags: [ Registry ]
+      operationId: getControllerHeartbeat
+      summary: Get last heartbeat for a controller
+      description: |
+        Returns the last heartbeat timestamp stored for the controller (operator visibility). Not the same payload as full controller registration; use when you only need freshness. `404` if the controller does not exist.
+      parameters:
+      - $ref: '#/components/parameters/ControllerId'
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Heartbeat record
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControllerHeartbeat'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/tenants:
+    get:
+      tags: [ Registry ]
+      operationId: listTenants
+      summary: List distinct tenants
+      description: |
+        Returns distinct `tenant` values observed across registered controllers. Cursor-paginated; combine with registry list endpoints to drill down.
+      parameters:
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Paginated tenant names
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantListResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/tenants/{tenant}/controllers:
+    get:
+      tags: [ Registry ]
+      operationId: listControllersByTenant
+      summary: List controllers for a tenant
+      description: |
+        Lists controllers whose `tenant` path parameter matches. Same response shape as `GET /api/v1/controllers` but scoped to one tenant.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Paginated controllers
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControllerListResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/tenants/{tenant}/environments:
+    get:
+      tags: [ Registry ]
+      operationId: listEnvironmentsByTenant
+      summary: Aggregated environments observed for a tenant (read-only snapshot)
+      description: |
+        Read-only aggregated view of environments (and their static bundles) as reported for this tenant. Environment lifecycle is owned by the Gateway Controller; this endpoint does not mutate configuration.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Paginated environments
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvironmentListResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/tenants/{tenant}/bundles:
+    get:
+      tags: [ Registry ]
+      operationId: listBundlesByTenant
+      summary: Static bundles aggregated across environments for a tenant
+      description: |
+        Flattens static bundle descriptors (`name`, `repository`, `ref`, `path`) across environments for the tenant. Useful for overview UIs; not a substitute for etcd bundle-key APIs.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Paginated bundle descriptors
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BundleRefListResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/bundles:
+    get:
+      tags: [ Bundles ]
+      operationId: listBundleKeys
+      summary: List bundle keys present in etcd
+      description: |
+        Lists bundle key strings that exist under the API Server’s contract snapshot prefix in etcd. Paginated; keys may require percent-encoding when used as path segments elsewhere.
+      parameters:
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Paginated bundle keys
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BundleKeyListResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/bundles/{bundle_key}/contracts:
+    get:
+      tags: [ Bundles ]
+      operationId: listContractsInBundle
+      summary: List contract names for a bundle key
+      description: |
+        Returns logical contract names stored for the given `bundle_key` in etcd. Paginated list; use `GET .../contracts/{contract_name}` for full document bodies.
+      parameters:
+      - $ref: '#/components/parameters/BundleKey'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Paginated contract names
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractNameListResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/bundles/{bundle_key}/contracts/{contract_name}:
+    get:
+      tags: [ Bundles ]
+      operationId: getContractInBundle
+      summary: Get a single contract document for a bundle
+      description: |
+        Returns one contract document from etcd-backed storage for the bundle key (JSON object; YAML sources may be normalized to JSON). Supports `If-None-Match` for caching. `404` if the bundle or contract is missing.
+      parameters:
+      - $ref: '#/components/parameters/BundleKey'
+      - $ref: '#/components/parameters/ContractName'
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Contract document (JSON)
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractDocument'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/bundles/sync:
+    post:
+      tags: [ Operations ]
+      operationId: syncBundle
+      summary: Trigger contract bundle synchronization (Schemas / bundle sync pipeline)
+      description: |
+        Triggers synchronization of a contract bundle from Git into etcd (same conceptual fields as `SyncContractBundle`: `repository`, `ref`, `bundle`, optional `force`). Idempotent retries may send the same `Idempotency-Key`. `502` indicates upstream/sync pipeline failure.
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BundleSyncRequest'
+      responses:
+        '200':
+          description: Sync completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BundleSyncResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          description: Upstream failure during sync
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/status:
+    get:
+      tags: [ System ]
+      operationId: getStatus
+      summary: Dependency status for operators
+      description: |
+        Aggregate readiness-style snapshot (e.g. API Server self-check, etcd, Contract Syncer). Exact fields may evolve; safe for dashboards and alerting. Conditional GET supported via `ETag` / `If-None-Match`.
+      parameters:
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Status snapshot
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
