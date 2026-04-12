@@ -51,4 +51,5 @@ func init() {
 	rootCmd.AddCommand(command.NewVersionCommand())
 	rootCmd.AddCommand(command.NewValidateCommand())
 	rootCmd.AddCommand(command.NewListCommand(resolveServer))
+	rootCmd.AddCommand(command.NewDescribeCommand(resolveServer))
 }

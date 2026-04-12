@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/merionyx/api-gateway/internal/cli/apiserver/httpapi"
+	"github.com/merionyx/api-gateway/internal/cli/bundleopt"
 	"github.com/merionyx/api-gateway/internal/cli/outputfmt"
 	"github.com/merionyx/api-gateway/internal/cli/resource"
 	"github.com/merionyx/api-gateway/internal/cli/style"
@@ -21,6 +22,9 @@ func NewListCommand(resolveServer func() (string, error)) *cobra.Command {
 		cursor      string
 		tenant      string
 		bundleKey   string
+		repo        string
+		ref         string
+		bundlePath  string
 		environment string
 		envAlias    string
 	)
@@ -36,7 +40,7 @@ Canonical resource names (plural): %s
 Use --tenant (-t) where required; for controllers it is optional (scopes to that tenant).
 For bundles, --tenant is required; optional --environment (-e) / --env filters bundles to one environment.
 
-Listing contract names in etcd requires --bundle-key.
+For contract-names, identify the bundle with --bundle-key or with --repo and --ref (optional --path).
 
 Aliases are accepted (e.g. controllers, ctrl, cnt; bundles, tenant-bundles; environments, env).`,
 			httpapi.MaxPageSize, resource.CanonicalNames()),
@@ -49,8 +53,15 @@ Aliases are accepted (e.g. controllers, ctrl, cnt; bundles, tenant-bundles; envi
 			if entry.RequiresTenant && strings.TrimSpace(tenant) == "" {
 				return fmt.Errorf("--tenant is required for resource %q", entry.Canonical)
 			}
-			if entry.RequiresBundleKey && strings.TrimSpace(bundleKey) == "" {
-				return fmt.Errorf("--bundle-key is required for resource %q", entry.Canonical)
+			var resolvedBundleKey string
+			if entry.Kind == resource.ContractNames {
+				var err error
+				resolvedBundleKey, err = bundleopt.ResolveBundleKey(bundleKey, repo, ref, bundlePath)
+				if err != nil {
+					return err
+				}
+			} else if bundleKey != "" || repo != "" || ref != "" || bundlePath != "" {
+				return fmt.Errorf("--bundle-key / --repo / --ref / --path apply only to list contract-names")
 			}
 
 			e1 := strings.TrimSpace(environment)
@@ -93,9 +104,8 @@ Aliases are accepted (e.g. controllers, ctrl, cnt; bundles, tenant-bundles; envi
 			}
 
 			tTrim := strings.TrimSpace(tenant)
-			bkTrim := strings.TrimSpace(bundleKey)
 
-			v, err := runList(ctx, httpClient, server, entry.Kind, cursorPtr, tTrim, bkTrim, envFilter)
+			v, err := runList(ctx, httpClient, server, entry.Kind, cursorPtr, tTrim, resolvedBundleKey, envFilter)
 			if err != nil {
 				return err
 			}
@@ -121,7 +131,10 @@ Aliases are accepted (e.g. controllers, ctrl, cnt; bundles, tenant-bundles; envi
 	cmd.Flags().StringVarP(&tenant, "tenant", "t", "", "Tenant name (required for environments and bundles; optional for controllers)")
 	cmd.Flags().StringVarP(&environment, "environment", "e", "", "When listing bundles: keep only bundles for this environment name (requires --tenant)")
 	cmd.Flags().StringVar(&envAlias, "env", "", "Alias for --environment")
-	cmd.Flags().StringVar(&bundleKey, "bundle-key", "", "Bundle key in etcd (required for contract-names)")
+	cmd.Flags().StringVar(&bundleKey, "bundle-key", "", "Full bundle key (for contract-names; mutually exclusive with --repo/--ref)")
+	cmd.Flags().StringVar(&repo, "repo", "", "Repository id (for contract-names; use with --ref)")
+	cmd.Flags().StringVar(&ref, "ref", "", "Git ref (for contract-names; use with --repo)")
+	cmd.Flags().StringVar(&bundlePath, "path", "", "Logical bundle root path inside the repo (optional; for contract-names with --repo/--ref)")
 	return cmd
 }
 

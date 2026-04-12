@@ -29,23 +29,18 @@ type App struct {
 	Environments *[]string `json:"environments,omitempty"`
 }
 
-// Bundle defines model for Bundle.
+// Bundle Logical bundle: human-oriented `name` plus `repository`, `ref`, and `path` as reported by controllers.
+// Field `key` is the canonical snapshot key (same string as under the etcd `.../snapshots/` prefix),
+// i.e. `repository` / escaped `ref` / escaped `path`.
 type Bundle struct {
+	// Key Canonical bundle key matching etcd snapshot paths (`repository/escapedRef/escapedPath`).
+	Key *string `json:"key,omitempty"`
+
+	// Name Display / config name (convenience; not necessarily unique globally).
 	Name       *string `json:"name,omitempty"`
 	Path       *string `json:"path,omitempty"`
 	Ref        *string `json:"ref,omitempty"`
 	Repository *string `json:"repository,omitempty"`
-}
-
-// BundleKeyListResponse defines model for BundleKeyListResponse.
-type BundleKeyListResponse struct {
-	HasMore bool `json:"has_more"`
-
-	// Items Bundle keys as stored in etcd.
-	Items []string `json:"items"`
-
-	// NextCursor Opaque cursor for the next page; null or omitted when there is no next page.
-	NextCursor *string `json:"next_cursor,omitempty"`
 }
 
 // BundleRefListResponse defines model for BundleRefListResponse.
@@ -287,8 +282,17 @@ type VersionResponse struct {
 	Release *string `json:"release,omitempty"`
 }
 
-// BundleKey defines model for BundleKey.
-type BundleKey = string
+// BundleKeyQuery defines model for BundleKeyQuery.
+type BundleKeyQuery = string
+
+// BundlePathQuery defines model for BundlePathQuery.
+type BundlePathQuery = string
+
+// BundleRefQuery defines model for BundleRefQuery.
+type BundleRefQuery = string
+
+// BundleRepoQuery defines model for BundleRepoQuery.
+type BundleRepoQuery = string
 
 // ContractName defines model for ContractName.
 type ContractName = string
@@ -361,15 +365,24 @@ type ListBundleKeysParams struct {
 	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
 }
 
-// SyncBundleParams defines parameters for SyncBundle.
-type SyncBundleParams struct {
-	// IdempotencyKey Optional unique key for safely retrying the same logical request. If the server has already
-	// completed a successful operation with this key, it may return the same response without repeating work.
-	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
-}
-
 // ListContractsInBundleParams defines parameters for ListContractsInBundle.
 type ListContractsInBundleParams struct {
+	// BundleKey Optional internal snapshot key (`repository/escapedRef/escapedPath`), same as in etcd paths.
+	// Prefer `repo` + `ref` (+ `path`) for clients. Mutually exclusive with those when both sets would
+	// identify a bundle. Standard query decoding can turn `%2F` into `/`; the server normalizes the
+	// usual over-decoded form when possible. Alternatively encode `%` as `%25` so literal `%2F` survives one decode.
+	BundleKey *BundleKeyQuery `form:"bundle_key,omitempty" json:"bundle_key,omitempty"`
+
+	// Repo Repository identifier (first segment of the bundle key). Use together with `ref`; optional `path`.
+	Repo *BundleRepoQuery `form:"repo,omitempty" json:"repo,omitempty"`
+
+	// Ref Git ref (slashes allowed). Combined with `repo` and optional `path` via the same rules as `bundlekey.Build`.
+	Ref *BundleRefQuery `form:"ref,omitempty" json:"ref,omitempty"`
+
+	// Path Logical bundle root path inside the repository. Omit or leave empty for the default root
+	// (same as `.` in the etcd key segment).
+	Path *BundlePathQuery `form:"path,omitempty" json:"path,omitempty"`
+
 	// Limit Maximum number of items to return (cursor pagination).
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
 
@@ -383,9 +396,32 @@ type ListContractsInBundleParams struct {
 
 // GetContractInBundleParams defines parameters for GetContractInBundle.
 type GetContractInBundleParams struct {
+	// BundleKey Optional internal snapshot key (`repository/escapedRef/escapedPath`), same as in etcd paths.
+	// Prefer `repo` + `ref` (+ `path`) for clients. Mutually exclusive with those when both sets would
+	// identify a bundle. Standard query decoding can turn `%2F` into `/`; the server normalizes the
+	// usual over-decoded form when possible. Alternatively encode `%` as `%25` so literal `%2F` survives one decode.
+	BundleKey *BundleKeyQuery `form:"bundle_key,omitempty" json:"bundle_key,omitempty"`
+
+	// Repo Repository identifier (first segment of the bundle key). Use together with `ref`; optional `path`.
+	Repo *BundleRepoQuery `form:"repo,omitempty" json:"repo,omitempty"`
+
+	// Ref Git ref (slashes allowed). Combined with `repo` and optional `path` via the same rules as `bundlekey.Build`.
+	Ref *BundleRefQuery `form:"ref,omitempty" json:"ref,omitempty"`
+
+	// Path Logical bundle root path inside the repository. Omit or leave empty for the default root
+	// (same as `.` in the etcd key segment).
+	Path *BundlePathQuery `form:"path,omitempty" json:"path,omitempty"`
+
 	// IfNoneMatch Weak or strong ETag from a prior `GET` response. When it matches the current representation,
 	// the server returns `304 Not Modified` with no response body.
 	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
+}
+
+// SyncBundleParams defines parameters for SyncBundle.
+type SyncBundleParams struct {
+	// IdempotencyKey Optional unique key for safely retrying the same logical request. If the server has already
+	// completed a successful operation with this key, it may return the same response without repeating work.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
 // ListControllersParams defines parameters for ListControllers.
@@ -569,16 +605,16 @@ type ClientInterface interface {
 	// ListBundleKeys request
 	ListBundleKeys(ctx context.Context, params *ListBundleKeysParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListContractsInBundle request
+	ListContractsInBundle(ctx context.Context, params *ListContractsInBundleParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetContractInBundle request
+	GetContractInBundle(ctx context.Context, contractName ContractName, params *GetContractInBundleParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// SyncBundleWithBody request with any body
 	SyncBundleWithBody(ctx context.Context, params *SyncBundleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	SyncBundle(ctx context.Context, params *SyncBundleParams, body SyncBundleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// ListContractsInBundle request
-	ListContractsInBundle(ctx context.Context, bundleKey BundleKey, params *ListContractsInBundleParams, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetContractInBundle request
-	GetContractInBundle(ctx context.Context, bundleKey BundleKey, contractName ContractName, params *GetContractInBundleParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ExportContractsWithBody request with any body
 	ExportContractsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -651,6 +687,30 @@ func (c *Client) ListBundleKeys(ctx context.Context, params *ListBundleKeysParam
 	return c.Client.Do(req)
 }
 
+func (c *Client) ListContractsInBundle(ctx context.Context, params *ListContractsInBundleParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListContractsInBundleRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetContractInBundle(ctx context.Context, contractName ContractName, params *GetContractInBundleParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetContractInBundleRequest(c.Server, contractName, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) SyncBundleWithBody(ctx context.Context, params *SyncBundleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSyncBundleRequestWithBody(c.Server, params, contentType, body)
 	if err != nil {
@@ -665,30 +725,6 @@ func (c *Client) SyncBundleWithBody(ctx context.Context, params *SyncBundleParam
 
 func (c *Client) SyncBundle(ctx context.Context, params *SyncBundleParams, body SyncBundleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSyncBundleRequest(c.Server, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) ListContractsInBundle(ctx context.Context, bundleKey BundleKey, params *ListContractsInBundleParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListContractsInBundleRequest(c.Server, bundleKey, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetContractInBundle(ctx context.Context, bundleKey BundleKey, contractName ContractName, params *GetContractInBundleParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetContractInBundleRequest(c.Server, bundleKey, contractName, params)
 	if err != nil {
 		return nil, err
 	}
@@ -1013,78 +1049,16 @@ func NewListBundleKeysRequest(server string, params *ListBundleKeysParams) (*htt
 	return req, nil
 }
 
-// NewSyncBundleRequest calls the generic SyncBundle builder with application/json body
-func NewSyncBundleRequest(server string, params *SyncBundleParams, body SyncBundleJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewSyncBundleRequestWithBody(server, params, "application/json", bodyReader)
-}
-
-// NewSyncBundleRequestWithBody generates requests for SyncBundle with any type of body
-func NewSyncBundleRequestWithBody(server string, params *SyncBundleParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/v1/bundles/sync")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
 // NewListContractsInBundleRequest generates requests for ListContractsInBundle
-func NewListContractsInBundleRequest(server string, bundleKey BundleKey, params *ListContractsInBundleParams) (*http.Request, error) {
+func NewListContractsInBundleRequest(server string, params *ListContractsInBundleParams) (*http.Request, error) {
 	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "bundle_key", bundleKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
 
 	serverURL, err := url.Parse(server)
 	if err != nil {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/bundles/%s/contracts", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/bundles/contracts")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1096,6 +1070,70 @@ func NewListContractsInBundleRequest(server string, bundleKey BundleKey, params 
 
 	if params != nil {
 		queryValues := queryURL.Query()
+
+		if params.BundleKey != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "bundle_key", *params.BundleKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Repo != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "repo", *params.Repo, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Ref != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "ref", *params.Ref, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
 
 		if params.Limit != nil {
 
@@ -1156,19 +1194,12 @@ func NewListContractsInBundleRequest(server string, bundleKey BundleKey, params 
 }
 
 // NewGetContractInBundleRequest generates requests for GetContractInBundle
-func NewGetContractInBundleRequest(server string, bundleKey BundleKey, contractName ContractName, params *GetContractInBundleParams) (*http.Request, error) {
+func NewGetContractInBundleRequest(server string, contractName ContractName, params *GetContractInBundleParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
 
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "bundle_key", bundleKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "contract_name", contractName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "contract_name", contractName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
 	if err != nil {
 		return nil, err
 	}
@@ -1178,7 +1209,7 @@ func NewGetContractInBundleRequest(server string, bundleKey BundleKey, contractN
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/bundles/%s/contracts/%s", pathParam0, pathParam1)
+	operationPath := fmt.Sprintf("/api/v1/bundles/contracts/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1186,6 +1217,76 @@ func NewGetContractInBundleRequest(server string, bundleKey BundleKey, contractN
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.BundleKey != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "bundle_key", *params.BundleKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Repo != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "repo", *params.Repo, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Ref != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "ref", *params.Ref, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
 	}
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
@@ -1204,6 +1305,61 @@ func NewGetContractInBundleRequest(server string, bundleKey BundleKey, contractN
 			}
 
 			req.Header.Set("If-None-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewSyncBundleRequest calls the generic SyncBundle builder with application/json body
+func NewSyncBundleRequest(server string, params *SyncBundleParams, body SyncBundleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSyncBundleRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewSyncBundleRequestWithBody generates requests for SyncBundle with any type of body
+func NewSyncBundleRequestWithBody(server string, params *SyncBundleParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/bundles/sync")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
 		}
 
 	}
@@ -2024,16 +2180,16 @@ type ClientWithResponsesInterface interface {
 	// ListBundleKeysWithResponse request
 	ListBundleKeysWithResponse(ctx context.Context, params *ListBundleKeysParams, reqEditors ...RequestEditorFn) (*ListBundleKeysResponse, error)
 
+	// ListContractsInBundleWithResponse request
+	ListContractsInBundleWithResponse(ctx context.Context, params *ListContractsInBundleParams, reqEditors ...RequestEditorFn) (*ListContractsInBundleResponse, error)
+
+	// GetContractInBundleWithResponse request
+	GetContractInBundleWithResponse(ctx context.Context, contractName ContractName, params *GetContractInBundleParams, reqEditors ...RequestEditorFn) (*GetContractInBundleResponse, error)
+
 	// SyncBundleWithBodyWithResponse request with any body
 	SyncBundleWithBodyWithResponse(ctx context.Context, params *SyncBundleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SyncBundleResponse, error)
 
 	SyncBundleWithResponse(ctx context.Context, params *SyncBundleParams, body SyncBundleJSONRequestBody, reqEditors ...RequestEditorFn) (*SyncBundleResponse, error)
-
-	// ListContractsInBundleWithResponse request
-	ListContractsInBundleWithResponse(ctx context.Context, bundleKey BundleKey, params *ListContractsInBundleParams, reqEditors ...RequestEditorFn) (*ListContractsInBundleResponse, error)
-
-	// GetContractInBundleWithResponse request
-	GetContractInBundleWithResponse(ctx context.Context, bundleKey BundleKey, contractName ContractName, params *GetContractInBundleParams, reqEditors ...RequestEditorFn) (*GetContractInBundleResponse, error)
 
 	// ExportContractsWithBodyWithResponse request with any body
 	ExportContractsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ExportContractsResponse, error)
@@ -2109,7 +2265,7 @@ func (r GetJwksResponse) StatusCode() int {
 type ListBundleKeysResponse struct {
 	Body                      []byte
 	HTTPResponse              *http.Response
-	JSON200                   *BundleKeyListResponse
+	JSON200                   *BundleRefListResponse
 	ApplicationproblemJSON400 *BadRequest
 	ApplicationproblemJSON500 *InternalError
 }
@@ -2124,32 +2280,6 @@ func (r ListBundleKeysResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r ListBundleKeysResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type SyncBundleResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *BundleSyncResponse
-	ApplicationproblemJSON400 *BadRequest
-	ApplicationproblemJSON409 *Problem
-	ApplicationproblemJSON500 *InternalError
-	ApplicationproblemJSON502 *Problem
-}
-
-// Status returns HTTPResponse.Status
-func (r SyncBundleResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r SyncBundleResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -2199,6 +2329,32 @@ func (r GetContractInBundleResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetContractInBundleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type SyncBundleResponse struct {
+	Body                      []byte
+	HTTPResponse              *http.Response
+	JSON200                   *BundleSyncResponse
+	ApplicationproblemJSON400 *BadRequest
+	ApplicationproblemJSON409 *Problem
+	ApplicationproblemJSON500 *InternalError
+	ApplicationproblemJSON502 *Problem
+}
+
+// Status returns HTTPResponse.Status
+func (r SyncBundleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SyncBundleResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -2558,6 +2714,24 @@ func (c *ClientWithResponses) ListBundleKeysWithResponse(ctx context.Context, pa
 	return ParseListBundleKeysResponse(rsp)
 }
 
+// ListContractsInBundleWithResponse request returning *ListContractsInBundleResponse
+func (c *ClientWithResponses) ListContractsInBundleWithResponse(ctx context.Context, params *ListContractsInBundleParams, reqEditors ...RequestEditorFn) (*ListContractsInBundleResponse, error) {
+	rsp, err := c.ListContractsInBundle(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListContractsInBundleResponse(rsp)
+}
+
+// GetContractInBundleWithResponse request returning *GetContractInBundleResponse
+func (c *ClientWithResponses) GetContractInBundleWithResponse(ctx context.Context, contractName ContractName, params *GetContractInBundleParams, reqEditors ...RequestEditorFn) (*GetContractInBundleResponse, error) {
+	rsp, err := c.GetContractInBundle(ctx, contractName, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetContractInBundleResponse(rsp)
+}
+
 // SyncBundleWithBodyWithResponse request with arbitrary body returning *SyncBundleResponse
 func (c *ClientWithResponses) SyncBundleWithBodyWithResponse(ctx context.Context, params *SyncBundleParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SyncBundleResponse, error) {
 	rsp, err := c.SyncBundleWithBody(ctx, params, contentType, body, reqEditors...)
@@ -2573,24 +2747,6 @@ func (c *ClientWithResponses) SyncBundleWithResponse(ctx context.Context, params
 		return nil, err
 	}
 	return ParseSyncBundleResponse(rsp)
-}
-
-// ListContractsInBundleWithResponse request returning *ListContractsInBundleResponse
-func (c *ClientWithResponses) ListContractsInBundleWithResponse(ctx context.Context, bundleKey BundleKey, params *ListContractsInBundleParams, reqEditors ...RequestEditorFn) (*ListContractsInBundleResponse, error) {
-	rsp, err := c.ListContractsInBundle(ctx, bundleKey, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseListContractsInBundleResponse(rsp)
-}
-
-// GetContractInBundleWithResponse request returning *GetContractInBundleResponse
-func (c *ClientWithResponses) GetContractInBundleWithResponse(ctx context.Context, bundleKey BundleKey, contractName ContractName, params *GetContractInBundleParams, reqEditors ...RequestEditorFn) (*GetContractInBundleResponse, error) {
-	rsp, err := c.GetContractInBundle(ctx, bundleKey, contractName, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetContractInBundleResponse(rsp)
 }
 
 // ExportContractsWithBodyWithResponse request with arbitrary body returning *ExportContractsResponse
@@ -2790,7 +2946,7 @@ func ParseListBundleKeysResponse(rsp *http.Response) (*ListBundleKeysResponse, e
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest BundleKeyListResponse
+		var dest BundleRefListResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -2809,60 +2965,6 @@ func ParseListBundleKeysResponse(rsp *http.Response) (*ListBundleKeysResponse, e
 			return nil, err
 		}
 		response.ApplicationproblemJSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseSyncBundleResponse parses an HTTP response from a SyncBundleWithResponse call
-func ParseSyncBundleResponse(rsp *http.Response) (*SyncBundleResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &SyncBundleResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest BundleSyncResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest Problem
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON409 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest InternalError
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON500 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
-		var dest Problem
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON502 = &dest
 
 	}
 
@@ -2950,6 +3052,60 @@ func ParseGetContractInBundleResponse(rsp *http.Response) (*GetContractInBundleR
 			return nil, err
 		}
 		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSyncBundleResponse parses an HTTP response from a SyncBundleWithResponse call
+func ParseSyncBundleResponse(rsp *http.Response) (*SyncBundleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SyncBundleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BundleSyncResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
 
 	}
 

@@ -201,7 +201,7 @@ func ListBundlesByTenant(ctx context.Context, httpClient *http.Client, serverURL
 }
 
 // ListBundleKeys calls GET /api/v1/bundles.
-func ListBundleKeys(ctx context.Context, httpClient *http.Client, serverURL string, cursor *string) (*apiserverclient.BundleKeyListResponse, error) {
+func ListBundleKeys(ctx context.Context, httpClient *http.Client, serverURL string, cursor *string) (*apiserverclient.BundleRefListResponse, error) {
 	c, err := newClientWithResponses(serverURL, httpClient)
 	if err != nil {
 		return nil, err
@@ -220,18 +220,19 @@ func ListBundleKeys(ctx context.Context, httpClient *http.Client, serverURL stri
 	return nil, errBundleKeys(resp)
 }
 
-// ListContractNamesInBundle calls GET /api/v1/bundles/{bundle_key}/contracts.
+// ListContractNamesInBundle calls GET /api/v1/bundles/contracts (bundle_key query).
 func ListContractNamesInBundle(ctx context.Context, httpClient *http.Client, serverURL, bundleKey string, cursor *string) (*apiserverclient.ContractNameListResponse, error) {
 	c, err := newClientWithResponses(serverURL, httpClient)
 	if err != nil {
 		return nil, err
 	}
-	bk := apiserverclient.BundleKey(bundleKey)
+	bkq := apiserverclient.BundleKeyQuery(bundleKey)
 	params := &apiserverclient.ListContractsInBundleParams{
-		Limit:  maxListLimit(),
-		Cursor: strCursor(cursor),
+		BundleKey: &bkq,
+		Limit:     maxListLimit(),
+		Cursor:    strCursor(cursor),
 	}
-	resp, err := c.ListContractsInBundleWithResponse(ctx, bk, params)
+	resp, err := c.ListContractsInBundleWithResponse(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}

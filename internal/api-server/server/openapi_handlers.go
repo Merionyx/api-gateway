@@ -30,12 +30,12 @@ func (s *OpenAPIServer) SyncBundle(c fiber.Ctx, params apiserver.SyncBundleParam
 	return s.c.RegistryHandler.SyncBundle(c, params)
 }
 
-func (s *OpenAPIServer) ListContractsInBundle(c fiber.Ctx, bundleKey apiserver.BundleKey, params apiserver.ListContractsInBundleParams) error {
-	return s.c.RegistryHandler.ListContractsInBundle(c, bundleKey, params)
+func (s *OpenAPIServer) ListContractsInBundle(c fiber.Ctx, params apiserver.ListContractsInBundleParams) error {
+	return s.c.RegistryHandler.ListContractsInBundle(c, params)
 }
 
-func (s *OpenAPIServer) GetContractInBundle(c fiber.Ctx, bundleKey apiserver.BundleKey, contractName apiserver.ContractName, params apiserver.GetContractInBundleParams) error {
-	return s.c.RegistryHandler.GetContractInBundle(c, bundleKey, contractName, params)
+func (s *OpenAPIServer) GetContractInBundle(c fiber.Ctx, contractName apiserver.ContractName, params apiserver.GetContractInBundleParams) error {
+	return s.c.RegistryHandler.GetContractInBundle(c, contractName, params)
 }
 
 func (s *OpenAPIServer) ExportContracts(c fiber.Ctx) error {

@@ -30,8 +30,8 @@ func printListTable(w io.Writer, color bool, kind resource.Kind, v any) {
 		printTenantBundleTable(w, x.Items)
 		writePaginationFooter(w, color, x.HasMore, x.NextCursor)
 	case resource.BundleKeys:
-		x := v.(*apiserverclient.BundleKeyListResponse)
-		printBundleKeyTable(w, x.Items)
+		x := v.(*apiserverclient.BundleRefListResponse)
+		printTenantBundleTable(w, x.Items)
 		writePaginationFooter(w, color, x.HasMore, x.NextCursor)
 	case resource.ContractNames:
 		x := v.(*apiserverclient.ContractNameListResponse)
@@ -78,10 +78,10 @@ func printEnvironmentTable(w io.Writer, items []apiserverclient.Environment) {
 
 func printTenantBundleTable(w io.Writer, items []apiserverclient.Bundle) {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(tw, "NAME\tREPOSITORY\tREF\tPATH")
+	_, _ = fmt.Fprintln(tw, "NAME\tKEY\tREPOSITORY\tREF\tPATH")
 	for _, b := range items {
-		name, repo, ref, path := deref(b.Name), deref(b.Repository), deref(b.Ref), deref(b.Path)
-		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", name, repo, ref, path)
+		name, key, repo, ref, path := deref(b.Name), deref(b.Key), deref(b.Repository), deref(b.Ref), deref(b.Path)
+		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", name, key, repo, ref, path)
 	}
 	_ = tw.Flush()
 	_, _ = fmt.Fprintln(w)
@@ -92,16 +92,6 @@ func deref(p *string) string {
 		return ""
 	}
 	return *p
-}
-
-func printBundleKeyTable(w io.Writer, items []string) {
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(tw, "BUNDLE_KEY")
-	for _, k := range items {
-		_, _ = fmt.Fprintln(tw, k)
-	}
-	_ = tw.Flush()
-	_, _ = fmt.Fprintln(w)
 }
 
 func printContractNameTable(w io.Writer, items []string) {

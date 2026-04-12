@@ -9,6 +9,7 @@ const (
 	CodeInvalidJSONBody             = "INVALID_JSON_BODY"
 	CodeSyncBundleParamsRequired    = "SYNC_BUNDLE_PARAMS_REQUIRED"
 	CodeInvalidBundleKeyPath        = "INVALID_BUNDLE_KEY_PATH"
+	CodeInvalidBundleQueryParams    = "INVALID_BUNDLE_QUERY_PARAMS"
 	CodeInvalidContractNamePath     = "INVALID_CONTRACT_NAME_PATH"
 	CodeContractNotInBundle         = "CONTRACT_NOT_IN_BUNDLE"
 	CodeControllerNotFound          = "CONTROLLER_NOT_FOUND"
@@ -44,6 +45,7 @@ const (
 
 	DetailSyncBundleParamsRequired    = "Fields repository, ref, and bundle are required."
 	DetailInvalidBundleKeyPath        = "The bundle_key path parameter is not valid."
+	DetailInvalidBundleQueryParams    = "Provide either bundle_key or repo and ref (path optional). Do not mix both."
 	DetailInvalidContractNamePath     = "The contract_name path parameter is not valid."
 	DetailContractNotInBundle         = "No contract with this name exists in the bundle."
 	DetailControllerNotFound          = "No controller with this identifier exists."

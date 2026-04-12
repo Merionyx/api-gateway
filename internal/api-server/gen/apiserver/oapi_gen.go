@@ -32,23 +32,18 @@ type App struct {
 	Environments *[]string `json:"environments,omitempty"`
 }
 
-// Bundle defines model for Bundle.
+// Bundle Logical bundle: human-oriented `name` plus `repository`, `ref`, and `path` as reported by controllers.
+// Field `key` is the canonical snapshot key (same string as under the etcd `.../snapshots/` prefix),
+// i.e. `repository` / escaped `ref` / escaped `path`.
 type Bundle struct {
+	// Key Canonical bundle key matching etcd snapshot paths (`repository/escapedRef/escapedPath`).
+	Key *string `json:"key,omitempty"`
+
+	// Name Display / config name (convenience; not necessarily unique globally).
 	Name       *string `json:"name,omitempty"`
 	Path       *string `json:"path,omitempty"`
 	Ref        *string `json:"ref,omitempty"`
 	Repository *string `json:"repository,omitempty"`
-}
-
-// BundleKeyListResponse defines model for BundleKeyListResponse.
-type BundleKeyListResponse struct {
-	HasMore bool `json:"has_more"`
-
-	// Items Bundle keys as stored in etcd.
-	Items []string `json:"items"`
-
-	// NextCursor Opaque cursor for the next page; null or omitted when there is no next page.
-	NextCursor *string `json:"next_cursor,omitempty"`
 }
 
 // BundleRefListResponse defines model for BundleRefListResponse.
@@ -290,8 +285,17 @@ type VersionResponse struct {
 	Release *string `json:"release,omitempty"`
 }
 
-// BundleKey defines model for BundleKey.
-type BundleKey = string
+// BundleKeyQuery defines model for BundleKeyQuery.
+type BundleKeyQuery = string
+
+// BundlePathQuery defines model for BundlePathQuery.
+type BundlePathQuery = string
+
+// BundleRefQuery defines model for BundleRefQuery.
+type BundleRefQuery = string
+
+// BundleRepoQuery defines model for BundleRepoQuery.
+type BundleRepoQuery = string
 
 // ContractName defines model for ContractName.
 type ContractName = string
@@ -367,15 +371,24 @@ type ListBundleKeysParams struct {
 	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
 }
 
-// SyncBundleParams defines parameters for SyncBundle.
-type SyncBundleParams struct {
-	// IdempotencyKey Optional unique key for safely retrying the same logical request. If the server has already
-	// completed a successful operation with this key, it may return the same response without repeating work.
-	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
-}
-
 // ListContractsInBundleParams defines parameters for ListContractsInBundle.
 type ListContractsInBundleParams struct {
+	// BundleKey Optional internal snapshot key (`repository/escapedRef/escapedPath`), same as in etcd paths.
+	// Prefer `repo` + `ref` (+ `path`) for clients. Mutually exclusive with those when both sets would
+	// identify a bundle. Standard query decoding can turn `%2F` into `/`; the server normalizes the
+	// usual over-decoded form when possible. Alternatively encode `%` as `%25` so literal `%2F` survives one decode.
+	BundleKey *BundleKeyQuery `form:"bundle_key,omitempty" json:"bundle_key,omitempty"`
+
+	// Repo Repository identifier (first segment of the bundle key). Use together with `ref`; optional `path`.
+	Repo *BundleRepoQuery `form:"repo,omitempty" json:"repo,omitempty"`
+
+	// Ref Git ref (slashes allowed). Combined with `repo` and optional `path` via the same rules as `bundlekey.Build`.
+	Ref *BundleRefQuery `form:"ref,omitempty" json:"ref,omitempty"`
+
+	// Path Logical bundle root path inside the repository. Omit or leave empty for the default root
+	// (same as `.` in the etcd key segment).
+	Path *BundlePathQuery `form:"path,omitempty" json:"path,omitempty"`
+
 	// Limit Maximum number of items to return (cursor pagination).
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
 
@@ -389,9 +402,32 @@ type ListContractsInBundleParams struct {
 
 // GetContractInBundleParams defines parameters for GetContractInBundle.
 type GetContractInBundleParams struct {
+	// BundleKey Optional internal snapshot key (`repository/escapedRef/escapedPath`), same as in etcd paths.
+	// Prefer `repo` + `ref` (+ `path`) for clients. Mutually exclusive with those when both sets would
+	// identify a bundle. Standard query decoding can turn `%2F` into `/`; the server normalizes the
+	// usual over-decoded form when possible. Alternatively encode `%` as `%25` so literal `%2F` survives one decode.
+	BundleKey *BundleKeyQuery `form:"bundle_key,omitempty" json:"bundle_key,omitempty"`
+
+	// Repo Repository identifier (first segment of the bundle key). Use together with `ref`; optional `path`.
+	Repo *BundleRepoQuery `form:"repo,omitempty" json:"repo,omitempty"`
+
+	// Ref Git ref (slashes allowed). Combined with `repo` and optional `path` via the same rules as `bundlekey.Build`.
+	Ref *BundleRefQuery `form:"ref,omitempty" json:"ref,omitempty"`
+
+	// Path Logical bundle root path inside the repository. Omit or leave empty for the default root
+	// (same as `.` in the etcd key segment).
+	Path *BundlePathQuery `form:"path,omitempty" json:"path,omitempty"`
+
 	// IfNoneMatch Weak or strong ETag from a prior `GET` response. When it matches the current representation,
 	// the server returns `304 Not Modified` with no response body.
 	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
+}
+
+// SyncBundleParams defines parameters for SyncBundle.
+type SyncBundleParams struct {
+	// IdempotencyKey Optional unique key for safely retrying the same logical request. If the server has already
+	// completed a successful operation with this key, it may return the same response without repeating work.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
 // ListControllersParams defines parameters for ListControllers.
@@ -501,18 +537,18 @@ type ServerInterface interface {
 	// JSON Web Key Set (JWKS)
 	// (GET /.well-known/jwks.json)
 	GetJwks(c fiber.Ctx, params GetJwksParams) error
-	// List bundle keys present in etcd
+	// List bundles present in etcd
 	// (GET /api/v1/bundles)
 	ListBundleKeys(c fiber.Ctx, params ListBundleKeysParams) error
+	// List contract names for a bundle key
+	// (GET /api/v1/bundles/contracts)
+	ListContractsInBundle(c fiber.Ctx, params ListContractsInBundleParams) error
+	// Get a single contract document for a bundle
+	// (GET /api/v1/bundles/contracts/{contract_name})
+	GetContractInBundle(c fiber.Ctx, contractName ContractName, params GetContractInBundleParams) error
 	// Trigger contract bundle synchronization (Schemas / bundle sync pipeline)
 	// (POST /api/v1/bundles/sync)
 	SyncBundle(c fiber.Ctx, params SyncBundleParams) error
-	// List contract names for a bundle key
-	// (GET /api/v1/bundles/{bundle_key}/contracts)
-	ListContractsInBundle(c fiber.Ctx, bundleKey BundleKey, params ListContractsInBundleParams) error
-	// Get a single contract document for a bundle
-	// (GET /api/v1/bundles/{bundle_key}/contracts/{contract_name})
-	GetContractInBundle(c fiber.Ctx, bundleKey BundleKey, contractName ContractName, params GetContractInBundleParams) error
 	// Export contract files from Git (via Contract Syncer)
 	// (POST /api/v1/contracts/export)
 	ExportContracts(c fiber.Ctx) error
@@ -644,48 +680,10 @@ func (siw *ServerInterfaceWrapper) ListBundleKeys(c fiber.Ctx) error {
 	return siw.Handler.ListBundleKeys(c, params)
 }
 
-// SyncBundle operation middleware
-func (siw *ServerInterfaceWrapper) SyncBundle(c fiber.Ctx) error {
-
-	var err error
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params SyncBundleParams
-
-	headers := c.GetReqHeaders()
-
-	// ------------- Optional header parameter "Idempotency-Key" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
-		var IdempotencyKey IdempotencyKey
-		n := len(valueList)
-		if n != 1 {
-			return fiber.NewError(fiber.StatusBadRequest, fmt.Sprintf("Too many values for header Idempotency-Key, 1 is required, but %d found", n))
-		}
-
-		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false})
-		if err != nil {
-			return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter Idempotency-Key: %w", err).Error())
-		}
-
-		params.IdempotencyKey = &IdempotencyKey
-
-	}
-
-	return siw.Handler.SyncBundle(c, params)
-}
-
 // ListContractsInBundle operation middleware
 func (siw *ServerInterfaceWrapper) ListContractsInBundle(c fiber.Ctx) error {
 
 	var err error
-
-	// ------------- Path parameter "bundle_key" -------------
-	var bundleKey BundleKey
-
-	err = runtime.BindStyledParameterWithOptions("simple", "bundle_key", c.Params("bundle_key"), &bundleKey, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter bundle_key: %w", err).Error())
-	}
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListContractsInBundleParams
@@ -694,6 +692,34 @@ func (siw *ServerInterfaceWrapper) ListContractsInBundle(c fiber.Ctx) error {
 	query, err = url.ParseQuery(string(c.Request().URI().QueryString()))
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for query string: %w", err).Error())
+	}
+
+	// ------------- Optional query parameter "bundle_key" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "bundle_key", query, &params.BundleKey)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter bundle_key: %w", err).Error())
+	}
+
+	// ------------- Optional query parameter "repo" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "repo", query, &params.Repo)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter repo: %w", err).Error())
+	}
+
+	// ------------- Optional query parameter "ref" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "ref", query, &params.Ref)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter ref: %w", err).Error())
+	}
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "path", query, &params.Path)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter path: %w", err).Error())
 	}
 
 	// ------------- Optional query parameter "limit" -------------
@@ -729,21 +755,13 @@ func (siw *ServerInterfaceWrapper) ListContractsInBundle(c fiber.Ctx) error {
 
 	}
 
-	return siw.Handler.ListContractsInBundle(c, bundleKey, params)
+	return siw.Handler.ListContractsInBundle(c, params)
 }
 
 // GetContractInBundle operation middleware
 func (siw *ServerInterfaceWrapper) GetContractInBundle(c fiber.Ctx) error {
 
 	var err error
-
-	// ------------- Path parameter "bundle_key" -------------
-	var bundleKey BundleKey
-
-	err = runtime.BindStyledParameterWithOptions("simple", "bundle_key", c.Params("bundle_key"), &bundleKey, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter bundle_key: %w", err).Error())
-	}
 
 	// ------------- Path parameter "contract_name" -------------
 	var contractName ContractName
@@ -755,6 +773,40 @@ func (siw *ServerInterfaceWrapper) GetContractInBundle(c fiber.Ctx) error {
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params GetContractInBundleParams
+
+	var query url.Values
+	query, err = url.ParseQuery(string(c.Request().URI().QueryString()))
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for query string: %w", err).Error())
+	}
+
+	// ------------- Optional query parameter "bundle_key" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "bundle_key", query, &params.BundleKey)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter bundle_key: %w", err).Error())
+	}
+
+	// ------------- Optional query parameter "repo" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "repo", query, &params.Repo)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter repo: %w", err).Error())
+	}
+
+	// ------------- Optional query parameter "ref" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "ref", query, &params.Ref)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter ref: %w", err).Error())
+	}
+
+	// ------------- Optional query parameter "path" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "path", query, &params.Path)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter path: %w", err).Error())
+	}
 
 	headers := c.GetReqHeaders()
 
@@ -775,7 +827,37 @@ func (siw *ServerInterfaceWrapper) GetContractInBundle(c fiber.Ctx) error {
 
 	}
 
-	return siw.Handler.GetContractInBundle(c, bundleKey, contractName, params)
+	return siw.Handler.GetContractInBundle(c, contractName, params)
+}
+
+// SyncBundle operation middleware
+func (siw *ServerInterfaceWrapper) SyncBundle(c fiber.Ctx) error {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SyncBundleParams
+
+	headers := c.GetReqHeaders()
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			return fiber.NewError(fiber.StatusBadRequest, fmt.Sprintf("Too many values for header Idempotency-Key, 1 is required, but %d found", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false})
+		if err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, fmt.Errorf("Invalid format for parameter Idempotency-Key: %w", err).Error())
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	return siw.Handler.SyncBundle(c, params)
 }
 
 // ExportContracts operation middleware
@@ -1243,11 +1325,11 @@ func RegisterHandlersWithOptions(router fiber.Router, si ServerInterface, option
 
 	router.Get(options.BaseURL+"/api/v1/bundles", wrapper.ListBundleKeys)
 
+	router.Get(options.BaseURL+"/api/v1/bundles/contracts", wrapper.ListContractsInBundle)
+
+	router.Get(options.BaseURL+"/api/v1/bundles/contracts/:contract_name", wrapper.GetContractInBundle)
+
 	router.Post(options.BaseURL+"/api/v1/bundles/sync", wrapper.SyncBundle)
-
-	router.Get(options.BaseURL+"/api/v1/bundles/:bundle_key/contracts", wrapper.ListContractsInBundle)
-
-	router.Get(options.BaseURL+"/api/v1/bundles/:bundle_key/contracts/:contract_name", wrapper.GetContractInBundle)
 
 	router.Post(options.BaseURL+"/api/v1/contracts/export", wrapper.ExportContracts)
 
@@ -1355,7 +1437,7 @@ type ListBundleKeys200ResponseHeaders struct {
 }
 
 type ListBundleKeys200JSONResponse struct {
-	Body    BundleKeyListResponse
+	Body    BundleRefListResponse
 	Headers ListBundleKeys200ResponseHeaders
 }
 
@@ -1396,67 +1478,8 @@ func (response ListBundleKeys500ApplicationProblemPlusJSONResponse) VisitListBun
 	return ctx.JSON(&response)
 }
 
-type SyncBundleRequestObject struct {
-	Params SyncBundleParams
-	Body   *SyncBundleJSONRequestBody
-}
-
-type SyncBundleResponseObject interface {
-	VisitSyncBundleResponse(ctx fiber.Ctx) error
-}
-
-type SyncBundle200JSONResponse BundleSyncResponse
-
-func (response SyncBundle200JSONResponse) VisitSyncBundleResponse(ctx fiber.Ctx) error {
-	ctx.Response().Header.Set("Content-Type", "application/json")
-	ctx.Status(200)
-
-	return ctx.JSON(&response)
-}
-
-type SyncBundle400ApplicationProblemPlusJSONResponse struct {
-	BadRequestApplicationProblemPlusJSONResponse
-}
-
-func (response SyncBundle400ApplicationProblemPlusJSONResponse) VisitSyncBundleResponse(ctx fiber.Ctx) error {
-	ctx.Response().Header.Set("Content-Type", "application/problem+json")
-	ctx.Status(400)
-
-	return ctx.JSON(&response)
-}
-
-type SyncBundle409ApplicationProblemPlusJSONResponse Problem
-
-func (response SyncBundle409ApplicationProblemPlusJSONResponse) VisitSyncBundleResponse(ctx fiber.Ctx) error {
-	ctx.Response().Header.Set("Content-Type", "application/problem+json")
-	ctx.Status(409)
-
-	return ctx.JSON(&response)
-}
-
-type SyncBundle500ApplicationProblemPlusJSONResponse struct {
-	InternalErrorApplicationProblemPlusJSONResponse
-}
-
-func (response SyncBundle500ApplicationProblemPlusJSONResponse) VisitSyncBundleResponse(ctx fiber.Ctx) error {
-	ctx.Response().Header.Set("Content-Type", "application/problem+json")
-	ctx.Status(500)
-
-	return ctx.JSON(&response)
-}
-
-type SyncBundle502ApplicationProblemPlusJSONResponse Problem
-
-func (response SyncBundle502ApplicationProblemPlusJSONResponse) VisitSyncBundleResponse(ctx fiber.Ctx) error {
-	ctx.Response().Header.Set("Content-Type", "application/problem+json")
-	ctx.Status(502)
-
-	return ctx.JSON(&response)
-}
-
 type ListContractsInBundleRequestObject struct {
-	BundleKey BundleKey `json:"bundle_key"`
-	Params    ListContractsInBundleParams
+	Params ListContractsInBundleParams
 }
 
 type ListContractsInBundleResponseObject interface {
@@ -1521,7 +1544,6 @@ func (response ListContractsInBundle500ApplicationProblemPlusJSONResponse) Visit
 }
 
 type GetContractInBundleRequestObject struct {
-	BundleKey    BundleKey    `json:"bundle_key"`
 	ContractName ContractName `json:"contract_name"`
 	Params       GetContractInBundleParams
 }
@@ -1572,6 +1594,64 @@ type GetContractInBundle500ApplicationProblemPlusJSONResponse struct {
 func (response GetContractInBundle500ApplicationProblemPlusJSONResponse) VisitGetContractInBundleResponse(ctx fiber.Ctx) error {
 	ctx.Response().Header.Set("Content-Type", "application/problem+json")
 	ctx.Status(500)
+
+	return ctx.JSON(&response)
+}
+
+type SyncBundleRequestObject struct {
+	Params SyncBundleParams
+	Body   *SyncBundleJSONRequestBody
+}
+
+type SyncBundleResponseObject interface {
+	VisitSyncBundleResponse(ctx fiber.Ctx) error
+}
+
+type SyncBundle200JSONResponse BundleSyncResponse
+
+func (response SyncBundle200JSONResponse) VisitSyncBundleResponse(ctx fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/json")
+	ctx.Status(200)
+
+	return ctx.JSON(&response)
+}
+
+type SyncBundle400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response SyncBundle400ApplicationProblemPlusJSONResponse) VisitSyncBundleResponse(ctx fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/problem+json")
+	ctx.Status(400)
+
+	return ctx.JSON(&response)
+}
+
+type SyncBundle409ApplicationProblemPlusJSONResponse Problem
+
+func (response SyncBundle409ApplicationProblemPlusJSONResponse) VisitSyncBundleResponse(ctx fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/problem+json")
+	ctx.Status(409)
+
+	return ctx.JSON(&response)
+}
+
+type SyncBundle500ApplicationProblemPlusJSONResponse struct {
+	InternalErrorApplicationProblemPlusJSONResponse
+}
+
+func (response SyncBundle500ApplicationProblemPlusJSONResponse) VisitSyncBundleResponse(ctx fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/problem+json")
+	ctx.Status(500)
+
+	return ctx.JSON(&response)
+}
+
+type SyncBundle502ApplicationProblemPlusJSONResponse Problem
+
+func (response SyncBundle502ApplicationProblemPlusJSONResponse) VisitSyncBundleResponse(ctx fiber.Ctx) error {
+	ctx.Response().Header.Set("Content-Type", "application/problem+json")
+	ctx.Status(502)
 
 	return ctx.JSON(&response)
 }
@@ -2249,18 +2329,18 @@ type StrictServerInterface interface {
 	// JSON Web Key Set (JWKS)
 	// (GET /.well-known/jwks.json)
 	GetJwks(ctx context.Context, request GetJwksRequestObject) (GetJwksResponseObject, error)
-	// List bundle keys present in etcd
+	// List bundles present in etcd
 	// (GET /api/v1/bundles)
 	ListBundleKeys(ctx context.Context, request ListBundleKeysRequestObject) (ListBundleKeysResponseObject, error)
+	// List contract names for a bundle key
+	// (GET /api/v1/bundles/contracts)
+	ListContractsInBundle(ctx context.Context, request ListContractsInBundleRequestObject) (ListContractsInBundleResponseObject, error)
+	// Get a single contract document for a bundle
+	// (GET /api/v1/bundles/contracts/{contract_name})
+	GetContractInBundle(ctx context.Context, request GetContractInBundleRequestObject) (GetContractInBundleResponseObject, error)
 	// Trigger contract bundle synchronization (Schemas / bundle sync pipeline)
 	// (POST /api/v1/bundles/sync)
 	SyncBundle(ctx context.Context, request SyncBundleRequestObject) (SyncBundleResponseObject, error)
-	// List contract names for a bundle key
-	// (GET /api/v1/bundles/{bundle_key}/contracts)
-	ListContractsInBundle(ctx context.Context, request ListContractsInBundleRequestObject) (ListContractsInBundleResponseObject, error)
-	// Get a single contract document for a bundle
-	// (GET /api/v1/bundles/{bundle_key}/contracts/{contract_name})
-	GetContractInBundle(ctx context.Context, request GetContractInBundleRequestObject) (GetContractInBundleResponseObject, error)
 	// Export contract files from Git (via Contract Syncer)
 	// (POST /api/v1/contracts/export)
 	ExportContracts(ctx context.Context, request ExportContractsRequestObject) (ExportContractsResponseObject, error)
@@ -2372,6 +2452,61 @@ func (sh *strictHandler) ListBundleKeys(ctx fiber.Ctx, params ListBundleKeysPara
 	return nil
 }
 
+// ListContractsInBundle operation middleware
+func (sh *strictHandler) ListContractsInBundle(ctx fiber.Ctx, params ListContractsInBundleParams) error {
+	var request ListContractsInBundleRequestObject
+
+	request.Params = params
+
+	handler := func(ctx fiber.Ctx, request interface{}) (interface{}, error) {
+		return sh.ssi.ListContractsInBundle(ctx.Context(), request.(ListContractsInBundleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListContractsInBundle")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	} else if validResponse, ok := response.(ListContractsInBundleResponseObject); ok {
+		if err := validResponse.VisitListContractsInBundleResponse(ctx); err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		}
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// GetContractInBundle operation middleware
+func (sh *strictHandler) GetContractInBundle(ctx fiber.Ctx, contractName ContractName, params GetContractInBundleParams) error {
+	var request GetContractInBundleRequestObject
+
+	request.ContractName = contractName
+	request.Params = params
+
+	handler := func(ctx fiber.Ctx, request interface{}) (interface{}, error) {
+		return sh.ssi.GetContractInBundle(ctx.Context(), request.(GetContractInBundleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetContractInBundle")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	} else if validResponse, ok := response.(GetContractInBundleResponseObject); ok {
+		if err := validResponse.VisitGetContractInBundleResponse(ctx); err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		}
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
 // SyncBundle operation middleware
 func (sh *strictHandler) SyncBundle(ctx fiber.Ctx, params SyncBundleParams) error {
 	var request SyncBundleRequestObject
@@ -2397,63 +2532,6 @@ func (sh *strictHandler) SyncBundle(ctx fiber.Ctx, params SyncBundleParams) erro
 		return fiber.NewError(fiber.StatusBadRequest, err.Error())
 	} else if validResponse, ok := response.(SyncBundleResponseObject); ok {
 		if err := validResponse.VisitSyncBundleResponse(ctx); err != nil {
-			return fiber.NewError(fiber.StatusBadRequest, err.Error())
-		}
-	} else if response != nil {
-		return fmt.Errorf("unexpected response type: %T", response)
-	}
-	return nil
-}
-
-// ListContractsInBundle operation middleware
-func (sh *strictHandler) ListContractsInBundle(ctx fiber.Ctx, bundleKey BundleKey, params ListContractsInBundleParams) error {
-	var request ListContractsInBundleRequestObject
-
-	request.BundleKey = bundleKey
-	request.Params = params
-
-	handler := func(ctx fiber.Ctx, request interface{}) (interface{}, error) {
-		return sh.ssi.ListContractsInBundle(ctx.Context(), request.(ListContractsInBundleRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ListContractsInBundle")
-	}
-
-	response, err := handler(ctx, request)
-
-	if err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, err.Error())
-	} else if validResponse, ok := response.(ListContractsInBundleResponseObject); ok {
-		if err := validResponse.VisitListContractsInBundleResponse(ctx); err != nil {
-			return fiber.NewError(fiber.StatusBadRequest, err.Error())
-		}
-	} else if response != nil {
-		return fmt.Errorf("unexpected response type: %T", response)
-	}
-	return nil
-}
-
-// GetContractInBundle operation middleware
-func (sh *strictHandler) GetContractInBundle(ctx fiber.Ctx, bundleKey BundleKey, contractName ContractName, params GetContractInBundleParams) error {
-	var request GetContractInBundleRequestObject
-
-	request.BundleKey = bundleKey
-	request.ContractName = contractName
-	request.Params = params
-
-	handler := func(ctx fiber.Ctx, request interface{}) (interface{}, error) {
-		return sh.ssi.GetContractInBundle(ctx.Context(), request.(GetContractInBundleRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetContractInBundle")
-	}
-
-	response, err := handler(ctx, request)
-
-	if err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, err.Error())
-	} else if validResponse, ok := response.(GetContractInBundleResponseObject); ok {
-		if err := validResponse.VisitGetContractInBundleResponse(ctx); err != nil {
 			return fiber.NewError(fiber.StatusBadRequest, err.Error())
 		}
 	} else if response != nil {
@@ -2850,113 +2928,122 @@ func (sh *strictHandler) GetReady(ctx fiber.Ctx) error {
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"bXIAAA==",
+	"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",
+	"aHCvAf++/vH6/wMAAP//MwEjM9N4AAA=",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
