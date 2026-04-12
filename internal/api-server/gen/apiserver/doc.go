@@ -15,6 +15,10 @@
 //
 // The spec is pinned to OpenAPI 3.0.x for compatibility with oapi-codegen v2 (3.1 unions such as
 // type: [string, null] are not supported).
+//
+// The `swaggerSpec` blob in oapi_gen.go must be regenerated together with the rest of the file; if it
+// drifts, GET handlers stay correct but GetSwagger / request validation may show an older document until
+// you run codegen with embedded-spec enabled.
 package apiserver
 
 //go:generate oapi-codegen -config oapi-codegen.yaml -o oapi_gen.go ../../../../apis/rest/api-server/openapi.yaml

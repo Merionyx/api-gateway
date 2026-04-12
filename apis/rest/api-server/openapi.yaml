@@ -103,13 +103,38 @@ components:
       description: Tenant name.
       schema:
         type: string
-    BundleKey:
+    BundleKeyQuery:
       name: bundle_key
-      in: path
-      required: true
+      in: query
+      required: false
       description: |
-        Bundle key as used in etcd snapshot paths. **Must be URL-safe:** pass a percent-encoded value
-        if the key contains reserved characters (`/`, `%`, etc.).
+        Optional internal snapshot key (`repository/escapedRef/escapedPath`), same as in etcd paths.
+        Prefer `repo` + `ref` (+ `path`) for clients. Mutually exclusive with those when both sets would
+        identify a bundle. Standard query decoding can turn `%2F` into `/`; the server normalizes the
+        usual over-decoded form when possible. Alternatively encode `%` as `%25` so literal `%2F` survives one decode.
+      schema:
+        type: string
+    BundleRepoQuery:
+      name: repo
+      in: query
+      required: false
+      description: Repository identifier (first segment of the bundle key). Use together with `ref`; optional `path`.
+      schema:
+        type: string
+    BundleRefQuery:
+      name: ref
+      in: query
+      required: false
+      description: Git ref (slashes allowed). Combined with `repo` and optional `path` via the same rules as `bundlekey.Build`.
+      schema:
+        type: string
+    BundlePathQuery:
+      name: path
+      in: query
+      required: false
+      description: |
+        Logical bundle root path inside the repository. Omit or leave empty for the default root
+        (same as `.` in the etcd key segment).
       schema:
         type: string
     ContractName:
@@ -358,9 +383,17 @@ components:
 
     Bundle:
       type: object
+      description: |
+        Logical bundle: human-oriented `name` plus `repository`, `ref`, and `path` as reported by controllers.
+        Field `key` is the canonical snapshot key (same string as under the etcd `.../snapshots/` prefix),
+        i.e. `repository` / escaped `ref` / escaped `path`.
       properties:
+        key:
+          type: string
+          description: Canonical bundle key matching etcd snapshot paths (`repository/escapedRef/escapedPath`).
         name:
           type: string
+          description: Display / config name (convenience; not necessarily unique globally).
         repository:
           type: string
         ref:
@@ -467,24 +500,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Bundle'
-        next_cursor:
-          type: string
-          nullable: true
-          description: Opaque cursor for the next page; null or omitted when there is no next page.
-        has_more:
-          type: boolean
-
-    BundleKeyListResponse:
-      type: object
-      required:
-      - items
-      - has_more
-      properties:
-        items:
-          type: array
-          items:
-            type: string
-          description: Bundle keys as stored in etcd.
         next_cursor:
           type: string
           nullable: true
@@ -999,23 +1014,23 @@ paths:
     get:
       tags: [ Bundles ]
       operationId: listBundleKeys
-      summary: List bundle keys present in etcd
+      summary: List bundles present in etcd
       description: |
-        Lists bundle key strings that exist under the API Server’s contract snapshot prefix in etcd. Paginated; keys may require percent-encoding when used as path segments elsewhere.
+        Lists bundles that exist under the API Server’s contract snapshot prefix in etcd (`repository`, `ref`, `path`, canonical `key`). Paginated; the `key` may require percent-encoding when used as path segments elsewhere.
       parameters:
       - $ref: '#/components/parameters/Limit'
       - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
-          description: Paginated bundle keys
+          description: Paginated bundle descriptors (etcd snapshot roots)
           headers:
             ETag:
               $ref: '#/components/headers/ETag'
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BundleKeyListResponse'
+                $ref: '#/components/schemas/BundleRefListResponse'
         '304':
           $ref: '#/components/responses/NotModified'
         '400':
@@ -1023,15 +1038,21 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/bundles/{bundle_key}/contracts:
+  /api/v1/bundles/contracts:
     get:
       tags: [ Bundles ]
       operationId: listContractsInBundle
       summary: List contract names for a bundle key
       description: |
-        Returns logical contract names stored for the given `bundle_key` in etcd. Paginated list; use `GET .../contracts/{contract_name}` for full document bodies.
+        Returns logical contract names stored for the bundle in etcd. Identify the bundle either with
+        query parameter `bundle_key` (full key as in list bundle keys) **or** with `repo` and `ref`
+        (and optional `path`) — same composition as elsewhere in this API. Paginated list; use
+        `GET .../contracts/{contract_name}` for full document bodies.
       parameters:
-      - $ref: '#/components/parameters/BundleKey'
+      - $ref: '#/components/parameters/BundleKeyQuery'
+      - $ref: '#/components/parameters/BundleRepoQuery'
+      - $ref: '#/components/parameters/BundleRefQuery'
+      - $ref: '#/components/parameters/BundlePathQuery'
       - $ref: '#/components/parameters/Limit'
       - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/IfNoneMatch'
@@ -1054,16 +1075,19 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/bundles/{bundle_key}/contracts/{contract_name}:
+  /api/v1/bundles/contracts/{contract_name}:
     get:
       tags: [ Bundles ]
       operationId: getContractInBundle
       summary: Get a single contract document for a bundle
       description: |
-        Returns one contract document from etcd-backed storage for the bundle key (JSON object; YAML sources may be normalized to JSON). Supports `If-None-Match` for caching. `404` if the bundle or contract is missing.
+        Returns one contract document from etcd-backed storage for the bundle (JSON object; YAML sources may be normalized to JSON). Identify the bundle with `bundle_key` **or** `repo` + `ref` (+ optional `path`) query parameters, same as `listContractsInBundle`. Supports `If-None-Match` for caching. `404` if the bundle or contract is missing.
       parameters:
-      - $ref: '#/components/parameters/BundleKey'
       - $ref: '#/components/parameters/ContractName'
+      - $ref: '#/components/parameters/BundleKeyQuery'
+      - $ref: '#/components/parameters/BundleRepoQuery'
+      - $ref: '#/components/parameters/BundleRefQuery'
+      - $ref: '#/components/parameters/BundlePathQuery'
       - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':

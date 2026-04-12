@@ -12,7 +12,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/merionyx/api-gateway/internal/cli/apiclient"
+	apiclient "github.com/merionyx/api-gateway/internal/cli/apiserver"
+	"github.com/merionyx/api-gateway/internal/cli/apiserver/httpapi"
 	"github.com/merionyx/api-gateway/internal/cli/convertfmt"
 	"github.com/merionyx/api-gateway/internal/cli/style"
 
@@ -61,14 +62,14 @@ func Compare(ctx context.Context, o Options) (Summary, error) {
 	if o.HTTPClient == nil {
 		o.HTTPClient = http.DefaultClient
 	}
-	remoteFiles, err := apiclient.ExportContracts(ctx, o.HTTPClient, o.ServerURL, o.Request)
+	remoteFiles, err := httpapi.ExportContracts(ctx, o.HTTPClient, o.ServerURL, o.Request)
 	if err != nil {
 		return Summary{}, err
 	}
 
 	remote := make(map[string]remoteEntry)
 	for _, f := range remoteFiles {
-		raw, err := apiclient.DecodePayload(f)
+		raw, err := httpapi.DecodePayload(f)
 		if err != nil {
 			return Summary{}, fmt.Errorf("decode %s: %w", f.ContractName, err)
 		}
@@ -95,11 +96,11 @@ func Compare(ctx context.Context, o Options) (Summary, error) {
 	_, _ = fmt.Fprintln(o.Out)
 	printKV(o.Out, o.Color, "Repository", o.Request.Repository)
 	printKV(o.Out, o.Color, "Ref", o.Request.Ref)
-	if strings.TrimSpace(o.Request.Path) != "" {
-		printKV(o.Out, o.Color, "Path", o.Request.Path)
+	if p := apiclient.ExportRequestPath(o.Request); p != "" {
+		printKV(o.Out, o.Color, "Path", p)
 	}
-	if strings.TrimSpace(o.Request.ContractName) != "" {
-		printKV(o.Out, o.Color, "Contract", o.Request.ContractName)
+	if c := apiclient.ExportRequestContractName(o.Request); c != "" {
+		printKV(o.Out, o.Color, "Contract", c)
 	}
 	printKV(o.Out, o.Color, "Target", o.Target)
 	_, _ = fmt.Fprintln(o.Out)

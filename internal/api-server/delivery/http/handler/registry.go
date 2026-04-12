@@ -17,6 +17,7 @@ import (
 	apimetrics "github.com/merionyx/api-gateway/internal/api-server/metrics"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/bundle"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/registry"
+	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
 	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 )
 
@@ -57,7 +58,16 @@ func (h *RegistryHandler) ListBundleKeys(c fiber.Ctx, params apiserver.ListBundl
 	if err != nil {
 		return problem.RespondError(c, err)
 	}
-	body := apiserver.BundleKeyListResponse{Items: items, HasMore: hasMore, NextCursor: next}
+	apiItems := make([]apiserver.Bundle, 0, len(items))
+	for _, key := range items {
+		b, err := bundleFromCanonicalKey(key)
+		if err != nil {
+			slog.Warn("skip invalid bundle key from etcd", "key", key, "err", err)
+			continue
+		}
+		apiItems = append(apiItems, b)
+	}
+	body := apiserver.BundleRefListResponse{Items: apiItems, HasMore: hasMore, NextCursor: next}
 	etag, err := jsonETag(body)
 	if err != nil {
 		return problem.RespondError(c, err)
@@ -145,10 +155,10 @@ func logHTTPProblem(st int, p *apiserver.Problem, cause error) {
 	slog.Error("http problem response", "status", st, "code", code, "err", cause)
 }
 
-func (h *RegistryHandler) ListContractsInBundle(c fiber.Ctx, bundleKey apiserver.BundleKey, params apiserver.ListContractsInBundleParams) error {
-	bk, err := url.PathUnescape(string(bundleKey))
+func (h *RegistryHandler) ListContractsInBundle(c fiber.Ctx, params apiserver.ListContractsInBundleParams) error {
+	bk, err := bundleKeyFromContractBundleParams(params.BundleKey, params.Repo, params.Ref, params.Path)
 	if err != nil {
-		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidBundleKeyPath, "", problem.DetailInvalidBundleKeyPath))
+		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidBundleQueryParams, "", problem.DetailInvalidBundleQueryParams))
 	}
 	items, next, hasMore, err := h.bundles.ListContractNames(c.Context(), bk, params.Limit, params.Cursor)
 	if err != nil {
@@ -167,10 +177,10 @@ func (h *RegistryHandler) ListContractsInBundle(c fiber.Ctx, bundleKey apiserver
 	return c.JSON(body)
 }
 
-func (h *RegistryHandler) GetContractInBundle(c fiber.Ctx, bundleKey apiserver.BundleKey, contractName apiserver.ContractName, params apiserver.GetContractInBundleParams) error {
-	bk, err := url.PathUnescape(string(bundleKey))
+func (h *RegistryHandler) GetContractInBundle(c fiber.Ctx, contractName apiserver.ContractName, params apiserver.GetContractInBundleParams) error {
+	bk, err := bundleKeyFromContractBundleParams(params.BundleKey, params.Repo, params.Ref, params.Path)
 	if err != nil {
-		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidBundleKeyPath, "", problem.DetailInvalidBundleKeyPath))
+		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidBundleQueryParams, "", problem.DetailInvalidBundleQueryParams))
 	}
 	cn, err := url.PathUnescape(string(contractName))
 	if err != nil {
@@ -384,16 +394,7 @@ func controllerToAPI(c models.ControllerInfo) apiserver.Controller {
 	for _, e := range c.Environments {
 		bundles := make([]apiserver.Bundle, 0, len(e.Bundles))
 		for _, b := range e.Bundles {
-			nm := b.Name
-			repo := b.Repository
-			ref := b.Ref
-			path := b.Path
-			bundles = append(bundles, apiserver.Bundle{
-				Name:       &nm,
-				Repository: &repo,
-				Ref:        &ref,
-				Path:       &path,
-			})
+			bundles = append(bundles, bundleToAPI(b))
 		}
 		envs = append(envs, apiserver.Environment{Name: e.Name, Bundles: &bundles})
 	}
@@ -407,18 +408,24 @@ func controllerToAPI(c models.ControllerInfo) apiserver.Controller {
 func environmentToAPI(e models.EnvironmentInfo) apiserver.Environment {
 	bundles := make([]apiserver.Bundle, 0, len(e.Bundles))
 	for _, b := range e.Bundles {
-		nm := b.Name
-		repo := b.Repository
-		ref := b.Ref
-		path := b.Path
-		bundles = append(bundles, apiserver.Bundle{
-			Name:       &nm,
-			Repository: &repo,
-			Ref:        &ref,
-			Path:       &path,
-		})
+		bundles = append(bundles, bundleToAPI(b))
 	}
 	return apiserver.Environment{Name: e.Name, Bundles: &bundles}
+}
+
+func bundleFromCanonicalKey(bundleKey string) (apiserver.Bundle, error) {
+	repo, ref, path, err := bundlekey.Parse(bundleKey)
+	if err != nil {
+		return apiserver.Bundle{}, err
+	}
+	k := bundlekey.Build(repo, ref, path)
+	repoP, refP, pathP := repo, ref, path
+	return apiserver.Bundle{
+		Key:        &k,
+		Repository: &repoP,
+		Ref:        &refP,
+		Path:       &pathP,
+	}, nil
 }
 
 func bundleToAPI(b models.BundleInfo) apiserver.Bundle {
@@ -426,7 +433,9 @@ func bundleToAPI(b models.BundleInfo) apiserver.Bundle {
 	repo := b.Repository
 	ref := b.Ref
 	path := b.Path
+	k := bundlekey.Build(b.Repository, b.Ref, b.Path)
 	return apiserver.Bundle{
+		Key:        &k,
 		Name:       &nm,
 		Repository: &repo,
 		Ref:        &ref,
@@ -446,4 +455,26 @@ func snapshotsToAPI(in []sharedgit.ContractSnapshot) ([]apiserver.ContractSnapsh
 		}
 	}
 	return out, nil
+}
+
+func bundleKeyFromContractBundleParams(
+	bk *apiserver.BundleKeyQuery,
+	repo *apiserver.BundleRepoQuery,
+	ref *apiserver.BundleRefQuery,
+	path *apiserver.BundlePathQuery,
+) (string, error) {
+	var kb, r, f, p string
+	if bk != nil {
+		kb = string(*bk)
+	}
+	if repo != nil {
+		r = string(*repo)
+	}
+	if ref != nil {
+		f = string(*ref)
+	}
+	if path != nil {
+		p = string(*path)
+	}
+	return bundlekey.ResolveFromHTTPQuery(kb, r, f, p)
 }

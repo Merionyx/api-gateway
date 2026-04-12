@@ -158,12 +158,12 @@ func (r *SnapshotRepository) ListBundleKeys(ctx context.Context) ([]string, erro
 
 	bundleKeysMap := make(map[string]bool)
 	for _, kv := range resp.Kvs {
-		key := string(kv.Key)
-		key = strings.TrimPrefix(key, snapshotPrefix)
-		parts := strings.Split(key, "/")
-		if len(parts) > 0 {
-			bundleKeysMap[parts[0]] = true
+		rel := strings.TrimPrefix(string(kv.Key), snapshotPrefix)
+		bk, ok := bundleKeyFromSnapshotRelativeKey(rel)
+		if !ok {
+			continue
 		}
+		bundleKeysMap[bk] = true
 	}
 
 	var bundleKeys []string
@@ -172,4 +172,14 @@ func (r *SnapshotRepository) ListBundleKeys(ctx context.Context) ([]string, erro
 	}
 
 	return bundleKeys, nil
+}
+
+// bundleKeyFromSnapshotRelativeKey returns the bundle key from a key path relative to snapshotPrefix
+// (e.g. "repo/remotes%2Forigin%2Fmaster/openapi/contracts/global.json").
+func bundleKeyFromSnapshotRelativeKey(rel string) (string, bool) {
+	idx := strings.Index(rel, "/contracts/")
+	if idx <= 0 {
+		return "", false
+	}
+	return rel[:idx], true
 }

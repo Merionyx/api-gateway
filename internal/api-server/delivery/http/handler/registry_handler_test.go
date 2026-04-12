@@ -121,7 +121,9 @@ func testSnap() sharedgit.ContractSnapshot {
 
 func TestRegistryHandler_ListBundleKeys_OK(t *testing.T) {
 	t.Parallel()
-	snap := &snapRepoStub{keys: []string{"a", "b"}}
+	k1 := "repo1/remotes%2Forigin%2Fmaster/."
+	k2 := "repo2/feature%2Fbranch/openapi"
+	snap := &snapRepoStub{keys: []string{k1, k2}}
 	h := NewRegistryHandler(
 		bundle.NewBundleReadUseCase(snap),
 		registry.NewControllerReadUseCase(&ctlRepoStub{}),
@@ -143,12 +145,15 @@ func TestRegistryHandler_ListBundleKeys_OK(t *testing.T) {
 	if resp.StatusCode != fiber.StatusOK {
 		t.Fatalf("status %d", resp.StatusCode)
 	}
-	var body apiserver.BundleKeyListResponse
+	var body apiserver.BundleRefListResponse
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		t.Fatal(err)
 	}
 	if len(body.Items) != 2 {
 		t.Fatalf("items %#v", body.Items)
+	}
+	if body.Items[0].Key == nil || *body.Items[0].Key != k1 {
+		t.Fatalf("first key %#v want %q", body.Items[0].Key, k1)
 	}
 }
 
@@ -410,7 +415,8 @@ func TestRegistryHandler_GetContractInBundle_notFound(t *testing.T) {
 	)
 	app := fiber.New()
 	app.Get("/doc", func(c fiber.Ctx) error {
-		return h.GetContractInBundle(c, apiserver.BundleKey(bk), "missing", apiserver.GetContractInBundleParams{})
+		bkq := apiserver.BundleKeyQuery(bk)
+		return h.GetContractInBundle(c, "missing", apiserver.GetContractInBundleParams{BundleKey: &bkq})
 	})
 	resp, err := app.Test(httptest.NewRequest(fiber.MethodGet, "/doc", nil))
 	if err != nil {
@@ -456,6 +462,10 @@ func TestControllerToAPI_bundleToAPI_environmentToAPI(t *testing.T) {
 	b := bundleToAPI(models.BundleInfo{Name: "n", Repository: "r", Ref: "x", Path: "y"})
 	if b.Name == nil || *b.Name != "n" {
 		t.Fatal()
+	}
+	wantKey := bundlekey.Build("r", "x", "y")
+	if b.Key == nil || *b.Key != wantKey {
+		t.Fatalf("key: got %v want %q", b.Key, wantKey)
 	}
 }
 

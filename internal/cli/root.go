@@ -29,7 +29,7 @@ func Execute() {
 
 var rootCmd = &cobra.Command{
 	Use:           "agwctl",
-	Short:         "Merionyx API Gateway control CLI",
+	Short:         "\nMerionyx API Gateway control CLI",
 	SilenceUsage:  true,
 	SilenceErrors: true, // print errors only once in Execute (stderr), not again as "Error:" from cobra
 }
@@ -46,8 +46,10 @@ func init() {
 		return config.ResolveServerURL(contextName, serverOverride)
 	}
 	rootCmd.AddCommand(command.NewContractCommand(resolveServer))
-	rootCmd.AddCommand(command.NewPingCommand(resolveServer))
+	rootCmd.AddCommand(command.NewServerCommand(resolveServer))
 	rootCmd.AddCommand(command.NewConfigCommand())
 	rootCmd.AddCommand(command.NewVersionCommand())
 	rootCmd.AddCommand(command.NewValidateCommand())
+	rootCmd.AddCommand(command.NewListCommand(resolveServer))
+	rootCmd.AddCommand(command.NewDescribeCommand(resolveServer))
 }
