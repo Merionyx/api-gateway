@@ -46,7 +46,7 @@ func init() {
 		return config.ResolveServerURL(contextName, serverOverride)
 	}
 	rootCmd.AddCommand(command.NewContractCommand(resolveServer))
-	rootCmd.AddCommand(command.NewPingCommand(resolveServer))
+	rootCmd.AddCommand(command.NewServerCommand(resolveServer))
 	rootCmd.AddCommand(command.NewConfigCommand())
 	rootCmd.AddCommand(command.NewVersionCommand())
 	rootCmd.AddCommand(command.NewValidateCommand())
