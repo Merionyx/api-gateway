@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	apiclient "github.com/merionyx/api-gateway/internal/cli/apiserver"
+	"github.com/merionyx/api-gateway/internal/cli/apiserver/httpapi"
 	"github.com/merionyx/api-gateway/internal/cli/contractfmt"
 	"github.com/merionyx/api-gateway/internal/cli/convertfmt"
 )
@@ -25,7 +26,7 @@ func WriteExported(files []apiclient.ExportFile, outDir, formatFlag string) erro
 		return err
 	}
 	for _, f := range files {
-		raw, err := apiclient.DecodePayload(f)
+		raw, err := httpapi.DecodePayload(f)
 		if err != nil {
 			return fmt.Errorf("file %s: %w", f.ContractName, err)
 		}

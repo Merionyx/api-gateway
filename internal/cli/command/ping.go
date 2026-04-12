@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	apiclient "github.com/merionyx/api-gateway/internal/cli/apiserver"
+	"github.com/merionyx/api-gateway/internal/cli/apiserver/httpapi"
 
 	"github.com/spf13/cobra"
 )
@@ -23,7 +23,7 @@ func NewPingCommand(resolveServer func() (string, error)) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := apiclient.PingDefaultTimeout(context.Background(), httpClient, server); err != nil {
+			if err := httpapi.PingDefaultTimeout(context.Background(), httpClient, server); err != nil {
 				return fmt.Errorf("ping %s: %w", server, err)
 			}
 			out := cmd.OutOrStdout()

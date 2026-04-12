@@ -1,9 +1,9 @@
 // Package apiserverclient contains OpenAPI-derived request/response types and an HTTP client
-// for the API Server REST API. Intended for agwctl; not wired into commands yet.
+// for the API Server REST API (used by internal/cli/apiserver helpers).
 //
 // Regenerate after editing the spec (from repo root):
 //
-//	go generate -run oapi-codegen ./internal/cli/apiclient/gen/apiserverclient
+//	go generate -run oapi-codegen ./internal/cli/apiserver/client
 //
 // go generate runs each command with the working directory set to this package’s directory, so
 // -o client_gen.go in the directive always writes next to this file.

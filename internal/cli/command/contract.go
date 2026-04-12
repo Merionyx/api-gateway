@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	apiclient "github.com/merionyx/api-gateway/internal/cli/apiserver"
+	"github.com/merionyx/api-gateway/internal/cli/apiserver/httpapi"
 	"github.com/merionyx/api-gateway/internal/cli/contractdiff"
 	"github.com/merionyx/api-gateway/internal/cli/contractfmt"
 	"github.com/merionyx/api-gateway/internal/cli/outfiles"
@@ -212,13 +213,8 @@ func newExportCmd(resolveServer func() (string, error)) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			req := apiclient.ExportRequest{
-				Repository:   repo,
-				Ref:          ref,
-				Path:         path,
-				ContractName: contract,
-			}
-			files, err := apiclient.ExportContracts(context.Background(), httpClient, server, req)
+			req := apiclient.NewExportRequest(repo, ref, path, contract)
+			files, err := httpapi.ExportContracts(context.Background(), httpClient, server, req)
 			if err != nil {
 				return err
 			}
@@ -281,13 +277,8 @@ func newExportBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 					continue
 				}
 				dest := batchItemDest(out, it)
-				req := apiclient.ExportRequest{
-					Repository:   it.Repository,
-					Ref:          it.Ref,
-					Path:         it.Path,
-					ContractName: batchItemExportContract(it),
-				}
-				files, err := apiclient.ExportContracts(context.Background(), httpClient, server, req)
+				req := apiclient.NewExportRequest(it.Repository, it.Ref, it.Path, batchItemExportContract(it))
+				files, err := httpapi.ExportContracts(context.Background(), httpClient, server, req)
 				if err != nil {
 					logf("batch[%d] %s@%s: %v", i, it.Repository, it.Ref, err)
 					continue
@@ -340,12 +331,7 @@ func newDiffCmd(resolveServer func() (string, error)) *cobra.Command {
 				Target:     target,
 				ServerURL:  server,
 				HTTPClient: httpClient,
-				Request: apiclient.ExportRequest{
-					Repository:   repo,
-					Ref:          ref,
-					Path:         path,
-					ContractName: contract,
-				},
+				Request: apiclient.NewExportRequest(repo, ref, path, contract),
 				Out:   out,
 				Color: color,
 			})
@@ -411,12 +397,7 @@ func newDiffBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 					Target:     itemTarget,
 					ServerURL:  server,
 					HTTPClient: httpClient,
-					Request: apiclient.ExportRequest{
-						Repository:   it.Repository,
-						Ref:          it.Ref,
-						Path:         it.Path,
-						ContractName: batchItemExportContract(it),
-					},
+					Request: apiclient.NewExportRequest(it.Repository, it.Ref, it.Path, batchItemExportContract(it)),
 					Out:   out,
 					Color: color,
 				})
