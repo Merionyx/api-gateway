@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/merionyx/api-gateway/internal/cli/apiserver/httpapi"
+	"github.com/merionyx/api-gateway/internal/cli/style"
 
 	"github.com/spf13/cobra"
 )
@@ -27,8 +28,9 @@ func NewPingCommand(resolveServer func() (string, error)) *cobra.Command {
 				return fmt.Errorf("ping %s: %w", server, err)
 			}
 			out := cmd.OutOrStdout()
+			color := style.UseColorFor(out)
 			_, _ = fmt.Fprintln(out)
-			_, _ = fmt.Fprintf(out, "ok %s\n", server)
+			_, _ = fmt.Fprintf(out, "%s %s %s\n", style.S(color, style.Green, markOK), style.S(color, style.Green, "ok"), server)
 			return nil
 		},
 	}
