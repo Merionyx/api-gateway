@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/merionyx/api-gateway/internal/cli/apiclient"
+	apiclient "github.com/merionyx/api-gateway/internal/cli/apiserver"
 	"github.com/merionyx/api-gateway/internal/cli/contractfmt"
 	"github.com/merionyx/api-gateway/internal/cli/convertfmt"
 )

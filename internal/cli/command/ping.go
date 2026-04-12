@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/merionyx/api-gateway/internal/cli/apiclient"
+	apiclient "github.com/merionyx/api-gateway/internal/cli/apiserver"
 
 	"github.com/spf13/cobra"
 )

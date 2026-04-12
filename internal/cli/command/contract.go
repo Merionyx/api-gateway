@@ -14,7 +14,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/merionyx/api-gateway/internal/cli/apiclient"
+	apiclient "github.com/merionyx/api-gateway/internal/cli/apiserver"
 	"github.com/merionyx/api-gateway/internal/cli/contractdiff"
 	"github.com/merionyx/api-gateway/internal/cli/contractfmt"
 	"github.com/merionyx/api-gateway/internal/cli/outfiles"

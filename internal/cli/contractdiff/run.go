@@ -12,7 +12,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/merionyx/api-gateway/internal/cli/apiclient"
+	apiclient "github.com/merionyx/api-gateway/internal/cli/apiserver"
 	"github.com/merionyx/api-gateway/internal/cli/convertfmt"
 	"github.com/merionyx/api-gateway/internal/cli/style"
 

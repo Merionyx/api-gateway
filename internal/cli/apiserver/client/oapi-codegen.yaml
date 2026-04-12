@@ -1,0 +1,7 @@
+# HTTP client + models for agwctl (OpenAPI-derived). Server lives in internal/api-server/gen/apiserver.
+# Output path is set on the go:generate line in doc.go (cwd = this directory).
+
+package: apiserverclient
+generate:
+  models: true
+  client: true
