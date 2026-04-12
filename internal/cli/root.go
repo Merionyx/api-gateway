@@ -50,5 +50,4 @@ func init() {
 	rootCmd.AddCommand(command.NewConfigCommand())
 	rootCmd.AddCommand(command.NewVersionCommand())
 	rootCmd.AddCommand(command.NewValidateCommand())
-	rootCmd.AddCommand(command.NewDescribeFormatTryCommand())
 }
