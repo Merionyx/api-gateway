@@ -45,7 +45,10 @@ func (b *xdsBuilder) BuildClusters(env *models.Environment) ([]*clusterv3.Cluste
 
 	// 4. Create clusters for services
 	for serviceName, upstream := range uniqueServices {
-		cluster := buildCluster(serviceName, upstream)
+		cluster, err := buildCluster(serviceName, upstream)
+		if err != nil {
+			return nil, err
+		}
 		clusters = append(clusters, cluster)
 	}
 
@@ -104,8 +107,11 @@ func buildAuthSidecarCluster() (*clusterv3.Cluster, error) {
 	}, nil
 }
 
-func buildCluster(name, upstream string) *clusterv3.Cluster {
-	host, port := parseUpstream(upstream)
+func buildCluster(name, upstream string) (*clusterv3.Cluster, error) {
+	host, port, err := parseUpstream(upstream)
+	if err != nil {
+		return nil, err
+	}
 
 	return &clusterv3.Cluster{
 		Name:           name,
@@ -125,7 +131,7 @@ func buildCluster(name, upstream string) *clusterv3.Cluster {
 									SocketAddress: &corev3.SocketAddress{
 										Address: host,
 										PortSpecifier: &corev3.SocketAddress_PortValue{
-											PortValue: uint32(port),
+											PortValue: port,
 										},
 									},
 								},
@@ -135,18 +141,23 @@ func buildCluster(name, upstream string) *clusterv3.Cluster {
 				}},
 			}},
 		},
-	}
+	}, nil
 }
 
-func parseUpstream(upstream string) (string, int) {
-	upstream = strings.TrimPrefix(upstream, "http://")
-	upstream = strings.TrimPrefix(upstream, "https://")
+// parseUpstream splits host:port from a simple upstream string (scheme optional).
+// Port is validated to 0–65535 so conversion to Envoy uint32 PortValue is safe.
+func parseUpstream(upstream string) (host string, port uint32, err error) {
+	s := strings.TrimPrefix(upstream, "http://")
+	s = strings.TrimPrefix(s, "https://")
 
-	parts := strings.Split(upstream, ":")
+	parts := strings.Split(s, ":")
 	if len(parts) == 2 {
-		port, _ := strconv.Atoi(parts[1])
-		return parts[0], port
+		p, err := strconv.ParseUint(parts[1], 10, 16)
+		if err != nil {
+			return "", 0, fmt.Errorf("upstream %q: invalid port %q: %w", upstream, parts[1], err)
+		}
+		return parts[0], uint32(p), nil
 	}
 
-	return upstream, 80
+	return s, 80, nil
 }
