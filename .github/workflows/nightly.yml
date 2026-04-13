@@ -8,6 +8,8 @@ on:
 
 jobs:
   govulncheck:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v6
@@ -24,6 +26,8 @@ jobs:
       run: govulncheck ./...
 
   trivy-fs:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     # trivy-action/setup-trivy pin actions/cache@v4.2.4 (Node 20); until upstream bumps pins:
     # https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
