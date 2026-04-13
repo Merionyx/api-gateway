@@ -11,7 +11,10 @@ func (b *xdsBuilder) BuildEndpoints(env *models.Environment) ([]*endpointv3.Clus
 	endpoints := make([]*endpointv3.ClusterLoadAssignment, 0)
 
 	for _, service := range env.Services.Static {
-		host, port := parseUpstream(service.Upstream)
+		host, port, err := parseUpstream(service.Upstream)
+		if err != nil {
+			return nil, err
+		}
 
 		endpoint := &endpointv3.ClusterLoadAssignment{
 			ClusterName: service.Name,
@@ -24,7 +27,7 @@ func (b *xdsBuilder) BuildEndpoints(env *models.Environment) ([]*endpointv3.Clus
 									SocketAddress: &corev3.SocketAddress{
 										Address: host,
 										PortSpecifier: &corev3.SocketAddress_PortValue{
-											PortValue: uint32(port),
+											PortValue: port,
 										},
 									},
 								},
