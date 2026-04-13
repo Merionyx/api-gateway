@@ -1,11 +1,10 @@
-.PHONY: run build build-agwctl test clean certs deps start lint fmt docker-build docker-run test-coverage test-coverage-ci help docker-up-dev-ha docker-down-dev-ha test-integration openapi-contract proto-generate proto-install proto-lint proto-breaking
+.PHONY: build build-cli test test-unit test-coverage test-coverage-ci test-integration clean tidy deps fmt lint docker-build docker-push docker-up docker-down docker-up-dev docker-down-dev docker-up-dev-ha docker-down-dev-ha help proto-generate proto-install proto-lint proto-breaking generate-etcd-certs generate-ed25519-key generate-rsa-key controller-gen-bin generate-crds
 
 # Variables
-BINARY_NAME=universal-server
 BUILD_DIR=./bin
 DOCKER_REPO=merionyx
-DOCKER_IMAGE=merionyx-universal-server
 DOCKER_TAG=latest
+
 # Release Dockerfiles: runtime-alpine (shell, wget healthcheck) | runtime-distroless (production)
 DOCKER_BUILD_TARGET?=runtime-alpine
 
@@ -15,13 +14,13 @@ BUILD_TIME ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 RELEASE_VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 DOCKER_BUILD_METADATA := --build-arg GIT_REVISION=$(GIT_REVISION) --build-arg BUILD_TIME=$(BUILD_TIME) --build-arg RELEASE_VERSION=$(RELEASE_VERSION)
 
-# Main commands
-run: ## Run the server
-	go run cmd/controller/main.go
-
 build: ## Build binary
-	mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o $(BUILD_DIR)/$(BINARY_NAME) cmd/controller/main.go
+	@mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=0 go build -a -installsuffix cgo -o $(BUILD_DIR)/api-server cmd/api-server/main.go
+	CGO_ENABLED=0 go build -a -installsuffix cgo -o $(BUILD_DIR)/auth-sidecar cmd/auth-sidecar/main.go
+	CGO_ENABLED=0 go build -a -installsuffix cgo -o $(BUILD_DIR)/controller cmd/controller/main.go
+	CGO_ENABLED=0 go build -a -installsuffix cgo -o $(BUILD_DIR)/contract-syncer cmd/contract-syncer/main.go
+	CGO_ENABLED=0 go build -a -installsuffix cgo -o $(BUILD_DIR)/mock-service cmd/mock-service/main.go
 
 build-cli: ## Build agwctl CLI (embeds git tag/rev/time via -ldflags when git available)
 	mkdir -p $(BUILD_DIR)
@@ -32,8 +31,11 @@ build-cli: ## Build agwctl CLI (embeds git tag/rev/time via -ldflags when git av
 		-X 'github.com/merionyx/api-gateway/internal/cli/version.BuildTime=$(shell date -u +%Y-%m-%dT%H:%M:%SZ)'" \
 		./cmd/agwctl
 
-test: ## Run all tests
-	go test -v ./...
+test: ## Run unit tests, coverage gate, then integration tests (Docker)
+	$(MAKE) test-unit && $(MAKE) test-coverage-ci && $(MAKE) test-integration
+
+test-unit: ## Run unit tests
+	go test ./...
 
 test-coverage: ## Run tests with coverage
 	go test -v -coverprofile=coverage.out ./...
@@ -47,8 +49,11 @@ test-integration: ## Run integration tests (starts etcd in Docker via scripts/de
 
 clean: ## Clean build artifacts
 	rm -rf $(BUILD_DIR)
-	rm -rf certs/
 	rm -f coverage.out coverage.html
+
+tidy: ## Tidy go mod
+	go mod tidy
+	go mod verify
 
 deps: ## Install and update dependencies
 	go mod download
@@ -76,9 +81,6 @@ docker-push: ## Push Docker image
 	@docker push $(DOCKER_REPO)/api-gateway-contract-syncer:$(DOCKER_TAG)
 	@docker push $(DOCKER_REPO)/api-gateway-auth-sidecar:$(DOCKER_TAG)
 	@docker push $(DOCKER_REPO)/api-gateway-mock-service:$(DOCKER_TAG)
-
-docker-run: ## Run Docker container
-	docker run -p 8080:8080 -p 8443:8443 -p 8444:8444 $(DOCKER_IMAGE):$(DOCKER_TAG)
 
 docker-up:
 	docker-compose \
@@ -140,14 +142,10 @@ docker-down-dev-ha: ## Stop HA dev stack
 		-f ./deployments/dev/docker/compose.mock-service.yaml \
 		down
 
-dev: ## Development mode with hot reload
-	air -c .air.toml
-
 PROTO_MODULE ?= github.com/merionyx/api-gateway
 PROTO_ROOT ?= apis/proto
 # Sources: apis/proto/merionyx/gateway/<domain>/v1 — package merionyx.gateway.<domain>.v1 (Buf PACKAGE_DIRECTORY_MATCH).
 PROTO_FILES := $(shell find $(PROTO_ROOT)/merionyx/gateway -type f -name '*.proto' 2>/dev/null | LC_ALL=C sort)
-
 
 proto-generate: ## Generate protobuf code (writes under pkg/grpc/...; see PROTO_MODULE)
 	protoc -I $(PROTO_ROOT) \
@@ -242,7 +240,7 @@ generate-etcd-certs: ## Generate etcd certificates
 	@echo "\033[0;90m  • Client: client.pem, client-key.pem\033[0m"
 
 # JWT Keys Management
-.PHONY: jwt-generate-ed25519
+.PHONY: generate-ed25519-key
 generate-ed25519-key:
 	@echo "Generating Ed25519 key..."
 	@mkdir -p secrets/api-server/keys/jwt
@@ -250,7 +248,7 @@ generate-ed25519-key:
 	@chmod 600 secrets/api-server/keys/jwt/api-server-key-$(shell date +%Y-%m-%d).key
 	@echo "✓ Generated: secrets/api-server/keys/jwt/api-server-key-$(shell date +%Y-%m-%d).key"
 
-.PHONY: jwt-generate-rsa
+.PHONY: generate-rsa-key
 generate-rsa-key:
 	@echo "Generating RSA 2048 key..."
 	@mkdir -p secrets/api-server/keys/jwt
