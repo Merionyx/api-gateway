@@ -28,6 +28,17 @@ func TestMergeEnvStaticWithRootPoolUpstreams_envWins(t *testing.T) {
 	}
 }
 
+func TestMergeEnvStaticWithRootPoolUpstreams_emptyEnv(t *testing.T) {
+	p := memory.NewServiceRepository()
+	_ = p.Initialize(&config.Config{
+		Services: config.ServicesConfig{Static: []config.StaticServiceConfig{{Name: "g", Upstream: "http://g"}}},
+	})
+	m := MergeEnvStaticWithRootPoolUpstreams(nil, p)
+	if m["g"] != "http://g" {
+		t.Fatalf("%v", m)
+	}
+}
+
 func TestRootPoolDeduplicatedExcludingNames(t *testing.T) {
 	p := memory.NewServiceRepository()
 	_ = p.Initialize(&config.Config{
