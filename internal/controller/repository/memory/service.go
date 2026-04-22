@@ -2,6 +2,7 @@ package memory
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/merionyx/api-gateway/internal/controller/config"
@@ -65,3 +66,29 @@ func (r *ServiceRepository) ListServices() ([]models.StaticServiceConfig, error)
 	services = append(services, r.kubeGlobals...)
 	return services, nil
 }
+
+func (r *ServiceRepository) ListRootPoolDeduplicated() (fromFile, fromKubernetes []models.StaticServiceConfig) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	fromFile = make([]models.StaticServiceConfig, 0, len(r.static))
+	for _, s := range r.static {
+		fromFile = append(fromFile, s)
+	}
+	sort.Slice(fromFile, func(i, j int) bool { return fromFile[i].Name < fromFile[j].Name })
+	inStatic := make(map[string]struct{}, len(r.static))
+	for n := range r.static {
+		inStatic[n] = struct{}{}
+	}
+	for _, s := range r.kubeGlobals {
+		if _, ok := inStatic[s.Name]; !ok {
+			fromKubernetes = append(fromKubernetes, s)
+		}
+	}
+	sort.Slice(fromKubernetes, func(i, j int) bool {
+		return fromKubernetes[i].Name < fromKubernetes[j].Name
+	})
+	return
+}
+
+// Compile-time check.
+var _ interfaces.InMemoryServiceRepository = (*ServiceRepository)(nil)

@@ -183,6 +183,7 @@ func (c *Container) initUseCasesWithDeps(effRecon interfaces.EffectiveReconciler
 		c.Config,
 		c.SchemaRepository,
 		c.InMemoryEnvironmentsRepository,
+		c.InMemoryServiceRepository,
 		c.EnvironmentRepository,
 		c.EtcdClient,
 		c.BundleEnvIndex,

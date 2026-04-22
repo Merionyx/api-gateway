@@ -21,22 +21,25 @@ import (
 // provenance, materialized generation) for Register/Heartbeat. It is independent of the gRPC stream.
 type registryEnvironmentsBuilder struct {
 	inMemoryEnvironmentsRepo interfaces.InMemoryEnvironmentsRepository
-	environmentRepo        interfaces.EnvironmentRepository
+	rootServicePool          interfaces.InMemoryServiceRepository
+	environmentRepo          interfaces.EnvironmentRepository
 	materialized             *ctrlrepoetcd.MaterializedStore
 	schemaRepo               interfaces.SchemaRepository
 }
 
 func newRegistryEnvironmentsBuilder(
 	inMem interfaces.InMemoryEnvironmentsRepository,
+	rootSvcPool interfaces.InMemoryServiceRepository,
 	environmentRepo interfaces.EnvironmentRepository,
 	materialized *ctrlrepoetcd.MaterializedStore,
 	schema interfaces.SchemaRepository,
 ) *registryEnvironmentsBuilder {
 	return &registryEnvironmentsBuilder{
 		inMemoryEnvironmentsRepo: inMem,
-		environmentRepo:        environmentRepo,
-		materialized:           materialized,
-		schemaRepo:             schema,
+		rootServicePool:          rootSvcPool,
+		environmentRepo:          environmentRepo,
+		materialized:             materialized,
+		schemaRepo:               schema,
 	}
 }
 
@@ -129,9 +132,11 @@ func (b *registryEnvironmentsBuilder) buildEnvironmentsForAPIServer(ctx context.
 			}
 		}
 		pbEnv.Bundles = bundles
+		seenService := make(map[string]struct{})
 		var services []*pb.ServiceInfo
 		if skel.Services != nil {
 			for _, s := range skel.Services.Static {
+				seenService[s.Name] = struct{}{}
 				src := envmodel.ConfigSourceForStaticService(s, fileS, k8sS, etcdS)
 				si := &pb.ServiceInfo{Name: s.Name, Upstream: s.Upstream}
 				if p := provenancePB(src); p != nil {
@@ -140,6 +145,34 @@ func (b *registryEnvironmentsBuilder) buildEnvironmentsForAPIServer(ctx context.
 				services = append(services, si)
 			}
 		}
+		// Controller root pool (config services.static + K8s global upstreams), same policy as xDS
+		// [builder.BuildClusters]: per-environment static wins; then add global names not present.
+		if b.rootServicePool != nil {
+			f, k := b.rootServicePool.ListRootPoolDeduplicated()
+			for _, s := range f {
+				if _, ok := seenService[s.Name]; ok {
+					continue
+				}
+				seenService[s.Name] = struct{}{}
+				si := &pb.ServiceInfo{Name: s.Name, Upstream: s.Upstream}
+				if p := provenancePB(envmodel.StaticConfigFile); p != nil {
+					si.Meta = &pb.ServiceMeta{Provenance: p}
+				}
+				services = append(services, si)
+			}
+			for _, s := range k {
+				if _, ok := seenService[s.Name]; ok {
+					continue
+				}
+				seenService[s.Name] = struct{}{}
+				si := &pb.ServiceInfo{Name: s.Name, Upstream: s.Upstream}
+				if p := provenancePB(envmodel.StaticConfigKubernetes); p != nil {
+					si.Meta = &pb.ServiceMeta{Provenance: p}
+				}
+				services = append(services, si)
+			}
+		}
+		sort.Slice(services, func(i, j int) bool { return services[i].Name < services[j].Name })
 		pbEnv.Services = services
 		out = append(out, pbEnv)
 	}

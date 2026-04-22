@@ -28,12 +28,38 @@ func TestServiceRepository_Initialize_Get_List(t *testing.T) {
 		t.Fatal("expected error")
 	}
 	r.SetKubernetesGlobalServices([]models.StaticServiceConfig{{Name: "k", Upstream: "http://k:3"}})
-	k, err := r.GetService("k")
-	if err != nil || k.Name != "k" {
-		t.Fatalf("%+v %v", k, err)
+	ks, err := r.GetService("k")
+	if err != nil || ks.Name != "k" {
+		t.Fatalf("%+v %v", ks, err)
 	}
 	list, err := r.ListServices()
 	if err != nil || len(list) < 3 {
 		t.Fatalf("list len %d err %v", len(list), err)
+	}
+	filePool, kubePool := r.ListRootPoolDeduplicated()
+	if len(filePool) != 2 || len(kubePool) != 1 || kubePool[0].Name != "k" {
+		t.Fatalf("dedup: file=%v kube=%v", filePool, kubePool)
+	}
+}
+
+func TestServiceRepository_ListRootPoolDeduplicated_staticWinsOverKube(t *testing.T) {
+	r := NewServiceRepository()
+	_ = r.Initialize(&config.Config{
+		Services: config.ServicesConfig{
+			Static: []config.StaticServiceConfig{
+				{Name: "dup", Upstream: "http://file:1"},
+			},
+		},
+	})
+	r.SetKubernetesGlobalServices([]models.StaticServiceConfig{
+		{Name: "dup", Upstream: "http://kube:2"},
+		{Name: "only-k", Upstream: "http://k:3"},
+	})
+	f, k := r.ListRootPoolDeduplicated()
+	if len(f) != 1 || f[0].Upstream != "http://file:1" {
+		t.Fatalf("file: %+v", f)
+	}
+	if len(k) != 1 || k[0].Name != "only-k" {
+		t.Fatalf("kube: %+v", k)
 	}
 }

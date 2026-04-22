@@ -47,6 +47,10 @@ type InMemoryServiceRepository interface {
 	Initialize(config *config.Config) error
 	GetService(name string) (*models.StaticServiceConfig, error)
 	ListServices() ([]models.StaticServiceConfig, error)
+	// ListRootPoolDeduplicated returns the controller root static service list (config services.static
+	// plus K8s global services). For the same name, file config wins, matching [GetService] and xDS
+	// [BuildClusters].
+	ListRootPoolDeduplicated() (fromFile, fromKubernetes []models.StaticServiceConfig)
 	SetKubernetesGlobalServices(services []models.StaticServiceConfig)
 }
 

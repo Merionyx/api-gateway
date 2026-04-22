@@ -32,6 +32,7 @@ func NewAPIServerSyncUseCase(
 	cfg *config.Config,
 	schemaRepo interfaces.SchemaRepository,
 	inMemoryEnvironmentsRepo interfaces.InMemoryEnvironmentsRepository,
+	inMemoryServiceRepo interfaces.InMemoryServiceRepository,
 	environmentRepo interfaces.EnvironmentRepository,
 	etcdClient *clientv3.Client,
 	bundleEnvIndex *bundleenv.Index,
@@ -56,6 +57,7 @@ func NewAPIServerSyncUseCase(
 
 	reg := newRegistryEnvironmentsBuilder(
 		inMemoryEnvironmentsRepo,
+		inMemoryServiceRepo,
 		environmentRepo,
 		materialized,
 		schemaRepo,
