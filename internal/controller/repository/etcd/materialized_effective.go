@@ -111,3 +111,26 @@ func (s *MaterializedStore) ReconcileIfChanged(ctx context.Context, skel *models
 	}
 	return nil
 }
+
+// Get returns the current materialized document, or nil if missing.
+func (s *MaterializedStore) Get(ctx context.Context, environmentName string) (*MaterializedEffectiveV1, error) {
+	if s == nil || s.client == nil {
+		return nil, nil
+	}
+	key := materializedV1Key(environmentName)
+	if key == "" {
+		return nil, nil
+	}
+	resp, err := s.client.Get(ctx, key)
+	if err != nil {
+		return nil, fmt.Errorf("get materialized: %w", err)
+	}
+	if len(resp.Kvs) == 0 {
+		return nil, nil
+	}
+	var v MaterializedEffectiveV1
+	if err := json.Unmarshal(resp.Kvs[0].Value, &v); err != nil {
+		return nil, fmt.Errorf("unmarshal materialized: %w", err)
+	}
+	return &v, nil
+}

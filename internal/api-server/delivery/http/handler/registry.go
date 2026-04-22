@@ -392,11 +392,7 @@ func (h *RegistryHandler) ListEnvironmentsByTenant(c fiber.Ctx, tenant apiserver
 func controllerToAPI(c models.ControllerInfo) apiserver.Controller {
 	envs := make([]apiserver.Environment, 0, len(c.Environments))
 	for _, e := range c.Environments {
-		bundles := make([]apiserver.Bundle, 0, len(e.Bundles))
-		for _, b := range e.Bundles {
-			bundles = append(bundles, bundleToAPI(b))
-		}
-		envs = append(envs, apiserver.Environment{Name: e.Name, Bundles: &bundles})
+		envs = append(envs, environmentToAPI(e))
 	}
 	return apiserver.Controller{
 		ControllerId: c.ControllerID,
@@ -410,7 +406,16 @@ func environmentToAPI(e models.EnvironmentInfo) apiserver.Environment {
 	for _, b := range e.Bundles {
 		bundles = append(bundles, bundleToAPI(b))
 	}
-	return apiserver.Environment{Name: e.Name, Bundles: &bundles}
+	out := apiserver.Environment{Name: e.Name, Bundles: &bundles}
+	if e.EffectiveGeneration != nil {
+		g := *e.EffectiveGeneration
+		out.EffectiveGeneration = &g
+	}
+	if e.SourcesFingerprint != "" {
+		s := e.SourcesFingerprint
+		out.SourcesFingerprint = &s
+	}
+	return out
 }
 
 func bundleFromCanonicalKey(bundleKey string) (apiserver.Bundle, error) {
@@ -434,13 +439,37 @@ func bundleToAPI(b models.BundleInfo) apiserver.Bundle {
 	ref := b.Ref
 	path := b.Path
 	k := bundlekey.Build(b.Repository, b.Ref, b.Path)
-	return apiserver.Bundle{
+	out := apiserver.Bundle{
 		Key:        &k,
 		Name:       &nm,
 		Repository: &repo,
 		Ref:        &ref,
 		Path:       &path,
 	}
+	if cs := modelConfigSourceToAPI(b.ConfigSource); cs != nil {
+		out.ConfigSource = cs
+	}
+	return out
+}
+
+func modelConfigSourceToAPI(s string) *apiserver.ConfigSource {
+	if s == "" {
+		return nil
+	}
+	var c apiserver.ConfigSource
+	switch s {
+	case "file":
+		c = apiserver.File
+	case "kubernetes":
+		c = apiserver.Kubernetes
+	case "etcd_grpc":
+		c = apiserver.EtcdGrpc
+	case "unspecified":
+		c = apiserver.Unspecified
+	default:
+		c = apiserver.ConfigSource(s)
+	}
+	return &c
 }
 
 func snapshotsToAPI(in []sharedgit.ContractSnapshot) ([]apiserver.ContractSnapshot, error) {

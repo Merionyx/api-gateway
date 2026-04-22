@@ -315,3 +315,16 @@ func (r *EnvironmentsRepository) ListEnvironments(ctx context.Context) (map[stri
 	defer r.mu.RUnlock()
 	return r.mergedLocked(), nil
 }
+
+// FileAndK8sStaticBundles returns unmerged static bundle lists for provenance (ADR 0001, phase 3).
+func (r *EnvironmentsRepository) FileAndK8sStaticBundles(_ context.Context, name string) (file, k8s []models.StaticContractBundleConfig) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if e, ok := r.fromFile[name]; ok && e != nil && e.Bundles != nil {
+		file = e.Bundles.Static
+	}
+	if e, ok := r.fromK8s[name]; ok && e != nil && e.Bundles != nil {
+		k8s = e.Bundles.Static
+	}
+	return file, k8s
+}

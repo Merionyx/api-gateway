@@ -17,6 +17,30 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for ConfigSource.
+const (
+	EtcdGrpc    ConfigSource = "etcd_grpc"
+	File        ConfigSource = "file"
+	Kubernetes  ConfigSource = "kubernetes"
+	Unspecified ConfigSource = "unspecified"
+)
+
+// Valid indicates whether the value is a known member of the ConfigSource enum.
+func (e ConfigSource) Valid() bool {
+	switch e {
+	case EtcdGrpc:
+		return true
+	case File:
+		return true
+	case Kubernetes:
+		return true
+	case Unspecified:
+		return true
+	default:
+		return false
+	}
+}
+
 // Access defines model for Access.
 type Access struct {
 	Apps   *[]App `json:"apps,omitempty"`
@@ -33,6 +57,10 @@ type App struct {
 // Field `key` is the canonical snapshot key (same string as under the etcd `.../snapshots/` prefix),
 // i.e. `repository` / escaped `ref` / escaped `path`.
 type Bundle struct {
+	// ConfigSource Which input layer’s static entry won for this bundle key in the effective merge
+	// (controller → API Server; ADR 0001).
+	ConfigSource *ConfigSource `json:"config_source,omitempty"`
+
 	// Key Canonical bundle key matching etcd snapshot paths (`repository/escapedRef/escapedPath`).
 	Key *string `json:"key,omitempty"`
 
@@ -69,6 +97,10 @@ type BundleSyncResponse struct {
 	FromCache bool               `json:"from_cache"`
 	Snapshots []ContractSnapshot `json:"snapshots"`
 }
+
+// ConfigSource Which input layer’s static entry won for this bundle key in the effective merge
+// (controller → API Server; ADR 0001).
+type ConfigSource string
 
 // ContractDocument Parsed contract document as JSON (YAML contracts are exposed as a canonical JSON representation).
 type ContractDocument map[string]interface{}
@@ -145,7 +177,13 @@ type ControllerListResponse struct {
 // Environment defines model for Environment.
 type Environment struct {
 	Bundles *[]Bundle `json:"bundles,omitempty"`
-	Name    string    `json:"name"`
+
+	// EffectiveGeneration Materialized effective document generation when available (controller etcd /effective/.../v1).
+	EffectiveGeneration *int64 `json:"effective_generation,omitempty"`
+	Name                string `json:"name"`
+
+	// SourcesFingerprint Hex SHA-256 fingerprint of static effective (name, type, bundle/service lists) from the controller.
+	SourcesFingerprint *string `json:"sources_fingerprint,omitempty"`
 }
 
 // EnvironmentListResponse defines model for EnvironmentListResponse.

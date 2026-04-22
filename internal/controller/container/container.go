@@ -181,6 +181,7 @@ func (c *Container) initUseCases() {
 		c.EtcdClient,
 		c.BundleEnvIndex,
 		c.SchemaCache,
+		ctrlrepoetcd.NewMaterializedStore(c.EtcdClient),
 	)
 
 	slog.Info("use cases initialized")

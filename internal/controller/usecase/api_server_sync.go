@@ -13,6 +13,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/controller/index/bundleenv"
 	ctrlmetrics "github.com/merionyx/api-gateway/internal/controller/metrics"
 	"github.com/merionyx/api-gateway/internal/controller/repository/cache"
+	ctrlrepoetcd "github.com/merionyx/api-gateway/internal/controller/repository/etcd"
 	xdscache "github.com/merionyx/api-gateway/internal/controller/xds/cache"
 	"github.com/merionyx/api-gateway/internal/shared/grpcutil"
 
@@ -33,6 +34,7 @@ type APIServerSyncUseCase struct {
 	etcdClient               *clientv3.Client
 	bundleEnvIndex           *bundleenv.Index
 	schemaCache              *cache.SchemaCache
+	materialized             *ctrlrepoetcd.MaterializedStore
 }
 
 func NewAPIServerSyncUseCase(
@@ -45,6 +47,7 @@ func NewAPIServerSyncUseCase(
 	etcdClient *clientv3.Client,
 	bundleEnvIndex *bundleenv.Index,
 	schemaCache *cache.SchemaCache,
+	materialized *ctrlrepoetcd.MaterializedStore,
 ) *APIServerSyncUseCase {
 	controllerID := strings.TrimSpace(cfg.HA.ControllerID)
 	if controllerID == "" {
@@ -68,6 +71,7 @@ func NewAPIServerSyncUseCase(
 		etcdClient:               etcdClient,
 		bundleEnvIndex:           bundleEnvIndex,
 		schemaCache:              schemaCache,
+		materialized:             materialized,
 	}
 }
 

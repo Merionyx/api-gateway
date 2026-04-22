@@ -26,6 +26,20 @@ func NewControllerRegistryHandler(registryUseCase interfaces.ControllerRegistryU
 	}
 }
 
+// registryConfigSourceString maps proto enum to stable JSON in etcd (see OpenAPI / ADR 0001).
+func registryConfigSourceString(s pb.ConfigSource) string {
+	switch s {
+	case pb.ConfigSource_CONFIG_SOURCE_FILE:
+		return "file"
+	case pb.ConfigSource_CONFIG_SOURCE_KUBERNETES:
+		return "kubernetes"
+	case pb.ConfigSource_CONFIG_SOURCE_ETCD_GRPC:
+		return "etcd_grpc"
+	default:
+		return ""
+	}
+}
+
 func (h *ControllerRegistryHandler) RegisterController(ctx context.Context, req *pb.RegisterControllerRequest) (*pb.RegisterControllerResponse, error) {
 	slog.Info("Received register controller request", "controller_id", req.ControllerId, "tenant", req.Tenant)
 
@@ -33,17 +47,26 @@ func (h *ControllerRegistryHandler) RegisterController(ctx context.Context, req 
 	for _, pbEnv := range req.Environments {
 		var bundles []models.BundleInfo
 		for _, pbBundle := range pbEnv.Bundles {
-			bundles = append(bundles, models.BundleInfo{
+			bi := models.BundleInfo{
 				Name:       pbBundle.Name,
 				Repository: pbBundle.Repository,
 				Ref:        pbBundle.Ref,
 				Path:       pbBundle.Path,
-			})
+			}
+			if p := pbBundle.GetProvenance(); p != nil {
+				bi.ConfigSource = registryConfigSourceString(p.GetSource())
+			}
+			bundles = append(bundles, bi)
 		}
-		environments = append(environments, models.EnvironmentInfo{
-			Name:    pbEnv.Name,
-			Bundles: bundles,
-		})
+		env := models.EnvironmentInfo{Name: pbEnv.Name, Bundles: bundles}
+		if pbEnv.GetSourcesFingerprint() != "" {
+			env.SourcesFingerprint = pbEnv.GetSourcesFingerprint()
+		}
+		if pbEnv.EffectiveGeneration != nil {
+			g := pbEnv.GetEffectiveGeneration()
+			env.EffectiveGeneration = &g
+		}
+		environments = append(environments, env)
 	}
 
 	info := models.ControllerInfo{
@@ -116,17 +139,26 @@ func (h *ControllerRegistryHandler) Heartbeat(ctx context.Context, req *pb.Heart
 	for _, pbEnv := range req.Environments {
 		var bundles []models.BundleInfo
 		for _, pbBundle := range pbEnv.Bundles {
-			bundles = append(bundles, models.BundleInfo{
+			bi := models.BundleInfo{
 				Name:       pbBundle.Name,
 				Repository: pbBundle.Repository,
 				Ref:        pbBundle.Ref,
 				Path:       pbBundle.Path,
-			})
+			}
+			if p := pbBundle.GetProvenance(); p != nil {
+				bi.ConfigSource = registryConfigSourceString(p.GetSource())
+			}
+			bundles = append(bundles, bi)
 		}
-		environments = append(environments, models.EnvironmentInfo{
-			Name:    pbEnv.Name,
-			Bundles: bundles,
-		})
+		env := models.EnvironmentInfo{Name: pbEnv.Name, Bundles: bundles}
+		if pbEnv.GetSourcesFingerprint() != "" {
+			env.SourcesFingerprint = pbEnv.GetSourcesFingerprint()
+		}
+		if pbEnv.EffectiveGeneration != nil {
+			g := pbEnv.GetEffectiveGeneration()
+			env.EffectiveGeneration = &g
+		}
+		environments = append(environments, env)
 	}
 
 	if err := h.registryUseCase.Heartbeat(ctx, req.ControllerId, environments); err != nil {

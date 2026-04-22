@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	pb "github.com/merionyx/api-gateway/pkg/grpc/controller_registry/v1"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 	"github.com/merionyx/api-gateway/internal/controller/envmodel"
@@ -96,18 +97,42 @@ func (uc *APIServerSyncUseCase) buildEnvironmentsForAPIServer(ctx context.Contex
 			slog.Warn("buildEnvironmentsForAPIServer: skip environment", "name", n, "error", err)
 			continue
 		}
+		file, k8s := uc.fileK8sSlices(ctx, n)
+		var etcdB []models.StaticContractBundleConfig
+		if uc.environmentRepo != nil {
+			if e, err := uc.environmentRepo.GetEnvironment(ctx, n); err == nil {
+				etcdB = etcdStaticBundles(e)
+			}
+		}
 		var bundles []*pb.BundleInfo
 		if skel.Bundles != nil {
 			for _, b := range skel.Bundles.Static {
-				bundles = append(bundles, &pb.BundleInfo{
+				src := envmodel.ConfigSourceForStaticBundle(b, file, k8s, etcdB)
+				bi := &pb.BundleInfo{
 					Name:       b.Name,
 					Repository: b.Repository,
 					Ref:        b.Ref,
 					Path:       b.Path,
-				})
+					Provenance: &pb.BundleProvenance{Source: staticConfigToPB(src)},
+				}
+				bundles = append(bundles, bi)
 			}
 		}
-		out = append(out, &pb.EnvironmentInfo{Name: skel.Name, Bundles: bundles})
+		fp := envmodel.FingerprintStaticEnvironment(skel)
+		pbEnv := &pb.EnvironmentInfo{
+			Name:               skel.Name,
+			Bundles:            bundles,
+			SourcesFingerprint: proto.String(fp),
+		}
+		if uc.materialized != nil {
+			if doc, err := uc.materialized.Get(ctx, n); err != nil {
+				slog.Warn("buildEnvironmentsForAPIServer: read materialized generation", "environment", n, "error", err)
+			} else if doc != nil {
+				g := doc.Generation
+				pbEnv.EffectiveGeneration = &g
+			}
+		}
+		out = append(out, pbEnv)
 	}
 	return out, nil
 }

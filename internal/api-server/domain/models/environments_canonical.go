@@ -23,7 +23,12 @@ func CanonicalEnvironmentsForStorage(envs []EnvironmentInfo) []EnvironmentInfo {
 			}
 			return bunds[i].Name < bunds[j].Name
 		})
-		out = append(out, EnvironmentInfo{Name: e.Name, Bundles: bunds})
+		out = append(out, EnvironmentInfo{
+			Name:                 e.Name,
+			Bundles:              bunds,
+			EffectiveGeneration:  e.EffectiveGeneration,
+			SourcesFingerprint:   e.SourcesFingerprint,
+		})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		return out[i].Name < out[j].Name

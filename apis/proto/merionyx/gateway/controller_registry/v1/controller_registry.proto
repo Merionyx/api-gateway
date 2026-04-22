@@ -15,10 +15,27 @@ message RegisterControllerRequest {
   repeated EnvironmentInfo environments = 3;
 }
 
+// ConfigSource names which input won for a bundle key in the effective merge (ADR 0001, phase 3).
+enum ConfigSource {
+  CONFIG_SOURCE_UNSPECIFIED = 0;
+  CONFIG_SOURCE_FILE = 1;
+  CONFIG_SOURCE_KUBERNETES = 2;
+  CONFIG_SOURCE_ETCD_GRPC = 3;
+}
+
+// Provenance of one static bundle in the effective list (per-bundle winner).
+message BundleProvenance {
+  ConfigSource source = 1;
+}
+
 // EnvironmentInfo information about environment
 message EnvironmentInfo {
   string name = 1;
   repeated BundleInfo bundles = 2;
+  // Materialized effective generation when available (from controller etcd /effective/.../v1). Omitted if unknown.
+  optional int64 effective_generation = 3;
+  // Fingerprint of static name/type/bundles/services (hex SHA-256) matching materialized `sources_fingerprint` when in sync.
+  optional string sources_fingerprint = 4;
 }
 
 // BundleInfo information about bundle
@@ -27,6 +44,8 @@ message BundleInfo {
   string repository = 2;
   string ref = 3;
   string path = 4;
+  // Which source’s entry won for this bundle key in the effective merge.
+  BundleProvenance provenance = 5;
 }
 
 // RegisterControllerResponse response to registration.

@@ -22,6 +22,59 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// ConfigSource names which input won for a bundle key in the effective merge (ADR 0001, phase 3).
+type ConfigSource int32
+
+const (
+	ConfigSource_CONFIG_SOURCE_UNSPECIFIED ConfigSource = 0
+	ConfigSource_CONFIG_SOURCE_FILE        ConfigSource = 1
+	ConfigSource_CONFIG_SOURCE_KUBERNETES  ConfigSource = 2
+	ConfigSource_CONFIG_SOURCE_ETCD_GRPC   ConfigSource = 3
+)
+
+// Enum value maps for ConfigSource.
+var (
+	ConfigSource_name = map[int32]string{
+		0: "CONFIG_SOURCE_UNSPECIFIED",
+		1: "CONFIG_SOURCE_FILE",
+		2: "CONFIG_SOURCE_KUBERNETES",
+		3: "CONFIG_SOURCE_ETCD_GRPC",
+	}
+	ConfigSource_value = map[string]int32{
+		"CONFIG_SOURCE_UNSPECIFIED": 0,
+		"CONFIG_SOURCE_FILE":        1,
+		"CONFIG_SOURCE_KUBERNETES":  2,
+		"CONFIG_SOURCE_ETCD_GRPC":   3,
+	}
+)
+
+func (x ConfigSource) Enum() *ConfigSource {
+	p := new(ConfigSource)
+	*p = x
+	return p
+}
+
+func (x ConfigSource) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ConfigSource) Descriptor() protoreflect.EnumDescriptor {
+	return file_merionyx_gateway_controller_registry_v1_controller_registry_proto_enumTypes[0].Descriptor()
+}
+
+func (ConfigSource) Type() protoreflect.EnumType {
+	return &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_enumTypes[0]
+}
+
+func (x ConfigSource) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ConfigSource.Descriptor instead.
+func (ConfigSource) EnumDescriptor() ([]byte, []int) {
+	return file_merionyx_gateway_controller_registry_v1_controller_registry_proto_rawDescGZIP(), []int{0}
+}
+
 // RegisterControllerRequest registers a Gateway Controller with the API Server.
 // environments is the full snapshot of environments this controller declares (static + K8s + etcd CRUD merge);
 // it is not a delta.
@@ -85,18 +138,67 @@ func (x *RegisterControllerRequest) GetEnvironments() []*EnvironmentInfo {
 	return nil
 }
 
-// EnvironmentInfo information about environment
-type EnvironmentInfo struct {
+// Provenance of one static bundle in the effective list (per-bundle winner).
+type BundleProvenance struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Bundles       []*BundleInfo          `protobuf:"bytes,2,rep,name=bundles,proto3" json:"bundles,omitempty"`
+	Source        ConfigSource           `protobuf:"varint,1,opt,name=source,proto3,enum=merionyx.gateway.controller_registry.v1.ConfigSource" json:"source,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
+func (x *BundleProvenance) Reset() {
+	*x = BundleProvenance{}
+	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BundleProvenance) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BundleProvenance) ProtoMessage() {}
+
+func (x *BundleProvenance) ProtoReflect() protoreflect.Message {
+	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BundleProvenance.ProtoReflect.Descriptor instead.
+func (*BundleProvenance) Descriptor() ([]byte, []int) {
+	return file_merionyx_gateway_controller_registry_v1_controller_registry_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *BundleProvenance) GetSource() ConfigSource {
+	if x != nil {
+		return x.Source
+	}
+	return ConfigSource_CONFIG_SOURCE_UNSPECIFIED
+}
+
+// EnvironmentInfo information about environment
+type EnvironmentInfo struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Name    string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Bundles []*BundleInfo          `protobuf:"bytes,2,rep,name=bundles,proto3" json:"bundles,omitempty"`
+	// Materialized effective generation when available (from controller etcd /effective/.../v1). Omitted if unknown.
+	EffectiveGeneration *int64 `protobuf:"varint,3,opt,name=effective_generation,json=effectiveGeneration,proto3,oneof" json:"effective_generation,omitempty"`
+	// Fingerprint of static name/type/bundles/services (hex SHA-256) matching materialized `sources_fingerprint` when in sync.
+	SourcesFingerprint *string `protobuf:"bytes,4,opt,name=sources_fingerprint,json=sourcesFingerprint,proto3,oneof" json:"sources_fingerprint,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
 func (x *EnvironmentInfo) Reset() {
 	*x = EnvironmentInfo{}
-	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[1]
+	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -108,7 +210,7 @@ func (x *EnvironmentInfo) String() string {
 func (*EnvironmentInfo) ProtoMessage() {}
 
 func (x *EnvironmentInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[1]
+	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -121,7 +223,7 @@ func (x *EnvironmentInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnvironmentInfo.ProtoReflect.Descriptor instead.
 func (*EnvironmentInfo) Descriptor() ([]byte, []int) {
-	return file_merionyx_gateway_controller_registry_v1_controller_registry_proto_rawDescGZIP(), []int{1}
+	return file_merionyx_gateway_controller_registry_v1_controller_registry_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *EnvironmentInfo) GetName() string {
@@ -138,20 +240,36 @@ func (x *EnvironmentInfo) GetBundles() []*BundleInfo {
 	return nil
 }
 
+func (x *EnvironmentInfo) GetEffectiveGeneration() int64 {
+	if x != nil && x.EffectiveGeneration != nil {
+		return *x.EffectiveGeneration
+	}
+	return 0
+}
+
+func (x *EnvironmentInfo) GetSourcesFingerprint() string {
+	if x != nil && x.SourcesFingerprint != nil {
+		return *x.SourcesFingerprint
+	}
+	return ""
+}
+
 // BundleInfo information about bundle
 type BundleInfo struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Repository    string                 `protobuf:"bytes,2,opt,name=repository,proto3" json:"repository,omitempty"`
-	Ref           string                 `protobuf:"bytes,3,opt,name=ref,proto3" json:"ref,omitempty"`
-	Path          string                 `protobuf:"bytes,4,opt,name=path,proto3" json:"path,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Name       string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Repository string                 `protobuf:"bytes,2,opt,name=repository,proto3" json:"repository,omitempty"`
+	Ref        string                 `protobuf:"bytes,3,opt,name=ref,proto3" json:"ref,omitempty"`
+	Path       string                 `protobuf:"bytes,4,opt,name=path,proto3" json:"path,omitempty"`
+	// Which source’s entry won for this bundle key in the effective merge.
+	Provenance    *BundleProvenance `protobuf:"bytes,5,opt,name=provenance,proto3" json:"provenance,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *BundleInfo) Reset() {
 	*x = BundleInfo{}
-	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[2]
+	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -163,7 +281,7 @@ func (x *BundleInfo) String() string {
 func (*BundleInfo) ProtoMessage() {}
 
 func (x *BundleInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[2]
+	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -176,7 +294,7 @@ func (x *BundleInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BundleInfo.ProtoReflect.Descriptor instead.
 func (*BundleInfo) Descriptor() ([]byte, []int) {
-	return file_merionyx_gateway_controller_registry_v1_controller_registry_proto_rawDescGZIP(), []int{2}
+	return file_merionyx_gateway_controller_registry_v1_controller_registry_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *BundleInfo) GetName() string {
@@ -207,6 +325,13 @@ func (x *BundleInfo) GetPath() string {
 	return ""
 }
 
+func (x *BundleInfo) GetProvenance() *BundleProvenance {
+	if x != nil {
+		return x.Provenance
+	}
+	return nil
+}
+
 // RegisterControllerResponse response to registration.
 // Failures are reported via gRPC status (google.rpc.Status); success=true only when RPC completes with OK.
 type RegisterControllerResponse struct {
@@ -219,7 +344,7 @@ type RegisterControllerResponse struct {
 
 func (x *RegisterControllerResponse) Reset() {
 	*x = RegisterControllerResponse{}
-	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[3]
+	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -231,7 +356,7 @@ func (x *RegisterControllerResponse) String() string {
 func (*RegisterControllerResponse) ProtoMessage() {}
 
 func (x *RegisterControllerResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[3]
+	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -244,7 +369,7 @@ func (x *RegisterControllerResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterControllerResponse.ProtoReflect.Descriptor instead.
 func (*RegisterControllerResponse) Descriptor() ([]byte, []int) {
-	return file_merionyx_gateway_controller_registry_v1_controller_registry_proto_rawDescGZIP(), []int{3}
+	return file_merionyx_gateway_controller_registry_v1_controller_registry_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *RegisterControllerResponse) GetSuccess() bool {
@@ -271,7 +396,7 @@ type StreamSnapshotsRequest struct {
 
 func (x *StreamSnapshotsRequest) Reset() {
 	*x = StreamSnapshotsRequest{}
-	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[4]
+	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -283,7 +408,7 @@ func (x *StreamSnapshotsRequest) String() string {
 func (*StreamSnapshotsRequest) ProtoMessage() {}
 
 func (x *StreamSnapshotsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[4]
+	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -296,7 +421,7 @@ func (x *StreamSnapshotsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamSnapshotsRequest.ProtoReflect.Descriptor instead.
 func (*StreamSnapshotsRequest) Descriptor() ([]byte, []int) {
-	return file_merionyx_gateway_controller_registry_v1_controller_registry_proto_rawDescGZIP(), []int{4}
+	return file_merionyx_gateway_controller_registry_v1_controller_registry_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *StreamSnapshotsRequest) GetControllerId() string {
@@ -318,7 +443,7 @@ type StreamSnapshotsResponse struct {
 
 func (x *StreamSnapshotsResponse) Reset() {
 	*x = StreamSnapshotsResponse{}
-	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[5]
+	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -330,7 +455,7 @@ func (x *StreamSnapshotsResponse) String() string {
 func (*StreamSnapshotsResponse) ProtoMessage() {}
 
 func (x *StreamSnapshotsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[5]
+	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -343,7 +468,7 @@ func (x *StreamSnapshotsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamSnapshotsResponse.ProtoReflect.Descriptor instead.
 func (*StreamSnapshotsResponse) Descriptor() ([]byte, []int) {
-	return file_merionyx_gateway_controller_registry_v1_controller_registry_proto_rawDescGZIP(), []int{5}
+	return file_merionyx_gateway_controller_registry_v1_controller_registry_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *StreamSnapshotsResponse) GetEnvironment() string {
@@ -380,7 +505,7 @@ type HeartbeatRequest struct {
 
 func (x *HeartbeatRequest) Reset() {
 	*x = HeartbeatRequest{}
-	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[6]
+	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -392,7 +517,7 @@ func (x *HeartbeatRequest) String() string {
 func (*HeartbeatRequest) ProtoMessage() {}
 
 func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[6]
+	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -405,7 +530,7 @@ func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatRequest.ProtoReflect.Descriptor instead.
 func (*HeartbeatRequest) Descriptor() ([]byte, []int) {
-	return file_merionyx_gateway_controller_registry_v1_controller_registry_proto_rawDescGZIP(), []int{6}
+	return file_merionyx_gateway_controller_registry_v1_controller_registry_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *HeartbeatRequest) GetControllerId() string {
@@ -433,7 +558,7 @@ type HeartbeatResponse struct {
 
 func (x *HeartbeatResponse) Reset() {
 	*x = HeartbeatResponse{}
-	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[7]
+	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -445,7 +570,7 @@ func (x *HeartbeatResponse) String() string {
 func (*HeartbeatResponse) ProtoMessage() {}
 
 func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[7]
+	mi := &file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -458,7 +583,7 @@ func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatResponse.ProtoReflect.Descriptor instead.
 func (*HeartbeatResponse) Descriptor() ([]byte, []int) {
-	return file_merionyx_gateway_controller_registry_v1_controller_registry_proto_rawDescGZIP(), []int{7}
+	return file_merionyx_gateway_controller_registry_v1_controller_registry_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *HeartbeatResponse) GetSuccess() bool {
@@ -476,10 +601,16 @@ const file_merionyx_gateway_controller_registry_v1_controller_registry_proto_raw
 	"\x19RegisterControllerRequest\x12#\n" +
 	"\rcontroller_id\x18\x01 \x01(\tR\fcontrollerId\x12\x16\n" +
 	"\x06tenant\x18\x02 \x01(\tR\x06tenant\x12\\\n" +
-	"\fenvironments\x18\x03 \x03(\v28.merionyx.gateway.controller_registry.v1.EnvironmentInfoR\fenvironments\"t\n" +
+	"\fenvironments\x18\x03 \x03(\v28.merionyx.gateway.controller_registry.v1.EnvironmentInfoR\fenvironments\"a\n" +
+	"\x10BundleProvenance\x12M\n" +
+	"\x06source\x18\x01 \x01(\x0e25.merionyx.gateway.controller_registry.v1.ConfigSourceR\x06source\"\x93\x02\n" +
 	"\x0fEnvironmentInfo\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12M\n" +
-	"\abundles\x18\x02 \x03(\v23.merionyx.gateway.controller_registry.v1.BundleInfoR\abundles\"f\n" +
+	"\abundles\x18\x02 \x03(\v23.merionyx.gateway.controller_registry.v1.BundleInfoR\abundles\x126\n" +
+	"\x14effective_generation\x18\x03 \x01(\x03H\x00R\x13effectiveGeneration\x88\x01\x01\x124\n" +
+	"\x13sources_fingerprint\x18\x04 \x01(\tH\x01R\x12sourcesFingerprint\x88\x01\x01B\x17\n" +
+	"\x15_effective_generationB\x16\n" +
+	"\x14_sources_fingerprint\"\xc1\x01\n" +
 	"\n" +
 	"BundleInfo\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1e\n" +
@@ -487,7 +618,10 @@ const file_merionyx_gateway_controller_registry_v1_controller_registry_proto_raw
 	"repository\x18\x02 \x01(\tR\n" +
 	"repository\x12\x10\n" +
 	"\x03ref\x18\x03 \x01(\tR\x03ref\x12\x12\n" +
-	"\x04path\x18\x04 \x01(\tR\x04path\"L\n" +
+	"\x04path\x18\x04 \x01(\tR\x04path\x12Y\n" +
+	"\n" +
+	"provenance\x18\x05 \x01(\v29.merionyx.gateway.controller_registry.v1.BundleProvenanceR\n" +
+	"provenance\"L\n" +
 	"\x1aRegisterControllerResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\"=\n" +
@@ -502,7 +636,12 @@ const file_merionyx_gateway_controller_registry_v1_controller_registry_proto_raw
 	"\rcontroller_id\x18\x01 \x01(\tR\fcontrollerId\x12\\\n" +
 	"\fenvironments\x18\x02 \x03(\v28.merionyx.gateway.controller_registry.v1.EnvironmentInfoR\fenvironments\"-\n" +
 	"\x11HeartbeatResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess2\xd9\x03\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess*\x80\x01\n" +
+	"\fConfigSource\x12\x1d\n" +
+	"\x19CONFIG_SOURCE_UNSPECIFIED\x10\x00\x12\x16\n" +
+	"\x12CONFIG_SOURCE_FILE\x10\x01\x12\x1c\n" +
+	"\x18CONFIG_SOURCE_KUBERNETES\x10\x02\x12\x1b\n" +
+	"\x17CONFIG_SOURCE_ETCD_GRPC\x10\x032\xd9\x03\n" +
 	"\x19ControllerRegistryService\x12\x9d\x01\n" +
 	"\x12RegisterController\x12B.merionyx.gateway.controller_registry.v1.RegisterControllerRequest\x1aC.merionyx.gateway.controller_registry.v1.RegisterControllerResponse\x12\x96\x01\n" +
 	"\x0fStreamSnapshots\x12?.merionyx.gateway.controller_registry.v1.StreamSnapshotsRequest\x1a@.merionyx.gateway.controller_registry.v1.StreamSnapshotsResponse0\x01\x12\x82\x01\n" +
@@ -520,34 +659,39 @@ func file_merionyx_gateway_controller_registry_v1_controller_registry_proto_rawD
 	return file_merionyx_gateway_controller_registry_v1_controller_registry_proto_rawDescData
 }
 
-var file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_merionyx_gateway_controller_registry_v1_controller_registry_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_merionyx_gateway_controller_registry_v1_controller_registry_proto_goTypes = []any{
-	(*RegisterControllerRequest)(nil),  // 0: merionyx.gateway.controller_registry.v1.RegisterControllerRequest
-	(*EnvironmentInfo)(nil),            // 1: merionyx.gateway.controller_registry.v1.EnvironmentInfo
-	(*BundleInfo)(nil),                 // 2: merionyx.gateway.controller_registry.v1.BundleInfo
-	(*RegisterControllerResponse)(nil), // 3: merionyx.gateway.controller_registry.v1.RegisterControllerResponse
-	(*StreamSnapshotsRequest)(nil),     // 4: merionyx.gateway.controller_registry.v1.StreamSnapshotsRequest
-	(*StreamSnapshotsResponse)(nil),    // 5: merionyx.gateway.controller_registry.v1.StreamSnapshotsResponse
-	(*HeartbeatRequest)(nil),           // 6: merionyx.gateway.controller_registry.v1.HeartbeatRequest
-	(*HeartbeatResponse)(nil),          // 7: merionyx.gateway.controller_registry.v1.HeartbeatResponse
-	(*v1.ContractSnapshot)(nil),        // 8: merionyx.gateway.common.v1.ContractSnapshot
+	(ConfigSource)(0),                  // 0: merionyx.gateway.controller_registry.v1.ConfigSource
+	(*RegisterControllerRequest)(nil),  // 1: merionyx.gateway.controller_registry.v1.RegisterControllerRequest
+	(*BundleProvenance)(nil),           // 2: merionyx.gateway.controller_registry.v1.BundleProvenance
+	(*EnvironmentInfo)(nil),            // 3: merionyx.gateway.controller_registry.v1.EnvironmentInfo
+	(*BundleInfo)(nil),                 // 4: merionyx.gateway.controller_registry.v1.BundleInfo
+	(*RegisterControllerResponse)(nil), // 5: merionyx.gateway.controller_registry.v1.RegisterControllerResponse
+	(*StreamSnapshotsRequest)(nil),     // 6: merionyx.gateway.controller_registry.v1.StreamSnapshotsRequest
+	(*StreamSnapshotsResponse)(nil),    // 7: merionyx.gateway.controller_registry.v1.StreamSnapshotsResponse
+	(*HeartbeatRequest)(nil),           // 8: merionyx.gateway.controller_registry.v1.HeartbeatRequest
+	(*HeartbeatResponse)(nil),          // 9: merionyx.gateway.controller_registry.v1.HeartbeatResponse
+	(*v1.ContractSnapshot)(nil),        // 10: merionyx.gateway.common.v1.ContractSnapshot
 }
 var file_merionyx_gateway_controller_registry_v1_controller_registry_proto_depIdxs = []int32{
-	1, // 0: merionyx.gateway.controller_registry.v1.RegisterControllerRequest.environments:type_name -> merionyx.gateway.controller_registry.v1.EnvironmentInfo
-	2, // 1: merionyx.gateway.controller_registry.v1.EnvironmentInfo.bundles:type_name -> merionyx.gateway.controller_registry.v1.BundleInfo
-	8, // 2: merionyx.gateway.controller_registry.v1.StreamSnapshotsResponse.snapshots:type_name -> merionyx.gateway.common.v1.ContractSnapshot
-	1, // 3: merionyx.gateway.controller_registry.v1.HeartbeatRequest.environments:type_name -> merionyx.gateway.controller_registry.v1.EnvironmentInfo
-	0, // 4: merionyx.gateway.controller_registry.v1.ControllerRegistryService.RegisterController:input_type -> merionyx.gateway.controller_registry.v1.RegisterControllerRequest
-	4, // 5: merionyx.gateway.controller_registry.v1.ControllerRegistryService.StreamSnapshots:input_type -> merionyx.gateway.controller_registry.v1.StreamSnapshotsRequest
-	6, // 6: merionyx.gateway.controller_registry.v1.ControllerRegistryService.Heartbeat:input_type -> merionyx.gateway.controller_registry.v1.HeartbeatRequest
-	3, // 7: merionyx.gateway.controller_registry.v1.ControllerRegistryService.RegisterController:output_type -> merionyx.gateway.controller_registry.v1.RegisterControllerResponse
-	5, // 8: merionyx.gateway.controller_registry.v1.ControllerRegistryService.StreamSnapshots:output_type -> merionyx.gateway.controller_registry.v1.StreamSnapshotsResponse
-	7, // 9: merionyx.gateway.controller_registry.v1.ControllerRegistryService.Heartbeat:output_type -> merionyx.gateway.controller_registry.v1.HeartbeatResponse
-	7, // [7:10] is the sub-list for method output_type
-	4, // [4:7] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	3,  // 0: merionyx.gateway.controller_registry.v1.RegisterControllerRequest.environments:type_name -> merionyx.gateway.controller_registry.v1.EnvironmentInfo
+	0,  // 1: merionyx.gateway.controller_registry.v1.BundleProvenance.source:type_name -> merionyx.gateway.controller_registry.v1.ConfigSource
+	4,  // 2: merionyx.gateway.controller_registry.v1.EnvironmentInfo.bundles:type_name -> merionyx.gateway.controller_registry.v1.BundleInfo
+	2,  // 3: merionyx.gateway.controller_registry.v1.BundleInfo.provenance:type_name -> merionyx.gateway.controller_registry.v1.BundleProvenance
+	10, // 4: merionyx.gateway.controller_registry.v1.StreamSnapshotsResponse.snapshots:type_name -> merionyx.gateway.common.v1.ContractSnapshot
+	3,  // 5: merionyx.gateway.controller_registry.v1.HeartbeatRequest.environments:type_name -> merionyx.gateway.controller_registry.v1.EnvironmentInfo
+	1,  // 6: merionyx.gateway.controller_registry.v1.ControllerRegistryService.RegisterController:input_type -> merionyx.gateway.controller_registry.v1.RegisterControllerRequest
+	6,  // 7: merionyx.gateway.controller_registry.v1.ControllerRegistryService.StreamSnapshots:input_type -> merionyx.gateway.controller_registry.v1.StreamSnapshotsRequest
+	8,  // 8: merionyx.gateway.controller_registry.v1.ControllerRegistryService.Heartbeat:input_type -> merionyx.gateway.controller_registry.v1.HeartbeatRequest
+	5,  // 9: merionyx.gateway.controller_registry.v1.ControllerRegistryService.RegisterController:output_type -> merionyx.gateway.controller_registry.v1.RegisterControllerResponse
+	7,  // 10: merionyx.gateway.controller_registry.v1.ControllerRegistryService.StreamSnapshots:output_type -> merionyx.gateway.controller_registry.v1.StreamSnapshotsResponse
+	9,  // 11: merionyx.gateway.controller_registry.v1.ControllerRegistryService.Heartbeat:output_type -> merionyx.gateway.controller_registry.v1.HeartbeatResponse
+	9,  // [9:12] is the sub-list for method output_type
+	6,  // [6:9] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_merionyx_gateway_controller_registry_v1_controller_registry_proto_init() }
@@ -555,18 +699,20 @@ func file_merionyx_gateway_controller_registry_v1_controller_registry_proto_init
 	if File_merionyx_gateway_controller_registry_v1_controller_registry_proto != nil {
 		return
 	}
+	file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes[2].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_merionyx_gateway_controller_registry_v1_controller_registry_proto_rawDesc), len(file_merionyx_gateway_controller_registry_v1_controller_registry_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   8,
+			NumEnums:      1,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_merionyx_gateway_controller_registry_v1_controller_registry_proto_goTypes,
 		DependencyIndexes: file_merionyx_gateway_controller_registry_v1_controller_registry_proto_depIdxs,
+		EnumInfos:         file_merionyx_gateway_controller_registry_v1_controller_registry_proto_enumTypes,
 		MessageInfos:      file_merionyx_gateway_controller_registry_v1_controller_registry_proto_msgTypes,
 	}.Build()
 	File_merionyx_gateway_controller_registry_v1_controller_registry_proto = out.File

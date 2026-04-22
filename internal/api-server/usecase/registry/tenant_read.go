@@ -56,12 +56,25 @@ func (u *TenantReadUseCase) ListEnvironmentsByTenant(ctx context.Context, tenant
 			prev, ok := byName[env.Name]
 			if !ok {
 				byName[env.Name] = models.EnvironmentInfo{
-					Name:    env.Name,
-					Bundles: dedupeBundles(env.Bundles),
+					Name:                 env.Name,
+					Bundles:              dedupeBundles(env.Bundles),
+					EffectiveGeneration:  env.EffectiveGeneration,
+					SourcesFingerprint:   env.SourcesFingerprint,
 				}
 				continue
 			}
 			prev.Bundles = dedupeBundles(append(append([]models.BundleInfo{}, prev.Bundles...), env.Bundles...))
+			if env.EffectiveGeneration != nil {
+				if prev.EffectiveGeneration == nil || *env.EffectiveGeneration > *prev.EffectiveGeneration {
+					g := *env.EffectiveGeneration
+					prev.EffectiveGeneration = &g
+					if env.SourcesFingerprint != "" {
+						prev.SourcesFingerprint = env.SourcesFingerprint
+					}
+				}
+			} else if prev.SourcesFingerprint == "" && env.SourcesFingerprint != "" {
+				prev.SourcesFingerprint = env.SourcesFingerprint
+			}
 			byName[env.Name] = prev
 		}
 	}
