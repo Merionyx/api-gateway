@@ -135,12 +135,58 @@ metrics_http:
 {{- toYaml (mergeOverwrite $withTel $usr) -}}
 {{- end }}
 
+{{/* OTLP trace cluster name; referenced by OpenTelemetryConfig in bootstrap. */}}
+{{- define "agwedge.tracing.clusterName" -}}
+{{- default (printf "%s-otlp-trace" (include "agwedge.fullname" .)) .Values.envoy.tracing.openTelemetry.clusterName -}}
+{{- end -}}
+
+{{/*
+  JSON: {"host":"..","port":4317} when .envoy.tracing.collector.host is set, or
+  .telemetry.otlp_endpoint matches host:port and inherit is true. Empty if unresolved.
+*/}}
+{{- define "agwedge.tracing.parsed" -}}
+{{- $e := .Values.envoy.tracing -}}
+{{- if (default false $e.enabled) -}}
+{{- $c := $e.collector | default dict -}}
+{{- $h := (default "" $c.host) | toString | trim -}}
+{{- if ne $h "" -}}
+{{- dict "host" $h "port" (int (default 4317 $c.port)) | toJson -}}
+{{- else if and (default true $e.inheritCollectorFromTelemetry) (default "" .Values.telemetry.otlp_endpoint) -}}
+{{- $rest := .Values.telemetry.otlp_endpoint | replace "https://" "" | replace "http://" "" | trim -}}
+{{- if (regexMatch `^[^:]+:[0-9]+$` $rest) -}}
+{{- $pstr := regexFind `[0-9]+$` $rest -}}
+{{- $h := regexReplaceAll `:[0-9]+$` $rest "" -}}
+{{- dict "host" $h "port" (int $pstr) | toJson -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/* service.name in Envoy resource attributes */}}
+{{- define "agwedge.tracing.serviceName" -}}
+{{- $def := printf "%s-envoy" (include "agwedge.fullname" .) -}}
+{{- default $def .Values.envoy.tracing.openTelemetry.serviceName -}}
+{{- end -}}
+
 {{/* Envoy bootstrap file (ConfigMap data key envoy.xds-tls.yaml); used for checksum + configmap. */}}
 {{- define "agwedge.envoy.bootstrapYaml" -}}
 node:
   id: {{ default (printf "%s-envoy" (include "agwedge.fullname" .)) .Values.connectivity.envoyNodeId | quote }}
   cluster: {{ default .Values.connectivity.tenant .Values.connectivity.envoyCluster | quote }}
 
+{{ if and .Values.envoy.tracing.enabled (include "agwedge.tracing.parsed" . | trim) -}}
+{{- $gto := .Values.envoy.tracing.openTelemetry.grpcTimeout | default "3s" -}}
+tracing:
+  http:
+    name: envoy.tracers.opentelemetry
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v3.OpenTelemetryConfig
+      service_name: {{ include "agwedge.tracing.serviceName" . | quote }}
+      grpc_service:
+        envoy_grpc:
+          cluster_name: {{ include "agwedge.tracing.clusterName" . | quote }}
+        timeout: {{ $gto | quote }}
+{{- end }}
 admin:
   address:
     socket_address:
@@ -199,4 +245,30 @@ static_resources:
               socket_address:
                 address: {{ .Values.connectivity.xdsHost | quote }}
                 port_value: {{ int .Values.connectivity.xdsPort }}
+{{ if and .Values.envoy.tracing.enabled (include "agwedge.tracing.parsed" . | trim) -}}
+  {{ $tc := fromJson (include "agwedge.tracing.parsed" . | trim) }}
+  - name: {{ include "agwedge.tracing.clusterName" . | quote }}
+    type: STRICT_DNS
+    connect_timeout: 1s
+    lb_policy: ROUND_ROBIN
+    common_lb_config:
+      locality_weighted_lb_config: {}
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+    load_assignment:
+      cluster_name: {{ include "agwedge.tracing.clusterName" . | quote }}
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: {{ $tc.host | quote }}
+                port_value: {{ int $tc.port }}
+{{- end -}}
+{{- with (trim (default "" .Values.envoy.tracing.appendBootstrap)) -}}
+{{ . | nindent 0 }}
+{{- end -}}
 {{- end }}

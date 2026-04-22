@@ -9,8 +9,10 @@ import (
 	extauthzv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ext_authz/v3"
 	routerv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/router/v3"
 	hcmv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
+	typev3 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 )
@@ -45,6 +47,15 @@ func buildHTTPListener(env *models.Environment) (*listenerv3.Listener, error) {
 		HttpFilters: httpFilters,
 
 		RequestTimeout: durationpb.New(30 * time.Second),
+		// Tracing: uses the global HTTP tracer from Envoy bootstrap (OpenTelemetry OTLP) when
+		// the edge chart enables envoy.tracing; 100% sampling here is independent of auth app sampling.
+		// Spawn upstream span for a gateway / edge role (W3C propagation to clusters).
+		Tracing: &hcmv3.HttpConnectionManager_Tracing{
+			ClientSampling:    &typev3.Percent{Value: 100},
+			RandomSampling:    &typev3.Percent{Value: 100},
+			OverallSampling:   &typev3.Percent{Value: 100},
+			SpawnUpstreamSpan: wrapperspb.Bool(true),
+		},
 	}
 	pbst, err := anypb.New(manager)
 	if err != nil {

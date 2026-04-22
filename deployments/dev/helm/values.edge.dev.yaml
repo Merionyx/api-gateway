@@ -42,6 +42,10 @@ certManager:
 envoy:
   image:
     pullPolicy: IfNotPresent
+  # OpenTelemetry → OTLP (same backend as `telemetry` for auth); see chart `envoy.tracing.*`
+  tracing:
+    enabled: true
+    inheritCollectorFromTelemetry: true
 
 authSidecar:
   image:

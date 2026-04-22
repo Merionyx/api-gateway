@@ -32,6 +32,9 @@ certManager:
 envoy:
   image:
     pullPolicy: IfNotPresent
+  tracing:
+    enabled: true
+    inheritCollectorFromTelemetry: true
 
 authSidecar:
   image:
