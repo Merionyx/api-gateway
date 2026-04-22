@@ -1,6 +1,3 @@
-// Package reconcile holds the effective-environment reconciler: (file∪K8s in memory) ∪ controller etcd
-// → xDS and optional materialized key (ADR 0001), shared by the memory repository, gRPC
-// Environments use case, and hot-path API Server / etcd watch updates.
 package reconcile
 
 import (
@@ -12,7 +9,7 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
-	"github.com/merionyx/api-gateway/internal/controller/envmodel"
+	"github.com/merionyx/api-gateway/internal/controller/effective"
 	xdscache "github.com/merionyx/api-gateway/internal/controller/xds/cache"
 	"github.com/merionyx/api-gateway/internal/controller/xds/snapshot"
 	"github.com/merionyx/api-gateway/internal/shared/election"
@@ -81,7 +78,7 @@ func (r *Reconciler) RebuildAllFromMemory(ctx context.Context, memoryMergedByNam
 		if etcdByName != nil {
 			etcdE = etcdByName[envName]
 		}
-		eff, err := envmodel.BuildOptionalEffectiveEnvironment(mem, etcdE)
+		eff, err := effective.MergeMemoryAndControllerEtcd(mem, etcdE)
 		if err != nil {
 			continue
 		}
@@ -158,9 +155,9 @@ func (r *Reconciler) ReconcileOne(ctx context.Context, name string, writeMateria
 			etcdE = e
 		}
 	}
-	eff, err := envmodel.BuildOptionalEffectiveEnvironment(mem, etcdE)
+	eff, err := effective.MergeMemoryAndControllerEtcd(mem, etcdE)
 	if err != nil {
-		if errors.Is(err, envmodel.ErrBuildEffectiveNotFound) {
+		if errors.Is(err, effective.ErrNotFound) {
 			return r.removeOne(ctx, name, writeMaterialized)
 		}
 		return err

@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/controller/effective"
 	"github.com/merionyx/api-gateway/internal/controller/envmodel"
 	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
 	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
@@ -41,8 +42,7 @@ func (uc *APIServerSyncUseCase) updateXDSSnapshot(ctx context.Context, environme
 	return uc.reconciler.ReconcileOne(ctx, environment, false)
 }
 
-// effectiveEnvironmentSkeleton merges static+Kubernetes (in-memory) with controller etcd CRUD:
-// union of bundles and services. If only one side exists, that side is used.
+// effectiveEnvironmentSkeleton uses [effective.MergeMemoryAndControllerEtcd] (ADR 0001) for this name.
 func (uc *APIServerSyncUseCase) effectiveEnvironmentSkeleton(ctx context.Context, name string) (*models.Environment, error) {
 	var mem *models.Environment
 	if m, err := uc.inMemoryEnvironmentsRepo.GetEnvironment(ctx, name); err == nil {
@@ -56,9 +56,9 @@ func (uc *APIServerSyncUseCase) effectiveEnvironmentSkeleton(ctx context.Context
 		}
 	}
 
-	skel, err := envmodel.BuildOptionalEffectiveEnvironment(mem, etcdEnv)
+	skel, err := effective.MergeMemoryAndControllerEtcd(mem, etcdEnv)
 	if err != nil {
-		if errors.Is(err, envmodel.ErrBuildEffectiveNotFound) {
+		if errors.Is(err, effective.ErrNotFound) {
 			return nil, fmt.Errorf("environment %s not found", name)
 		}
 		return nil, err
