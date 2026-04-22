@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-git/go-billy/v6/memfs"
 	"github.com/go-git/go-billy/v6/util"
@@ -151,12 +152,28 @@ func isCommitHash(ref string) bool {
 	}
 
 	for _, c := range ref {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') && (c < 'A' || c > 'F') {
 			return false
 		}
 	}
 
 	return true
+}
+
+// resolveCheckoutRefName maps CLI-style refs to a [plumbing.ReferenceName] for
+// [gogit.CheckoutOptions.Branch]. [plumbing.NewBranchReferenceName] expects a short
+// branch name; values like "heads/main" would incorrectly become refs/heads/heads/main.
+func resolveCheckoutRefName(ref string) plumbing.ReferenceName {
+	switch {
+	case strings.HasPrefix(ref, "refs/"):
+		return plumbing.ReferenceName(ref)
+	case strings.HasPrefix(ref, "heads/"):
+		return plumbing.ReferenceName("refs/" + ref)
+	case strings.HasPrefix(ref, "remotes/"):
+		return plumbing.ReferenceName("refs/" + ref)
+	default:
+		return plumbing.NewBranchReferenceName(ref)
+	}
 }
 
 func (rm *RepositoryManager) getSnapshotsFromGit(managedRepo *ManagedRepo, ref string, path string) ([]ContractSnapshot, error) {
@@ -183,7 +200,7 @@ func (rm *RepositoryManager) getSnapshotsFromGit(managedRepo *ManagedRepo, ref s
 		}
 	} else {
 		checkoutOptions = &gogit.CheckoutOptions{
-			Branch: plumbing.NewBranchReferenceName(ref),
+			Branch: resolveCheckoutRefName(ref),
 		}
 	}
 
