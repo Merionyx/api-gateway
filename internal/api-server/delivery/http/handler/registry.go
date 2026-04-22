@@ -411,27 +411,51 @@ func environmentToAPI(e models.EnvironmentInfo) apiserver.Environment {
 		svcs = append(svcs, staticServiceToAPI(s))
 	}
 	out := apiserver.Environment{Name: e.Name, Bundles: &bundles, Services: &svcs}
-	if e.EnvironmentConfigSource != "" {
-		if cs := modelConfigSourceToAPI(e.EnvironmentConfigSource); cs != nil {
-			out.EnvironmentConfigSource = cs
-		}
-	}
-	if e.EffectiveGeneration != nil {
-		g := *e.EffectiveGeneration
-		out.EffectiveGeneration = &g
-	}
-	if e.SourcesFingerprint != "" {
-		s := e.SourcesFingerprint
-		out.SourcesFingerprint = &s
+	if m := environmentMetaToAPI(e.Meta); m != nil {
+		out.Meta = m
 	}
 	return out
+}
+
+func environmentMetaToAPI(m *models.EnvironmentMeta) *apiserver.EnvironmentMeta {
+	if m == nil {
+		return nil
+	}
+	out := &apiserver.EnvironmentMeta{}
+	if p := provenanceToAPI(m.Provenance); p != nil {
+		out.Provenance = p
+	}
+	if m.EffectiveGeneration != nil {
+		g := *m.EffectiveGeneration
+		out.EffectiveGeneration = &g
+	}
+	if m.SourcesFingerprint != "" {
+		s := m.SourcesFingerprint
+		out.SourcesFingerprint = &s
+	}
+	if out.Provenance == nil && out.EffectiveGeneration == nil && out.SourcesFingerprint == nil {
+		return nil
+	}
+	return out
+}
+
+func provenanceToAPI(p *models.Provenance) *apiserver.Provenance {
+	if p == nil || p.ConfigSource == "" {
+		return nil
+	}
+	if cs := modelConfigSourceToAPI(p.ConfigSource); cs != nil {
+		return &apiserver.Provenance{ConfigSource: cs}
+	}
+	return nil
 }
 
 func staticServiceToAPI(s models.ServiceInfo) apiserver.RegistryService {
 	n, u := s.Name, s.Upstream
 	out := apiserver.RegistryService{Name: n, Upstream: u}
-	if cs := modelConfigSourceToAPI(s.ConfigSource); cs != nil {
-		out.ConfigSource = cs
+	if sm := s.Meta; sm != nil {
+		if p := provenanceToAPI(sm.Provenance); p != nil {
+			out.Meta = &apiserver.ServiceMeta{Provenance: p}
+		}
 	}
 	return out
 }
@@ -464,8 +488,10 @@ func bundleToAPI(b models.BundleInfo) apiserver.Bundle {
 		Ref:        &ref,
 		Path:       &path,
 	}
-	if cs := modelConfigSourceToAPI(b.ConfigSource); cs != nil {
-		out.ConfigSource = cs
+	if bm := b.Meta; bm != nil {
+		if p := provenanceToAPI(bm.Provenance); p != nil {
+			out.Meta = &apiserver.BundleMeta{Provenance: p}
+		}
 	}
 	return out
 }

@@ -1,5 +1,27 @@
 package models
 
+// Provenance is the winning static config layer (ADR 0001). Extend with new fields as needed.
+type Provenance struct {
+	ConfigSource string `json:"config_source,omitempty"`
+}
+
+// EnvironmentMeta groups observability for a logical environment (separate from name/bundles/services).
+type EnvironmentMeta struct {
+	Provenance            *Provenance `json:"provenance,omitempty"`
+	EffectiveGeneration   *int64      `json:"effective_generation,omitempty"`
+	SourcesFingerprint    string      `json:"sources_fingerprint,omitempty"`
+}
+
+// BundleMeta is control-plane metadata for a bundle line.
+type BundleMeta struct {
+	Provenance *Provenance `json:"provenance,omitempty"`
+}
+
+// ServiceMeta is control-plane metadata for a static service line.
+type ServiceMeta struct {
+	Provenance *Provenance `json:"provenance,omitempty"`
+}
+
 type ControllerInfo struct {
 	ControllerID string
 	Tenant       string
@@ -7,24 +29,17 @@ type ControllerInfo struct {
 }
 
 type EnvironmentInfo struct {
-	Name    string
-	Bundles []BundleInfo
-	// EffectiveGeneration is the materialized effective document generation when reported by the controller.
-	EffectiveGeneration *int64 `json:"effective_generation,omitempty"`
-	// SourcesFingerprint is a hex hash of static name/type/bundles/services (aligned with controller materialized).
-	SourcesFingerprint string `json:"sources_fingerprint,omitempty"`
-	// EnvironmentConfigSource is the dominant layer for the environment name: etcd > kubernetes > file.
-	EnvironmentConfigSource string `json:"environment_config_source,omitempty"`
-	// Services are effective static upstreams with per-line provenance.
-	Services []ServiceInfo `json:"services,omitempty"`
+	Name     string
+	Bundles  []BundleInfo
+	Services []ServiceInfo
+	Meta     *EnvironmentMeta `json:"meta,omitempty"`
 }
 
-// ServiceInfo is a static service line with config provenance.
+// ServiceInfo is a static service line; meta holds provenance and future fields.
 type ServiceInfo struct {
 	Name     string
 	Upstream string
-	// ConfigSource is the winning input for this service name in the effective merge.
-	ConfigSource string `json:"config_source,omitempty"`
+	Meta     *ServiceMeta `json:"meta,omitempty"`
 }
 
 type BundleInfo struct {
@@ -32,7 +47,13 @@ type BundleInfo struct {
 	Repository string
 	Ref        string
 	Path       string
-	// ConfigSource is the winning input for this bundle key in the effective merge: file | kubernetes | etcd_grpc.
-	ConfigSource string `json:"config_source,omitempty"`
+	Meta       *BundleMeta `json:"meta,omitempty"`
 }
 
+// EnvironmentMetaConfigSource returns the dominant config_source string for merge rules, or "".
+func EnvironmentMetaConfigSource(m *EnvironmentMeta) string {
+	if m == nil || m.Provenance == nil {
+		return ""
+	}
+	return m.Provenance.ConfigSource
+}

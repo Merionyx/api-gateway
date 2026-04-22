@@ -27,6 +27,14 @@ func staticConfigToPB(s envmodel.StaticConfigSource) pb.ConfigSource {
 	}
 }
 
+func provenancePB(src envmodel.StaticConfigSource) *pb.Provenance {
+	v := staticConfigToPB(src)
+	if v == pb.ConfigSource_CONFIG_SOURCE_UNSPECIFIED {
+		return nil
+	}
+	return &pb.Provenance{ConfigSource: v}
+}
+
 // fileK8sSlices returns unmerged file and K8s static bundles if the in-memory implementation supports it.
 func (uc *APIServerSyncUseCase) fileK8sSlices(ctx context.Context, envName string) (file, k8s []models.StaticContractBundleConfig) {
 	if uc.inMemoryEnvironmentsRepo == nil {

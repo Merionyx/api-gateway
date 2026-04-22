@@ -91,22 +91,32 @@ func (uc *APIServerSyncUseCase) buildEnvironmentsForAPIServer(ctx context.Contex
 		etcdS := etcdStaticServices(etcdE)
 		inEtcd := etcdE != nil
 		envLayer := envmodel.ConfigSourceForEnvironmentLayers(inF, inK8, inEtcd)
-		ecs := staticConfigToPB(envLayer)
+		fp := envmodel.FingerprintStaticEnvironment(skel)
+		em := &pb.EnvironmentMeta{
+			Provenance:         provenancePB(envLayer),
+			SourcesFingerprint: proto.String(fp),
+		}
+		if uc.materialized != nil {
+			if doc, err := uc.materialized.Get(ctx, n); err != nil {
+				slog.Warn("buildEnvironmentsForAPIServer: read materialized generation", "environment", n, "error", err)
+			} else if doc != nil {
+				g := doc.Generation
+				em.EffectiveGeneration = &g
+			}
+		}
 		pbEnv := &pb.EnvironmentInfo{
-			Name:                     skel.Name,
-			SourcesFingerprint:       proto.String(envmodel.FingerprintStaticEnvironment(skel)),
-			EnvironmentConfigSource:  &ecs,
+			Name: skel.Name,
+			Meta: em,
 		}
 		var bundles []*pb.BundleInfo
 		if skel.Bundles != nil {
 			for _, b := range skel.Bundles.Static {
 				src := envmodel.ConfigSourceForStaticBundle(b, file, k8s, etcdB)
 				bi := &pb.BundleInfo{
-					Name:       b.Name,
-					Repository: b.Repository,
-					Ref:        b.Ref,
-					Path:       b.Path,
-					Provenance: &pb.BundleProvenance{Source: staticConfigToPB(src)},
+					Name: b.Name, Repository: b.Repository, Ref: b.Ref, Path: b.Path,
+				}
+				if p := provenancePB(src); p != nil {
+					bi.Meta = &pb.BundleMeta{Provenance: p}
 				}
 				bundles = append(bundles, bi)
 			}
@@ -116,22 +126,14 @@ func (uc *APIServerSyncUseCase) buildEnvironmentsForAPIServer(ctx context.Contex
 		if skel.Services != nil {
 			for _, s := range skel.Services.Static {
 				src := envmodel.ConfigSourceForStaticService(s, fileS, k8sS, etcdS)
-				services = append(services, &pb.ServiceInfo{
-					Name:       s.Name,
-					Upstream:   s.Upstream,
-					Provenance: &pb.BundleProvenance{Source: staticConfigToPB(src)},
-				})
+				si := &pb.ServiceInfo{Name: s.Name, Upstream: s.Upstream}
+				if p := provenancePB(src); p != nil {
+					si.Meta = &pb.ServiceMeta{Provenance: p}
+				}
+				services = append(services, si)
 			}
 		}
 		pbEnv.Services = services
-		if uc.materialized != nil {
-			if doc, err := uc.materialized.Get(ctx, n); err != nil {
-				slog.Warn("buildEnvironmentsForAPIServer: read materialized generation", "environment", n, "error", err)
-			} else if doc != nil {
-				g := doc.Generation
-				pbEnv.EffectiveGeneration = &g
-			}
-		}
 		out = append(out, pbEnv)
 	}
 	return out, nil

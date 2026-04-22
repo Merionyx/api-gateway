@@ -40,44 +40,82 @@ func registryConfigSourceString(s pb.ConfigSource) string {
 	}
 }
 
+func provenanceFromPB(p *pb.Provenance) *models.Provenance {
+	if p == nil {
+		return nil
+	}
+	if p.GetConfigSource() == pb.ConfigSource_CONFIG_SOURCE_UNSPECIFIED {
+		return nil
+	}
+	return &models.Provenance{ConfigSource: registryConfigSourceString(p.GetConfigSource())}
+}
+
+func environmentMetaFromPB(m *pb.EnvironmentMeta) *models.EnvironmentMeta {
+	if m == nil {
+		return nil
+	}
+	out := &models.EnvironmentMeta{}
+	if p := provenanceFromPB(m.GetProvenance()); p != nil {
+		out.Provenance = p
+	}
+	if m.EffectiveGeneration != nil {
+		g := *m.EffectiveGeneration
+		out.EffectiveGeneration = &g
+	}
+	if m.SourcesFingerprint != nil {
+		out.SourcesFingerprint = *m.SourcesFingerprint
+	}
+	if out.Provenance == nil && out.EffectiveGeneration == nil && out.SourcesFingerprint == "" {
+		return nil
+	}
+	return out
+}
+
+func bundleFromPB(b *pb.BundleInfo) models.BundleInfo {
+	bi := models.BundleInfo{
+		Name: b.Name, Repository: b.Repository, Ref: b.Ref, Path: b.Path,
+	}
+	if m := b.GetMeta(); m != nil {
+		if p := provenanceFromPB(m.GetProvenance()); p != nil {
+			bi.Meta = &models.BundleMeta{Provenance: p}
+		}
+	}
+	return bi
+}
+
+func serviceFromPB(s *pb.ServiceInfo) models.ServiceInfo {
+	si := models.ServiceInfo{Name: s.Name, Upstream: s.Upstream}
+	if m := s.GetMeta(); m != nil {
+		if p := provenanceFromPB(m.GetProvenance()); p != nil {
+			si.Meta = &models.ServiceMeta{Provenance: p}
+		}
+	}
+	return si
+}
+
+func environmentFromPB(e *pb.EnvironmentInfo) models.EnvironmentInfo {
+	var bundles []models.BundleInfo
+	for _, b := range e.Bundles {
+		bundles = append(bundles, bundleFromPB(b))
+	}
+	var services []models.ServiceInfo
+	for _, s := range e.Services {
+		services = append(services, serviceFromPB(s))
+	}
+	return models.EnvironmentInfo{
+		Name:     e.Name,
+		Bundles:  bundles,
+		Services: services,
+		Meta:     environmentMetaFromPB(e.GetMeta()),
+	}
+}
+
 func (h *ControllerRegistryHandler) RegisterController(ctx context.Context, req *pb.RegisterControllerRequest) (*pb.RegisterControllerResponse, error) {
 	slog.Info("Received register controller request", "controller_id", req.ControllerId, "tenant", req.Tenant)
 
-	var environments []models.EnvironmentInfo
+	environments := make([]models.EnvironmentInfo, 0, len(req.Environments))
 	for _, pbEnv := range req.Environments {
-		var bundles []models.BundleInfo
-		for _, pbBundle := range pbEnv.Bundles {
-			bi := models.BundleInfo{
-				Name:       pbBundle.Name,
-				Repository: pbBundle.Repository,
-				Ref:        pbBundle.Ref,
-				Path:       pbBundle.Path,
-			}
-			if p := pbBundle.GetProvenance(); p != nil {
-				bi.ConfigSource = registryConfigSourceString(p.GetSource())
-			}
-			bundles = append(bundles, bi)
-		}
-		var services []models.ServiceInfo
-		for _, ps := range pbEnv.GetServices() {
-			si := models.ServiceInfo{Name: ps.GetName(), Upstream: ps.GetUpstream()}
-			if p := ps.GetProvenance(); p != nil {
-				si.ConfigSource = registryConfigSourceString(p.GetSource())
-			}
-			services = append(services, si)
-		}
-		env := models.EnvironmentInfo{Name: pbEnv.Name, Bundles: bundles, Services: services}
-		if pbEnv.GetSourcesFingerprint() != "" {
-			env.SourcesFingerprint = pbEnv.GetSourcesFingerprint()
-		}
-		if pbEnv.EffectiveGeneration != nil {
-			g := pbEnv.GetEffectiveGeneration()
-			env.EffectiveGeneration = &g
-		}
-		if s := pbEnv.GetEnvironmentConfigSource(); s != pb.ConfigSource_CONFIG_SOURCE_UNSPECIFIED {
-			env.EnvironmentConfigSource = registryConfigSourceString(s)
-		}
-		environments = append(environments, env)
+		environments = append(environments, environmentFromPB(pbEnv))
 	}
 
 	info := models.ControllerInfo{
@@ -146,41 +184,9 @@ func (h *ControllerRegistryHandler) StreamSnapshots(req *pb.StreamSnapshotsReque
 func (h *ControllerRegistryHandler) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) (*pb.HeartbeatResponse, error) {
 	slog.Debug("Received heartbeat", "controller_id", req.ControllerId)
 
-	var environments []models.EnvironmentInfo
+	environments := make([]models.EnvironmentInfo, 0, len(req.Environments))
 	for _, pbEnv := range req.Environments {
-		var bundles []models.BundleInfo
-		for _, pbBundle := range pbEnv.Bundles {
-			bi := models.BundleInfo{
-				Name:       pbBundle.Name,
-				Repository: pbBundle.Repository,
-				Ref:        pbBundle.Ref,
-				Path:       pbBundle.Path,
-			}
-			if p := pbBundle.GetProvenance(); p != nil {
-				bi.ConfigSource = registryConfigSourceString(p.GetSource())
-			}
-			bundles = append(bundles, bi)
-		}
-		var services []models.ServiceInfo
-		for _, ps := range pbEnv.GetServices() {
-			si := models.ServiceInfo{Name: ps.GetName(), Upstream: ps.GetUpstream()}
-			if p := ps.GetProvenance(); p != nil {
-				si.ConfigSource = registryConfigSourceString(p.GetSource())
-			}
-			services = append(services, si)
-		}
-		env := models.EnvironmentInfo{Name: pbEnv.Name, Bundles: bundles, Services: services}
-		if pbEnv.GetSourcesFingerprint() != "" {
-			env.SourcesFingerprint = pbEnv.GetSourcesFingerprint()
-		}
-		if pbEnv.EffectiveGeneration != nil {
-			g := pbEnv.GetEffectiveGeneration()
-			env.EffectiveGeneration = &g
-		}
-		if s := pbEnv.GetEnvironmentConfigSource(); s != pb.ConfigSource_CONFIG_SOURCE_UNSPECIFIED {
-			env.EnvironmentConfigSource = registryConfigSourceString(s)
-		}
-		environments = append(environments, env)
+		environments = append(environments, environmentFromPB(pbEnv))
 	}
 
 	if err := h.registryUseCase.Heartbeat(ctx, req.ControllerId, environments); err != nil {

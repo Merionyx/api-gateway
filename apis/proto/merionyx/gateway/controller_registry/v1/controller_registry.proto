@@ -23,40 +23,53 @@ enum ConfigSource {
   CONFIG_SOURCE_ETCD_GRPC = 3;
 }
 
-// Provenance of one static bundle in the effective list (per-bundle winner).
-message BundleProvenance {
-  ConfigSource source = 1;
+// Provenance identifies the winning static config layer for a resource (ADR 0001).
+message Provenance {
+  ConfigSource config_source = 1;
 }
 
-// EnvironmentInfo information about environment
+// EnvironmentMeta groups observability and merge metadata for a logical environment.
+message EnvironmentMeta {
+  // Dominant layer for the environment name: etcd (gRPC) if present, else in-memory (kubernetes over file).
+  Provenance provenance = 1;
+  // Materialized effective generation (controller etcd /effective/.../v1), when available.
+  optional int64 effective_generation = 2;
+  // Fingerprint of static name/type/bundles/services (hex SHA-256), aligned with materialized.
+  optional string sources_fingerprint = 3;
+}
+
+// BundleMeta is control-plane metadata for a static bundle line (separate from repository/ref identity).
+message BundleMeta {
+  Provenance provenance = 1;
+}
+
+// ServiceMeta is control-plane metadata for a static service line.
+message ServiceMeta {
+  Provenance provenance = 1;
+}
+
+// EnvironmentInfo is an environment identity plus nested bundles and services, each with its own meta.
 message EnvironmentInfo {
   string name = 1;
   repeated BundleInfo bundles = 2;
-  // Materialized effective generation when available (from controller etcd /effective/.../v1). Omitted if unknown.
-  optional int64 effective_generation = 3;
-  // Fingerprint of static name/type/bundles/services (hex SHA-256) matching materialized `sources_fingerprint` when in sync.
-  optional string sources_fingerprint = 4;
-  // Which layer “owns” the environment name: etcd (gRPC CRUD) if present, else in-memory: kubernetes over file.
-  optional ConfigSource environment_config_source = 5;
-  // Effective static services (merged) with per-service provenance.
-  repeated ServiceInfo services = 6;
+  optional EnvironmentMeta meta = 3;
+  repeated ServiceInfo services = 4;
 }
 
-// ServiceInfo is a static service line with provenance (which layer supplied the name).
+// ServiceInfo is a static service line; operational fields live in meta.
 message ServiceInfo {
   string name = 1;
   string upstream = 2;
-  BundleProvenance provenance = 3;
+  optional ServiceMeta meta = 3;
 }
 
-// BundleInfo information about bundle
+// BundleInfo is a static bundle line; provenance lives in meta.
 message BundleInfo {
   string name = 1;
   string repository = 2;
   string ref = 3;
   string path = 4;
-  // Which source’s entry won for this bundle key in the effective merge.
-  BundleProvenance provenance = 5;
+  optional BundleMeta meta = 5;
 }
 
 // RegisterControllerResponse response to registration.

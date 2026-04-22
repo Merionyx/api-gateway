@@ -56,31 +56,16 @@ func (u *TenantReadUseCase) ListEnvironmentsByTenant(ctx context.Context, tenant
 			prev, ok := byName[env.Name]
 			if !ok {
 				byName[env.Name] = models.EnvironmentInfo{
-					Name:                    env.Name,
-					Bundles:                 dedupeBundles(env.Bundles),
-					Services:                dedupeServices(env.Services),
-					EffectiveGeneration:     env.EffectiveGeneration,
-					SourcesFingerprint:      env.SourcesFingerprint,
-					EnvironmentConfigSource: env.EnvironmentConfigSource,
+					Name:     env.Name,
+					Bundles:  dedupeBundles(env.Bundles),
+					Services: dedupeServices(env.Services),
+					Meta:     cloneEnvironmentMetaForMerge(env.Meta),
 				}
 				continue
 			}
 			prev.Bundles = dedupeBundles(append(append([]models.BundleInfo{}, prev.Bundles...), env.Bundles...))
 			prev.Services = dedupeServices(append(append([]models.ServiceInfo{}, prev.Services...), env.Services...))
-			if env.EffectiveGeneration != nil {
-				if prev.EffectiveGeneration == nil || *env.EffectiveGeneration > *prev.EffectiveGeneration {
-					g := *env.EffectiveGeneration
-					prev.EffectiveGeneration = &g
-					if env.SourcesFingerprint != "" {
-						prev.SourcesFingerprint = env.SourcesFingerprint
-					}
-				}
-			} else if prev.SourcesFingerprint == "" && env.SourcesFingerprint != "" {
-				prev.SourcesFingerprint = env.SourcesFingerprint
-			}
-			if env.EnvironmentConfigSource != "" {
-				prev.EnvironmentConfigSource = strongerConfigSource(prev.EnvironmentConfigSource, env.EnvironmentConfigSource)
-			}
+			prev.Meta = mergeEnvironmentMetasForTenant(prev.Meta, env.Meta)
 			byName[env.Name] = prev
 		}
 	}
@@ -129,6 +114,70 @@ func (u *TenantReadUseCase) ListBundlesByTenant(ctx context.Context, tenant stri
 	}
 	lim := pagination.ResolveLimit(limit)
 	return pagination.PageSlice(out, lim, cursor)
+}
+
+func environmentMetaIsEmpty(m *models.EnvironmentMeta) bool {
+	if m == nil {
+		return true
+	}
+	return m.Provenance == nil && m.EffectiveGeneration == nil && m.SourcesFingerprint == ""
+}
+
+func cloneEnvironmentMetaForMerge(m *models.EnvironmentMeta) *models.EnvironmentMeta {
+	if m == nil {
+		return nil
+	}
+	out := &models.EnvironmentMeta{SourcesFingerprint: m.SourcesFingerprint}
+	if p := m.Provenance; p != nil {
+		cp := *p
+		out.Provenance = &cp
+	}
+	if m.EffectiveGeneration != nil {
+		g := *m.EffectiveGeneration
+		out.EffectiveGeneration = &g
+	}
+	if environmentMetaIsEmpty(out) {
+		return nil
+	}
+	return out
+}
+
+func mergeEnvironmentMetasForTenant(a, b *models.EnvironmentMeta) *models.EnvironmentMeta {
+	if a == nil && b == nil {
+		return nil
+	}
+	if a == nil {
+		return cloneEnvironmentMetaForMerge(b)
+	}
+	if b == nil {
+		return cloneEnvironmentMetaForMerge(a)
+	}
+	out := cloneEnvironmentMetaForMerge(a)
+	if b.EffectiveGeneration != nil {
+		if out.EffectiveGeneration == nil || *b.EffectiveGeneration > *out.EffectiveGeneration {
+			g := *b.EffectiveGeneration
+			out.EffectiveGeneration = &g
+			if b.SourcesFingerprint != "" {
+				out.SourcesFingerprint = b.SourcesFingerprint
+			}
+		}
+	} else if out.SourcesFingerprint == "" && b.SourcesFingerprint != "" {
+		out.SourcesFingerprint = b.SourcesFingerprint
+	}
+	src := strongerConfigSource(models.EnvironmentMetaConfigSource(a), models.EnvironmentMetaConfigSource(b))
+	if src != "" {
+		if out.Provenance == nil {
+			out.Provenance = &models.Provenance{ConfigSource: src}
+		} else {
+			cp := *out.Provenance
+			cp.ConfigSource = src
+			out.Provenance = &cp
+		}
+	}
+	if environmentMetaIsEmpty(out) {
+		return nil
+	}
+	return out
 }
 
 func dedupeServices(in []models.ServiceInfo) []models.ServiceInfo {
