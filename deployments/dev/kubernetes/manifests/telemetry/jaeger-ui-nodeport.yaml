@@ -1,0 +1,19 @@
+# UI only (same pattern as api-server-nodeport in workloads/services.yaml).
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-ui-nodeport
+  namespace: default
+  labels:
+    app.kubernetes.io/name: jaeger-ui-nodeport
+    app.kubernetes.io/part-of: api-gateway-dev
+    app.kubernetes.io/component: tracing
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: jaeger
+  ports:
+    - name: ui
+      port: 16686
+      targetPort: ui
+      nodePort: 30120

@@ -1,0 +1,30 @@
+# In-cluster: UI + OTLP + Zipkin. Use host "jaeger" (jaeger.default.svc.cluster.local) from pods.
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger
+  namespace: default
+  labels:
+    app.kubernetes.io/name: jaeger
+    app.kubernetes.io/part-of: api-gateway-dev
+    app.kubernetes.io/component: tracing
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: jaeger
+  ports:
+    - name: ui
+      port: 16686
+      targetPort: ui
+    - name: otlp-grpc
+      port: 4317
+      targetPort: otlp-grpc
+    - name: otlp-http
+      port: 4318
+      targetPort: otlp-http
+    - name: agent-config
+      port: 5778
+      targetPort: agent-config
+    - name: zipkin
+      port: 9411
+      targetPort: zipkin
