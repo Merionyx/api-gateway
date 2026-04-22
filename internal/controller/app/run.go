@@ -16,6 +16,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/controller/server"
 	"github.com/merionyx/api-gateway/internal/shared/metricshttp"
 	"github.com/merionyx/api-gateway/internal/shared/serviceapp"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
 
 func Run() error {
@@ -27,6 +28,12 @@ func Run() error {
 		return fmt.Errorf("load config: %w", err)
 	}
 	logger.Info("config loaded", "config", cfg)
+
+	tele, err := telemetry.Init(context.Background(), telemetry.BuildConfig("controller", cfg.Telemetry))
+	if err != nil {
+		return fmt.Errorf("telemetry: %w", err)
+	}
+	defer telemetry.Shutdown(tele)
 
 	c, err := container.NewContainer(cfg)
 	if err != nil {

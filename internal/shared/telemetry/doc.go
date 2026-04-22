@@ -4,9 +4,16 @@
 //
 // # Initialization
 //
-// Call [Init] once at process startup. When [Config.Enabled] is false, a noop
-// TracerProvider is used (no export, minimal overhead). Use the returned
-// shutdown on exit.
+// Call [Init] with [BuildConfig] (YAML [FileBlock] from Viper, then environment)
+// or [ConfigFromEnv] (environment only) once at process startup. When
+// [Config.Enabled] is false, a noop TracerProvider is used. Use the returned
+// shutdown or [Shutdown] on exit. [EnvTelemetryEnabled] in the environment
+// overrides a config file for the same key.
+//
+// Default service name: pass a stable id as the first argument to [BuildConfig]
+// (e.g. "api-server", "controller"); it is [Config.BinaryName] and the default
+// for [Config.ResolvedServiceName] when [OTEL_SERVICE_NAME] and the
+// `SERVICE_NAME` environment variable are not set.
 //
 // # Handlers
 //

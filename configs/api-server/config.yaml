@@ -40,3 +40,11 @@ idempotency:
   bundle_sync_ttl: "24h"
   etcd_key_prefix: "/api-gateway/api-server/idempotency/v1"
   cluster: ""
+
+# OpenTelemetry: optional; can be overridden (e.g. TELEMETRY_ENABLED) via environment.
+# telemetry:
+#   enabled: false
+#   service_name: "api-server"
+#   otlp_endpoint: "http://jaeger:4317"
+#   otlp_insecure: true
+#   otlp_protocol: "grpc"

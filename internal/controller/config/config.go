@@ -9,6 +9,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/shared/etcd"
 	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
 	"github.com/merionyx/api-gateway/internal/shared/metricshttp"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
@@ -33,6 +34,8 @@ type Config struct {
 	// GRPCAPIServerClient: TLS when dialing API Server (RegisterAndStream).
 	GRPCAPIServerClient grpcobs.ClientTLSConfig `mapstructure:"grpc_api_server_client" json:"grpc_api_server_client"`
 	MetricsHTTP         metricshttp.Config      `mapstructure:"metrics_http" json:"metrics_http"`
+	// Telemetry: OpenTelemetry trace export (optional). Merged with env; see FileBlock in the telemetry package.
+	Telemetry telemetry.FileBlock `mapstructure:"telemetry" json:"telemetry"`
 }
 
 // GRPCServerSection groups server TLS and observability for one gRPC listener.

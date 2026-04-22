@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -8,6 +9,8 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
 
 func Run() error {
@@ -20,6 +23,12 @@ func Run() error {
 	if environment == "" {
 		environment = "unknown"
 	}
+
+	tele, err := telemetry.Init(context.Background(), telemetry.BuildConfig("mock-service", telemetry.FileBlock{}))
+	if err != nil {
+		return fmt.Errorf("telemetry: %w", err)
+	}
+	defer telemetry.Shutdown(tele)
 
 	port := os.Getenv("PORT")
 	if port == "" {
