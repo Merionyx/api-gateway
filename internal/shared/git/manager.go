@@ -146,11 +146,17 @@ func (rm *RepositoryManager) GetRepositorySnapshots(ctx context.Context, name st
 }
 
 func isCommitHash(ref string) bool {
-	if len(ref) != 40 {
+	if len(ref) < 7 || len(ref) > 40 {
 		return false
 	}
-	_, ok := plumbing.FromHex(ref)
-	return ok
+
+	for _, c := range ref {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (rm *RepositoryManager) getSnapshotsFromGit(managedRepo *ManagedRepo, ref string, path string) ([]ContractSnapshot, error) {
@@ -177,7 +183,7 @@ func (rm *RepositoryManager) getSnapshotsFromGit(managedRepo *ManagedRepo, ref s
 		}
 	} else {
 		checkoutOptions = &gogit.CheckoutOptions{
-			Branch: plumbing.ReferenceName("refs/" + ref),
+			Branch: plumbing.NewBranchReferenceName(ref),
 		}
 	}
 
@@ -294,10 +300,11 @@ func syncLocalGitWorktree(w *gogit.Worktree, clientOpts []gitclient.Option, name
 		ClientOptions: clientOpts,
 	})
 	if err != nil {
-		if err != gogit.NoErrAlreadyUpToDate {
-			return fmt.Errorf("failed to pull repository %s: %w", name, err)
+		if err == gogit.NoErrAlreadyUpToDate {
+			slog.Debug("repository already up to date", "repository", name)
+			return nil
 		}
-		slog.Debug("repository already up to date", "repository", name)
+		return fmt.Errorf("failed to pull repository %s: %w", name, err)
 	}
 	slog.Debug("pulled repository", "repository", name)
 	return nil
