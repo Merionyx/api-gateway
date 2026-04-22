@@ -23,7 +23,9 @@ type Config struct {
 	Tenant              string                     `mapstructure:"tenant" json:"tenant"`
 	HA                  HAConfig                   `mapstructure:"ha" json:"ha"`
 	LeaderElection      LeaderElectionConfig       `mapstructure:"leader_election" json:"leader_election"`
-	KubernetesDiscovery *KubernetesDiscoveryConfig `mapstructure:"kubernetes_discovery" json:"kubernetes_discovery"`
+	// EffectiveMaterialized: write merged effective (static) to etcd for observability (ADR 0001, phase 2). Leader only.
+	EffectiveMaterialized EffectiveMaterializedConfig `mapstructure:"effective_materialized" json:"effective_materialized"`
+	KubernetesDiscovery *KubernetesDiscoveryConfig  `mapstructure:"kubernetes_discovery" json:"kubernetes_discovery"`
 	// GRPCControlPlane: TLS and observability for the management gRPC API (snapshots, environments, schemas, auth).
 	GRPCControlPlane GRPCServerSection `mapstructure:"grpc_control_plane" json:"grpc_control_plane"`
 	// GRPCXDS: TLS and observability for the Envoy xDS gRPC server.
@@ -59,6 +61,11 @@ type LeaderElectionConfig struct {
 	KeyPrefix         string `mapstructure:"key_prefix" json:"key_prefix"`
 	Identity          string `mapstructure:"identity" json:"identity"`
 	SessionTTLSeconds int    `mapstructure:"session_ttl_seconds" json:"session_ttl_seconds"`
+}
+
+// EffectiveMaterializedConfig controls persistence of merged effective static config (ADR 0001).
+type EffectiveMaterializedConfig struct {
+	WriteEnabled bool `mapstructure:"write_enabled" json:"write_enabled"`
 }
 
 type APIServerConfig struct {
@@ -113,6 +120,7 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("leader_election.enabled", true)
 	v.SetDefault("leader_election.key_prefix", "/api-gateway/controller/election/leader")
 	v.SetDefault("leader_election.session_ttl_seconds", 5)
+	v.SetDefault("effective_materialized.write_enabled", true)
 	setDefaultGRPCObservability(v, "grpc_control_plane.observability")
 	setDefaultGRPCObservability(v, "grpc_xds.observability")
 	v.SetDefault("metrics_http.enabled", false)

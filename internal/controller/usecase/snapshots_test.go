@@ -16,7 +16,7 @@ type snapEnvFake struct {
 	list map[string]*models.Environment
 }
 
-func (snapEnvFake) SetDependencies(interfaces.EnvironmentRepository, interfaces.SchemasUseCase, *xdscache.SnapshotManager, interfaces.XDSBuilder) {
+func (snapEnvFake) SetDependencies(interfaces.EnvironmentRepository, interfaces.InMemoryEnvironmentsRepository, interfaces.SchemasUseCase, *xdscache.SnapshotManager, interfaces.XDSBuilder) {
 }
 
 func (f snapEnvFake) CreateEnvironment(context.Context, *models.CreateEnvironmentRequest) (*models.Environment, error) {
@@ -107,7 +107,7 @@ type snapFakeGet struct {
 	env *models.Environment
 }
 
-func (snapFakeGet) SetDependencies(interfaces.EnvironmentRepository, interfaces.SchemasUseCase, *xdscache.SnapshotManager, interfaces.XDSBuilder) {
+func (snapFakeGet) SetDependencies(interfaces.EnvironmentRepository, interfaces.InMemoryEnvironmentsRepository, interfaces.SchemasUseCase, *xdscache.SnapshotManager, interfaces.XDSBuilder) {
 }
 func (f snapFakeGet) GetEnvironment(context.Context, string) (*models.Environment, error) {
 	return f.env, nil

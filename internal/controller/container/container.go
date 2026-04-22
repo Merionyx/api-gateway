@@ -87,6 +87,12 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 	c.initHandlers()
 	if mem, ok := c.InMemoryEnvironmentsRepository.(*memory.EnvironmentsRepository); ok {
 		mem.SetBundleEnvIndex(c.BundleEnvIndex, c.Config.MetricsHTTP.Enabled)
+		mem.SetEffectiveReconcile(
+			c.EnvironmentRepository,
+			c.LeaderGate,
+			ctrlrepoetcd.NewMaterializedStore(c.EtcdClient),
+			c.Config.EffectiveMaterialized.WriteEnabled,
+		)
 	}
 	if err := c.initInMemoryRepositories(); err != nil {
 		return nil, err
@@ -161,7 +167,7 @@ func (c *Container) initUseCases() {
 	c.SchemasUseCase = usecase.NewSchemasUseCase()
 
 	// Two-phase wiring: use cases reference each other; order matches dependency direction (schemas → env → snapshots).
-	c.EnvironmentsUseCase.SetDependencies(c.EnvironmentRepository, c.SchemasUseCase, c.XDSSnapshotManager, c.XDSBuilder)
+	c.EnvironmentsUseCase.SetDependencies(c.EnvironmentRepository, c.InMemoryEnvironmentsRepository, c.SchemasUseCase, c.XDSSnapshotManager, c.XDSBuilder)
 	c.SnapshotsUseCase.SetDependencies(c.EnvironmentsUseCase, c.XDSSnapshotManager, c.XDSBuilder)
 	c.SchemasUseCase.SetDependencies(c.SchemaRepository, c.EnvironmentRepository)
 

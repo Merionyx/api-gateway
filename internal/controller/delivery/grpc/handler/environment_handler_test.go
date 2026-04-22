@@ -17,7 +17,7 @@ import (
 
 type noopEnvUC struct{}
 
-func (noopEnvUC) SetDependencies(interfaces.EnvironmentRepository, interfaces.SchemasUseCase, *xdscache.SnapshotManager, interfaces.XDSBuilder) {
+func (noopEnvUC) SetDependencies(interfaces.EnvironmentRepository, interfaces.InMemoryEnvironmentsRepository, interfaces.SchemasUseCase, *xdscache.SnapshotManager, interfaces.XDSBuilder) {
 }
 
 func (noopEnvUC) CreateEnvironment(context.Context, *models.CreateEnvironmentRequest) (*models.Environment, error) {

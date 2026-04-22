@@ -34,6 +34,11 @@ func TestClassifyControllerEtcdWatchKey(t *testing.T) {
 			want: ControllerEtcdKeyEffect{Environment: "staging"},
 		},
 		{
+			name: "materialized_effective_ignored",
+			key:  etcd.EffectiveMaterializedPrefix + "dev/v1",
+			want: ControllerEtcdKeyEffect{Ignore: true},
+		},
+		{
 			name: "unknown_under_controller",
 			key:  etcd.ControllerWatchPrefix + "other/sub/key",
 			want: ControllerEtcdKeyEffect{UnknownUnderPrefix: true},

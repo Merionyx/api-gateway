@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -73,16 +74,14 @@ func (uc *APIServerSyncUseCase) effectiveEnvironmentSkeleton(ctx context.Context
 		}
 	}
 
-	if mem == nil && etcdEnv == nil {
-		return nil, fmt.Errorf("environment %s not found", name)
+	skel, err := envmodel.BuildOptionalEffectiveEnvironment(mem, etcdEnv)
+	if err != nil {
+		if errors.Is(err, envmodel.ErrBuildEffectiveNotFound) {
+			return nil, fmt.Errorf("environment %s not found", name)
+		}
+		return nil, err
 	}
-	if mem == nil {
-		return envmodel.ToAPIServerSkeleton(etcdEnv), nil
-	}
-	if etcdEnv == nil {
-		return envmodel.ToAPIServerSkeleton(mem), nil
-	}
-	return envmodel.MergeInMemoryWithEtcd(mem, etcdEnv), nil
+	return skel, nil
 }
 
 // buildEnvironmentsForAPIServer returns the full declared environment set for Register/Heartbeat

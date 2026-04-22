@@ -50,6 +50,11 @@ type InMemoryServiceRepository interface {
 	SetKubernetesGlobalServices(services []models.StaticServiceConfig)
 }
 
+// MaterializedEffectiveStore persists idempotent materialized effective (static) to etcd (ADR 0001). Optional; may be nil.
+type MaterializedEffectiveStore interface {
+	ReconcileIfChanged(ctx context.Context, skel *models.Environment) error
+}
+
 type InMemoryEnvironmentsRepository interface {
 	// SetDependencies must run before Initialize so merged config/Kubernetes updates can rebuild xDS.
 	SetDependencies(xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder XDSBuilder, schemaRepo SchemaRepository)

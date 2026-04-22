@@ -53,7 +53,7 @@ func TestEnvironmentsUseCase_CreateEnvironment(t *testing.T) {
 
 	uc := NewEnvironmentsUseCase().(*environmentsUseCase)
 	repo := &fakeEnvRepo{}
-	uc.SetDependencies(repo, su, sm, xb)
+	uc.SetDependencies(repo, nil, su, sm, xb)
 
 	env, err := uc.CreateEnvironment(context.Background(), &models.CreateEnvironmentRequest{
 		Name: "test-env",
@@ -80,7 +80,7 @@ func TestEnvironmentsUseCase_CreateEnvironment_AlreadyExists(t *testing.T) {
 	su := NewSchemasUseCase().(*schemasUseCase)
 	su.SetDependencies(&fakeSchemaRepo{}, nil)
 	uc := NewEnvironmentsUseCase().(*environmentsUseCase)
-	uc.SetDependencies(&fakeEnvRepo{get: &models.Environment{Name: "e1"}}, su, sm, xb)
+	uc.SetDependencies(&fakeEnvRepo{get: &models.Environment{Name: "e1"}}, nil, su, sm, xb)
 
 	_, err := uc.CreateEnvironment(context.Background(), &models.CreateEnvironmentRequest{Name: "e1"})
 	if err == nil {

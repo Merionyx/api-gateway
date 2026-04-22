@@ -21,7 +21,7 @@ type SnapshotsUseCase interface {
 
 // EnvironmentsUseCase manages environments in etcd and xDS. SetDependencies is two-phase wiring (see container).
 type EnvironmentsUseCase interface {
-	SetDependencies(environmentRepo EnvironmentRepository, schemasUseCase SchemasUseCase, xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder XDSBuilder)
+	SetDependencies(environmentRepo EnvironmentRepository, inMemory InMemoryEnvironmentsRepository, schemasUseCase SchemasUseCase, xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder XDSBuilder)
 
 	CreateEnvironment(ctx context.Context, req *models.CreateEnvironmentRequest) (*models.Environment, error)
 	GetEnvironment(ctx context.Context, name string) (*models.Environment, error)
