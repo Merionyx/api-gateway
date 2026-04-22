@@ -9,6 +9,55 @@ import (
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 )
 
+// FingerprintK8sDiscovery is a single stable hash of the K8s discovery result: per-name
+// environments (static bundles and services) plus cluster-global upstreams. Ordering of map
+// iteration and list appends is normalized; [DiscoveryRef] is excluded, matching
+// [FingerprintStaticEnvironment].
+func FingerprintK8sDiscovery(envs map[string]*models.Environment, globals []models.StaticServiceConfig) string {
+	keys := make([]string, 0, len(envs))
+	for k := range envs {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	entries := make([]k8sDiscoveryEnvEntry, 0, len(keys))
+	for _, name := range keys {
+		entries = append(entries, k8sDiscoveryEnvEntry{
+			Name:          name,
+			StaticStateFP: FingerprintStaticEnvironment(envs[name]),
+		})
+	}
+	gs := make([]k8sDiscoveryServiceRow, 0, len(globals))
+	for i := range globals {
+		s := &globals[i]
+		gs = append(gs, k8sDiscoveryServiceRow{Name: s.Name, Upstream: s.Upstream})
+	}
+	sort.Slice(gs, func(i, j int) bool {
+		if gs[i].Name != gs[j].Name {
+			return gs[i].Name < gs[j].Name
+		}
+		return gs[i].Upstream < gs[j].Upstream
+	})
+	p := k8sDiscoveryFPPayload{Environments: entries, GlobalServices: gs}
+	b, _ := json.Marshal(p)
+	h := sha256.Sum256(b)
+	return hex.EncodeToString(h[:])
+}
+
+type k8sDiscoveryEnvEntry struct {
+	Name          string `json:"name"`
+	StaticStateFP string `json:"staticStateFp"`
+}
+
+type k8sDiscoveryServiceRow struct {
+	Name     string `json:"name"`
+	Upstream string `json:"upstream"`
+}
+
+type k8sDiscoveryFPPayload struct {
+	Environments   []k8sDiscoveryEnvEntry   `json:"environments"`
+	GlobalServices []k8sDiscoveryServiceRow `json:"globalServices"`
+}
+
 // FingerprintStaticEnvironment returns a stable hex-encoded SHA-256 of the name, type, and
 // static bundles and services, for idempotent materialized effective writes. Snapshots are
 // not included.

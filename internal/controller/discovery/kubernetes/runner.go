@@ -15,6 +15,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/controller/config"
 	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/controller/envmodel"
 	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 
 	corev1 "k8s.io/api/core/v1"
@@ -42,6 +43,8 @@ type Runner struct {
 	cfg     *config.KubernetesDiscoveryConfig
 	envRepo interfaces.InMemoryEnvironmentsRepository
 	svcRepo interfaces.InMemoryServiceRepository
+	// lastK8sDiscoveryFP is a fingerprint of the last successful ApplyKubernetesEnvironments+globals push.
+	lastK8sDiscoveryFP string
 }
 
 func restConfig() (*rest.Config, error) {
@@ -229,8 +232,16 @@ func (r *Runner) applyCoreServices(ctx context.Context, listOpts []client.ListOp
 }
 
 func (r *Runner) reconcileGlobalServices(ctx context.Context, st *k8sSyncState) error {
+	fp := envmodel.FingerprintK8sDiscovery(st.envs, st.globals)
+	if fp == r.lastK8sDiscoveryFP {
+		return nil
+	}
 	r.svcRepo.SetKubernetesGlobalServices(st.globals)
-	return r.envRepo.ApplyKubernetesEnvironments(ctx, st.envs)
+	if err := r.envRepo.ApplyKubernetesEnvironments(ctx, st.envs); err != nil {
+		return err
+	}
+	r.lastK8sDiscoveryFP = fp
+	return nil
 }
 
 func (r *Runner) listOpts() []client.ListOption {
