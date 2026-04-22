@@ -8,26 +8,24 @@ import (
 	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
 
-// path for span names, aligned with the package that wires the HTTP app (one span per request).
-const spanAPIHTTPServerPkg = "internal/api-server/server"
-
 // httpTraceMiddleware runs W3C TraceContext extraction, starts a request span, stores the
 // trace on [fiber.Ctx] (handlers use [fiber.Ctx.Context] in use case calls), and on exit
-// records HTTP status. The span name is updated to the matched route pattern after
-// [fiber.Ctx.Next] when available.
+// records HTTP status. Span names are "{METHOD} {path}" (route template from [fiber.Ctx.FullPath]
+// after a match) — not `telemetry.SpanName` with a package prefix, so names don’t look
+// like `.../server.GET` glued to the path.
 func httpTraceMiddleware() fiber.Handler {
 	return func(c fiber.Ctx) error {
 		ctx := c.Context()
 		ctx = telemetry.ExtractIncomingHTTP(ctx, http.Header(c.GetReqHeaders()))
 		prov := c.Method() + " " + c.Path()
-		ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanAPIHTTPServerPkg, prov))
+		ctx, span := telemetry.Start(ctx, prov)
 		c.SetContext(ctx)
 
 		err := c.Next()
 
 		if c.Matched() {
 			if fp := c.FullPath(); fp != "" {
-				span.SetName(telemetry.SpanName(spanAPIHTTPServerPkg, c.Method()+" "+fp))
+				span.SetName(c.Method() + " " + fp)
 			}
 		}
 
