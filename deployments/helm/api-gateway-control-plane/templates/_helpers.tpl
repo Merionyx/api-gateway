@@ -314,20 +314,39 @@ api_server:
   address: {{ printf "%s:19093" (include "agwcp.svc.apiServer" .) | quote }}
 {{- end }}
 
+{{/*
+  Global .telemetry merged with .components.<name>.telemetry (component keys win).
+  Shapes the same keys as internal/shared/telemetry FileBlock in repo YAML.
+*/}}
+{{- define "agwcp.telemetry.merged" -}}
+{{- $root := index . 0 -}}
+{{- $compName := index . 1 -}}
+{{- $g := $root.Values.telemetry | default dict -}}
+{{- $c := index $root.Values.components $compName -}}
+{{- $p := $c.telemetry | default dict -}}
+{{- toYaml (mergeOverwrite (mergeOverwrite (dict) $g) $p) -}}
+{{- end }}
+
 {{- define "agwcp.controller.config.merged" -}}
 {{- $def := fromYaml (include "agwcp.controller.config.defaults" .) -}}
+{{- $tel := fromYaml (include "agwcp.telemetry.merged" (list . "controller")) -}}
+{{- $withTel := mergeOverwrite $def (dict "telemetry" $tel) -}}
 {{- $usr := .Values.components.controller.config | default dict -}}
-{{- toYaml (mergeOverwrite $def $usr) -}}
+{{- toYaml (mergeOverwrite $withTel $usr) -}}
 {{- end }}
 
 {{- define "agwcp.apiServer.config.merged" -}}
 {{- $def := fromYaml (include "agwcp.apiServer.config.defaults" .) -}}
+{{- $tel := fromYaml (include "agwcp.telemetry.merged" (list . "apiServer")) -}}
+{{- $withTel := mergeOverwrite $def (dict "telemetry" $tel) -}}
 {{- $usr := .Values.components.apiServer.config | default dict -}}
-{{- toYaml (mergeOverwrite $def $usr) -}}
+{{- toYaml (mergeOverwrite $withTel $usr) -}}
 {{- end }}
 
 {{- define "agwcp.contractSyncer.config.merged" -}}
 {{- $def := fromYaml (include "agwcp.contractSyncer.config.defaults" .) -}}
+{{- $tel := fromYaml (include "agwcp.telemetry.merged" (list . "contractSyncer")) -}}
+{{- $withTel := mergeOverwrite $def (dict "telemetry" $tel) -}}
 {{- $usr := .Values.components.contractSyncer.config | default dict -}}
-{{- toYaml (mergeOverwrite $def $usr) -}}
+{{- toYaml (mergeOverwrite $withTel $usr) -}}
 {{- end }}

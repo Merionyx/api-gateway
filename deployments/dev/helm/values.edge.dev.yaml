@@ -5,7 +5,18 @@
 # Requires: control plane with useNamespaceCAChain already installed, Issuer and CA Secret exist.
 #
 #   helm upgrade --install edge-dev ./deployments/helm/api-gateway-edge -n api-gateway \
-#     -f ./deployments/helm/api-gateway-edge/values.edge.dev.yaml
+#     -f ./deployments/dev/helm/values.edge.dev.yaml
+#
+# Upgrade existing release:
+#   helm upgrade edge-dev ./deployments/helm/api-gateway-edge -n api-gateway -f ./deployments/dev/helm/values.edge.dev.yaml
+#
+# Jaeger: deployments/dev/kubernetes/manifests/telemetry (Service jaeger in namespace default, OTLP 4317).
+
+telemetry:
+  enabled: true
+  otlp_endpoint: "http://jaeger.default.svc.cluster.local:4317"
+  otlp_insecure: true
+  otlp_protocol: grpc
 
 connectivity:
   envoyNodeId: envoy-dev

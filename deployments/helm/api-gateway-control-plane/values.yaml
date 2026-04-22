@@ -12,6 +12,18 @@ global:
 defaultPodAntiAffinity: true
 defaultTopologySpreadConstraints: true
 
+# OpenTelemetry (optional). Merged into each component app `config` as a top-level `telemetry:` key.
+# Per-component merge overwrites these keys: see `components.<name>.telemetry`.
+# Maps to the same structure as the `telemetry` section in repo config YAML
+# (enabled, service_name, otlp_endpoint, otlp_insecure, otlp_protocol).
+# Base is off: enable explicitly when a collector (e.g. Jaeger OTLP) is available.
+telemetry:
+  enabled: false
+  # service_name: ""          # optional; app defaults to the binary (api-server, controller, …)
+  # otlp_endpoint: ""         # e.g. http://jaeger.observability.svc.cluster.local:4317
+  # otlp_insecure: true
+  # otlp_protocol: "grpc"     # grpc | http
+
 etcd:
   endpoints: []
   tls:
@@ -70,6 +82,7 @@ components:
         gateway.merionyx.com/team: demo
     tenant: cluster-default
     config: {}
+    telemetry: {}
 
   apiServer:
     enabled: true
@@ -91,6 +104,8 @@ components:
       existingSecret: ""
     # Merged over chart defaults (e.g. readiness.require_contract_syncer for GET /ready).
     config: {}
+    # Merged over global .telemetry; use to override tracing for this component only.
+    telemetry: {}
 
   contractSyncer:
     enabled: true
@@ -118,3 +133,4 @@ components:
     #     secretKey: token
     repositoryTokens: []
     config: {}
+    telemetry: {}

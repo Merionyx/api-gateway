@@ -1,6 +1,9 @@
 # Local test of control plane.
-# Example installation (release local-cp, NS api-gateway):
-#   helm upgrade --install local-cp ./deployments/helm/api-gateway-control-plane -n api-gateway --create-namespace -f values.local.yaml
+# Example installation (release local-cp, NS api-gateway), from repo root:
+#   helm upgrade --install local-cp ./deployments/helm/api-gateway-control-plane -n api-gateway --create-namespace -f ./deployments/dev/helm/values.cp.local.yaml
+#
+# To apply the same file to an existing release (e.g. after editing this file):
+#   helm upgrade local-cp ./deployments/helm/api-gateway-control-plane -n api-gateway -f ./deployments/dev/helm/values.cp.local.yaml
 #
 # Important: Secrets are mounted only from the SAME namespace as the release (here api-gateway).
 # If etcd-client-tls is in another namespace (e.g. etcd), copy it to api-gateway:
@@ -13,6 +16,15 @@
 # Also in api-gateway must be: api-gateway-jwt-keys, api-gateway-contract-syncer (if used below).
 
 namespace: api-gateway
+
+# OTLP в Jaeger all-in-one из deployments/dev/kubernetes/manifests/telemetry
+# (Service jaeger, namespace default, порт 4317 — см. jaeger-service.yaml).
+
+telemetry:
+  enabled: true
+  otlp_endpoint: "http://jaeger.default.svc.cluster.local:4317"
+  otlp_insecure: true
+  otlp_protocol: grpc
 
 # Convenient for images from docker load / kind load:
 global:

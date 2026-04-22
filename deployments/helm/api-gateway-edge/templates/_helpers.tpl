@@ -121,10 +121,18 @@ metrics_http:
   path: "/metrics"
 {{- end }}
 
+{{- define "agwedge.telemetry.merged" -}}
+{{- $g := .Values.telemetry | default dict -}}
+{{- $p := .Values.authSidecar.telemetry | default dict -}}
+{{- toYaml (mergeOverwrite (mergeOverwrite (dict) $g) $p) -}}
+{{- end }}
+
 {{- define "agwedge.auth.config.merged" -}}
 {{- $def := fromYaml (include "agwedge.auth.config.defaults" .) -}}
+{{- $tel := fromYaml (include "agwedge.telemetry.merged" .) -}}
+{{- $withTel := mergeOverwrite $def (dict "telemetry" $tel) -}}
 {{- $usr := .Values.authSidecar.config | default dict -}}
-{{- toYaml (mergeOverwrite $def $usr) -}}
+{{- toYaml (mergeOverwrite $withTel $usr) -}}
 {{- end }}
 
 {{/* Envoy bootstrap file (ConfigMap data key envoy.xds-tls.yaml); used for checksum + configmap. */}}

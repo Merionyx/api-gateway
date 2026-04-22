@@ -10,6 +10,15 @@ global:
 
 replicaCount: 1
 
+# OpenTelemetry; merged as top-level `telemetry` into the auth sidecar app config
+# (same keys as internal/shared/telemetry FileBlock). Overridden by `authSidecar.telemetry`.
+telemetry:
+  enabled: false
+  # service_name: ""
+  # otlp_endpoint: ""
+  # otlp_insecure: true
+  # otlp_protocol: "grpc"
+
 defaultPodAntiAffinity: true
 defaultTopologySpreadConstraints: true
 
@@ -41,6 +50,8 @@ authSidecar:
   topologySpreadConstraints: []
   hostAliases: []
   config: {}
+  # Merged over global .telemetry for the auth sidecar only.
+  telemetry: {}
 
 # Explicit connectivity (set to your control-plane Services / cross-cluster DNS)
 connectivity:
