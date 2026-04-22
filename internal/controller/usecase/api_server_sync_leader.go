@@ -17,12 +17,16 @@ import (
 	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
 	"github.com/merionyx/api-gateway/internal/shared/grpcutil"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
 )
+
+// spanUsecaseAPIPkg is the import path of this file for [telemetry.SpanName].
+const spanUsecaseAPIPkg = "github.com/merionyx/api-gateway/internal/controller/usecase"
 
 // leaderAPIServerStream runs the long-lived gRPC session to the API Server (this replica when
 // it is the cluster leader): register, heartbeat, snapshot stream, save to schema etcd, xDS nudge.
@@ -138,19 +142,25 @@ func (l *leaderAPIServerStream) runAPIServerSession(parentCtx context.Context) e
 }
 
 func (l *leaderAPIServerStream) registerController(ctx context.Context, client pb.ControllerRegistryServiceClient) error {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseAPIPkg, "registerController"))
+	defer span.End()
+	rpcCtx := telemetry.OutgoingContextWithTrace(ctx)
+
 	environments, report, err := l.reg.buildEnvironmentsForAPIServer(ctx)
 	observeRegistryEnvironmentsBuildDegradation(ctx, l.config, registryOpRegister, &report)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return err
 	}
 
-	_, err = client.RegisterController(ctx, &pb.RegisterControllerRequest{
+	_, err = client.RegisterController(rpcCtx, &pb.RegisterControllerRequest{
 		ControllerId:           l.controllerID,
 		Tenant:                 l.config.Tenant,
 		Environments:           environments,
 		RegistryPayloadVersion: RegistryPayloadVersionV1,
 	})
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return err
 	}
 
@@ -167,18 +177,24 @@ func (l *leaderAPIServerStream) startHeartbeat(ctx context.Context, client pb.Co
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			environments, report, err := l.reg.buildEnvironmentsForAPIServer(ctx)
+			hctx, hspan := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseAPIPkg, "sendHeartbeat"))
+			environments, report, err := l.reg.buildEnvironmentsForAPIServer(hctx)
 			observeRegistryEnvironmentsBuildDegradation(ctx, l.config, registryOpHeartbeat, &report)
 			if err != nil {
+				telemetry.MarkError(hspan, err)
+				hspan.End()
 				slog.Error("build environments for heartbeat", "error", err)
 				continue
 			}
 
-			_, err = client.Heartbeat(ctx, &pb.HeartbeatRequest{
+			rpcCtx := telemetry.OutgoingContextWithTrace(hctx)
+			_, err = client.Heartbeat(rpcCtx, &pb.HeartbeatRequest{
 				ControllerId:           l.controllerID,
 				Environments:           environments,
 				RegistryPayloadVersion: RegistryPayloadVersionV1,
 			})
+			telemetry.MarkError(hspan, err)
+			hspan.End()
 			if err != nil {
 				slog.Error("send heartbeat", "error", err)
 			}
@@ -186,8 +202,16 @@ func (l *leaderAPIServerStream) startHeartbeat(ctx context.Context, client pb.Co
 	}
 }
 
-func (l *leaderAPIServerStream) streamSnapshots(ctx context.Context, client pb.ControllerRegistryServiceClient) error {
-	stream, err := client.StreamSnapshots(ctx, &pb.StreamSnapshotsRequest{
+func (l *leaderAPIServerStream) streamSnapshots(ctx context.Context, client pb.ControllerRegistryServiceClient) (err error) {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseAPIPkg, "streamSnapshots"))
+	defer func() {
+		if err != nil {
+			telemetry.MarkError(span, err)
+		}
+		span.End()
+	}()
+	rpcCtx := telemetry.OutgoingContextWithTrace(ctx)
+	stream, err := client.StreamSnapshots(rpcCtx, &pb.StreamSnapshotsRequest{
 		ControllerId: l.controllerID,
 	})
 	if err != nil {

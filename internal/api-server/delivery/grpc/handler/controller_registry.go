@@ -11,7 +11,11 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
+
+// spanHandlerPkg is the import path of this package (span names: {importPath}.MethodName).
+const spanHandlerPkg = "github.com/merionyx/api-gateway/internal/api-server/delivery/grpc/handler"
 
 type ControllerRegistryHandler struct {
 	pb.UnimplementedControllerRegistryServiceServer
@@ -170,6 +174,9 @@ func environmentFromPB(e *pb.EnvironmentInfo) models.EnvironmentInfo {
 }
 
 func (h *ControllerRegistryHandler) RegisterController(ctx context.Context, req *pb.RegisterControllerRequest) (*pb.RegisterControllerResponse, error) {
+	ctx, span := telemetry.ServerSpan(ctx, spanHandlerPkg, "RegisterController")
+	defer span.End()
+
 	slog.Info("Received register controller request", "controller_id", req.ControllerId, "tenant", req.Tenant)
 
 	environments := make([]models.EnvironmentInfo, 0, len(req.Environments))
@@ -185,6 +192,7 @@ func (h *ControllerRegistryHandler) RegisterController(ctx context.Context, req 
 	}
 
 	if err := h.registryUseCase.RegisterController(ctx, info); err != nil {
+		telemetry.MarkError(span, err)
 		slog.Error("Failed to register controller", "error", err)
 		return nil, grpcerr.Status(h.metricsEnabled, err)
 	}
@@ -229,11 +237,15 @@ func (w *snapshotStreamWrapper) Send(environment, bundleKey string, snapshots []
 }
 
 func (h *ControllerRegistryHandler) StreamSnapshots(req *pb.StreamSnapshotsRequest, stream pb.ControllerRegistryService_StreamSnapshotsServer) error {
+	ctx, span := telemetry.ServerSpan(stream.Context(), spanHandlerPkg, "StreamSnapshots")
+	defer span.End()
+
 	slog.Info("Starting snapshot stream", "controller_id", req.ControllerId)
 
 	wrapper := &snapshotStreamWrapper{stream: stream}
 
-	if err := h.registryUseCase.StreamSnapshots(stream.Context(), req.ControllerId, wrapper); err != nil {
+	if err := h.registryUseCase.StreamSnapshots(ctx, req.ControllerId, wrapper); err != nil {
+		telemetry.MarkError(span, err)
 		slog.Error("Stream error", "error", err)
 		return grpcerr.Status(h.metricsEnabled, err)
 	}
@@ -242,6 +254,9 @@ func (h *ControllerRegistryHandler) StreamSnapshots(req *pb.StreamSnapshotsReque
 }
 
 func (h *ControllerRegistryHandler) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) (*pb.HeartbeatResponse, error) {
+	ctx, span := telemetry.ServerSpan(ctx, spanHandlerPkg, "Heartbeat")
+	defer span.End()
+
 	slog.Debug("Received heartbeat", "controller_id", req.ControllerId)
 
 	environments := make([]models.EnvironmentInfo, 0, len(req.Environments))
@@ -250,6 +265,7 @@ func (h *ControllerRegistryHandler) Heartbeat(ctx context.Context, req *pb.Heart
 	}
 
 	if err := h.registryUseCase.Heartbeat(ctx, req.ControllerId, environments, req.RegistryPayloadVersion); err != nil {
+		telemetry.MarkError(span, err)
 		slog.Error("Failed to process heartbeat", "error", err)
 		return nil, grpcerr.Status(h.metricsEnabled, err)
 	}

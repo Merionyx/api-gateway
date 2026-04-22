@@ -15,6 +15,12 @@
 // for [Config.ResolvedServiceName] when [OTEL_SERVICE_NAME] and the
 // `SERVICE_NAME` environment variable are not set.
 //
+// # gRPC
+//
+// On the server, use [ServerSpan] (or [ExtractIncomingGRPC] then [Start]) at the
+// start of each method. On the client, [Start] then [OutgoingContextWithTrace]
+// with the gRPC call context.
+//
 // # Handlers
 //
 // In each gRPC or HTTP handler, start a span and pass the returned

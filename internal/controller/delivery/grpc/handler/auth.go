@@ -14,6 +14,7 @@ import (
 	ctrlmetrics "github.com/merionyx/api-gateway/internal/controller/metrics"
 	"github.com/merionyx/api-gateway/internal/controller/repository/cache"
 	"github.com/merionyx/api-gateway/internal/controller/repository/etcd"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
@@ -67,10 +68,12 @@ func NewAuthHandler(
 
 // SyncAccess — bidirectional streaming for synchronization.
 func (h *AuthHandler) SyncAccess(stream authv1.AuthService_SyncAccessServer) error {
-	ctx := stream.Context()
+	ctx, span := telemetry.ServerSpan(stream.Context(), spanHandlerPkg, "SyncAccess")
+	defer span.End()
 
 	req, err := stream.Recv()
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return err
 	}
 
@@ -145,8 +148,12 @@ func (h *AuthHandler) SyncAccess(stream authv1.AuthService_SyncAccessServer) err
 
 // GetAccessConfig — get the current configuration (unary).
 func (h *AuthHandler) GetAccessConfig(ctx context.Context, req *authv1.GetAccessConfigRequest) (*authv1.GetAccessConfigResponse, error) {
+	ctx, span := telemetry.ServerSpan(ctx, spanHandlerPkg, "GetAccessConfig")
+	defer span.End()
+
 	cfg, err := h.buildAccessConfig(ctx, req.Environment)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return nil, err
 	}
 	return &authv1.GetAccessConfigResponse{Config: cfg}, nil

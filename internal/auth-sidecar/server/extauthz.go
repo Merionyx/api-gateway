@@ -20,6 +20,7 @@ import (
 	authmetrics "github.com/merionyx/api-gateway/internal/auth-sidecar/metrics"
 	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
 	"github.com/merionyx/api-gateway/internal/shared/serviceapp"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 	"github.com/merionyx/api-gateway/internal/shared/utils"
 )
 
@@ -58,6 +59,9 @@ func RunExtAuthzServer(ctx context.Context, cnt *container.Container) error {
 
 // Check implements the ext_authz Check method
 func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*authv3.CheckResponse, error) {
+	ctx, span := telemetry.ServerSpan(ctx, spanExtAuthzPkg, "Check")
+	defer span.End()
+
 	startTime := time.Now()
 	enabled := s.container.Config.MetricsHTTP.Enabled
 	record := func(result, reason string) {
