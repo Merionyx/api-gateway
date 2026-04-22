@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	gogit "github.com/go-git/go-git/v6"
-	"github.com/go-git/go-git/v6/plumbing/transport"
+	gitclient "github.com/go-git/go-git/v6/plumbing/client"
 )
 
 // Supported RepositoryConfig.Source values (keep in sync with CRD / config docs).
@@ -30,11 +30,11 @@ type AuthConfig struct {
 }
 
 type ManagedRepo struct {
-	Name   string
-	Repo   *gogit.Repository
-	Auth   transport.AuthMethod
-	Source string
-	Path   string
+	Name          string
+	Repo          *gogit.Repository
+	ClientOptions []gitclient.Option
+	Source        string
+	Path          string
 }
 
 type bundleSnapshotCacheEntry struct {

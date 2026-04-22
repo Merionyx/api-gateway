@@ -48,7 +48,7 @@ func (s *stubControllerRepo) ListControllers(context.Context) ([]models.Controll
 	return s.list, nil
 }
 
-func (s *stubControllerRepo) UpdateControllerHeartbeat(context.Context, string, []models.EnvironmentInfo) (bool, error) {
+func (s *stubControllerRepo) UpdateControllerHeartbeat(context.Context, string, []models.EnvironmentInfo, int32) (bool, error) {
 	if s.updateHeartbeatErr != nil {
 		return false, s.updateHeartbeatErr
 	}

@@ -21,7 +21,7 @@ func (noopRegistryUC) RegisterController(context.Context, models.ControllerInfo)
 func (noopRegistryUC) StreamSnapshots(context.Context, string, interfaces.SnapshotStream) error {
 	return nil
 }
-func (noopRegistryUC) Heartbeat(context.Context, string, []models.EnvironmentInfo) error { return nil }
+func (noopRegistryUC) Heartbeat(context.Context, string, []models.EnvironmentInfo, int32) error { return nil }
 func (noopRegistryUC) StartEtcdWatch(context.Context)                                    {}
 
 func TestControllerRegistryHandler_RegisterController_Success(t *testing.T) {
@@ -44,7 +44,7 @@ func (e errRegistryUC) RegisterController(context.Context, models.ControllerInfo
 func (errRegistryUC) StreamSnapshots(context.Context, string, interfaces.SnapshotStream) error {
 	return nil
 }
-func (errRegistryUC) Heartbeat(context.Context, string, []models.EnvironmentInfo) error { return nil }
+func (errRegistryUC) Heartbeat(context.Context, string, []models.EnvironmentInfo, int32) error { return nil }
 func (errRegistryUC) StartEtcdWatch(context.Context)                                    {}
 
 func TestControllerRegistryHandler_RegisterController_StatusError(t *testing.T) {
@@ -71,7 +71,7 @@ func (heartbeatErrUC) RegisterController(context.Context, models.ControllerInfo)
 func (heartbeatErrUC) StreamSnapshots(context.Context, string, interfaces.SnapshotStream) error {
 	return nil
 }
-func (h heartbeatErrUC) Heartbeat(context.Context, string, []models.EnvironmentInfo) error {
+func (h heartbeatErrUC) Heartbeat(context.Context, string, []models.EnvironmentInfo, int32) error {
 	return h.err
 }
 func (heartbeatErrUC) StartEtcdWatch(context.Context) {}

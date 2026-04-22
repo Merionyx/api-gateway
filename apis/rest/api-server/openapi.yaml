@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: API Gateway — API Server HTTP API
-  version: 1.0.0
+  version: 1.3.0
   description: |
     HTTP API for the **API Server** control plane: authentication material (JWT, JWKS), contract export,
     registry views backed by **etcd** (controllers, tenants, bundles), and operational endpoints.
@@ -10,6 +10,12 @@ info:
     lifecycle is owned by the **Gateway Controller**; this API does not expose CRUD for environments.
 
     **JSON naming:** request and response bodies use **snake_case** field names unless noted.
+
+    **v1.1.0** added optional `config_source` on static bundles, `sources_fingerprint` and `effective_generation` on
+    environments. **v1.2.0** added `environment_config_source`, `services` (static upstreams with per-line
+    `config_source`). **v1.3.0** nests that observability in **`meta`** on each entity (`provenance.config_source`, plus
+    `effective_generation` / `sources_fingerprint` only on environment `meta`); flat `config_source` fields on bundles
+    and services are removed in favor of `meta.provenance`.
 
     **Errors:** all failed requests use **`application/problem+json`** (RFC 9457 / RFC 7807 Problem Details).
   contact:
@@ -381,6 +387,99 @@ components:
           type: string
           description: Base64-encoded file bytes.
 
+    ConfigSource:
+      type: string
+      description: |
+        Which input layer’s static entry won for this name/key in the effective merge
+        (controller → API Server; ADR 0001).
+      enum:
+      - file
+      - kubernetes
+      - etcd_grpc
+      - unspecified
+
+    Provenance:
+      type: object
+      description: Provenance of the winning static line (may extend in future API versions).
+      properties:
+        config_source:
+          $ref: '#/components/schemas/ConfigSource'
+          description: Declared winning source for this entity in the static merge.
+        layer_detail:
+          type: string
+          description: |
+            Finer sub-classification (e.g. dominant:etcd_grpc, crd/ContractBundle, pool:controller_root, discovery:…).
+
+    EnvironmentMeta:
+      type: object
+      description: |
+        Control-plane metadata for a logical environment, separate from `name`, `bundles`, and `services`
+        (materialization generation, static fingerprint, dominant config layer).
+      properties:
+        provenance:
+          $ref: '#/components/schemas/Provenance'
+        effective_generation:
+          type: integer
+          format: int64
+          description: Materialized effective document generation when available (controller etcd /effective/.../v1).
+        sources_fingerprint:
+          type: string
+          description: Hex SHA-256 fingerprint of static effective (name, type, bundle/service lists) from the controller.
+        environment_type:
+          type: string
+          description: Environment kind in the effective (e.g. `kubernetes` from K8s discovery, file bootstrap).
+        materialized_updated_at:
+          type: string
+          format: date-time
+          description: When the materialized v1 document was last written in controller etcd (if available).
+        materialized_schema_version:
+          type: integer
+          format: int32
+          description: schema_version in the materialized v1 document when available.
+        materialized_mismatch:
+          type: boolean
+          description: |
+            `true` when the live effective fingerprint (controller merge) does not match the last materialized
+            document (reconcile lag or error).
+
+    BundleMeta:
+      type: object
+      description: Control-plane metadata for a bundle line in the effective environment.
+      properties:
+        provenance:
+          $ref: '#/components/schemas/Provenance'
+        resolved_ref:
+          type: string
+          description: Optional resolved Git identifier (e.g. commit) when the sync pipeline exposes it.
+        last_sync_utc:
+          type: string
+          format: date-time
+          description: Optional timestamp of the last successful bundle-to-etcd sync.
+        sync_error:
+          type: string
+          description: Last known sync error for the bundle, if any.
+        k8s_resource_ref:
+          type: string
+          description: K8s object that carried this static line, when from discovery.
+
+    ServiceLineScope:
+      type: string
+      description: Whether a service line belongs to the per-environment static merge or the controller root pool.
+      enum:
+        - environment
+        - controller_root
+        - unspecified
+
+    ServiceMeta:
+      type: object
+      description: Control-plane metadata for a static service line.
+      properties:
+        provenance:
+          $ref: '#/components/schemas/Provenance'
+        k8s_service_ref:
+          type: string
+          description: Declared or discovered K8s backend reference (format may vary, e.g. `ns/svc` or `GatewayUpstream:...`).
+
     Bundle:
       type: object
       description: |
@@ -400,6 +499,9 @@ components:
           type: string
         path:
           type: string
+        meta:
+          $ref: '#/components/schemas/BundleMeta'
+          description: When present, includes `provenance.config_source` (winning static layer for this bundle key).
 
     Environment:
       type: object
@@ -408,10 +510,38 @@ components:
       properties:
         name:
           type: string
+        meta:
+          $ref: '#/components/schemas/EnvironmentMeta'
+          description: When present, includes `provenance` (dominant layer for the environment name), `effective_generation`, and `sources_fingerprint`.
         bundles:
           type: array
           items:
             $ref: '#/components/schemas/Bundle'
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/RegistryService'
+          description: Static upstream services in the effective environment (as reported by the controller).
+
+    RegistryService:
+      type: object
+      required:
+      - name
+      - upstream
+      properties:
+        name:
+          type: string
+          description: Logical service name in the environment.
+        upstream:
+          type: string
+          description: Upstream base URL or host as in controller static config.
+        scope:
+          $ref: '#/components/schemas/ServiceLineScope'
+        meta:
+          $ref: '#/components/schemas/ServiceMeta'
+          description: |
+            When present, includes `provenance.config_source` (winning static layer for this service name: etcd gRPC
+            &gt; kubernetes &gt; file, ADR 0001).
 
     Controller:
       type: object
@@ -423,6 +553,10 @@ components:
           type: string
         tenant:
           type: string
+        registry_payload_version:
+          type: integer
+          format: int32
+          description: DTO / schema version the controller used when last registering (extended meta fields in v1).
         environments:
           type: array
           items:

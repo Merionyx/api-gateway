@@ -7,26 +7,29 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
-	xdscache "github.com/merionyx/api-gateway/internal/controller/xds/cache"
-	"github.com/merionyx/api-gateway/internal/controller/xds/snapshot"
 )
 
 type environmentsUseCase struct {
-	environmentRepo    interfaces.EnvironmentRepository
-	schemasUseCase     interfaces.SchemasUseCase
-	xdsSnapshotManager *xdscache.SnapshotManager
-	xdsBuilder         interfaces.XDSBuilder
+	environmentRepo interfaces.EnvironmentRepository
+	inMemoryEnvs    interfaces.InMemoryEnvironmentsRepository
+	schemasUseCase  interfaces.SchemasUseCase
+	eff             interfaces.EffectiveReconciler
 }
 
 func NewEnvironmentsUseCase() interfaces.EnvironmentsUseCase {
 	return &environmentsUseCase{}
 }
 
-func (uc *environmentsUseCase) SetDependencies(environmentRepo interfaces.EnvironmentRepository, schemasUseCase interfaces.SchemasUseCase, xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder interfaces.XDSBuilder) {
+func (uc *environmentsUseCase) SetDependencies(
+	environmentRepo interfaces.EnvironmentRepository,
+	inMemory interfaces.InMemoryEnvironmentsRepository,
+	schemasUseCase interfaces.SchemasUseCase,
+	eff interfaces.EffectiveReconciler,
+) {
 	uc.environmentRepo = environmentRepo
+	uc.inMemoryEnvs = inMemory
 	uc.schemasUseCase = schemasUseCase
-	uc.xdsSnapshotManager = xdsSnapshotManager
-	uc.xdsBuilder = xdsBuilder
+	uc.eff = eff
 }
 
 func (uc *environmentsUseCase) CreateEnvironment(ctx context.Context, req *models.CreateEnvironmentRequest) (*models.Environment, error) {
@@ -51,9 +54,10 @@ func (uc *environmentsUseCase) CreateEnvironment(ctx context.Context, req *model
 
 	slog.Info("environment created", "name", req.Name)
 
-	// Create initial xDS snapshot
-	if err := uc.rebuildXDSSnapshot(ctx, env); err != nil {
-		slog.Warn("failed to build initial xDS snapshot", "environment", req.Name, "error", err)
+	if uc.eff != nil {
+		if err := uc.eff.ReconcileOne(ctx, req.Name, true); err != nil {
+			slog.Warn("reconcile xDS / materialized after create", "environment", req.Name, "error", err)
+		}
 	}
 
 	return env, nil
@@ -112,9 +116,10 @@ func (uc *environmentsUseCase) UpdateEnvironment(ctx context.Context, req *model
 
 	slog.Info("environment updated", "name", req.Name)
 
-	// Rebuild xDS snapshot
-	if err := uc.rebuildXDSSnapshot(ctx, existing); err != nil {
-		slog.Warn("failed to rebuild xDS snapshot", "environment", req.Name, "error", err)
+	if uc.eff != nil {
+		if err := uc.eff.ReconcileOne(ctx, req.Name, true); err != nil {
+			slog.Warn("reconcile xDS / materialized after update", "environment", req.Name, "error", err)
+		}
 	}
 
 	return existing, nil
@@ -134,26 +139,11 @@ func (uc *environmentsUseCase) DeleteEnvironment(ctx context.Context, name strin
 
 	slog.Info("environment deleted", "name", name)
 
-	// Delete xDS snapshot (optional, depends on your implementation)
-	nodeID := fmt.Sprintf("envoy-%s", name)
-	if err := uc.xdsSnapshotManager.DeleteSnapshot(nodeID); err != nil {
-		return fmt.Errorf("delete xds snapshot: %w", err)
+	if uc.eff != nil {
+		if err := uc.eff.ReconcileOne(ctx, name, true); err != nil {
+			return fmt.Errorf("reconcile after delete: %w", err)
+		}
 	}
 
-	return nil
-}
-
-func (uc *environmentsUseCase) rebuildXDSSnapshot(ctx context.Context, env *models.Environment) error {
-	xdsSnapshot, err := snapshot.BuildEnvoySnapshot(uc.xdsBuilder, env)
-	if err != nil {
-		return fmt.Errorf("build envoy snapshot: %w", err)
-	}
-	nodeID := fmt.Sprintf("envoy-%s", env.Name)
-
-	if err := uc.xdsSnapshotManager.UpdateSnapshot(nodeID, xdsSnapshot); err != nil {
-		return fmt.Errorf("failed to update xDS snapshot: %w", err)
-	}
-
-	slog.Info("xDS snapshot rebuilt", "environment", env.Name)
 	return nil
 }

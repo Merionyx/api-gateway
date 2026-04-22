@@ -23,6 +23,10 @@ func ClassifyControllerEtcdWatchKey(key string) ControllerEtcdKeyEffect {
 	if strings.HasPrefix(key, etcd.ControllerWatchPrefix+"election/") {
 		return ControllerEtcdKeyEffect{Ignore: true}
 	}
+	// Materialized effective output (ADR 0001) — not an input; ignore to avoid no-op follow-up reconciles.
+	if strings.HasPrefix(key, etcd.EffectiveMaterializedPrefix) && strings.HasSuffix(key, "/v1") {
+		return ControllerEtcdKeyEffect{Ignore: true}
+	}
 	if bk, ok := BundleKeyFromSchemaEtcdKey(key); ok {
 		return ControllerEtcdKeyEffect{SchemaBundleKey: bk}
 	}

@@ -2,49 +2,43 @@ package usecase
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/merionyx/api-gateway/internal/controller/config"
 	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/controller/index/bundleenv"
-	ctrlmetrics "github.com/merionyx/api-gateway/internal/controller/metrics"
 	"github.com/merionyx/api-gateway/internal/controller/repository/cache"
-	xdscache "github.com/merionyx/api-gateway/internal/controller/xds/cache"
-	"github.com/merionyx/api-gateway/internal/shared/grpcutil"
+	ctrlrepoetcd "github.com/merionyx/api-gateway/internal/controller/repository/etcd"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 // APIServerSyncUseCase keeps the Gateway Controller in sync with API Server (leader stream) and
-// reconciles xDS from controller-local etcd on every replica (follower watch).
+// reconciles xDS from controller-local etcd on every replica (follower watch). Internally it
+// composes a registry DTO builder, gRPC leader stream, and etcd follower watch.
+// Degradation (partial name lists, skip env, read materialized): RegistryEnvironmentsBuildReport, counter
+// gateway_controller_registry_environments_build_warnings_total and aggregated logs (P.5 backlog).
 type APIServerSyncUseCase struct {
-	config                   *config.Config
-	schemaRepo               interfaces.SchemaRepository
-	inMemoryEnvironmentsRepo interfaces.InMemoryEnvironmentsRepository
-	environmentRepo          interfaces.EnvironmentRepository
-	xdsSnapshotManager       *xdscache.SnapshotManager
-	apiServerAddress         string
-	controllerID             string
-	xdsBuilder               interfaces.XDSBuilder
-	etcdClient               *clientv3.Client
-	bundleEnvIndex           *bundleenv.Index
-	schemaCache              *cache.SchemaCache
+	config *config.Config
+
+	registry   *registryEnvironmentsBuilder
+	leader     *leaderAPIServerStream
+	etcdFollow *etcdFollowerWatch
 }
 
 func NewAPIServerSyncUseCase(
 	cfg *config.Config,
 	schemaRepo interfaces.SchemaRepository,
 	inMemoryEnvironmentsRepo interfaces.InMemoryEnvironmentsRepository,
+	inMemoryServiceRepo interfaces.InMemoryServiceRepository,
 	environmentRepo interfaces.EnvironmentRepository,
-	xdsSnapshotManager *xdscache.SnapshotManager,
-	xdsBuilder interfaces.XDSBuilder,
 	etcdClient *clientv3.Client,
 	bundleEnvIndex *bundleenv.Index,
 	schemaCache *cache.SchemaCache,
+	materialized *ctrlrepoetcd.MaterializedStore,
+	effectiveReconciler interfaces.EffectiveReconciler,
 ) *APIServerSyncUseCase {
 	controllerID := strings.TrimSpace(cfg.HA.ControllerID)
 	if controllerID == "" {
@@ -53,61 +47,52 @@ func NewAPIServerSyncUseCase(
 		if err != nil {
 			slog.Error("Failed to get hostname", "error", err)
 			controllerID = "unknown"
+		} else {
+			slog.Info("controller_id from OS hostname (ha.controller_id empty; for leader_election pool — set id in config)",
+				"controller_id", controllerID, "source", "hostname")
 		}
+	} else {
+		slog.Info("controller_id from config (API Server / registry sync)", "controller_id", controllerID, "source", "ha.controller_id")
 	}
 
+	reg := newRegistryEnvironmentsBuilder(
+		inMemoryEnvironmentsRepo,
+		inMemoryServiceRepo,
+		environmentRepo,
+		materialized,
+		schemaRepo,
+	)
+
 	return &APIServerSyncUseCase{
-		config:                   cfg,
-		schemaRepo:               schemaRepo,
-		inMemoryEnvironmentsRepo: inMemoryEnvironmentsRepo,
-		environmentRepo:          environmentRepo,
-		xdsSnapshotManager:       xdsSnapshotManager,
-		apiServerAddress:         cfg.APIServer.Address,
-		xdsBuilder:               xdsBuilder,
-		controllerID:             controllerID,
-		etcdClient:               etcdClient,
-		bundleEnvIndex:           bundleEnvIndex,
-		schemaCache:              schemaCache,
+		config:   cfg,
+		registry: reg,
+		leader: newLeaderAPIServerStream(
+			cfg,
+			cfg.APIServer.Address,
+			controllerID,
+			reg,
+			schemaRepo,
+			effectiveReconciler,
+		),
+		etcdFollow: newEtcdFollowerWatch(
+			cfg,
+			etcdClient,
+			schemaCache,
+			bundleEnvIndex,
+			effectiveReconciler,
+			reg,
+		),
 	}
 }
 
 // RegisterAndStream keeps a long-lived connection to API Server: register, heartbeat, snapshot stream.
 // On any failure it backs off and reconnects without restarting the process.
 func (uc *APIServerSyncUseCase) RegisterAndStream(ctx context.Context) error {
-	const (
-		initialBackoff = time.Second
-		maxBackoff     = 60 * time.Second
-	)
-	backoff := time.Duration(0)
+	return uc.leader.registerAndStream(ctx)
+}
 
-	for {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-
-		if backoff > 0 {
-			slog.Warn("Reconnecting to API Server after backoff", "address", uc.apiServerAddress, "backoff", backoff)
-			if err := grpcutil.SleepOrDone(ctx, backoff); err != nil {
-				return err
-			}
-		}
-
-		slog.Info("Connecting to API Server", "address", uc.apiServerAddress)
-		sessErr := uc.runAPIServerSession(ctx)
-		if err := ctx.Err(); err != nil {
-			ctrlmetrics.RecordAPIServerSessionEnd(uc.config.MetricsHTTP.Enabled, ctrlmetrics.SessionReasonCanceled)
-			return err
-		}
-		if sessErr == nil {
-			return nil
-		}
-		if errors.Is(sessErr, context.Canceled) {
-			ctrlmetrics.RecordAPIServerSessionEnd(uc.config.MetricsHTTP.Enabled, ctrlmetrics.SessionReasonCanceled)
-			return sessErr
-		}
-
-		ctrlmetrics.RecordAPIServerSessionEnd(uc.config.MetricsHTTP.Enabled, ctrlmetrics.SessionReasonError)
-		slog.Warn("API Server sync session ended", "error", sessErr)
-		backoff = grpcutil.NextReconnectBackoff(backoff, initialBackoff, maxBackoff)
-	}
+// StartEtcdFollowerWatch rebuilds xDS from controller etcd when the leader (or another writer) changes data.
+// Every replica runs this so snapshots stay aligned without each one streaming from API Server.
+func (uc *APIServerSyncUseCase) StartEtcdFollowerWatch(ctx context.Context) {
+	uc.etcdFollow.start(ctx)
 }

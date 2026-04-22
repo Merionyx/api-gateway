@@ -2,6 +2,7 @@ package election
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"sync/atomic"
 	"time"
@@ -9,6 +10,12 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/concurrency"
 )
+
+// campaignProposal is the JSON document written as the concurrency election value in etcd
+// (so every key under the election prefix holds valid JSON, not a bare string).
+type campaignProposal struct {
+	Identity string `json:"identity"`
+}
 
 // EtcdGate implements leader election against etcd (client/v3 concurrency).
 // Only one candidate holds leadership per election prefix at a time.
@@ -75,7 +82,13 @@ func (g *EtcdGate) Run(ctx context.Context) {
 
 		el := concurrency.NewElection(sess, g.prefix)
 
-		err = el.Campaign(ctx, g.identity)
+		proposal, mErr := json.Marshal(campaignProposal{Identity: g.identity})
+		if mErr != nil {
+			_ = sess.Close()
+			slog.Error("leader election: marshal proposal", "error", mErr)
+			continue
+		}
+		err = el.Campaign(ctx, string(proposal))
 		if err != nil {
 			_ = sess.Close()
 			if ctx.Err() != nil {

@@ -31,4 +31,18 @@ func TestCollectFiles(t *testing.T) {
 	if err != nil || len(paths) != 1 {
 		t.Fatalf("dir walk: %v %#v", err, paths)
 	}
+	if _, err := CollectFiles(filepath.Join(dir, "nope.yaml")); err == nil {
+		t.Fatal("missing file")
+	}
+	sub := filepath.Join(dir, "sub")
+	if err := os.Mkdir(sub, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sub, "b.json"), []byte(`{}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	paths, err = CollectFiles(dir)
+	if err != nil || len(paths) != 2 {
+		t.Fatalf("nested: %v %#v", err, paths)
+	}
 }

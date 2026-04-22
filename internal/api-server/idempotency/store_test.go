@@ -20,6 +20,27 @@ func TestHashBundleSyncRequest_Stable(t *testing.T) {
 	}
 }
 
+func TestExecute_bypassesWhenKeyOrHashEmpty(t *testing.T) {
+	t.Parallel()
+	s := NewStore(time.Hour)
+	var runs int
+	res1, err := s.Execute(context.Background(), "", "ab", func() (*HTTPResult, error) {
+		runs++
+		return &HTTPResult{StatusCode: 201}, nil
+	})
+	if err != nil || res1.StatusCode != 201 || runs != 1 {
+		t.Fatalf("empty key: err=%v res=%v runs=%d", err, res1, runs)
+	}
+	var runs2 int
+	_, _ = s.Execute(context.Background(), "akey", "", func() (*HTTPResult, error) {
+		runs2++
+		return &HTTPResult{StatusCode: 202}, nil
+	})
+	if runs2 != 1 {
+		t.Fatalf("empty body hash: runs=%d", runs2)
+	}
+}
+
 func TestExecute_ConflictDifferentBody(t *testing.T) {
 	t.Parallel()
 	s := NewStore(time.Hour)

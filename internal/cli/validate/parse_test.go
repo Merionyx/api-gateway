@@ -11,4 +11,7 @@ func TestParseRoot(t *testing.T) {
 	if _, err := ParseRoot([]byte(`null`)); err == nil {
 		t.Fatal("expected empty document error")
 	}
+	if _, err := ParseRoot([]byte(":\n")); err == nil {
+		t.Fatal("invalid yaml")
+	}
 }

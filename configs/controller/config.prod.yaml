@@ -19,8 +19,10 @@ etcd:
 
 tenant: "prod-cluster"
 
+# Стабильный id пула (одинаков на всех репликах; уникален в пределах tenant / API Server).
+# Обязателен при leader_election.enabled: true (см. валидацию в internal/controller/config).
 ha:
-  controller_id: ""
+  controller_id: "gateway-controller-prod"
 
 leader_election:
   enabled: true

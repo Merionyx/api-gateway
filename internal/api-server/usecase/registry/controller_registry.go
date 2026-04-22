@@ -106,10 +106,10 @@ func (uc *ControllerRegistryUseCase) StreamSnapshots(ctx context.Context, contro
 	return nil
 }
 
-func (uc *ControllerRegistryUseCase) Heartbeat(ctx context.Context, controllerID string, environments []models.EnvironmentInfo) error {
+func (uc *ControllerRegistryUseCase) Heartbeat(ctx context.Context, controllerID string, environments []models.EnvironmentInfo, registryPayloadVersion int32) error {
 	slog.Debug("Received heartbeat", "controller_id", controllerID)
 
-	mainUpdated, err := uc.controllerRepo.UpdateControllerHeartbeat(ctx, controllerID, environments)
+	mainUpdated, err := uc.controllerRepo.UpdateControllerHeartbeat(ctx, controllerID, environments, registryPayloadVersion)
 	if err != nil {
 		return fmt.Errorf("failed to update heartbeat: %w", err)
 	}

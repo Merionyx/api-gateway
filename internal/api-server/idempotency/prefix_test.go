@@ -16,4 +16,7 @@ func TestResolveKeyPrefix(t *testing.T) {
 	if got := ResolveKeyPrefix("/custom", "a/b"); got != "/custom/clusters/a_b" {
 		t.Fatalf("sanitized cluster: %q", got)
 	}
+	if got := ResolveKeyPrefix("  /x/  ", "c"); got != "/x/clusters/c" {
+		t.Fatalf("trim: %q", got)
+	}
 }

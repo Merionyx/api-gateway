@@ -26,30 +26,162 @@ func NewControllerRegistryHandler(registryUseCase interfaces.ControllerRegistryU
 	}
 }
 
+// registryConfigSourceString maps proto enum to stable JSON in etcd (see OpenAPI / ADR 0001).
+func registryConfigSourceString(s pb.ConfigSource) string {
+	switch s {
+	case pb.ConfigSource_CONFIG_SOURCE_FILE:
+		return "file"
+	case pb.ConfigSource_CONFIG_SOURCE_KUBERNETES:
+		return "kubernetes"
+	case pb.ConfigSource_CONFIG_SOURCE_ETCD_GRPC:
+		return "etcd_grpc"
+	default:
+		return ""
+	}
+}
+
+func provenanceFromPB(p *pb.Provenance) *models.Provenance {
+	if p == nil {
+		return nil
+	}
+	cs := registryConfigSourceString(p.GetConfigSource())
+	if p.GetConfigSource() == pb.ConfigSource_CONFIG_SOURCE_UNSPECIFIED {
+		cs = ""
+	}
+	ld := p.GetLayerDetail()
+	if cs == "" && ld == "" {
+		return nil
+	}
+	return &models.Provenance{ConfigSource: cs, LayerDetail: ld}
+}
+
+func environmentMetaFromPB(m *pb.EnvironmentMeta) *models.EnvironmentMeta {
+	if m == nil {
+		return nil
+	}
+	out := &models.EnvironmentMeta{}
+	if p := provenanceFromPB(m.GetProvenance()); p != nil {
+		out.Provenance = p
+	}
+	if m.EffectiveGeneration != nil {
+		g := *m.EffectiveGeneration
+		out.EffectiveGeneration = &g
+	}
+	if m.SourcesFingerprint != nil {
+		out.SourcesFingerprint = *m.SourcesFingerprint
+	}
+	if v := m.GetEnvironmentType(); v != "" {
+		out.EnvironmentType = v
+	}
+	if v := m.GetMaterializedUpdatedAt(); v != "" {
+		out.MaterializedUpdatedAt = v
+	}
+	if m.MaterializedSchemaVersion != nil {
+		sv := *m.MaterializedSchemaVersion
+		out.MaterializedSchemaVersion = &sv
+	}
+	if m.MaterializedMismatch != nil {
+		mm := *m.MaterializedMismatch
+		out.MaterializedMismatch = &mm
+	}
+	if out.Provenance == nil && out.EffectiveGeneration == nil && out.SourcesFingerprint == "" &&
+		out.EnvironmentType == "" && out.MaterializedUpdatedAt == "" && out.MaterializedSchemaVersion == nil && out.MaterializedMismatch == nil {
+		return nil
+	}
+	return out
+}
+
+func bundleFromPB(b *pb.BundleInfo) models.BundleInfo {
+	bi := models.BundleInfo{
+		Name: b.Name, Repository: b.Repository, Ref: b.Ref, Path: b.Path,
+	}
+	if m := b.GetMeta(); m != nil {
+		if p := provenanceFromPB(m.GetProvenance()); p != nil ||
+			m.GetResolvedRef() != "" || m.GetLastSyncUtc() != "" || m.GetSyncError() != "" || m.GetK8SResourceRef() != "" {
+			bm := &models.BundleMeta{}
+			if p != nil {
+				bm.Provenance = p
+			}
+			if v := m.GetResolvedRef(); v != "" {
+				bm.ResolvedRef = v
+			}
+			if v := m.GetLastSyncUtc(); v != "" {
+				bm.LastSyncUTC = v
+			}
+			if v := m.GetSyncError(); v != "" {
+				bm.SyncError = v
+			}
+			if v := m.GetK8SResourceRef(); v != "" {
+				bm.K8SResourceRef = v
+			}
+			if bm.Provenance != nil || bm.ResolvedRef != "" || bm.LastSyncUTC != "" || bm.SyncError != "" || bm.K8SResourceRef != "" {
+				bi.Meta = bm
+			}
+		}
+	}
+	return bi
+}
+
+func serviceLineScopeFromPB(s pb.ServiceLineScope) string {
+	switch s {
+	case pb.ServiceLineScope_SERVICE_LINE_SCOPE_ENVIRONMENT:
+		return "environment"
+	case pb.ServiceLineScope_SERVICE_LINE_SCOPE_CONTROLLER_ROOT:
+		return "controller_root"
+	default:
+		return ""
+	}
+}
+
+func serviceFromPB(s *pb.ServiceInfo) models.ServiceInfo {
+	si := models.ServiceInfo{Name: s.Name, Upstream: s.Upstream, Scope: serviceLineScopeFromPB(s.GetScope())}
+	if m := s.GetMeta(); m != nil {
+		if p := provenanceFromPB(m.GetProvenance()); p != nil || m.GetK8SServiceRef() != "" {
+			sm := &models.ServiceMeta{}
+			if p != nil {
+				sm.Provenance = p
+			}
+			if v := m.GetK8SServiceRef(); v != "" {
+				sm.K8sServiceRef = v
+			}
+			if sm.Provenance != nil || sm.K8sServiceRef != "" {
+				si.Meta = sm
+			}
+		}
+	}
+	return si
+}
+
+func environmentFromPB(e *pb.EnvironmentInfo) models.EnvironmentInfo {
+	var bundles []models.BundleInfo
+	for _, b := range e.Bundles {
+		bundles = append(bundles, bundleFromPB(b))
+	}
+	var services []models.ServiceInfo
+	for _, s := range e.Services {
+		services = append(services, serviceFromPB(s))
+	}
+	return models.EnvironmentInfo{
+		Name:     e.Name,
+		Bundles:  bundles,
+		Services: services,
+		Meta:     environmentMetaFromPB(e.GetMeta()),
+	}
+}
+
 func (h *ControllerRegistryHandler) RegisterController(ctx context.Context, req *pb.RegisterControllerRequest) (*pb.RegisterControllerResponse, error) {
 	slog.Info("Received register controller request", "controller_id", req.ControllerId, "tenant", req.Tenant)
 
-	var environments []models.EnvironmentInfo
+	environments := make([]models.EnvironmentInfo, 0, len(req.Environments))
 	for _, pbEnv := range req.Environments {
-		var bundles []models.BundleInfo
-		for _, pbBundle := range pbEnv.Bundles {
-			bundles = append(bundles, models.BundleInfo{
-				Name:       pbBundle.Name,
-				Repository: pbBundle.Repository,
-				Ref:        pbBundle.Ref,
-				Path:       pbBundle.Path,
-			})
-		}
-		environments = append(environments, models.EnvironmentInfo{
-			Name:    pbEnv.Name,
-			Bundles: bundles,
-		})
+		environments = append(environments, environmentFromPB(pbEnv))
 	}
 
 	info := models.ControllerInfo{
-		ControllerID: req.ControllerId,
-		Tenant:       req.Tenant,
-		Environments: environments,
+		ControllerID:           req.ControllerId,
+		Tenant:                 req.Tenant,
+		Environments:           environments,
+		RegistryPayloadVersion: req.RegistryPayloadVersion,
 	}
 
 	if err := h.registryUseCase.RegisterController(ctx, info); err != nil {
@@ -112,24 +244,12 @@ func (h *ControllerRegistryHandler) StreamSnapshots(req *pb.StreamSnapshotsReque
 func (h *ControllerRegistryHandler) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) (*pb.HeartbeatResponse, error) {
 	slog.Debug("Received heartbeat", "controller_id", req.ControllerId)
 
-	var environments []models.EnvironmentInfo
+	environments := make([]models.EnvironmentInfo, 0, len(req.Environments))
 	for _, pbEnv := range req.Environments {
-		var bundles []models.BundleInfo
-		for _, pbBundle := range pbEnv.Bundles {
-			bundles = append(bundles, models.BundleInfo{
-				Name:       pbBundle.Name,
-				Repository: pbBundle.Repository,
-				Ref:        pbBundle.Ref,
-				Path:       pbBundle.Path,
-			})
-		}
-		environments = append(environments, models.EnvironmentInfo{
-			Name:    pbEnv.Name,
-			Bundles: bundles,
-		})
+		environments = append(environments, environmentFromPB(pbEnv))
 	}
 
-	if err := h.registryUseCase.Heartbeat(ctx, req.ControllerId, environments); err != nil {
+	if err := h.registryUseCase.Heartbeat(ctx, req.ControllerId, environments, req.RegistryPayloadVersion); err != nil {
 		slog.Error("Failed to process heartbeat", "error", err)
 		return nil, grpcerr.Status(h.metricsEnabled, err)
 	}

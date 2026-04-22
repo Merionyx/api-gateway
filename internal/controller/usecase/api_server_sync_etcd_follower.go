@@ -7,6 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/merionyx/api-gateway/internal/controller/config"
+	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
+	"github.com/merionyx/api-gateway/internal/controller/index/bundleenv"
 	ctrlmetrics "github.com/merionyx/api-gateway/internal/controller/metrics"
 	"github.com/merionyx/api-gateway/internal/controller/repository/cache"
 	ctrlrepoetcd "github.com/merionyx/api-gateway/internal/controller/repository/etcd"
@@ -17,13 +20,40 @@ import (
 
 const xdsRebuildParallelism = 8
 
-// StartEtcdFollowerWatch rebuilds xDS from controller etcd when the leader (or another writer) changes data.
-// Every replica runs this so snapshots stay aligned without each one streaming from API Server.
+// etcdFollowerWatch runs on every replica: initial xDS rebuild from controller etcd, then watch + debounced rebuilds.
+type etcdFollowerWatch struct {
+	config         *config.Config
+	etcdClient     *clientv3.Client
+	schemaCache    *cache.SchemaCache
+	bundleEnvIndex *bundleenv.Index
+	reconciler     interfaces.EffectiveReconciler
+	reg            *registryEnvironmentsBuilder
+}
+
+func newEtcdFollowerWatch(
+	cfg *config.Config,
+	etcd *clientv3.Client,
+	schemaCache *cache.SchemaCache,
+	bundleIndex *bundleenv.Index,
+	recon interfaces.EffectiveReconciler,
+	reg *registryEnvironmentsBuilder,
+) *etcdFollowerWatch {
+	return &etcdFollowerWatch{
+		config:         cfg,
+		etcdClient:     etcd,
+		schemaCache:    schemaCache,
+		bundleEnvIndex: bundleIndex,
+		reconciler:     recon,
+		reg:            reg,
+	}
+}
+
+// start blocks until the watch channel closes (typically ctx cancel). See [APIServerSyncUseCase.StartEtcdFollowerWatch].
 //
 // etcd Watch does not replay existing keys: without an initial rebuild, followers (and configs with
 // environments only in etcd) would serve an empty xDS cache until the next write.
-func (uc *APIServerSyncUseCase) StartEtcdFollowerWatch(ctx context.Context) {
-	if uc.etcdClient == nil {
+func (f *etcdFollowerWatch) start(ctx context.Context) {
+	if f.etcdClient == nil {
 		slog.Warn("StartEtcdFollowerWatch: etcd client is nil")
 		return
 	}
@@ -32,8 +62,8 @@ func (uc *APIServerSyncUseCase) StartEtcdFollowerWatch(ctx context.Context) {
 		flushCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
 		start := time.Now()
-		err := uc.rebuildAllXDS(flushCtx)
-		uc.recordRebuildMetrics(ctrlmetrics.RebuildPhaseInitial, err, time.Since(start))
+		err := f.rebuildAllXDS(flushCtx)
+		f.recordRebuildMetrics(ctrlmetrics.RebuildPhaseInitial, err, time.Since(start))
 		if err != nil {
 			slog.Error("initial xDS rebuild from etcd (HA / cold start)", "error", err)
 		} else {
@@ -41,7 +71,7 @@ func (uc *APIServerSyncUseCase) StartEtcdFollowerWatch(ctx context.Context) {
 		}
 	}()
 
-	ch := uc.etcdClient.Watch(ctx, ctrlrepoetcd.ControllerWatchPrefix, clientv3.WithPrefix())
+	ch := f.etcdClient.Watch(ctx, ctrlrepoetcd.ControllerWatchPrefix, clientv3.WithPrefix())
 
 	var mu sync.Mutex
 	var debounce *time.Timer
@@ -65,21 +95,21 @@ func (uc *APIServerSyncUseCase) StartEtcdFollowerWatch(ctx context.Context) {
 		start := time.Now()
 		var err error
 		if full {
-			err = uc.rebuildAllXDS(flushCtx)
+			err = f.rebuildAllXDS(flushCtx)
 		} else {
 			names := make([]string, 0, len(toFlush))
 			for e := range toFlush {
 				names = append(names, e)
 			}
-			err = uc.rebuildXDSForEnvironments(flushCtx, names)
+			err = f.rebuildXDSForEnvironments(flushCtx, names)
 		}
-		uc.recordRebuildMetrics(ctrlmetrics.RebuildPhaseDebounced, err, time.Since(start))
+		f.recordRebuildMetrics(ctrlmetrics.RebuildPhaseDebounced, err, time.Since(start))
 		if err != nil {
 			slog.Error("etcd follower watch: rebuild xDS", "error", err)
 		}
 	}
 
-	en := uc.config.MetricsHTTP.Enabled
+	en := f.config.MetricsHTTP.Enabled
 	for wresp := range ch {
 		if err := wresp.Err(); err != nil {
 			ctrlmetrics.RecordEtcdWatchError(en)
@@ -105,10 +135,10 @@ func (uc *APIServerSyncUseCase) StartEtcdFollowerWatch(ctx context.Context) {
 
 			if eff.SchemaBundleKey != "" {
 				batchTouched = true
-				if uc.schemaCache != nil {
-					uc.schemaCache.InvalidateBundleKey(eff.SchemaBundleKey)
+				if f.schemaCache != nil {
+					f.schemaCache.InvalidateBundleKey(eff.SchemaBundleKey)
 				}
-				envNames := uc.environmentsForBundleKey(context.Background(), eff.SchemaBundleKey)
+				envNames := f.environmentsForBundleKey(context.Background(), eff.SchemaBundleKey)
 				if len(envNames) == 0 {
 					mu.Lock()
 					needFull = true
@@ -125,9 +155,9 @@ func (uc *APIServerSyncUseCase) StartEtcdFollowerWatch(ctx context.Context) {
 
 			if eff.Environment != "" {
 				batchTouched = true
-				if uc.bundleEnvIndex != nil {
+				if f.bundleEnvIndex != nil {
 					rctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
-					uc.bundleEnvIndex.Rebuild(rctx)
+					f.bundleEnvIndex.Rebuild(rctx)
 					cancel()
 					ctrlmetrics.RecordBundleEnvIndexRebuild(en)
 				}
@@ -159,27 +189,30 @@ func (uc *APIServerSyncUseCase) StartEtcdFollowerWatch(ctx context.Context) {
 	slog.Info("controller etcd watch channel closed")
 }
 
-func (uc *APIServerSyncUseCase) environmentsForBundleKey(ctx context.Context, bundleKey string) []string {
-	if uc.bundleEnvIndex == nil {
+func (f *etcdFollowerWatch) environmentsForBundleKey(ctx context.Context, bundleKey string) []string {
+	if f.bundleEnvIndex == nil {
 		return nil
 	}
-	envs := uc.bundleEnvIndex.EnvironmentsForBundle(bundleKey)
+	envs := f.bundleEnvIndex.EnvironmentsForBundle(bundleKey)
 	if len(envs) > 0 {
 		return envs
 	}
 	rctx, cancel := context.WithTimeout(ctx, 120*time.Second)
-	uc.bundleEnvIndex.Rebuild(rctx)
+	f.bundleEnvIndex.Rebuild(rctx)
 	cancel()
-	ctrlmetrics.RecordBundleEnvIndexRebuild(uc.config.MetricsHTTP.Enabled)
-	return uc.bundleEnvIndex.EnvironmentsForBundle(bundleKey)
+	ctrlmetrics.RecordBundleEnvIndexRebuild(f.config.MetricsHTTP.Enabled)
+	return f.bundleEnvIndex.EnvironmentsForBundle(bundleKey)
 }
 
-func (uc *APIServerSyncUseCase) rebuildAllXDS(ctx context.Context) error {
-	names := uc.collectEnvironmentNames(ctx)
-	return uc.rebuildXDSForEnvironments(ctx, names)
+func (f *etcdFollowerWatch) rebuildAllXDS(ctx context.Context) error {
+	names, listWarns := f.reg.collectEnvironmentNames(ctx)
+	if len(listWarns) > 0 {
+		observeNameListDegradationForFollower(ctx, f.config, listWarns)
+	}
+	return f.rebuildXDSForEnvironments(ctx, names)
 }
 
-func (uc *APIServerSyncUseCase) rebuildXDSForEnvironments(ctx context.Context, names []string) error {
+func (f *etcdFollowerWatch) rebuildXDSForEnvironments(ctx context.Context, names []string) error {
 	if len(names) == 0 {
 		return nil
 	}
@@ -197,7 +230,7 @@ func (uc *APIServerSyncUseCase) rebuildXDSForEnvironments(ctx context.Context, n
 				return
 			}
 			defer sem.Release(1)
-			if err := uc.updateXDSSnapshot(ctx, name); err != nil {
+			if err := f.updateXDSSnapshot(ctx, name); err != nil {
 				failMu.Lock()
 				nFail++
 				if firstErr == nil {
@@ -218,8 +251,17 @@ func (uc *APIServerSyncUseCase) rebuildXDSForEnvironments(ctx context.Context, n
 	return nil
 }
 
-func (uc *APIServerSyncUseCase) recordRebuildMetrics(phase string, err error, d time.Duration) {
-	en := uc.config.MetricsHTTP.Enabled
+func (f *etcdFollowerWatch) updateXDSSnapshot(ctx context.Context, environment string) error {
+	slog.Info("Updating xDS snapshot", "environment", environment)
+	if f.reconciler == nil {
+		return nil
+	}
+	// No materialized writes on follower / hot path (leader CRUD and memory rebuild use writeMaterialized).
+	return f.reconciler.ReconcileOne(ctx, environment, false)
+}
+
+func (f *etcdFollowerWatch) recordRebuildMetrics(phase string, err error, d time.Duration) {
+	en := f.config.MetricsHTTP.Enabled
 	res := ctrlmetrics.XDSResultOK
 	if err != nil {
 		res = ctrlmetrics.XDSResultError

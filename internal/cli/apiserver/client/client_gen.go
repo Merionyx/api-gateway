@@ -17,6 +17,51 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for ConfigSource.
+const (
+	ConfigSourceEtcdGrpc    ConfigSource = "etcd_grpc"
+	ConfigSourceFile        ConfigSource = "file"
+	ConfigSourceKubernetes  ConfigSource = "kubernetes"
+	ConfigSourceUnspecified ConfigSource = "unspecified"
+)
+
+// Valid indicates whether the value is a known member of the ConfigSource enum.
+func (e ConfigSource) Valid() bool {
+	switch e {
+	case ConfigSourceEtcdGrpc:
+		return true
+	case ConfigSourceFile:
+		return true
+	case ConfigSourceKubernetes:
+		return true
+	case ConfigSourceUnspecified:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ServiceLineScope.
+const (
+	ServiceLineScopeControllerRoot ServiceLineScope = "controller_root"
+	ServiceLineScopeEnvironment    ServiceLineScope = "environment"
+	ServiceLineScopeUnspecified    ServiceLineScope = "unspecified"
+)
+
+// Valid indicates whether the value is a known member of the ServiceLineScope enum.
+func (e ServiceLineScope) Valid() bool {
+	switch e {
+	case ServiceLineScopeControllerRoot:
+		return true
+	case ServiceLineScopeEnvironment:
+		return true
+	case ServiceLineScopeUnspecified:
+		return true
+	default:
+		return false
+	}
+}
+
 // Access defines model for Access.
 type Access struct {
 	Apps   *[]App `json:"apps,omitempty"`
@@ -36,11 +81,32 @@ type Bundle struct {
 	// Key Canonical bundle key matching etcd snapshot paths (`repository/escapedRef/escapedPath`).
 	Key *string `json:"key,omitempty"`
 
+	// Meta Control-plane metadata for a bundle line in the effective environment.
+	Meta *BundleMeta `json:"meta,omitempty"`
+
 	// Name Display / config name (convenience; not necessarily unique globally).
 	Name       *string `json:"name,omitempty"`
 	Path       *string `json:"path,omitempty"`
 	Ref        *string `json:"ref,omitempty"`
 	Repository *string `json:"repository,omitempty"`
+}
+
+// BundleMeta Control-plane metadata for a bundle line in the effective environment.
+type BundleMeta struct {
+	// K8sResourceRef K8s object that carried this static line, when from discovery.
+	K8sResourceRef *string `json:"k8s_resource_ref,omitempty"`
+
+	// LastSyncUtc Optional timestamp of the last successful bundle-to-etcd sync.
+	LastSyncUtc *time.Time `json:"last_sync_utc,omitempty"`
+
+	// Provenance Provenance of the winning static line (may extend in future API versions).
+	Provenance *Provenance `json:"provenance,omitempty"`
+
+	// ResolvedRef Optional resolved Git identifier (e.g. commit) when the sync pipeline exposes it.
+	ResolvedRef *string `json:"resolved_ref,omitempty"`
+
+	// SyncError Last known sync error for the bundle, if any.
+	SyncError *string `json:"sync_error,omitempty"`
 }
 
 // BundleRefListResponse defines model for BundleRefListResponse.
@@ -69,6 +135,10 @@ type BundleSyncResponse struct {
 	FromCache bool               `json:"from_cache"`
 	Snapshots []ContractSnapshot `json:"snapshots"`
 }
+
+// ConfigSource Which input layer’s static entry won for this name/key in the effective merge
+// (controller → API Server; ADR 0001).
+type ConfigSource string
 
 // ContractDocument Parsed contract document as JSON (YAML contracts are exposed as a canonical JSON representation).
 type ContractDocument map[string]interface{}
@@ -124,7 +194,10 @@ type ContractsExportResponse struct {
 type Controller struct {
 	ControllerId string         `json:"controller_id"`
 	Environments *[]Environment `json:"environments,omitempty"`
-	Tenant       string         `json:"tenant"`
+
+	// RegistryPayloadVersion DTO / schema version the controller used when last registering (extended meta fields in v1).
+	RegistryPayloadVersion *int32 `json:"registry_payload_version,omitempty"`
+	Tenant                 string `json:"tenant"`
 }
 
 // ControllerHeartbeat defines model for ControllerHeartbeat.
@@ -145,7 +218,14 @@ type ControllerListResponse struct {
 // Environment defines model for Environment.
 type Environment struct {
 	Bundles *[]Bundle `json:"bundles,omitempty"`
-	Name    string    `json:"name"`
+
+	// Meta Control-plane metadata for a logical environment, separate from `name`, `bundles`, and `services`
+	// (materialization generation, static fingerprint, dominant config layer).
+	Meta *EnvironmentMeta `json:"meta,omitempty"`
+	Name string           `json:"name"`
+
+	// Services Static upstream services in the effective environment (as reported by the controller).
+	Services *[]RegistryService `json:"services,omitempty"`
 }
 
 // EnvironmentListResponse defines model for EnvironmentListResponse.
@@ -155,6 +235,32 @@ type EnvironmentListResponse struct {
 
 	// NextCursor Opaque cursor for the next page; null or omitted when there is no next page.
 	NextCursor *string `json:"next_cursor,omitempty"`
+}
+
+// EnvironmentMeta Control-plane metadata for a logical environment, separate from `name`, `bundles`, and `services`
+// (materialization generation, static fingerprint, dominant config layer).
+type EnvironmentMeta struct {
+	// EffectiveGeneration Materialized effective document generation when available (controller etcd /effective/.../v1).
+	EffectiveGeneration *int64 `json:"effective_generation,omitempty"`
+
+	// EnvironmentType Environment kind in the effective (e.g. `kubernetes` from K8s discovery, file bootstrap).
+	EnvironmentType *string `json:"environment_type,omitempty"`
+
+	// MaterializedMismatch `true` when the live effective fingerprint (controller merge) does not match the last materialized
+	// document (reconcile lag or error).
+	MaterializedMismatch *bool `json:"materialized_mismatch,omitempty"`
+
+	// MaterializedSchemaVersion schema_version in the materialized v1 document when available.
+	MaterializedSchemaVersion *int32 `json:"materialized_schema_version,omitempty"`
+
+	// MaterializedUpdatedAt When the materialized v1 document was last written in controller etcd (if available).
+	MaterializedUpdatedAt *time.Time `json:"materialized_updated_at,omitempty"`
+
+	// Provenance Provenance of the winning static line (may extend in future API versions).
+	Provenance *Provenance `json:"provenance,omitempty"`
+
+	// SourcesFingerprint Hex SHA-256 fingerprint of static effective (name, type, bundle/service lists) from the controller.
+	SourcesFingerprint *string `json:"sources_fingerprint,omitempty"`
 }
 
 // GenerateTokenRequest defines model for GenerateTokenRequest.
@@ -226,6 +332,16 @@ type Problem struct {
 	Type *string `json:"type,omitempty"`
 }
 
+// Provenance Provenance of the winning static line (may extend in future API versions).
+type Provenance struct {
+	// ConfigSource Which input layer’s static entry won for this name/key in the effective merge
+	// (controller → API Server; ADR 0001).
+	ConfigSource *ConfigSource `json:"config_source,omitempty"`
+
+	// LayerDetail Finer sub-classification (e.g. dominant:etcd_grpc, crd/ContractBundle, pool:controller_root, discovery:…).
+	LayerDetail *string `json:"layer_detail,omitempty"`
+}
+
 // ReadinessStatus Kubernetes-style readiness: **200** when `status` is `ok`, **503** when `not_ready`.
 // Contract Syncer may be `skipped` when the server is configured not to require it for readiness.
 type ReadinessStatus struct {
@@ -237,6 +353,33 @@ type ReadinessStatus struct {
 
 	// Status ok if all required dependency checks passed
 	Status string `json:"status"`
+}
+
+// RegistryService defines model for RegistryService.
+type RegistryService struct {
+	// Meta Control-plane metadata for a static service line.
+	Meta *ServiceMeta `json:"meta,omitempty"`
+
+	// Name Logical service name in the environment.
+	Name string `json:"name"`
+
+	// Scope Whether a service line belongs to the per-environment static merge or the controller root pool.
+	Scope *ServiceLineScope `json:"scope,omitempty"`
+
+	// Upstream Upstream base URL or host as in controller static config.
+	Upstream string `json:"upstream"`
+}
+
+// ServiceLineScope Whether a service line belongs to the per-environment static merge or the controller root pool.
+type ServiceLineScope string
+
+// ServiceMeta Control-plane metadata for a static service line.
+type ServiceMeta struct {
+	// K8sServiceRef Declared or discovered K8s backend reference (format may vary, e.g. `ns/svc` or `GatewayUpstream:...`).
+	K8sServiceRef *string `json:"k8s_service_ref,omitempty"`
+
+	// Provenance Provenance of the winning static line (may extend in future API versions).
+	Provenance *Provenance `json:"provenance,omitempty"`
 }
 
 // SigningKey defines model for SigningKey.

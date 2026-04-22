@@ -13,3 +13,12 @@ func TestSyncUseCase_Sync_UnknownRepo(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestSyncUseCase_ExportContracts_Unknown(t *testing.T) {
+	t.Parallel()
+	u := NewSyncUseCase(sharedgit.NewRepositoryManager(), true)
+	_, err := u.ExportContracts("missing", "ref", "path", "c")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}

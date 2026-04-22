@@ -11,7 +11,7 @@ import (
 	"github.com/go-git/go-billy/v6/util"
 	gogit "github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/plumbing"
-	"github.com/go-git/go-git/v6/plumbing/transport"
+	gitclient "github.com/go-git/go-git/v6/plumbing/client"
 	"github.com/go-git/go-git/v6/storage/memory"
 )
 
@@ -33,25 +33,25 @@ func (rm *RepositoryManager) InitializeRepositories(repos []RepositoryConfig) er
 
 		switch repository.Source {
 		case RepositorySourceGit:
-			auth, err := resolveTransportAuth(repository.Auth, repository.Name)
+			clientOpts, err := resolveTransportAuth(repository.Auth, repository.Name)
 			if err != nil {
 				return err
 			}
 
 			repo, err := gogit.Clone(memory.NewStorage(), memfs.New(), &gogit.CloneOptions{
-				URL:  repository.URL,
-				Auth: auth,
+				URL:             repository.URL,
+				ClientOptions:   clientOpts,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to clone repository %s: %w", repository.Name, err)
 			}
 
 			rm.repos[repository.Name] = &ManagedRepo{
-				Name:   repository.Name,
-				Repo:   repo,
-				Auth:   auth,
-				Source: repository.Source,
-				Path:   repository.Path,
+				Name:          repository.Name,
+				Repo:          repo,
+				ClientOptions: clientOpts,
+				Source:        repository.Source,
+				Path:          repository.Path,
 			}
 
 			slog.Info("Successfully cloned repository", "name", repository.Name)
@@ -66,22 +66,22 @@ func (rm *RepositoryManager) InitializeRepositories(repos []RepositoryConfig) er
 			}
 
 			rm.repos[repository.Name] = &ManagedRepo{
-				Name:   repository.Name,
-				Repo:   repo,
-				Auth:   nil,
-				Source: repository.Source,
-				Path:   repository.Path,
+				Name:          repository.Name,
+				Repo:          repo,
+				ClientOptions: nil,
+				Source:        repository.Source,
+				Path:          repository.Path,
 			}
 
 			slog.Info("Successfully cloned local git repository to memory", "name", repository.Name)
 
 		case RepositorySourceLocalDir:
 			rm.repos[repository.Name] = &ManagedRepo{
-				Name:   repository.Name,
-				Repo:   nil,
-				Auth:   nil,
-				Source: repository.Source,
-				Path:   repository.Path,
+				Name:          repository.Name,
+				Repo:          nil,
+				ClientOptions: nil,
+				Source:        repository.Source,
+				Path:          repository.Path,
 			}
 
 			slog.Info("Successfully opened local directory", "name", repository.Name)
@@ -105,14 +105,14 @@ func (rm *RepositoryManager) GetRepository(name string) (*gogit.Repository, erro
 	return repo.Repo, nil
 }
 
-func (rm *RepositoryManager) getAuth(name string) (transport.AuthMethod, error) {
+func (rm *RepositoryManager) getClientOptions(name string) ([]gitclient.Option, error) {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
 	repo, ok := rm.repos[name]
 	if !ok {
 		return nil, fmt.Errorf("repository %s not found", name)
 	}
-	return repo.Auth, nil
+	return repo.ClientOptions, nil
 }
 
 func (rm *RepositoryManager) GetRepositorySnapshots(name string, ref string, path string) ([]ContractSnapshot, error) {
@@ -176,18 +176,18 @@ func (rm *RepositoryManager) getSnapshotsFromGit(managedRepo *ManagedRepo, ref s
 		return nil, fmt.Errorf("failed to checkout repository %s: %w", managedRepo.Name, err)
 	}
 
-	auth, err := rm.getAuth(managedRepo.Name)
+	clientOpts, err := rm.getClientOptions(managedRepo.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get auth for repository %s: %w", managedRepo.Name, err)
 	}
 
 	switch managedRepo.Source {
 	case RepositorySourceGit:
-		if err = syncRemoteGitRepo(repo, w, auth, managedRepo.Name, ref); err != nil {
+		if err = syncRemoteGitRepo(repo, w, clientOpts, managedRepo.Name, ref); err != nil {
 			return nil, err
 		}
 	default:
-		if err = syncLocalGitWorktree(w, auth, managedRepo.Name); err != nil {
+		if err = syncLocalGitWorktree(w, clientOpts, managedRepo.Name); err != nil {
 			return nil, err
 		}
 	}
@@ -257,10 +257,10 @@ func (rm *RepositoryManager) getSnapshotsFromGit(managedRepo *ManagedRepo, ref s
 	return snapshots, nil
 }
 
-func syncRemoteGitRepo(repo *gogit.Repository, w *gogit.Worktree, auth transport.AuthMethod, name, ref string) error {
+func syncRemoteGitRepo(repo *gogit.Repository, w *gogit.Worktree, clientOpts []gitclient.Option, name, ref string) error {
 	fetchErr := repo.Fetch(&gogit.FetchOptions{
-		RemoteName: gogit.DefaultRemoteName,
-		Auth:       auth,
+		RemoteName:    gogit.DefaultRemoteName,
+		ClientOptions: clientOpts,
 	})
 	if fetchErr != nil && fetchErr != gogit.NoErrAlreadyUpToDate {
 		return fmt.Errorf("failed to fetch repository %s: %w", name, fetchErr)
@@ -269,17 +269,20 @@ func syncRemoteGitRepo(repo *gogit.Repository, w *gogit.Worktree, auth transport
 		slog.Debug("git remote unchanged, skip pull", "repository", name, "ref", ref)
 		return nil
 	}
-	if err := w.Pull(&gogit.PullOptions{Force: true, Auth: auth}); err != nil && err != gogit.NoErrAlreadyUpToDate {
+	if err := w.Pull(&gogit.PullOptions{
+		Force:         true,
+		ClientOptions: clientOpts,
+	}); err != nil && err != gogit.NoErrAlreadyUpToDate {
 		return fmt.Errorf("failed to pull repository %s: %w", name, err)
 	}
 	slog.Debug("pulled repository", "repository", name)
 	return nil
 }
 
-func syncLocalGitWorktree(w *gogit.Worktree, auth transport.AuthMethod, name string) error {
+func syncLocalGitWorktree(w *gogit.Worktree, clientOpts []gitclient.Option, name string) error {
 	err := w.Pull(&gogit.PullOptions{
-		Force: true,
-		Auth:  auth,
+		Force:         true,
+		ClientOptions: clientOpts,
 	})
 	if err != nil {
 		if err != gogit.NoErrAlreadyUpToDate {

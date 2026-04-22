@@ -10,30 +10,29 @@ import (
 	authv1 "github.com/merionyx/api-gateway/pkg/grpc/auth/v1"
 
 	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
-	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 	"github.com/merionyx/api-gateway/internal/controller/index/bundleenv"
 	ctrlmetrics "github.com/merionyx/api-gateway/internal/controller/metrics"
 	"github.com/merionyx/api-gateway/internal/controller/repository/cache"
 	"github.com/merionyx/api-gateway/internal/controller/repository/etcd"
-	"github.com/merionyx/api-gateway/internal/shared/utils"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
+// AuthHandler — gRPC: stream SyncAccess, watch etcd, notification of subscribers. Payload build — AuthConfigBuilder.
+// See auth_config_builder.go.
 type AuthHandler struct {
 	authv1.UnimplementedAuthServiceServer
-	environmentRepo                interfaces.EnvironmentRepository
-	inMemoryEnvironmentsRepository interfaces.InMemoryEnvironmentsRepository
-	schemaRepo                     interfaces.SchemaRepository
-	schemaCache                    *cache.SchemaCache
-	bundleIndex                    *bundleenv.Index
-	metricsEnabled                 bool
-	etcdClient                     *clientv3.Client
+	configBuilder  *AuthConfigBuilder
+	schemaCache    *cache.SchemaCache
+	bundleIndex    *bundleenv.Index
+	metricsEnabled bool
+	etcdClient     *clientv3.Client
 
 	subscribers map[string]chan *authv1.SyncAccessResponse
 	mu          sync.RWMutex
 }
 
+// NewAuthHandler — dependencies for AuthHandler.
 func NewAuthHandler(
 	environmentRepo interfaces.EnvironmentRepository,
 	inMemoryEnvironmentsRepository interfaces.InMemoryEnvironmentsRepository,
@@ -43,15 +42,14 @@ func NewAuthHandler(
 	metricsEnabled bool,
 	etcdClient *clientv3.Client,
 ) *AuthHandler {
+	cfg := NewAuthConfigBuilder(environmentRepo, inMemoryEnvironmentsRepository, schemaRepo)
 	handler := &AuthHandler{
-		environmentRepo:                environmentRepo,
-		inMemoryEnvironmentsRepository: inMemoryEnvironmentsRepository,
-		schemaRepo:                     schemaRepo,
-		schemaCache:                    schemaCache,
-		bundleIndex:                    bundleIndex,
-		metricsEnabled:                 metricsEnabled,
-		etcdClient:                     etcdClient,
-		subscribers:                    make(map[string]chan *authv1.SyncAccessResponse),
+		configBuilder:  cfg,
+		schemaCache:    schemaCache,
+		bundleIndex:    bundleIndex,
+		metricsEnabled: metricsEnabled,
+		etcdClient:     etcdClient,
+		subscribers:    make(map[string]chan *authv1.SyncAccessResponse),
 	}
 
 	go handler.watchEtcdChanges()
@@ -67,7 +65,7 @@ func NewAuthHandler(
 	return handler
 }
 
-// SyncAccess bidirectional streaming for synchronization
+// SyncAccess — bidirectional streaming for synchronization.
 func (h *AuthHandler) SyncAccess(stream authv1.AuthService_SyncAccessServer) error {
 	ctx := stream.Context()
 
@@ -145,7 +143,7 @@ func (h *AuthHandler) SyncAccess(stream authv1.AuthService_SyncAccessServer) err
 	}
 }
 
-// GetAccessConfig get the current configuration (unary)
+// GetAccessConfig — get the current configuration (unary).
 func (h *AuthHandler) GetAccessConfig(ctx context.Context, req *authv1.GetAccessConfigRequest) (*authv1.GetAccessConfigResponse, error) {
 	cfg, err := h.buildAccessConfig(ctx, req.Environment)
 	if err != nil {
@@ -159,99 +157,7 @@ func (h *AuthHandler) buildAccessConfig(ctx context.Context, environment string)
 	defer func() {
 		ctrlmetrics.ObserveAuthBuildAccessConfig(h.metricsEnabled, time.Since(start))
 	}()
-
-	var env *models.Environment
-
-	config := &authv1.AccessConfig{
-		Environment: environment,
-		Contracts:   make([]*authv1.ContractAccess, 0),
-		Version:     time.Now().Unix(),
-	}
-
-	env, err := h.environmentRepo.GetEnvironment(ctx, environment)
-	if err != nil {
-		env, err = h.inMemoryEnvironmentsRepository.GetEnvironment(ctx, environment)
-
-		if err != nil {
-			return config, fmt.Errorf("environment not found: %w", err)
-		}
-
-		for _, snapshot := range env.Snapshots {
-			contractAccess := &authv1.ContractAccess{
-				ContractName: snapshot.Name,
-				Prefix:       snapshot.Prefix,
-				Secure:       snapshot.Access.Secure,
-				Apps:         make([]*authv1.AppAccess, 0),
-			}
-
-			for _, app := range snapshot.Access.Apps {
-				hasAccess := false
-				if len(app.Environments) == 0 {
-					hasAccess = true
-				} else {
-					for _, envName := range app.Environments {
-						if envName == environment {
-							hasAccess = true
-							break
-						}
-					}
-				}
-
-				if hasAccess {
-					contractAccess.Apps = append(contractAccess.Apps, &authv1.AppAccess{
-						AppId:        app.AppID,
-						Environments: app.Environments,
-					})
-				}
-			}
-
-			config.Contracts = append(config.Contracts, contractAccess)
-		}
-	}
-
-	if env != nil && env.Bundles != nil {
-		for _, bundle := range env.Bundles.Static {
-			snapshots, err := h.schemaRepo.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref, bundle.Path)
-			if err != nil {
-				slog.Warn("auth sync: failed to list snapshots for bundle", "bundle", bundle.Name, "error", err)
-				continue
-			}
-
-			for _, snapshot := range snapshots {
-				contractAccess := &authv1.ContractAccess{
-					ContractName: snapshot.Name,
-					Prefix:       snapshot.Prefix,
-					Secure:       snapshot.Access.Secure,
-					Apps:         make([]*authv1.AppAccess, 0),
-				}
-
-				for _, app := range snapshot.Access.Apps {
-					hasAccess := false
-					if len(app.Environments) == 0 {
-						hasAccess = true
-					} else {
-						for _, envPattern := range app.Environments {
-							if utils.MatchesEnvironmentPattern(environment, envPattern) {
-								hasAccess = true
-								break
-							}
-						}
-					}
-
-					if hasAccess {
-						contractAccess.Apps = append(contractAccess.Apps, &authv1.AppAccess{
-							AppId:        app.AppID,
-							Environments: app.Environments,
-						})
-					}
-				}
-
-				config.Contracts = append(config.Contracts, contractAccess)
-			}
-		}
-	}
-
-	return config, nil
+	return h.configBuilder.BuildAccessConfig(ctx, environment)
 }
 
 func (h *AuthHandler) watchEtcdChanges() {

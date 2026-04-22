@@ -47,7 +47,27 @@ type InMemoryServiceRepository interface {
 	Initialize(config *config.Config) error
 	GetService(name string) (*models.StaticServiceConfig, error)
 	ListServices() ([]models.StaticServiceConfig, error)
+	// ListRootPoolDeduplicated returns the controller root static service list (config services.static
+	// plus K8s global services). For the same name, file config wins, matching [GetService] and xDS
+	// [BuildClusters].
+	ListRootPoolDeduplicated() (fromFile, fromKubernetes []models.StaticServiceConfig)
 	SetKubernetesGlobalServices(services []models.StaticServiceConfig)
+}
+
+// MaterializedEffectiveStore persists idempotent materialized effective (static) to etcd (ADR 0001). Optional; may be nil.
+type MaterializedEffectiveStore interface {
+	ReconcileIfChanged(ctx context.Context, skel *models.Environment) error
+	// Delete removes the materialized v1 key for the environment. No-op for nil/invalid name or if the store is nil.
+	Delete(ctx context.Context, environmentName string) error
+}
+
+// EffectiveReconciler reconciles the effective environment (in-memory file∪K8s ∪ controller etcd) into
+// xDS and optionally materialized JSON in etcd (ADR 0001). In-memory binding is documented in
+// internal/controller/repository/memory (NewEnvironmentsRepository, AttachEffectiveReconciler).
+type EffectiveReconciler interface {
+	RebuildAllFromMemory(ctx context.Context, memoryMergedByName map[string]*models.Environment)
+	// ReconcileOne is one environment by name. writeMaterialized: true for CRUD paths (leader + flag); false for hot-path follower watch.
+	ReconcileOne(ctx context.Context, name string, writeMaterialized bool) error
 }
 
 type InMemoryEnvironmentsRepository interface {

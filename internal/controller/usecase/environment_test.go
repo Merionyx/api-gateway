@@ -8,7 +8,6 @@ import (
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 	"github.com/merionyx/api-gateway/internal/controller/repository/memory"
 	"github.com/merionyx/api-gateway/internal/controller/xds/builder"
-	xdscache "github.com/merionyx/api-gateway/internal/controller/xds/cache"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
@@ -46,14 +45,13 @@ func TestEnvironmentsUseCase_CreateEnvironment(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	xb := builder.NewXDSBuilder(svcRepo)
-	sm := xdscache.NewSnapshotManager(false)
+	_ = builder.NewXDSBuilder(svcRepo)
 	su := NewSchemasUseCase().(*schemasUseCase)
 	su.SetDependencies(&fakeSchemaRepo{}, nil)
 
 	uc := NewEnvironmentsUseCase().(*environmentsUseCase)
 	repo := &fakeEnvRepo{}
-	uc.SetDependencies(repo, su, sm, xb)
+	uc.SetDependencies(repo, nil, su, nil)
 
 	env, err := uc.CreateEnvironment(context.Background(), &models.CreateEnvironmentRequest{
 		Name: "test-env",
@@ -75,12 +73,11 @@ func TestEnvironmentsUseCase_CreateEnvironment(t *testing.T) {
 func TestEnvironmentsUseCase_CreateEnvironment_AlreadyExists(t *testing.T) {
 	svcRepo := memory.NewServiceRepository()
 	_ = svcRepo.Initialize(&config.Config{Services: config.ServicesConfig{Static: []config.StaticServiceConfig{{Name: "s1", Upstream: "http://x"}}}})
-	xb := builder.NewXDSBuilder(svcRepo)
-	sm := xdscache.NewSnapshotManager(false)
+	_ = builder.NewXDSBuilder(svcRepo)
 	su := NewSchemasUseCase().(*schemasUseCase)
 	su.SetDependencies(&fakeSchemaRepo{}, nil)
 	uc := NewEnvironmentsUseCase().(*environmentsUseCase)
-	uc.SetDependencies(&fakeEnvRepo{get: &models.Environment{Name: "e1"}}, su, sm, xb)
+	uc.SetDependencies(&fakeEnvRepo{get: &models.Environment{Name: "e1"}}, nil, su, nil)
 
 	_, err := uc.CreateEnvironment(context.Background(), &models.CreateEnvironmentRequest{Name: "e1"})
 	if err == nil {

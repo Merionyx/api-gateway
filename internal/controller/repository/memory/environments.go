@@ -4,17 +4,16 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"sort"
 	"sync"
 	"time"
 
 	"github.com/merionyx/api-gateway/internal/controller/config"
 	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/controller/envmodel"
 	"github.com/merionyx/api-gateway/internal/controller/index/bundleenv"
 	ctrlmetrics "github.com/merionyx/api-gateway/internal/controller/metrics"
 	xdscache "github.com/merionyx/api-gateway/internal/controller/xds/cache"
-	"github.com/merionyx/api-gateway/internal/controller/xds/snapshot"
 )
 
 type EnvironmentsRepository struct {
@@ -24,23 +23,50 @@ type EnvironmentsRepository struct {
 	fromK8s  map[string]*models.Environment
 
 	xdsSnapshotManager *xdscache.SnapshotManager
-	xdsBuilder         interfaces.XDSBuilder
-	schemaRepo         interfaces.SchemaRepository
 	bundleEnvIndex     *bundleenv.Index
 	bundleEnvMetrics   bool
+
+	// Effective (ADR 0001): from [NewEnvironmentsRepository] and/or
+	// [AttachEffectiveReconciler] in production; tests may pass a non-nil
+	// reconciler in New and never call Attach.
+	eff interfaces.EffectiveReconciler
 }
 
-func NewEnvironmentsRepository() interfaces.InMemoryEnvironmentsRepository {
+// NewEnvironmentsRepository creates an in-memory file ∪ Kubernetes environment store. If
+// eff is non-nil, it is used for RebuildAllFromMemory / ReconcileOne. If nil, call
+// [AttachEffectiveReconciler] once after [reconcile.New] with the same
+// [interfaces.InMemoryEnvironmentsRepository] in ReconcilerDeps (circular ref), and before
+// [EnvironmentsRepository.Initialize].
+func NewEnvironmentsRepository(eff interfaces.EffectiveReconciler) interfaces.InMemoryEnvironmentsRepository {
 	return &EnvironmentsRepository{
 		fromFile: make(map[string]*models.Environment),
 		fromK8s:  make(map[string]*models.Environment),
+		eff:      eff,
 	}
 }
 
-func (r *EnvironmentsRepository) SetDependencies(xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder interfaces.XDSBuilder, schemaRepo interfaces.SchemaRepository) {
+// AttachEffectiveReconciler binds the effective reconciler created after the repository
+// (solves the memory↔reconcile cycle in one place). Must be called at most once when
+// [NewEnvironmentsRepository] was called with eff == nil, before Initialize. Panics if
+// the concrete type is wrong, eff is nil, or a reconciler is already set.
+func AttachEffectiveReconciler(ier interfaces.InMemoryEnvironmentsRepository, eff interfaces.EffectiveReconciler) {
+	if eff == nil {
+		panic("controller/memory: AttachEffectiveReconciler: eff is nil")
+	}
+	r, ok := ier.(*EnvironmentsRepository)
+	if !ok {
+		panic("controller/memory: AttachEffectiveReconciler: wrong concrete type")
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.eff != nil {
+		panic("controller/memory: AttachEffectiveReconciler: already set (pass reconciler in New, or use Attach only from nil start)")
+	}
+	r.eff = eff
+}
+
+func (r *EnvironmentsRepository) SetDependencies(xdsSnapshotManager *xdscache.SnapshotManager, _ interfaces.XDSBuilder, _ interfaces.SchemaRepository) {
 	r.xdsSnapshotManager = xdsSnapshotManager
-	r.xdsBuilder = xdsBuilder
-	r.schemaRepo = schemaRepo
 }
 
 // SetBundleEnvIndex wires the bundle→environment index refreshed after Kubernetes or static config changes.
@@ -67,7 +93,6 @@ func (r *EnvironmentsRepository) scheduleBundleEnvIndexRebuildLocked() {
 
 func (r *EnvironmentsRepository) Initialize(config *config.Config) error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 
 	r.fromFile = make(map[string]*models.Environment)
 	r.fromK8s = make(map[string]*models.Environment)
@@ -111,197 +136,129 @@ func (r *EnvironmentsRepository) Initialize(config *config.Config) error {
 		slog.Info("environment from config", "name", environment.Name, "bundles", len(environment.Bundles.Static), "services", len(environment.Services.Static))
 	}
 
-	r.rebuildMergedXDSSnapshotsLocked(context.Background())
+	r.mu.Unlock()
+	r.rebuildMergedXDSSnapshots(context.Background())
+	r.mu.Lock()
 	r.scheduleBundleEnvIndexRebuildLocked()
+	r.mu.Unlock()
 	return nil
-}
-
-func bundleDedupeKey(b models.StaticContractBundleConfig) string {
-	return b.Repository + "\x00" + b.Ref + "\x00" + b.Path + "\x00" + b.Name
 }
 
 // UnionStaticContractBundles returns the union of two bundle lists keyed by repository, ref, path, and name.
 func UnionStaticContractBundles(a, b []models.StaticContractBundleConfig) []models.StaticContractBundleConfig {
-	return unionStaticBundles(a, b)
+	return envmodel.UnionStaticBundles(a, b)
 }
 
 // UnionStaticServices returns the union of two service lists by name (later entries override same name).
 func UnionStaticServices(a, b []models.StaticServiceConfig) []models.StaticServiceConfig {
-	return unionStaticServices(a, b)
+	return envmodel.UnionStaticServices(a, b)
 }
 
-func unionStaticBundles(file, k8s []models.StaticContractBundleConfig) []models.StaticContractBundleConfig {
-	byKey := make(map[string]models.StaticContractBundleConfig)
-	for _, b := range file {
-		byKey[bundleDedupeKey(b)] = b
-	}
-	for _, b := range k8s {
-		byKey[bundleDedupeKey(b)] = b
-	}
-	keys := make([]string, 0, len(byKey))
-	for k := range byKey {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	out := make([]models.StaticContractBundleConfig, 0, len(keys))
-	for _, k := range keys {
-		out = append(out, byKey[k])
-	}
-	return out
-}
-
-func unionStaticServices(file, k8s []models.StaticServiceConfig) []models.StaticServiceConfig {
-	byName := make(map[string]models.StaticServiceConfig)
-	for _, s := range file {
-		byName[s.Name] = s
-	}
-	for _, s := range k8s {
-		byName[s.Name] = s
-	}
-	names := make([]string, 0, len(byName))
-	for n := range byName {
-		names = append(names, n)
-	}
-	sort.Strings(names)
-	out := make([]models.StaticServiceConfig, 0, len(names))
-	for _, n := range names {
-		out = append(out, byName[n])
-	}
-	return out
-}
-
-// mergeEnvironment overlays Kubernetes-discovered bundles/services onto static config for the same logical environment.
-func mergeEnvironment(file, k8s *models.Environment) *models.Environment {
-	var fBundles, kBundles []models.StaticContractBundleConfig
-	if file != nil && file.Bundles != nil {
-		fBundles = file.Bundles.Static
-	}
-	if k8s != nil && k8s.Bundles != nil {
-		kBundles = k8s.Bundles.Static
-	}
-	var fSvc, kSvc []models.StaticServiceConfig
-	if file != nil && file.Services != nil {
-		fSvc = file.Services.Static
-	}
-	if k8s != nil && k8s.Services != nil {
-		kSvc = k8s.Services.Static
-	}
-	name := ""
-	typ := "kubernetes"
-	if k8s != nil {
-		name = k8s.Name
-		typ = k8s.Type
-	} else if file != nil {
-		name = file.Name
-		typ = file.Type
-	}
-	return &models.Environment{
-		Name: name,
-		Type: typ,
-		Bundles: &models.EnvironmentBundleConfig{
-			Static: unionStaticBundles(fBundles, kBundles),
-		},
-		Services: &models.EnvironmentServiceConfig{
-			Static: unionStaticServices(fSvc, kSvc),
-		},
-		Snapshots: nil,
-	}
-}
-
+// mergedLocked returns the in-memory (file ∪ K8s) view for each name. The repository only stores
+// fromFile and fromK8s; this is never a cached "effective" layer, but a fresh envmodel result per call.
+// Single-source entries are ToAPIServerSkeleton copies so the returned map never aliases storage.
 func (r *EnvironmentsRepository) mergedLocked() map[string]*models.Environment {
-	out := make(map[string]*models.Environment)
-	for k, v := range r.fromFile {
-		out[k] = v
+	keys := make(map[string]struct{})
+	for k := range r.fromFile {
+		keys[k] = struct{}{}
 	}
-	for k, k8s := range r.fromK8s {
-		if fileEnv, ok := r.fromFile[k]; ok {
-			out[k] = mergeEnvironment(fileEnv, k8s)
-		} else {
-			out[k] = k8s
+	for k := range r.fromK8s {
+		keys[k] = struct{}{}
+	}
+	out := make(map[string]*models.Environment, len(keys))
+	for k := range keys {
+		var f, k8s *models.Environment
+		if e, ok := r.fromFile[k]; ok {
+			f = e
 		}
+		if e, ok := r.fromK8s[k]; ok {
+			k8s = e
+		}
+		out[k] = envmodel.InMemoryEffective(f, k8s)
 	}
 	return out
 }
 
-func (r *EnvironmentsRepository) envWithSnapshotsFromEtcd(ctx context.Context, env *models.Environment) (*models.Environment, error) {
-	if env == nil {
-		return nil, nil
-	}
-	if r.schemaRepo == nil {
-		return env, nil
-	}
-	out := *env
-	out.Snapshots = nil
-	if env.Bundles == nil {
-		return &out, nil
-	}
-	for _, bundle := range env.Bundles.Static {
-		snaps, err := r.schemaRepo.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref, bundle.Path)
-		if err != nil {
-			return nil, fmt.Errorf("list contract snapshots for bundle %q (repo %q ref %q path %q): %w", bundle.Name, bundle.Repository, bundle.Ref, bundle.Path, err)
-		}
-		out.Snapshots = append(out.Snapshots, snaps...)
-	}
-	return &out, nil
-}
-
-func (r *EnvironmentsRepository) rebuildMergedXDSSnapshotsLocked(ctx context.Context) {
-	if r.xdsSnapshotManager == nil || r.xdsBuilder == nil {
+// rebuildMergedXDSSnapshots runs without holding r.mu. Delegates to the effective reconciler
+// (file ∪ k8s ∪ controller etcd) → xDS + optional materialized.
+func (r *EnvironmentsRepository) rebuildMergedXDSSnapshots(ctx context.Context) {
+	if r.eff == nil {
 		return
 	}
-	for envName, env := range r.mergedLocked() {
-		buildEnv, err := r.envWithSnapshotsFromEtcd(ctx, env)
-		if err != nil {
-			slog.Error("xDS rebuild from memory: enrich snapshots from etcd", "environment", envName, "error", err)
-			continue
-		}
-		snap, err := snapshot.BuildEnvoySnapshot(r.xdsBuilder, buildEnv)
-		if err != nil {
-			slog.Error("xDS rebuild from memory: build envoy snapshot", "environment", envName, "error", err)
-			continue
-		}
-		nodeID := fmt.Sprintf("envoy-%s", envName)
-		if err := r.xdsSnapshotManager.UpdateSnapshot(nodeID, snap); err != nil {
-			slog.Error("xDS snapshot update failed", "node_id", nodeID, "error", err)
-			continue
-		}
-		slog.Info("updated xDS snapshot", "environment", envName, "node_id", nodeID)
+	if r.xdsSnapshotManager == nil {
+		return
 	}
+	r.mu.RLock()
+	merged := r.mergedLocked()
+	r.mu.RUnlock()
+	r.eff.RebuildAllFromMemory(ctx, merged)
 }
 
 // ApplyKubernetesEnvironments replaces the Kubernetes-sourced environment map and rebuilds xDS.
 func (r *EnvironmentsRepository) ApplyKubernetesEnvironments(ctx context.Context, envs map[string]*models.Environment) error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	r.fromK8s = envs
-	r.rebuildMergedXDSSnapshotsLocked(ctx)
+	r.mu.Unlock()
+	r.rebuildMergedXDSSnapshots(ctx)
+	r.mu.Lock()
 	r.scheduleBundleEnvIndexRebuildLocked()
+	r.mu.Unlock()
 	return nil
 }
 
-// GetEnvironment returns the merged view when the same name exists in static config and Kubernetes; otherwise the sole source.
+// GetEnvironment returns the in-memory (file ∪ K8s) view. Storage holds only the two partials;
+// this result is envmodel-computed, with single-source values as skeleton copies (no pointer alias into fromFile/fromK8s).
 func (r *EnvironmentsRepository) GetEnvironment(ctx context.Context, name string) (*models.Environment, error) {
 	_ = ctx
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	fileEnv, fromFile := r.fromFile[name]
 	k8sEnv, fromK8s := r.fromK8s[name]
-	if fromFile && fromK8s {
-		return mergeEnvironment(fileEnv, k8sEnv), nil
+	if !fromFile && !fromK8s {
+		return nil, fmt.Errorf("environment %s not found in config", name)
 	}
-	if fromK8s {
-		return k8sEnv, nil
-	}
-	if fromFile {
-		return fileEnv, nil
-	}
-	return nil, fmt.Errorf("environment %s not found in config", name)
+	return envmodel.InMemoryEffective(fileEnv, k8sEnv), nil
 }
 
-// ListEnvironments merges static config with Kubernetes sources (Kubernetes wins on name conflict).
+// ListEnvironments returns the file ∪ K8s effective map (computed; not a third stored snapshot).
 func (r *EnvironmentsRepository) ListEnvironments(ctx context.Context) (map[string]*models.Environment, error) {
 	_ = ctx
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.mergedLocked(), nil
+}
+
+// FileAndK8sStaticBundles returns unmerged static bundle lists for provenance (ADR 0001, phase 3).
+func (r *EnvironmentsRepository) FileAndK8sStaticBundles(_ context.Context, name string) (file, k8s []models.StaticContractBundleConfig) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if e, ok := r.fromFile[name]; ok && e != nil && e.Bundles != nil {
+		file = e.Bundles.Static
+	}
+	if e, ok := r.fromK8s[name]; ok && e != nil && e.Bundles != nil {
+		k8s = e.Bundles.Static
+	}
+	return file, k8s
+}
+
+// FileAndK8sStaticServices returns unmerged static service lists (same layering as FileAndK8sStaticBundles).
+func (r *EnvironmentsRepository) FileAndK8sStaticServices(_ context.Context, name string) (file, k8s []models.StaticServiceConfig) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if e, ok := r.fromFile[name]; ok && e != nil && e.Services != nil {
+		file = e.Services.Static
+	}
+	if e, ok := r.fromK8s[name]; ok && e != nil && e.Services != nil {
+		k8s = e.Services.Static
+	}
+	return file, k8s
+}
+
+// EnvironmentLayersPresent returns whether the environment name is declared in static file and/or K8s maps.
+func (r *EnvironmentsRepository) EnvironmentLayersPresent(name string) (inFile, inK8s bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	_, inFile = r.fromFile[name]
+	_, inK8s = r.fromK8s[name]
+	return inFile, inK8s
 }
