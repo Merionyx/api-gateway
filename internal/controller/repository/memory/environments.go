@@ -152,17 +152,27 @@ func UnionStaticServices(a, b []models.StaticServiceConfig) []models.StaticServi
 	return envmodel.UnionStaticServices(a, b)
 }
 
+// mergedLocked returns the in-memory (file ∪ K8s) view for each name. The repository only stores
+// fromFile and fromK8s; this is never a cached "effective" layer, but a fresh envmodel result per call.
+// Single-source entries are ToAPIServerSkeleton copies so the returned map never aliases storage.
 func (r *EnvironmentsRepository) mergedLocked() map[string]*models.Environment {
-	out := make(map[string]*models.Environment)
-	for k, v := range r.fromFile {
-		out[k] = v
+	keys := make(map[string]struct{})
+	for k := range r.fromFile {
+		keys[k] = struct{}{}
 	}
-	for k, k8s := range r.fromK8s {
-		if fileEnv, ok := r.fromFile[k]; ok {
-			out[k] = envmodel.MergeFileAndK8s(fileEnv, k8s)
-		} else {
-			out[k] = k8s
+	for k := range r.fromK8s {
+		keys[k] = struct{}{}
+	}
+	out := make(map[string]*models.Environment, len(keys))
+	for k := range keys {
+		var f, k8s *models.Environment
+		if e, ok := r.fromFile[k]; ok {
+			f = e
 		}
+		if e, ok := r.fromK8s[k]; ok {
+			k8s = e
+		}
+		out[k] = envmodel.InMemoryEffective(f, k8s)
 	}
 	return out
 }
@@ -289,26 +299,21 @@ func (r *EnvironmentsRepository) ApplyKubernetesEnvironments(ctx context.Context
 	return nil
 }
 
-// GetEnvironment returns the merged view when the same name exists in static config and Kubernetes; otherwise the sole source.
+// GetEnvironment returns the in-memory (file ∪ K8s) view. Storage holds only the two partials;
+// this result is envmodel-computed, with single-source values as skeleton copies (no pointer alias into fromFile/fromK8s).
 func (r *EnvironmentsRepository) GetEnvironment(ctx context.Context, name string) (*models.Environment, error) {
 	_ = ctx
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	fileEnv, fromFile := r.fromFile[name]
 	k8sEnv, fromK8s := r.fromK8s[name]
-	if fromFile && fromK8s {
-		return envmodel.MergeFileAndK8s(fileEnv, k8sEnv), nil
+	if !fromFile && !fromK8s {
+		return nil, fmt.Errorf("environment %s not found in config", name)
 	}
-	if fromK8s {
-		return k8sEnv, nil
-	}
-	if fromFile {
-		return fileEnv, nil
-	}
-	return nil, fmt.Errorf("environment %s not found in config", name)
+	return envmodel.InMemoryEffective(fileEnv, k8sEnv), nil
 }
 
-// ListEnvironments merges static config with Kubernetes sources (Kubernetes wins on name conflict).
+// ListEnvironments returns the file ∪ K8s effective map (computed; not a third stored snapshot).
 func (r *EnvironmentsRepository) ListEnvironments(ctx context.Context) (map[string]*models.Environment, error) {
 	_ = ctx
 	r.mu.RLock()
