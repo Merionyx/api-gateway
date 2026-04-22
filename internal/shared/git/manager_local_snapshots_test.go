@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -40,7 +41,7 @@ x-api-gateway:
 	}); err != nil {
 		t.Fatal(err)
 	}
-	snaps, err := rm.GetRepositorySnapshots("schemas", "", "openapi")
+	snaps, err := rm.GetRepositorySnapshots(context.Background(), "schemas", "", "openapi")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
 	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
@@ -46,9 +47,12 @@ func NewControllerRegistryUseCase(
 }
 
 func (uc *ControllerRegistryUseCase) RegisterController(ctx context.Context, info models.ControllerInfo) error {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseRegistryPkg, "RegisterController"))
+	defer span.End()
 	slog.Info("Registering controller", "controller_id", info.ControllerID, "tenant", info.Tenant)
 
 	if err := uc.controllerRepo.RegisterController(ctx, info); err != nil {
+		telemetry.MarkError(span, err)
 		return fmt.Errorf("failed to register controller: %w", err)
 	}
 
@@ -60,8 +64,11 @@ func (uc *ControllerRegistryUseCase) sendAllSnapshotsForControllerStream(
 	controllerID string,
 	stream interfaces.SnapshotStream,
 ) error {
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseRegistryPkg, "sendAllSnapshotsForControllerStream"))
+	defer span.End()
 	controller, err := uc.controllerRepo.GetController(ctx, controllerID)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return fmt.Errorf("failed to get controller: %w", err)
 	}
 
@@ -78,6 +85,7 @@ func (uc *ControllerRegistryUseCase) sendAllSnapshotsForControllerStream(
 			}
 
 			if err := stream.Send(env.Name, bundleKey, snapshots); err != nil {
+				telemetry.MarkError(span, err)
 				return fmt.Errorf("failed to send snapshots: %w", err)
 			}
 		}
@@ -86,6 +94,8 @@ func (uc *ControllerRegistryUseCase) sendAllSnapshotsForControllerStream(
 }
 
 func (uc *ControllerRegistryUseCase) StreamSnapshots(ctx context.Context, controllerID string, stream interfaces.SnapshotStream) error {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseRegistryPkg, "StreamSnapshots"))
+	defer span.End()
 	slog.Info("Starting snapshot stream", "controller_id", controllerID)
 
 	uc.mu.Lock()
@@ -99,6 +109,7 @@ func (uc *ControllerRegistryUseCase) StreamSnapshots(ctx context.Context, contro
 	}()
 
 	if err := uc.sendAllSnapshotsForControllerStream(ctx, controllerID, stream); err != nil {
+		telemetry.MarkError(span, err)
 		return err
 	}
 
@@ -107,10 +118,13 @@ func (uc *ControllerRegistryUseCase) StreamSnapshots(ctx context.Context, contro
 }
 
 func (uc *ControllerRegistryUseCase) Heartbeat(ctx context.Context, controllerID string, environments []models.EnvironmentInfo, registryPayloadVersion int32) error {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseRegistryPkg, "Heartbeat"))
+	defer span.End()
 	slog.Debug("Received heartbeat", "controller_id", controllerID)
 
 	mainUpdated, err := uc.controllerRepo.UpdateControllerHeartbeat(ctx, controllerID, environments, registryPayloadVersion)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return fmt.Errorf("failed to update heartbeat: %w", err)
 	}
 
@@ -132,6 +146,8 @@ func (uc *ControllerRegistryUseCase) Heartbeat(ctx context.Context, controllerID
 }
 
 func (uc *ControllerRegistryUseCase) NotifySnapshotUpdate(ctx context.Context, bundleKey string, snapshots []sharedgit.ContractSnapshot) error {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseRegistryPkg, "NotifySnapshotUpdate"))
+	defer span.End()
 	uc.mu.RLock()
 	defer uc.mu.RUnlock()
 
@@ -139,6 +155,7 @@ func (uc *ControllerRegistryUseCase) NotifySnapshotUpdate(ctx context.Context, b
 
 	controllers, err := uc.controllerRepo.ListControllers(ctx)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return fmt.Errorf("failed to list controllers: %w", err)
 	}
 
@@ -192,6 +209,8 @@ func (uc *ControllerRegistryUseCase) StartEtcdWatch(ctx context.Context) {
 
 		flushCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
+		_, flushSpan := telemetry.Start(flushCtx, telemetry.SpanName(spanUsecaseRegistryPkg, "EtcdWatchFlush"))
+		defer flushSpan.End()
 
 		for bk := range bundles {
 			snapshots, err := uc.snapshotRepo.GetSnapshots(flushCtx, bk)
@@ -262,11 +281,17 @@ func parseControllerIDKey(key string) (controllerID string, ok bool) {
 }
 
 func (uc *ControllerRegistryUseCase) resyncConnectedController(ctx context.Context, controllerID string) error {
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseRegistryPkg, "resyncConnectedController"))
+	defer span.End()
 	uc.mu.RLock()
 	stream, ok := uc.controllerStreams[controllerID]
 	uc.mu.RUnlock()
 	if !ok {
 		return nil
 	}
-	return uc.sendAllSnapshotsForControllerStream(ctx, controllerID, stream)
+	err := uc.sendAllSnapshotsForControllerStream(ctx, controllerID, stream)
+	if err != nil {
+		telemetry.MarkError(span, err)
+	}
+	return err
 }

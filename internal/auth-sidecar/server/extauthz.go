@@ -70,7 +70,9 @@ func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*
 
 	// 1. Find the contract by path (longest prefix match)
 	path := req.Attributes.Request.Http.Path
+	_, findSp := telemetry.Start(ctx, telemetry.SpanName(spanExtAuthzPkg, "accessStorage.findContractByPath"))
 	accessConfig := s.container.AccessStorage.FindContractByPath(path)
+	findSp.End()
 
 	if accessConfig == nil {
 		slog.Warn("auth: contract not found for path", "path", path)
@@ -95,12 +97,16 @@ func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*
 	}
 
 	// 5. Validate the JWT
+	_, jwtSp := telemetry.Start(ctx, telemetry.SpanName(spanExtAuthzPkg, "jwtValidator.validateToken"))
 	claims, err := s.container.JWTValidator.ValidateToken(token)
 	if err != nil {
+		telemetry.MarkError(jwtSp, err)
+		jwtSp.End()
 		slog.Warn("auth: invalid JWT", "error", err)
 		record(authmetrics.ResultDeny, authmetrics.ReasonInvalidJWT)
 		return denyResponse("Invalid token", 401), nil
 	}
+	jwtSp.End()
 
 	// 6. Extract the app_id and environments from the JWT
 	appID, ok := claims["app_id"].(string)
@@ -135,7 +141,9 @@ func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*
 
 	// 7. Check that the current environment matches any of the patterns in the token
 	currentEnv := s.container.Config.Controller.Environment
+	_, envSp := telemetry.Start(ctx, telemetry.SpanName(spanExtAuthzPkg, "authorize.checkEnvironmentAndAccess"))
 	if !utils.MatchesAnyEnvironment(currentEnv, tokenEnvironments) {
+		envSp.End()
 		record(authmetrics.ResultDeny, authmetrics.ReasonEnvNotAllowed)
 		return denyResponse(fmt.Sprintf("Token environments %v don't match current env %s",
 			tokenEnvironments, currentEnv), 403), nil
@@ -144,10 +152,12 @@ func (s *ExtAuthzServer) Check(ctx context.Context, req *authv3.CheckRequest) (*
 	// 8. Check access rights from in-memory storage
 	allowed := s.container.AccessStorage.CheckAccess(contractName, appID, currentEnv)
 	if !allowed {
+		envSp.End()
 		slog.Warn("auth: access denied", "app_id", appID, "contract", contractName, "environment", currentEnv)
 		record(authmetrics.ResultDeny, authmetrics.ReasonAccessDenied)
 		return denyResponse(fmt.Sprintf("Access denied to contract %s", contractName), 403), nil
 	}
+	envSp.End()
 
 	duration := time.Since(startTime)
 	slog.Info("auth: allowed",

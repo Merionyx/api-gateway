@@ -19,6 +19,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/bundle"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/registry"
 	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 )
 
@@ -55,8 +56,11 @@ func NewRegistryHandler(
 }
 
 func (h *RegistryHandler) ListBundleKeys(c fiber.Ctx, params apiserver.ListBundleKeysParams) error {
+	span := beginHandlerSpan(c, "ListBundleKeys")
+	defer span.End()
 	items, next, hasMore, err := h.bundles.ListBundleKeys(c.Context(), params.Limit, params.Cursor)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.RespondError(c, err)
 	}
 	apiItems := make([]apiserver.Bundle, 0, len(items))
@@ -71,6 +75,7 @@ func (h *RegistryHandler) ListBundleKeys(c fiber.Ctx, params apiserver.ListBundl
 	body := apiserver.BundleRefListResponse{Items: apiItems, HasMore: hasMore, NextCursor: next}
 	etag, err := jsonETag(body)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.RespondError(c, err)
 	}
 	if params.IfNoneMatch != nil && ifNoneMatchMatches(*params.IfNoneMatch, etag) {
@@ -82,8 +87,11 @@ func (h *RegistryHandler) ListBundleKeys(c fiber.Ctx, params apiserver.ListBundl
 }
 
 func (h *RegistryHandler) SyncBundle(c fiber.Ctx, params apiserver.SyncBundleParams) error {
+	span := beginHandlerSpan(c, "SyncBundle")
+	defer span.End()
 	var req apiserver.BundleSyncRequest
 	if err := c.Bind().Body(&req); err != nil {
+		telemetry.MarkError(span, err)
 		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidJSONBody, "", problem.DetailInvalidJSONBody))
 	}
 	if req.Repository == "" || req.Ref == "" || req.Bundle == "" {
@@ -99,6 +107,7 @@ func (h *RegistryHandler) SyncBundle(c fiber.Ctx, params apiserver.SyncBundlePar
 				return problem.Write(c, http.StatusConflict, problem.Conflict(problem.CodeIdempotencyKeyMismatch, "", problem.DetailIdempotencyKeyMismatch))
 			}
 			if err != nil {
+				telemetry.MarkError(span, err)
 				return problem.WriteInternal(c, err)
 			}
 			return writeCachedHTTPResult(c, res)
@@ -107,6 +116,7 @@ func (h *RegistryHandler) SyncBundle(c fiber.Ctx, params apiserver.SyncBundlePar
 
 	res, err := h.syncBundleHTTPResult(c, &req)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.WriteInternal(c, err)
 	}
 	return writeCachedHTTPResult(c, res)
@@ -157,17 +167,22 @@ func logHTTPProblem(st int, p *apiserver.Problem, cause error) {
 }
 
 func (h *RegistryHandler) ListContractsInBundle(c fiber.Ctx, params apiserver.ListContractsInBundleParams) error {
+	span := beginHandlerSpan(c, "ListContractsInBundle")
+	defer span.End()
 	bk, err := bundleKeyFromContractBundleParams(params.BundleKey, params.Repo, params.Ref, params.Path)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidBundleQueryParams, "", problem.DetailInvalidBundleQueryParams))
 	}
 	items, next, hasMore, err := h.bundles.ListContractNames(c.Context(), bk, params.Limit, params.Cursor)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.RespondError(c, err)
 	}
 	body := apiserver.ContractNameListResponse{Items: items, HasMore: hasMore, NextCursor: next}
 	etag, err := jsonETag(body)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.RespondError(c, err)
 	}
 	if params.IfNoneMatch != nil && ifNoneMatchMatches(*params.IfNoneMatch, etag) {
@@ -179,12 +194,16 @@ func (h *RegistryHandler) ListContractsInBundle(c fiber.Ctx, params apiserver.Li
 }
 
 func (h *RegistryHandler) GetContractInBundle(c fiber.Ctx, contractName apiserver.ContractName, params apiserver.GetContractInBundleParams) error {
+	span := beginHandlerSpan(c, "GetContractInBundle")
+	defer span.End()
 	bk, err := bundleKeyFromContractBundleParams(params.BundleKey, params.Repo, params.Ref, params.Path)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidBundleQueryParams, "", problem.DetailInvalidBundleQueryParams))
 	}
 	cn, err := url.PathUnescape(string(contractName))
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidContractNamePath, "", problem.DetailInvalidContractNamePath))
 	}
 	doc, err := h.bundles.GetContractDocument(c.Context(), bk, cn)
@@ -193,10 +212,12 @@ func (h *RegistryHandler) GetContractInBundle(c fiber.Ctx, contractName apiserve
 			apimetrics.RecordDomainOutcome(apimetrics.MetricsEnabledFromCtx(c), apimetrics.TransportHTTP, err)
 			return problem.Write(c, http.StatusNotFound, problem.NotFound(problem.CodeContractNotInBundle, "", problem.DetailContractNotInBundle))
 		}
+		telemetry.MarkError(span, err)
 		return problem.RespondError(c, err)
 	}
 	etag, err := jsonETag(doc)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.RespondError(c, err)
 	}
 	if params.IfNoneMatch != nil && ifNoneMatchMatches(*params.IfNoneMatch, etag) {
@@ -208,8 +229,11 @@ func (h *RegistryHandler) GetContractInBundle(c fiber.Ctx, contractName apiserve
 }
 
 func (h *RegistryHandler) ListControllers(c fiber.Ctx, params apiserver.ListControllersParams) error {
+	span := beginHandlerSpan(c, "ListControllers")
+	defer span.End()
 	items, next, hasMore, err := h.controllers.ListControllers(c.Context(), params.Limit, params.Cursor)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.RespondError(c, err)
 	}
 	apiItems := make([]apiserver.Controller, 0, len(items))
@@ -219,6 +243,7 @@ func (h *RegistryHandler) ListControllers(c fiber.Ctx, params apiserver.ListCont
 	body := apiserver.ControllerListResponse{Items: apiItems, HasMore: hasMore, NextCursor: next}
 	etag, err := jsonETag(body)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.RespondError(c, err)
 	}
 	if params.IfNoneMatch != nil && ifNoneMatchMatches(*params.IfNoneMatch, etag) {
@@ -230,17 +255,21 @@ func (h *RegistryHandler) ListControllers(c fiber.Ctx, params apiserver.ListCont
 }
 
 func (h *RegistryHandler) GetController(c fiber.Ctx, controllerID apiserver.ControllerId, params apiserver.GetControllerParams) error {
+	span := beginHandlerSpan(c, "GetController")
+	defer span.End()
 	info, err := h.controllers.GetController(c.Context(), string(controllerID))
 	if err != nil {
 		if errors.Is(err, apierrors.ErrNotFound) {
 			apimetrics.RecordDomainOutcome(apimetrics.MetricsEnabledFromCtx(c), apimetrics.TransportHTTP, err)
 			return problem.Write(c, http.StatusNotFound, problem.NotFound(problem.CodeControllerNotFound, "", problem.DetailControllerNotFound))
 		}
+		telemetry.MarkError(span, err)
 		return problem.RespondError(c, err)
 	}
 	body := controllerToAPI(*info)
 	etag, err := jsonETag(body)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.RespondError(c, err)
 	}
 	if params.IfNoneMatch != nil && ifNoneMatchMatches(*params.IfNoneMatch, etag) {
@@ -252,17 +281,21 @@ func (h *RegistryHandler) GetController(c fiber.Ctx, controllerID apiserver.Cont
 }
 
 func (h *RegistryHandler) GetControllerHeartbeat(c fiber.Ctx, controllerID apiserver.ControllerId, params apiserver.GetControllerHeartbeatParams) error {
+	span := beginHandlerSpan(c, "GetControllerHeartbeat")
+	defer span.End()
 	ts, err := h.controllers.GetHeartbeat(c.Context(), string(controllerID))
 	if err != nil {
 		if errors.Is(err, apierrors.ErrNotFound) {
 			apimetrics.RecordDomainOutcome(apimetrics.MetricsEnabledFromCtx(c), apimetrics.TransportHTTP, err)
 			return problem.Write(c, http.StatusNotFound, problem.NotFound(problem.CodeControllerHeartbeatNotFound, "", problem.DetailControllerHeartbeatNotFound))
 		}
+		telemetry.MarkError(span, err)
 		return problem.RespondError(c, err)
 	}
 	body := apiserver.ControllerHeartbeat{Timestamp: ts}
 	etag, err := jsonETag(body)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.RespondError(c, err)
 	}
 	if params.IfNoneMatch != nil && ifNoneMatchMatches(*params.IfNoneMatch, etag) {
@@ -274,6 +307,8 @@ func (h *RegistryHandler) GetControllerHeartbeat(c fiber.Ctx, controllerID apise
 }
 
 func (h *RegistryHandler) GetReady(c fiber.Ctx) error {
+	span := beginHandlerSpan(c, "GetReady")
+	defer span.End()
 	r := h.status.Readiness(c.Context(), h.readinessRequireContractSyncer)
 	body := apiserver.ReadinessStatus{
 		Status:         r.Status,
@@ -287,6 +322,8 @@ func (h *RegistryHandler) GetReady(c fiber.Ctx) error {
 }
 
 func (h *RegistryHandler) GetStatus(c fiber.Ctx, params apiserver.GetStatusParams) error {
+	span := beginHandlerSpan(c, "GetStatus")
+	defer span.End()
 	etcd := h.status.CheckEtcd(c.Context())
 	syncer := h.status.CheckContractSyncer(c.Context())
 	body := apiserver.StatusResponse{
@@ -296,6 +333,7 @@ func (h *RegistryHandler) GetStatus(c fiber.Ctx, params apiserver.GetStatusParam
 	}
 	etag, err := jsonETag(body)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.RespondError(c, err)
 	}
 	if params.IfNoneMatch != nil && ifNoneMatchMatches(*params.IfNoneMatch, etag) {
@@ -307,13 +345,17 @@ func (h *RegistryHandler) GetStatus(c fiber.Ctx, params apiserver.GetStatusParam
 }
 
 func (h *RegistryHandler) ListTenants(c fiber.Ctx, params apiserver.ListTenantsParams) error {
+	span := beginHandlerSpan(c, "ListTenants")
+	defer span.End()
 	items, next, hasMore, err := h.tenants.ListTenants(c.Context(), params.Limit, params.Cursor)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.RespondError(c, err)
 	}
 	body := apiserver.TenantListResponse{Items: items, HasMore: hasMore, NextCursor: next}
 	etag, err := jsonETag(body)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.RespondError(c, err)
 	}
 	if params.IfNoneMatch != nil && ifNoneMatchMatches(*params.IfNoneMatch, etag) {
@@ -325,8 +367,11 @@ func (h *RegistryHandler) ListTenants(c fiber.Ctx, params apiserver.ListTenantsP
 }
 
 func (h *RegistryHandler) ListBundlesByTenant(c fiber.Ctx, tenant apiserver.Tenant, params apiserver.ListBundlesByTenantParams) error {
+	span := beginHandlerSpan(c, "ListBundlesByTenant")
+	defer span.End()
 	items, next, hasMore, err := h.tenants.ListBundlesByTenant(c.Context(), string(tenant), params.Limit, params.Cursor)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.RespondError(c, err)
 	}
 	apiItems := make([]apiserver.Bundle, 0, len(items))
@@ -336,6 +381,7 @@ func (h *RegistryHandler) ListBundlesByTenant(c fiber.Ctx, tenant apiserver.Tena
 	body := apiserver.BundleRefListResponse{Items: apiItems, HasMore: hasMore, NextCursor: next}
 	etag, err := jsonETag(body)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.RespondError(c, err)
 	}
 	if params.IfNoneMatch != nil && ifNoneMatchMatches(*params.IfNoneMatch, etag) {
@@ -347,8 +393,11 @@ func (h *RegistryHandler) ListBundlesByTenant(c fiber.Ctx, tenant apiserver.Tena
 }
 
 func (h *RegistryHandler) ListControllersByTenant(c fiber.Ctx, tenant apiserver.Tenant, params apiserver.ListControllersByTenantParams) error {
+	span := beginHandlerSpan(c, "ListControllersByTenant")
+	defer span.End()
 	items, next, hasMore, err := h.controllers.ListControllersByTenant(c.Context(), string(tenant), params.Limit, params.Cursor)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.RespondError(c, err)
 	}
 	apiItems := make([]apiserver.Controller, 0, len(items))
@@ -358,6 +407,7 @@ func (h *RegistryHandler) ListControllersByTenant(c fiber.Ctx, tenant apiserver.
 	body := apiserver.ControllerListResponse{Items: apiItems, HasMore: hasMore, NextCursor: next}
 	etag, err := jsonETag(body)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.RespondError(c, err)
 	}
 	if params.IfNoneMatch != nil && ifNoneMatchMatches(*params.IfNoneMatch, etag) {
@@ -369,8 +419,11 @@ func (h *RegistryHandler) ListControllersByTenant(c fiber.Ctx, tenant apiserver.
 }
 
 func (h *RegistryHandler) ListEnvironmentsByTenant(c fiber.Ctx, tenant apiserver.Tenant, params apiserver.ListEnvironmentsByTenantParams) error {
+	span := beginHandlerSpan(c, "ListEnvironmentsByTenant")
+	defer span.End()
 	items, next, hasMore, err := h.tenants.ListEnvironmentsByTenant(c.Context(), string(tenant), params.Limit, params.Cursor)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.RespondError(c, err)
 	}
 	apiItems := make([]apiserver.Environment, 0, len(items))
@@ -380,6 +433,7 @@ func (h *RegistryHandler) ListEnvironmentsByTenant(c fiber.Ctx, tenant apiserver
 	body := apiserver.EnvironmentListResponse{Items: apiItems, HasMore: hasMore, NextCursor: next}
 	etag, err := jsonETag(body)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.RespondError(c, err)
 	}
 	if params.IfNoneMatch != nil && ifNoneMatchMatches(*params.IfNoneMatch, etag) {

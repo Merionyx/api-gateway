@@ -18,7 +18,10 @@ import (
 	"github.com/merionyx/api-gateway/internal/auth-sidecar/storage"
 	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
 	"github.com/merionyx/api-gateway/internal/shared/grpcutil"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
+
+const spanSyncPkg = "internal/auth-sidecar/sync"
 
 type SyncClient struct {
 	config    *config.Config
@@ -95,10 +98,15 @@ func (c *SyncClient) Start(ctx context.Context) error {
 	}
 }
 
-func (c *SyncClient) syncLoop(ctx context.Context) error {
+func (c *SyncClient) syncLoop(ctx context.Context) (err error) {
+	ctx, loopSpan := telemetry.Start(ctx, telemetry.SpanName(spanSyncPkg, "syncLoop"))
+	defer func() {
+		telemetry.MarkError(loopSpan, err)
+		loopSpan.End()
+	}()
+	rpcCtx := telemetry.OutgoingContextWithTrace(ctx)
 	en := c.config.MetricsHTTP.Enabled
-	// Create a bidirectional stream
-	stream, err := c.client.SyncAccess(ctx)
+	stream, err := c.client.SyncAccess(rpcCtx)
 	if err != nil {
 		authmetrics.RecordControllerStreamClose(en, authmetrics.SyncCloseDialError)
 		return fmt.Errorf("failed to create stream: %w", err)

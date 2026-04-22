@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/ed25519"
 	"crypto/rsa"
 	"encoding/base64"
@@ -10,10 +11,13 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
 
 // GetJWKS returns a JSON Web Key Set with all public keys.
-func (uc *JWTUseCase) GetJWKS() (*models.JWKS, error) {
+func (uc *JWTUseCase) GetJWKS(ctx context.Context) (*models.JWKS, error) {
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseAuthPkg, "GetJWKS"))
+	defer span.End()
 	jwks := &models.JWKS{
 		Keys: make([]models.JWK, 0),
 	}
@@ -29,7 +33,9 @@ func (uc *JWTUseCase) GetJWKS() (*models.JWKS, error) {
 
 		jwk, err := jwtPublicKeyToJWK(keyPair)
 		if err != nil {
-			return nil, fmt.Errorf("kid %s: %w", kid, err)
+			err = fmt.Errorf("kid %s: %w", kid, err)
+			telemetry.MarkError(span, err)
+			return nil, err
 		}
 
 		jwks.Keys = append(jwks.Keys, *jwk)
@@ -39,7 +45,9 @@ func (uc *JWTUseCase) GetJWKS() (*models.JWKS, error) {
 }
 
 // GetSigningKeys returns a list of signing keys.
-func (uc *JWTUseCase) GetSigningKeys() []models.SigningKey {
+func (uc *JWTUseCase) GetSigningKeys(ctx context.Context) []models.SigningKey {
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseAuthPkg, "GetSigningKeys"))
+	defer span.End()
 	keys := make([]models.SigningKey, 0, len(uc.signingKeys))
 
 	for kid, keyPair := range uc.signingKeys {

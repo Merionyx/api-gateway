@@ -9,6 +9,7 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 	"github.com/merionyx/api-gateway/internal/controller/envmodel"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
@@ -53,10 +54,15 @@ func materializedV1Key(environmentName string) string {
 
 // ReconcileIfChanged updates the key only when the fingerprint of the effective skeleton
 // (static bundles and services) differs; bumps generation. No-op on unchanged fingerprint.
-func (s *MaterializedStore) ReconcileIfChanged(ctx context.Context, skel *models.Environment) error {
+func (s *MaterializedStore) ReconcileIfChanged(ctx context.Context, skel *models.Environment) (err error) {
 	if s == nil || s.client == nil {
 		return nil
 	}
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanCtrlEtcdPkg, "ReconcileIfChanged"))
+	defer func() {
+		telemetry.MarkError(span, err)
+		span.End()
+	}()
 	if skel == nil {
 		return fmt.Errorf("materialized: nil environment")
 	}
@@ -113,7 +119,7 @@ func (s *MaterializedStore) ReconcileIfChanged(ctx context.Context, skel *models
 }
 
 // Delete removes the materialized v1 key. No-op if store/client is nil or name is invalid.
-func (s *MaterializedStore) Delete(ctx context.Context, environmentName string) error {
+func (s *MaterializedStore) Delete(ctx context.Context, environmentName string) (err error) {
 	if s == nil || s.client == nil {
 		return nil
 	}
@@ -121,7 +127,12 @@ func (s *MaterializedStore) Delete(ctx context.Context, environmentName string) 
 	if key == "" {
 		return nil
 	}
-	_, err := s.client.Delete(ctx, key)
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanCtrlEtcdPkg, "DeleteMaterialized"))
+	defer func() {
+		telemetry.MarkError(span, err)
+		span.End()
+	}()
+	_, err = s.client.Delete(ctx, key)
 	if err != nil {
 		return fmt.Errorf("delete materialized: %w", err)
 	}
@@ -129,7 +140,7 @@ func (s *MaterializedStore) Delete(ctx context.Context, environmentName string) 
 }
 
 // Get returns the current materialized document, or nil if missing.
-func (s *MaterializedStore) Get(ctx context.Context, environmentName string) (*MaterializedEffectiveV1, error) {
+func (s *MaterializedStore) Get(ctx context.Context, environmentName string) (v *MaterializedEffectiveV1, err error) {
 	if s == nil || s.client == nil {
 		return nil, nil
 	}
@@ -137,6 +148,11 @@ func (s *MaterializedStore) Get(ctx context.Context, environmentName string) (*M
 	if key == "" {
 		return nil, nil
 	}
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanCtrlEtcdPkg, "GetMaterialized"))
+	defer func() {
+		telemetry.MarkError(span, err)
+		span.End()
+	}()
 	resp, err := s.client.Get(ctx, key)
 	if err != nil {
 		return nil, fmt.Errorf("get materialized: %w", err)
@@ -144,9 +160,9 @@ func (s *MaterializedStore) Get(ctx context.Context, environmentName string) (*M
 	if len(resp.Kvs) == 0 {
 		return nil, nil
 	}
-	var v MaterializedEffectiveV1
-	if err := json.Unmarshal(resp.Kvs[0].Value, &v); err != nil {
+	var doc MaterializedEffectiveV1
+	if err := json.Unmarshal(resp.Kvs[0].Value, &doc); err != nil {
 		return nil, fmt.Errorf("unmarshal materialized: %w", err)
 	}
-	return &v, nil
+	return &doc, nil
 }

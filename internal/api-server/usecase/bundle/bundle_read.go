@@ -8,6 +8,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/pagination"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
 
 // BundleReadUseCase serves HTTP registry reads for etcd bundle keys and contract snapshots.
@@ -20,8 +21,11 @@ func NewBundleReadUseCase(snapshots interfaces.SnapshotRepository) *BundleReadUs
 }
 
 func (u *BundleReadUseCase) ListBundleKeys(ctx context.Context, limit *int, cursor *string) ([]string, *string, bool, error) {
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseBundlePkg, "ListBundleKeys"))
+	defer span.End()
 	keys, err := u.snapshots.ListBundleKeys(ctx)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return nil, nil, false, err
 	}
 	lim := pagination.ResolveLimit(limit)
@@ -29,8 +33,11 @@ func (u *BundleReadUseCase) ListBundleKeys(ctx context.Context, limit *int, curs
 }
 
 func (u *BundleReadUseCase) ListContractNames(ctx context.Context, bundleKey string, limit *int, cursor *string) ([]string, *string, bool, error) {
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseBundlePkg, "ListContractNames"))
+	defer span.End()
 	snaps, err := u.snapshots.GetSnapshots(ctx, bundleKey)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return nil, nil, false, err
 	}
 	names := make([]string, 0, len(snaps))
@@ -49,8 +56,11 @@ func (u *BundleReadUseCase) ListContractNames(ctx context.Context, bundleKey str
 
 // GetContractDocument returns the stored snapshot as a generic JSON object (canonical encoding).
 func (u *BundleReadUseCase) GetContractDocument(ctx context.Context, bundleKey, contractName string) (map[string]interface{}, error) {
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseBundlePkg, "GetContractDocument"))
+	defer span.End()
 	snaps, err := u.snapshots.GetSnapshots(ctx, bundleKey)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return nil, err
 	}
 	for _, s := range snaps {
@@ -59,10 +69,12 @@ func (u *BundleReadUseCase) GetContractDocument(ctx context.Context, bundleKey, 
 		}
 		raw, err := json.Marshal(s)
 		if err != nil {
+			telemetry.MarkError(span, err)
 			return nil, err
 		}
 		var doc map[string]interface{}
 		if err := json.Unmarshal(raw, &doc); err != nil {
+			telemetry.MarkError(span, err)
 			return nil, err
 		}
 		return doc, nil

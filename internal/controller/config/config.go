@@ -36,6 +36,8 @@ type Config struct {
 	MetricsHTTP         metricshttp.Config      `mapstructure:"metrics_http" json:"metrics_http"`
 	// Telemetry: OpenTelemetry trace export (optional). Merged with env; see FileBlock in the telemetry package.
 	Telemetry telemetry.FileBlock `mapstructure:"telemetry" json:"telemetry"`
+	// XDSTraceCallbacks: when true, xDS gRPC [Callbacks] emit a span per stream request (very high QPS; debugging only). Default off.
+	XDSTraceCallbacks bool `mapstructure:"xds_trace_callbacks" json:"xds_trace_callbacks,omitempty"`
 }
 
 // GRPCServerSection groups server TLS and observability for one gRPC listener.

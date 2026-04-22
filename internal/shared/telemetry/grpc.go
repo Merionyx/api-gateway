@@ -48,6 +48,14 @@ func ExtractIncomingGRPC(ctx context.Context, md metadata.MD) context.Context {
 	return otel.GetTextMapPropagator().Extract(ctx, &mdCarrier{md: &mdc})
 }
 
+// OutgoingCall is shorthand for [Start] followed by [OutgoingContextWithTrace] for
+// a client span. The returned context is ready for unary or streaming gRPC calls;
+// defer [trace.Span.End] on the returned span in the same scope.
+func OutgoingCall(ctx context.Context, spanName string) (context.Context, trace.Span) {
+	ctx, span := Start(ctx, spanName)
+	return OutgoingContextWithTrace(ctx), span
+}
+
 // OutgoingContextWithTrace copies outgoing metadata from ctx (or starts empty), injects
 // the current trace, and returns a new context. Use after [Start] on the **client** side
 // before unary or streaming gRPC calls.

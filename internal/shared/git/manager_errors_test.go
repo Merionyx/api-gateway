@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"strings"
 	"testing"
 )
@@ -15,7 +16,7 @@ func TestRepositoryManager_GetRepository_NotFound(t *testing.T) {
 
 func TestRepositoryManager_GetRepositorySnapshots_NotFound(t *testing.T) {
 	rm := NewRepositoryManager()
-	_, err := rm.GetRepositorySnapshots("missing", "heads/main", ".")
+	_, err := rm.GetRepositorySnapshots(context.Background(), "missing", "heads/main", ".")
 	if err == nil || !strings.Contains(err.Error(), "not found") {
 		t.Fatalf("got %v", err)
 	}

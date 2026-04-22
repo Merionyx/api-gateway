@@ -1,19 +1,23 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
 
 // GenerateToken generates a JWT token.
-func (uc *JWTUseCase) GenerateToken(req *models.GenerateTokenRequest) (*models.GenerateTokenResponse, error) {
+func (uc *JWTUseCase) GenerateToken(ctx context.Context, req *models.GenerateTokenRequest) (*models.GenerateTokenResponse, error) {
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseAuthPkg, "GenerateToken"))
+	defer span.End()
 	now := time.Now()
 	tokenID := uuid.New().String()
 
@@ -29,7 +33,9 @@ func (uc *JWTUseCase) GenerateToken(req *models.GenerateTokenRequest) (*models.G
 
 	keyPair := uc.signingKeys[uc.activeKeyID]
 	if keyPair == nil {
-		return nil, fmt.Errorf("%w", apierrors.ErrNoActiveSigningKey)
+		err := fmt.Errorf("%w", apierrors.ErrNoActiveSigningKey)
+		telemetry.MarkError(span, err)
+		return nil, err
 	}
 
 	var token *jwt.Token
@@ -39,14 +45,18 @@ func (uc *JWTUseCase) GenerateToken(req *models.GenerateTokenRequest) (*models.G
 	case AlgorithmRS256:
 		token = jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	default:
-		return nil, fmt.Errorf("%w: %s", apierrors.ErrUnsupportedSigningAlgorithm, keyPair.Algorithm)
+		err := fmt.Errorf("%w: %s", apierrors.ErrUnsupportedSigningAlgorithm, keyPair.Algorithm)
+		telemetry.MarkError(span, err)
+		return nil, err
 	}
 
 	token.Header["kid"] = keyPair.Kid
 
 	tokenString, err := token.SignedString(keyPair.PrivateKey)
 	if err != nil {
-		return nil, errors.Join(apierrors.ErrSigningOperationFailed, fmt.Errorf("jwt SignedString: %w", err))
+		err = errors.Join(apierrors.ErrSigningOperationFailed, fmt.Errorf("jwt SignedString: %w", err))
+		telemetry.MarkError(span, err)
+		return nil, err
 	}
 
 	return &models.GenerateTokenResponse{

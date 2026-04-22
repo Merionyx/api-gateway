@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -53,7 +54,7 @@ func TestExportContractFiles_DuplicateContractName(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = rm.ExportContractFiles("ex", "heads/main", "", "")
+	_, err = rm.ExportContractFiles(context.Background(), "ex", "heads/main", "", "")
 	if err == nil {
 		t.Fatal("expected duplicate contract name error")
 	}
@@ -103,7 +104,7 @@ x-api-gateway:
 		t.Fatal(err)
 	}
 
-	out, err := rm.ExportContractFiles("ex", "heads/main", "", "")
+	out, err := rm.ExportContractFiles(context.Background(), "ex", "heads/main", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,12 +112,12 @@ x-api-gateway:
 		t.Fatalf("unexpected: %+v", out)
 	}
 
-	_, err = rm.ExportContractFiles("ex", "heads/main", "", "missing")
+	_, err = rm.ExportContractFiles(context.Background(), "ex", "heads/main", "", "missing")
 	if err == nil || !strings.Contains(err.Error(), "not found") {
 		t.Fatalf("expected not found: %v", err)
 	}
 
-	one, err := rm.ExportContractFiles("ex", "heads/main", "", "only-one")
+	one, err := rm.ExportContractFiles(context.Background(), "ex", "heads/main", "", "only-one")
 	if err != nil || len(one) != 1 {
 		t.Fatalf("filter: %v %+v", err, one)
 	}

@@ -15,6 +15,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/shared/election"
 	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 	"github.com/merionyx/api-gateway/internal/shared/grpcutil"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
 
 // ErrContractSyncerRejected is re-exported for backward compatibility; prefer apierrors.ErrContractSyncerRejected.
@@ -49,6 +50,9 @@ func NewBundleSyncUseCase(
 
 // SyncBundle pulls schemas from Contract Syncer (with transient retries), writes API Server etcd, notifies controllers.
 func (uc *BundleSyncUseCase) SyncBundle(ctx context.Context, bundle models.BundleInfo) ([]sharedgit.ContractSnapshot, error) {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseBundlePkg, "SyncBundle"))
+	defer span.End()
+
 	slog.Info("Syncing bundle", "repository", bundle.Repository, "ref", bundle.Ref, "path", bundle.Path)
 
 	start := time.Now()
@@ -58,11 +62,13 @@ func (uc *BundleSyncUseCase) SyncBundle(ctx context.Context, bundle models.Bundl
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		if err := ctx.Err(); err != nil {
+			telemetry.MarkError(span, err)
 			apimetrics.RecordBundleSyncOutcome(uc.metricsEnabled, apimetrics.BundleOutcomeCtxCanceled)
 			return nil, err
 		}
 		if backoff > 0 {
 			if err := grpcutil.SleepOrDone(ctx, backoff); err != nil {
+				telemetry.MarkError(span, err)
 				apimetrics.RecordBundleSyncOutcome(uc.metricsEnabled, apimetrics.BundleOutcomeCtxCanceled)
 				return nil, err
 			}
@@ -75,6 +81,7 @@ func (uc *BundleSyncUseCase) SyncBundle(ctx context.Context, bundle models.Bundl
 			return snapshots, nil
 		}
 		if errors.Is(err, apierrors.ErrContractSyncerRejected) {
+			telemetry.MarkError(span, err)
 			apimetrics.RecordBundleSyncOutcome(uc.metricsEnabled, apimetrics.BundleOutcomeRejected)
 			return nil, err
 		}
@@ -83,13 +90,17 @@ func (uc *BundleSyncUseCase) SyncBundle(ctx context.Context, bundle models.Bundl
 		backoff = grpcutil.NextReconnectBackoff(backoff, 400*time.Millisecond, 10*time.Second)
 	}
 
+	telemetry.MarkError(span, lastErr)
 	apimetrics.RecordBundleSyncOutcome(uc.metricsEnabled, apimetrics.BundleOutcomeFailed)
 	return nil, apierrors.JoinContractSyncer(fmt.Sprintf("syncBundle after %d attempts", maxAttempts), lastErr)
 }
 
 func (uc *BundleSyncUseCase) syncBundleOnce(ctx context.Context, bundle models.BundleInfo) ([]sharedgit.ContractSnapshot, error) {
+	_, fetchSpan := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseBundlePkg, "FetchContractSnapshots"))
 	snapshots, err := uc.syncRemote.FetchContractSnapshots(ctx, bundle)
 	if err != nil {
+		telemetry.MarkError(fetchSpan, err)
+		fetchSpan.End()
 		if errors.Is(err, apierrors.ErrContractSyncerRejected) {
 			apimetrics.RecordBundleSyncAttempt(uc.metricsEnabled, apimetrics.BundleAttemptResponseError)
 		} else {
@@ -97,13 +108,18 @@ func (uc *BundleSyncUseCase) syncBundleOnce(ctx context.Context, bundle models.B
 		}
 		return nil, err
 	}
+	fetchSpan.End()
 
 	bundleKey := bundlekey.Build(bundle.Repository, bundle.Ref, bundle.Path)
+	_, saveSpan := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseBundlePkg, "SaveSnapshots"))
 	written, err := uc.snapshotRepo.SaveSnapshots(ctx, bundleKey, snapshots)
 	if err != nil {
+		telemetry.MarkError(saveSpan, err)
+		saveSpan.End()
 		apimetrics.RecordBundleSyncAttempt(uc.metricsEnabled, apimetrics.BundleAttemptSaveError)
 		return nil, apierrors.JoinStore("save snapshots after sync", err)
 	}
+	saveSpan.End()
 	if !written {
 		slog.Debug("API Server: bundle sync finished, no etcd snapshot keys changed", "bundle_key", bundleKey)
 	}

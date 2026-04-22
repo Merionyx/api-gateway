@@ -18,11 +18,11 @@ type fakeSyncUC struct {
 	expErr error
 }
 
-func (f *fakeSyncUC) Sync(string, string, string) ([]sharedgit.ContractSnapshot, error) {
+func (f *fakeSyncUC) Sync(context.Context, string, string, string) ([]sharedgit.ContractSnapshot, error) {
 	return f.snaps, f.err
 }
 
-func (f *fakeSyncUC) ExportContracts(string, string, string, string) ([]sharedgit.ExportedContractFile, error) {
+func (f *fakeSyncUC) ExportContracts(context.Context, string, string, string, string) ([]sharedgit.ExportedContractFile, error) {
 	return f.export, f.expErr
 }
 

@@ -9,7 +9,11 @@ import (
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/concurrency"
+
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
+
+const spanElectionPkg = "internal/shared/election"
 
 // campaignProposal is the JSON document written as the concurrency election value in etcd
 // (so every key under the election prefix holds valid JSON, not a bare string).
@@ -69,8 +73,11 @@ func (g *EtcdGate) Run(ctx context.Context) {
 			return
 		}
 
+		campCtx, campSpan := telemetry.Start(ctx, telemetry.SpanName(spanElectionPkg, "Campaign"))
 		sess, err := concurrency.NewSession(g.client, concurrency.WithTTL(g.ttlSec))
 		if err != nil {
+			telemetry.MarkError(campSpan, err)
+			campSpan.End()
 			slog.Warn("leader election: session failed", "error", err)
 			select {
 			case <-ctx.Done():
@@ -85,18 +92,23 @@ func (g *EtcdGate) Run(ctx context.Context) {
 		proposal, mErr := json.Marshal(campaignProposal{Identity: g.identity})
 		if mErr != nil {
 			_ = sess.Close()
+			telemetry.MarkError(campSpan, mErr)
+			campSpan.End()
 			slog.Error("leader election: marshal proposal", "error", mErr)
 			continue
 		}
-		err = el.Campaign(ctx, string(proposal))
+		err = el.Campaign(campCtx, string(proposal))
 		if err != nil {
 			_ = sess.Close()
+			telemetry.MarkError(campSpan, err)
+			campSpan.End()
 			if ctx.Err() != nil {
 				return
 			}
 			slog.Warn("leader election: campaign ended", "error", err)
 			continue
 		}
+		campSpan.End()
 
 		g.isLeader.Store(true)
 		g.notifyLeaderChanged()

@@ -8,9 +8,12 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
+
+const spanCtrlEtcdPkg = "internal/controller/repository/etcd"
 
 // EnvironmentPrefix is the etcd prefix for environment config keys.
 const EnvironmentPrefix = "/api-gateway/controller/environments/"
@@ -26,7 +29,12 @@ func NewEnvironmentRepository(client *clientv3.Client) interfaces.EnvironmentRep
 }
 
 // SaveEnvironment saves environment to etcd
-func (r *environmentRepository) SaveEnvironment(ctx context.Context, env *models.Environment) error {
+func (r *environmentRepository) SaveEnvironment(ctx context.Context, env *models.Environment) (err error) {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanCtrlEtcdPkg, "SaveEnvironment"))
+	defer func() {
+		telemetry.MarkError(span, err)
+		span.End()
+	}()
 	key := EnvironmentPrefix + env.Name + "/config"
 
 	data, err := json.Marshal(env)
@@ -43,7 +51,12 @@ func (r *environmentRepository) SaveEnvironment(ctx context.Context, env *models
 }
 
 // GetEnvironment gets environment by name
-func (r *environmentRepository) GetEnvironment(ctx context.Context, name string) (*models.Environment, error) {
+func (r *environmentRepository) GetEnvironment(ctx context.Context, name string) (out *models.Environment, err error) {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanCtrlEtcdPkg, "GetEnvironment"))
+	defer func() {
+		telemetry.MarkError(span, err)
+		span.End()
+	}()
 	key := EnvironmentPrefix + name + "/config"
 
 	resp, err := r.client.Get(ctx, key)
@@ -64,14 +77,18 @@ func (r *environmentRepository) GetEnvironment(ctx context.Context, name string)
 }
 
 // ListEnvironments gets all environments
-func (r *environmentRepository) ListEnvironments(ctx context.Context) (map[string]*models.Environment, error) {
+func (r *environmentRepository) ListEnvironments(ctx context.Context) (environments map[string]*models.Environment, err error) {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanCtrlEtcdPkg, "ListEnvironments"))
+	defer func() {
+		telemetry.MarkError(span, err)
+		span.End()
+	}()
 	resp, err := r.client.Get(ctx, EnvironmentPrefix, clientv3.WithPrefix())
 	if err != nil {
 		return nil, fmt.Errorf("failed to list environments from etcd: %w", err)
 	}
 
-	environments := make(map[string]*models.Environment)
-
+	environments = make(map[string]*models.Environment)
 	for _, kv := range resp.Kvs {
 		if !strings.HasSuffix(string(kv.Key), "/config") {
 			continue
@@ -89,9 +106,14 @@ func (r *environmentRepository) ListEnvironments(ctx context.Context) (map[strin
 }
 
 // DeleteEnvironment deletes environment from etcd
-func (r *environmentRepository) DeleteEnvironment(ctx context.Context, name string) error {
+func (r *environmentRepository) DeleteEnvironment(ctx context.Context, name string) (err error) {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanCtrlEtcdPkg, "DeleteEnvironment"))
+	defer func() {
+		telemetry.MarkError(span, err)
+		span.End()
+	}()
 	key := EnvironmentPrefix + name + "/config"
-	_, err := r.client.Delete(ctx, key)
+	_, err = r.client.Delete(ctx, key)
 	if err != nil {
 		return fmt.Errorf("failed to delete environment from etcd: %w", err)
 	}

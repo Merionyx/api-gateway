@@ -30,10 +30,10 @@ type Server struct {
 	cache      cache.SnapshotCache
 }
 
-func NewXDSServer(snapshotCache cache.SnapshotCache, registerReflection bool, metricsEnabled bool, opts ...grpc.ServerOption) *Server {
+func NewXDSServer(snapshotCache cache.SnapshotCache, registerReflection bool, metricsEnabled bool, xdsTraceCallbacks bool, opts ...grpc.ServerOption) *Server {
 	grpcServer := grpc.NewServer(opts...)
 
-	cb := xdspkg.NewCallbacks(metricsEnabled)
+	cb := xdspkg.NewCallbacks(metricsEnabled, xdsTraceCallbacks)
 	xdsServer := server.NewServer(context.Background(), snapshotCache, cb)
 
 	// xDS services

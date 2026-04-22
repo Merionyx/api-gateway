@@ -24,3 +24,15 @@ func TestOutgoingContextWithTrace_DoesNotPanic(t *testing.T) {
 	defer span.End()
 	_ = OutgoingContextWithTrace(ctx)
 }
+
+func TestOutgoingCall_DoesNotPanic(t *testing.T) {
+	t.Parallel()
+	sh, err := Init(context.Background(), BuildConfig("t", FileBlock{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = sh(context.Background()) })
+	rpcCtx, span := OutgoingCall(context.Background(), "x")
+	defer span.End()
+	_ = rpcCtx
+}

@@ -18,8 +18,8 @@
 // # gRPC
 //
 // On the server, use [ServerSpan] (or [ExtractIncomingGRPC] then [Start]) at the
-// start of each method. On the client, [Start] then [OutgoingContextWithTrace]
-// with the gRPC call context.
+// start of each method. On the client, use [OutgoingCall] (or [Start] then
+// [OutgoingContextWithTrace]) with the gRPC call context.
 //
 // # HTTP
 //

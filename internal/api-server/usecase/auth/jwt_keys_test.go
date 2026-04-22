@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,7 +17,7 @@ func TestJWTUseCase_loadKeys_skipsInvalidThenGenerates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(uc.GetSigningKeys()) == 0 {
+	if len(uc.GetSigningKeys(context.Background())) == 0 {
 		t.Fatal("expected generated default key")
 	}
 }

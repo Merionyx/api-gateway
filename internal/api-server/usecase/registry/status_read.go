@@ -6,6 +6,8 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
 
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
+
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
@@ -27,13 +29,16 @@ func NewStatusReadUseCase(
 
 // CheckEtcd performs a lightweight read against the API Server key prefix.
 func (u *StatusReadUseCase) CheckEtcd(ctx context.Context) string {
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseRegistryPkg, "CheckEtcd"))
+	defer span.End()
 	if u.etcdClient == nil {
 		return "error"
 	}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	tctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
-	_, err := u.etcdClient.Get(ctx, "/api-gateway/api-server/", clientv3.WithPrefix(), clientv3.WithLimit(1))
+	_, err := u.etcdClient.Get(tctx, "/api-gateway/api-server/", clientv3.WithPrefix(), clientv3.WithLimit(1))
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return "error"
 	}
 	return "ok"
@@ -41,9 +46,12 @@ func (u *StatusReadUseCase) CheckEtcd(ctx context.Context) string {
 
 // CheckContractSyncer verifies gRPC connectivity to the Contract Syncer.
 func (u *StatusReadUseCase) CheckContractSyncer(ctx context.Context) string {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseRegistryPkg, "CheckContractSyncer"))
+	defer span.End()
+	tctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	if err := u.contractSyncerPing.Ping(ctx); err != nil {
+	if err := u.contractSyncerPing.Ping(tctx); err != nil {
+		telemetry.MarkError(span, err)
 		return "error"
 	}
 	return "ok"
@@ -58,6 +66,8 @@ type ReadinessResult struct {
 
 // Readiness evaluates etcd (always) and optionally Contract Syncer for Kubernetes readiness.
 func (u *StatusReadUseCase) Readiness(ctx context.Context, requireContractSyncer bool) ReadinessResult {
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseRegistryPkg, "Readiness"))
+	defer span.End()
 	etcd := u.CheckEtcd(ctx)
 	if etcd != "ok" {
 		return ReadinessResult{

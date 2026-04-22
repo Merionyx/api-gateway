@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -12,6 +13,7 @@ import (
 	"github.com/go-git/go-billy/v6/util"
 	gogit "github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
 
 // ExportedContractFile is raw schema file content keyed by logical contract name from x-api-gateway.
@@ -24,7 +26,12 @@ type ExportedContractFile struct {
 // ExportContractFiles returns raw OpenAPI files for contracts under path (empty = repository root).
 // contractNameFilter empty means all contracts; otherwise only that name.
 // Duplicate contract names across different files under the same walk root return an error.
-func (rm *RepositoryManager) ExportContractFiles(name string, ref string, path string, contractNameFilter string) ([]ExportedContractFile, error) {
+func (rm *RepositoryManager) ExportContractFiles(ctx context.Context, name string, ref string, path string, contractNameFilter string) (out []ExportedContractFile, err error) {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanGitPkg, "ExportContractFiles"))
+	defer func() {
+		telemetry.MarkError(span, err)
+		span.End()
+	}()
 	rm.mu.RLock()
 	managedRepo := rm.repos[name]
 	rm.mu.RUnlock()

@@ -15,6 +15,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/controller/config"
 	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,6 +33,8 @@ const (
 	AnnPort            = "gateway.merionyx.com/port"
 	LabelEnvironmentID = "gateway.merionyx.com/environment-id"
 )
+
+const spanK8sDiscoveryPkg = "internal/controller/discovery/kubernetes"
 
 // Runner periodically lists Kubernetes resources and pushes a snapshot into in-memory repositories.
 type Runner struct {
@@ -94,7 +97,12 @@ type k8sSyncState struct {
 	globals []models.StaticServiceConfig
 }
 
-func (r *Runner) syncOnce(ctx context.Context) error {
+func (r *Runner) syncOnce(ctx context.Context) (err error) {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanK8sDiscoveryPkg, "syncOnce"))
+	defer func() {
+		telemetry.MarkError(span, err)
+		span.End()
+	}()
 	nsList, err := r.allowedNamespaces(ctx)
 	if err != nil {
 		return err

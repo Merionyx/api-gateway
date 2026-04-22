@@ -34,7 +34,7 @@ func (h *SyncHandler) Sync(ctx context.Context, req *pb.SyncRequest) (*pb.SyncRe
 	slog.Info("Received sync request", "repository", req.Repository, "ref", req.Ref, "path", req.Path)
 
 	start := time.Now()
-	snapshots, err := h.syncUseCase.Sync(req.Repository, req.Ref, req.Path)
+	snapshots, err := h.syncUseCase.Sync(ctx, req.Repository, req.Ref, req.Path)
 	if err != nil {
 		telemetry.MarkError(span, err)
 		slog.Error("Failed to sync repository", "error", err)
@@ -81,7 +81,7 @@ func (h *SyncHandler) ExportContracts(ctx context.Context, req *pb.ExportContrac
 	slog.Info("Received export request", "repository", req.Repository, "ref", req.Ref, "path", req.Path, "contract", req.ContractName)
 
 	start := time.Now()
-	files, err := h.syncUseCase.ExportContracts(req.Repository, req.Ref, req.Path, req.ContractName)
+	files, err := h.syncUseCase.ExportContracts(ctx, req.Repository, req.Ref, req.Path, req.ContractName)
 	if err != nil {
 		telemetry.MarkError(span, err)
 		slog.Error("Export contracts failed", "error", err)
