@@ -2,31 +2,11 @@ package server
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
-
-// isK8SProbePath reports paths for which we avoid creating a root HTTP span
-// (high-frequency; little diagnostic value in traces).
-func isK8SProbePath(path string) bool {
-	if path == "/health" || path == "/ready" {
-		return true
-	}
-	if path == "" {
-		return false
-	}
-	// e.g. /v1/health, /api/v1/ready
-	if len(path) > len("/health") && strings.HasSuffix(path, "/health") {
-		return true
-	}
-	if len(path) > len("/ready") && strings.HasSuffix(path, "/ready") {
-		return true
-	}
-	return false
-}
 
 // httpTraceMiddleware runs W3C TraceContext extraction, starts a request span, stores the
 // trace on [fiber.Ctx] (handlers use [fiber.Ctx.Context] in use case calls), and on exit
@@ -35,7 +15,7 @@ func isK8SProbePath(path string) bool {
 // like `.../server.GET` glued to the path.
 func httpTraceMiddleware() fiber.Handler {
 	return func(c fiber.Ctx) error {
-		if p := c.Path(); isK8SProbePath(p) {
+		if p := c.Path(); telemetry.SkipProbePath(p) {
 			return c.Next()
 		}
 		ctx := c.Context()

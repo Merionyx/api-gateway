@@ -25,7 +25,9 @@
 //
 // At the start of a request, use [ExtractIncomingHTTP] on the request headers, then
 // [Start] (or a framework middleware that does both). [SetHTTPStatus] is optional
-// for recording the response code before [trace.Span.End].
+// for recording the response code before [trace.Span.End]. For [net/http] handlers,
+// [WrapHandlerHTTP] can skip probes when the second argument returns true for the
+// request; use [SkipProbePath] on [http.Request.URL.Path] for /health and /ready.
 //
 // # Handlers
 //

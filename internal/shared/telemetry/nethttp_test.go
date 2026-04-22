@@ -1,28 +1,23 @@
 package telemetry
 
-import (
-	"net/http"
-	"net/http/httptest"
-	"testing"
-)
+import "testing"
 
-func TestWrapHandlerHTTP_SkipHealth(t *testing.T) {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
-	mux.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) })
-
-	skip := func(r *http.Request) bool { return r.URL.Path == "/health" }
-	h := WrapHandlerHTTP(mux, skip)
-
-	rr := httptest.NewRecorder()
-	h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/health", nil))
-	if got := rr.Code; got != http.StatusOK {
-		t.Fatalf("health: status %d", got)
+func TestSkipProbePath(t *testing.T) {
+	t.Parallel()
+	cases := map[string]bool{
+		"/health":         true,
+		"/ready":          true,
+		"/v1/health":      true,
+		"/api/v1/ready":   true,
+		"/":               false,
+		"/v1/healthcheck": false, // must not match: path does not end with /health
+		"/v1/health/":     false,
+		"/readiness":      false, // not suffix /ready
+		"/v1/contract":    false,
 	}
-
-	rr2 := httptest.NewRecorder()
-	h.ServeHTTP(rr2, httptest.NewRequest(http.MethodGet, "/api", nil))
-	if got := rr2.Code; got != http.StatusNoContent {
-		t.Fatalf("api: status %d", got)
+	for p, want := range cases {
+		if got := SkipProbePath(p); got != want {
+			t.Fatalf("SkipProbePath(%q) = %v, want %v", p, got, want)
+		}
 	}
 }

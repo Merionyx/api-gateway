@@ -307,7 +307,7 @@ func (h *RegistryHandler) GetControllerHeartbeat(c fiber.Ctx, controllerID apise
 }
 
 func (h *RegistryHandler) GetReady(c fiber.Ctx) error {
-	// No handler/usecase sub-spans for GET /ready (K8s probe; high frequency) — see httpTraceMiddleware isK8SProbePath.
+	// No handler/usecase sub-spans for GET /ready (K8s probe; high frequency) — see telemetry.SkipProbePath in httpTraceMiddleware.
 	r := h.status.Readiness(c.Context(), h.readinessRequireContractSyncer)
 	body := apiserver.ReadinessStatus{
 		Status:         r.Status,
