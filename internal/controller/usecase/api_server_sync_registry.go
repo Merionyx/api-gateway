@@ -13,6 +13,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 	"github.com/merionyx/api-gateway/internal/controller/effective"
 	"github.com/merionyx/api-gateway/internal/controller/envmodel"
+	"github.com/merionyx/api-gateway/internal/controller/portservices"
 	ctrlrepoetcd "github.com/merionyx/api-gateway/internal/controller/repository/etcd"
 	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 )
@@ -194,14 +195,11 @@ func (b *registryEnvironmentsBuilder) buildServiceInfosForRegistry(
 			services = append(services, si)
 		}
 	}
-	// Controller root pool (config services.static + K8s global upstreams), same policy as xDS
-	// [builder.BuildClusters]: per-environment static wins; then add global names not present.
+	// Controller root pool: [portservices.RootPoolDeduplicatedExcludingNames] + same upstream merge as xDS
+	// [portservices.MergeEnvStaticWithRootPoolUpstreams].
 	if b.rootServicePool != nil {
-		f, k := b.rootServicePool.ListRootPoolDeduplicated()
+		f, k := portservices.RootPoolDeduplicatedExcludingNames(b.rootServicePool, seenService)
 		for _, s := range f {
-			if _, ok := seenService[s.Name]; ok {
-				continue
-			}
 			seenService[s.Name] = struct{}{}
 			si := &pb.ServiceInfo{
 				Name:     s.Name,
@@ -220,9 +218,6 @@ func (b *registryEnvironmentsBuilder) buildServiceInfosForRegistry(
 			services = append(services, si)
 		}
 		for _, s := range k {
-			if _, ok := seenService[s.Name]; ok {
-				continue
-			}
 			seenService[s.Name] = struct{}{}
 			si := &pb.ServiceInfo{
 				Name:     s.Name,

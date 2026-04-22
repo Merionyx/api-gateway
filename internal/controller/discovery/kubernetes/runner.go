@@ -88,16 +88,35 @@ func (r *Runner) Run(ctx context.Context, interval time.Duration) {
 	}
 }
 
+// k8sSyncState is one discovery pass: per-environment view plus controller-global services from K8s.
+type k8sSyncState struct {
+	envs    map[string]*models.Environment
+	globals []models.StaticServiceConfig
+}
+
 func (r *Runner) syncOnce(ctx context.Context) error {
 	nsList, err := r.allowedNamespaces(ctx)
 	if err != nil {
 		return err
 	}
 	listOpts := r.listOpts()
+	st := k8sSyncState{envs: make(map[string]*models.Environment)}
+	if err := r.loadEnvironmentMapFromCRDs(ctx, nsList, listOpts, &st); err != nil {
+		return err
+	}
+	if err := r.collectContractBundles(ctx, listOpts, &st); err != nil {
+		return err
+	}
+	if err := r.applyGatewayUpstreams(ctx, listOpts, &st); err != nil {
+		return err
+	}
+	if err := r.applyCoreServices(ctx, listOpts, &st); err != nil {
+		return err
+	}
+	return r.reconcileGlobalServices(ctx, &st)
+}
 
-	envs := make(map[string]*models.Environment)
-	var globals []models.StaticServiceConfig
-
+func (r *Runner) loadEnvironmentMapFromCRDs(ctx context.Context, nsList []string, listOpts []client.ListOption, st *k8sSyncState) error {
 	for _, ns := range nsList {
 		var elist gwv1alpha1.EnvironmentList
 		if err := r.client.List(ctx, &elist, append(listOpts, client.InNamespace(ns))...); err != nil {
@@ -106,10 +125,13 @@ func (r *Runner) syncOnce(ctx context.Context) error {
 		for i := range elist.Items {
 			e := &elist.Items[i]
 			id := environmentLogicalName(e)
-			envs[id] = newEnvModel(id)
+			st.envs[id] = newEnvModel(id)
 		}
 	}
+	return nil
+}
 
+func (r *Runner) collectContractBundles(ctx context.Context, listOpts []client.ListOption, st *k8sSyncState) error {
 	var blist gwv1alpha1.ContractBundleList
 	if err := r.client.List(ctx, &blist, listOpts...); err != nil {
 		return fmt.Errorf("list contractbundles: %w", err)
@@ -121,11 +143,11 @@ func (r *Runner) syncOnce(ctx context.Context) error {
 			slog.Warn("skip contractbundle", "ns", b.Namespace, "name", b.Name, "error", err)
 			continue
 		}
-		if envs[id] == nil {
-			envs[id] = newEnvModel(id)
+		if st.envs[id] == nil {
+			st.envs[id] = newEnvModel(id)
 		}
 		disc := b.Namespace + "/" + b.Name
-		envs[id].Bundles.Static = append(envs[id].Bundles.Static, models.StaticContractBundleConfig{
+		st.envs[id].Bundles.Static = append(st.envs[id].Bundles.Static, models.StaticContractBundleConfig{
 			Name:         b.Spec.Name,
 			Repository:   b.Spec.Repository,
 			Ref:          b.Spec.Ref,
@@ -133,7 +155,10 @@ func (r *Runner) syncOnce(ctx context.Context) error {
 			DiscoveryRef: disc,
 		})
 	}
+	return nil
+}
 
+func (r *Runner) applyGatewayUpstreams(ctx context.Context, listOpts []client.ListOption, st *k8sSyncState) error {
 	var ulist gwv1alpha1.GatewayUpstreamList
 	if err := r.client.List(ctx, &ulist, listOpts...); err != nil {
 		return fmt.Errorf("list gatewayupstreams: %w", err)
@@ -143,7 +168,7 @@ func (r *Runner) syncOnce(ctx context.Context) error {
 		ug := u.Namespace + "/" + u.Name
 		uref := "GatewayUpstream:" + ug
 		if u.Spec.EnvironmentID == "" {
-			globals = append(globals, models.StaticServiceConfig{
+			st.globals = append(st.globals, models.StaticServiceConfig{
 				Name:         u.Spec.Name,
 				Upstream:     u.Spec.Upstream,
 				DiscoveryRef: uref,
@@ -151,16 +176,19 @@ func (r *Runner) syncOnce(ctx context.Context) error {
 			continue
 		}
 		id := u.Spec.EnvironmentID
-		if envs[id] == nil {
-			envs[id] = newEnvModel(id)
+		if st.envs[id] == nil {
+			st.envs[id] = newEnvModel(id)
 		}
-		envs[id].Services.Static = append(envs[id].Services.Static, models.StaticServiceConfig{
+		st.envs[id].Services.Static = append(st.envs[id].Services.Static, models.StaticServiceConfig{
 			Name:         u.Spec.Name,
 			Upstream:     u.Spec.Upstream,
 			DiscoveryRef: uref,
 		})
 	}
+	return nil
+}
 
+func (r *Runner) applyCoreServices(ctx context.Context, listOpts []client.ListOption, st *k8sSyncState) error {
 	var slist corev1.ServiceList
 	if err := r.client.List(ctx, &slist, listOpts...); err != nil {
 		return fmt.Errorf("list services: %w", err)
@@ -179,19 +207,22 @@ func (r *Runner) syncOnce(ctx context.Context) error {
 		if up == "" {
 			up = upstreamFromService(svc)
 		}
-		if envs[envID] == nil {
-			envs[envID] = newEnvModel(envID)
+		if st.envs[envID] == nil {
+			st.envs[envID] = newEnvModel(envID)
 		}
 		sref := "core/Service:" + svc.Namespace + "/" + svc.Name
-		envs[envID].Services.Static = append(envs[envID].Services.Static, models.StaticServiceConfig{
+		st.envs[envID].Services.Static = append(st.envs[envID].Services.Static, models.StaticServiceConfig{
 			Name:         svcName,
 			Upstream:     up,
 			DiscoveryRef: sref,
 		})
 	}
+	return nil
+}
 
-	r.svcRepo.SetKubernetesGlobalServices(globals)
-	return r.envRepo.ApplyKubernetesEnvironments(ctx, envs)
+func (r *Runner) reconcileGlobalServices(ctx context.Context, st *k8sSyncState) error {
+	r.svcRepo.SetKubernetesGlobalServices(st.globals)
+	return r.envRepo.ApplyKubernetesEnvironments(ctx, st.envs)
 }
 
 func (r *Runner) listOpts() []client.ListOption {

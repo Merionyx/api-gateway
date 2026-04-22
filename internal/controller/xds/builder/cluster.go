@@ -14,11 +14,11 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/controller/portservices"
 )
 
 func (b *xdsBuilder) BuildClusters(env *models.Environment) ([]*clusterv3.Cluster, error) {
 	clusters := make([]*clusterv3.Cluster, 0)
-	uniqueServices := make(map[string]string)
 
 	authSidecarCluster, err := buildAuthSidecarCluster()
 	if err != nil {
@@ -26,22 +26,9 @@ func (b *xdsBuilder) BuildClusters(env *models.Environment) ([]*clusterv3.Cluste
 	}
 	clusters = append(clusters, authSidecarCluster)
 
-	// 2. Add services from environment
-	for _, service := range env.Services.Static {
-		uniqueServices[service.Name] = service.Upstream
-	}
-
-	// 3. Add global services
-	if b.inMemoryServiceRepository != nil {
-		globalServices, err := b.inMemoryServiceRepository.ListServices()
-		if err == nil {
-			for _, service := range globalServices {
-				if _, exists := uniqueServices[service.Name]; !exists {
-					uniqueServices[service.Name] = service.Upstream
-				}
-			}
-		}
-	}
+	// 2–3. Add services from the effective environment, then the controller root pool (config + K8s globals),
+	// with the same merge policy as the API registry: [portservices.MergeEnvStaticWithRootPoolUpstreams].
+	uniqueServices := portservices.MergeEnvStaticWithRootPoolUpstreams(env, b.inMemoryServiceRepository)
 
 	// 4. Create clusters for services
 	for serviceName, upstream := range uniqueServices {
