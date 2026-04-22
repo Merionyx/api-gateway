@@ -3,6 +3,7 @@ package etcd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -14,6 +15,11 @@ import (
 )
 
 const spanCtrlEtcdPkg = "internal/controller/repository/etcd"
+
+// ErrNotFound is returned by [environmentRepository.GetEnvironment] when no key exists for
+// the environment in controller etcd. Callers that treat a missing key as a normal case
+// can use [errors.Is](err, ErrNotFound).
+var ErrNotFound = errors.New("environment not found in controller etcd")
 
 // EnvironmentPrefix is the etcd prefix for environment config keys.
 const EnvironmentPrefix = "/api-gateway/controller/environments/"
@@ -54,7 +60,9 @@ func (r *environmentRepository) SaveEnvironment(ctx context.Context, env *models
 func (r *environmentRepository) GetEnvironment(ctx context.Context, name string) (out *models.Environment, err error) {
 	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanCtrlEtcdPkg, "GetEnvironment"))
 	defer func() {
-		telemetry.MarkError(span, err)
+		if err != nil && !errors.Is(err, ErrNotFound) {
+			telemetry.MarkError(span, err)
+		}
 		span.End()
 	}()
 	key := EnvironmentPrefix + name + "/config"
@@ -65,7 +73,7 @@ func (r *environmentRepository) GetEnvironment(ctx context.Context, name string)
 	}
 
 	if len(resp.Kvs) == 0 {
-		return nil, fmt.Errorf("environment %s not found", name)
+		return nil, fmt.Errorf("environment %s not found: %w", name, ErrNotFound)
 	}
 
 	var env models.Environment
