@@ -53,7 +53,8 @@ func newLeaderAPIServerStream(
 	}
 }
 
-// registerAndStream runs until ctx is done or the session returns without restart policy (nil error after clean exit is not used; loop is in use case).
+// registerAndStream — внешний цикл (backoff → connect → runAPIServerSession).
+// Исходы итерации: afterRegisterAndStreamSession, документ docs/refactor/api-server-sync-register-and-stream.md.
 func (l *leaderAPIServerStream) registerAndStream(ctx context.Context) error {
 	const (
 		initialBackoff = time.Second
@@ -75,21 +76,16 @@ func (l *leaderAPIServerStream) registerAndStream(ctx context.Context) error {
 
 		slog.Info("Connecting to API Server", "address", l.apiAddress)
 		sessErr := l.runAPIServerSession(ctx)
-		if err := ctx.Err(); err != nil {
-			metrics.RecordAPIServerSessionEnd(l.config.MetricsHTTP.Enabled, metrics.SessionReasonCanceled)
-			return err
+		step := afterRegisterAndStreamSession(ctx, sessErr)
+		if step.sessionEnd != "" {
+			metrics.RecordAPIServerSessionEnd(l.config.MetricsHTTP.Enabled, step.sessionEnd)
 		}
-		if sessErr == nil {
-			return nil
+		if !step.endLoop {
+			slog.Warn("API Server sync session ended", "error", sessErr)
+			backoff = grpcutil.NextReconnectBackoff(backoff, initialBackoff, maxBackoff)
+			continue
 		}
-		if errors.Is(sessErr, context.Canceled) {
-			metrics.RecordAPIServerSessionEnd(l.config.MetricsHTTP.Enabled, metrics.SessionReasonCanceled)
-			return sessErr
-		}
-
-		metrics.RecordAPIServerSessionEnd(l.config.MetricsHTTP.Enabled, metrics.SessionReasonError)
-		slog.Warn("API Server sync session ended", "error", sessErr)
-		backoff = grpcutil.NextReconnectBackoff(backoff, initialBackoff, maxBackoff)
+		return step.returnErr
 	}
 }
 
