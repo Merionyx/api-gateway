@@ -35,32 +35,21 @@ type Reconciler struct {
 	xm     *xdscache.SnapshotManager
 	xb     interfaces.XDSBuilder
 	mat    interfaces.MaterializedEffectiveStore
-	leader election.LeaderGate
-	matW   bool
+	// matWrite is the single policy for materialized etcd keys; see [MaterializedWritePolicy].
+	matWrite MaterializedWritePolicy
 }
 
 // New builds a reconciler. Omitted/ nil leader defaults to "no materialized writes" when checked.
 func New(d ReconcilerDeps) *Reconciler {
 	return &Reconciler{
-		etcd:   d.Etcd,
-		inMem:  d.InMemory,
-		schema: d.Schema,
-		xm:     d.XDSM,
-		xb:     d.XDSB,
-		mat:    d.Materialized,
-		leader: d.Leader,
-		matW:   d.MaterializedWriteEnabled,
+		etcd:     d.Etcd,
+		inMem:    d.InMemory,
+		schema:   d.Schema,
+		xm:       d.XDSM,
+		xb:       d.XDSB,
+		mat:      d.Materialized,
+		matWrite: NewMaterializedWritePolicy(d.MaterializedWriteEnabled, d.Materialized, d.Leader),
 	}
-}
-
-func (r *Reconciler) shouldWriteMaterialized() bool {
-	if !r.matW || r.mat == nil {
-		return false
-	}
-	if r.leader == nil {
-		return false
-	}
-	return r.leader.IsLeader()
 }
 
 // RebuildAllFromMemory enqueues xDS and optional materialized for the union of names in memory-merged
@@ -82,7 +71,7 @@ func (r *Reconciler) RebuildAllFromMemory(ctx context.Context, memoryMergedByNam
 		if err != nil {
 			continue
 		}
-		if err := r.reconcileOneBuilt(ctx, envName, eff, r.shouldWriteMaterialized()); err != nil {
+		if err := r.reconcileOneBuilt(ctx, envName, eff, r.matWrite.Allow()); err != nil {
 			slog.Error("effective reconciler: rebuild all", "environment", envName, "error", err)
 		}
 	}
@@ -162,7 +151,7 @@ func (r *Reconciler) ReconcileOne(ctx context.Context, name string, writeMateria
 		}
 		return err
 	}
-	writeMat := writeMaterialized && r.shouldWriteMaterialized()
+	writeMat := writeMaterialized && r.matWrite.Allow()
 	if err := r.reconcileOneBuilt(ctx, name, eff, writeMat); err != nil {
 		return err
 	}
@@ -204,7 +193,7 @@ func (r *Reconciler) removeOne(ctx context.Context, name string, requestMaterial
 	if !requestMaterialized {
 		return nil
 	}
-	if r.shouldWriteMaterialized() {
+	if r.matWrite.Allow() {
 		if err := r.mat.Delete(ctx, name); err != nil {
 			return fmt.Errorf("delete materialized: %w", err)
 		}
