@@ -21,6 +21,12 @@
 // start of each method. On the client, [Start] then [OutgoingContextWithTrace]
 // with the gRPC call context.
 //
+// # HTTP
+//
+// At the start of a request, use [ExtractIncomingHTTP] on the request headers, then
+// [Start] (or a framework middleware that does both). [SetHTTPStatus] is optional
+// for recording the response code before [trace.Span.End].
+//
 // # Handlers
 //
 // In each gRPC or HTTP handler, start a span and pass the returned
