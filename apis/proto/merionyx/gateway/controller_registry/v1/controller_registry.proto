@@ -13,6 +13,8 @@ message RegisterControllerRequest {
   string controller_id = 1;
   string tenant = 2;
   repeated EnvironmentInfo environments = 3;
+  // Envelope / DTO version the controller sends (1 = first extended meta fields).
+  int32 registry_payload_version = 4;
 }
 
 // ConfigSource names which input won for a bundle key in the effective merge (ADR 0001, phase 3).
@@ -26,6 +28,8 @@ enum ConfigSource {
 // Provenance identifies the winning static config layer for a resource (ADR 0001).
 message Provenance {
   ConfigSource config_source = 1;
+  // Optional sub-classifier (e.g. crd/ContractBundle, k8s.core/Service, controller_root_pool).
+  optional string layer_detail = 2;
 }
 
 // EnvironmentMeta groups observability and merge metadata for a logical environment.
@@ -36,16 +40,41 @@ message EnvironmentMeta {
   optional int64 effective_generation = 2;
   // Fingerprint of static name/type/bundles/services (hex SHA-256), aligned with materialized.
   optional string sources_fingerprint = 3;
+  // Environment kind from effective (e.g. "kubernetes" from K8s discovery, file bootstrap).
+  optional string environment_type = 4;
+  // Last write time of the materialized effective document (RFC3339), from controller etcd, when available.
+  optional string materialized_updated_at = 5;
+  // schema_version in the materialized v1 document when available.
+  optional int32 materialized_schema_version = 6;
+  // True if live in-memory/merged effective fingerprint differs from materialized doc (reconcile lag or failure).
+  optional bool materialized_mismatch = 7;
 }
 
 // BundleMeta is control-plane metadata for a static bundle line (separate from repository/ref identity).
 message BundleMeta {
   Provenance provenance = 1;
+  // Resolved Git ref (e.g. commit SHA) when the sync pipeline exposes it; empty if unknown.
+  optional string resolved_ref = 2;
+  // Optional RFC3339 timestamp of the last successful bundle-to-etcd sync when available.
+  optional string last_sync_utc = 3;
+  // Last reported sync error for this bundle (empty = none / not tracked).
+  optional string sync_error = 4;
+  // K8s resource that declared this line when from discovery, e.g. "namespace/ContractBundle/name".
+  optional string k8s_resource_ref = 5;
 }
 
 // ServiceMeta is control-plane metadata for a static service line.
 message ServiceMeta {
   Provenance provenance = 1;
+  // Short ref for a discovered K8s backend (e.g. "ns/svc" for core Service).
+  optional string k8s_service_ref = 2;
+}
+
+// ServiceLineScope distinguishes per-environment static lines from controller root pool.
+enum ServiceLineScope {
+  SERVICE_LINE_SCOPE_UNSPECIFIED = 0;
+  SERVICE_LINE_SCOPE_ENVIRONMENT = 1;
+  SERVICE_LINE_SCOPE_CONTROLLER_ROOT = 2;
 }
 
 // EnvironmentInfo is an environment identity plus nested bundles and services, each with its own meta.
@@ -61,6 +90,7 @@ message ServiceInfo {
   string name = 1;
   string upstream = 2;
   optional ServiceMeta meta = 3;
+  optional ServiceLineScope scope = 4;
 }
 
 // BundleInfo is a static bundle line; provenance lives in meta.
@@ -97,6 +127,7 @@ message StreamSnapshotsResponse {
 message HeartbeatRequest {
   string controller_id = 1;
   repeated EnvironmentInfo environments = 2;
+  int32 registry_payload_version = 3;
 }
 
 // HeartbeatResponse response to heartbeat.

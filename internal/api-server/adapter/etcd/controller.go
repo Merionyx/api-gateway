@@ -137,7 +137,7 @@ func (r *ControllerRepository) GetHeartbeat(ctx context.Context, controllerID st
 	return hi.Timestamp, nil
 }
 
-func (r *ControllerRepository) UpdateControllerHeartbeat(ctx context.Context, controllerID string, environments []models.EnvironmentInfo) (mainKeyUpdated bool, err error) {
+func (r *ControllerRepository) UpdateControllerHeartbeat(ctx context.Context, controllerID string, environments []models.EnvironmentInfo, registryPayloadVersion int32) (mainKeyUpdated bool, err error) {
 	heartbeatKey := fmt.Sprintf("%s%s/heartbeat", controllerPrefix, controllerID)
 	heartbeatData, err := json.Marshal(HeartbeatInfo{
 		Timestamp: time.Now(),
@@ -167,6 +167,9 @@ func (r *ControllerRepository) UpdateControllerHeartbeat(ctx context.Context, co
 	}
 
 	info.Environments = models.CanonicalEnvironmentsForStorage(environments)
+	if registryPayloadVersion > 0 {
+		info.RegistryPayloadVersion = registryPayloadVersion
+	}
 
 	data, err := json.Marshal(info)
 	if err != nil {

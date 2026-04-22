@@ -83,7 +83,7 @@ func (c *ctlRepoStub) ListControllers(context.Context) ([]models.ControllerInfo,
 	return c.list, nil
 }
 
-func (c *ctlRepoStub) UpdateControllerHeartbeat(context.Context, string, []models.EnvironmentInfo) (bool, error) {
+func (c *ctlRepoStub) UpdateControllerHeartbeat(context.Context, string, []models.EnvironmentInfo, int32) (bool, error) {
 	panic("unexpected")
 }
 

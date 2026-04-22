@@ -37,7 +37,7 @@ func TestControllerRegistryUseCase_NotifySnapshotUpdate(t *testing.T) {
 func TestControllerRegistryUseCase_Heartbeat_noResync(t *testing.T) {
 	t.Parallel()
 	uc := NewControllerRegistryUseCase(&stubControllerRepo{}, nil, nil)
-	if err := uc.Heartbeat(context.Background(), "c1", nil); err != nil {
+	if err := uc.Heartbeat(context.Background(), "c1", nil, 0); err != nil {
 		t.Fatal(err)
 	}
 }

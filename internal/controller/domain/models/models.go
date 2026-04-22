@@ -15,6 +15,8 @@ type EnvironmentServiceConfig struct {
 type StaticServiceConfig struct {
 	Name     string
 	Upstream string
+	// Optional discovery / declaration handle (K8s Service, CRD, etc.); excluded from static fingerprint.
+	DiscoveryRef string `json:"discovery_ref,omitempty"`
 }
 
 type EnvironmentBundleConfig struct {
@@ -26,6 +28,8 @@ type StaticContractBundleConfig struct {
 	Repository string
 	Ref        string
 	Path       string
+	// Optional, e.g. "namespace/ContractBundle/name" from discovery; excluded from static fingerprint.
+	DiscoveryRef string `json:"discovery_ref,omitempty"`
 }
 
 // Snapshots UseCase models

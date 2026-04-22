@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 
@@ -394,11 +395,16 @@ func controllerToAPI(c models.ControllerInfo) apiserver.Controller {
 	for _, e := range c.Environments {
 		envs = append(envs, environmentToAPI(e))
 	}
-	return apiserver.Controller{
+	out := apiserver.Controller{
 		ControllerId: c.ControllerID,
 		Tenant:       c.Tenant,
 		Environments: &envs,
 	}
+	if c.RegistryPayloadVersion > 0 {
+		v := c.RegistryPayloadVersion
+		out.RegistryPayloadVersion = &v
+	}
+	return out
 }
 
 func environmentToAPI(e models.EnvironmentInfo) apiserver.Environment {
@@ -433,28 +439,76 @@ func environmentMetaToAPI(m *models.EnvironmentMeta) *apiserver.EnvironmentMeta 
 		s := m.SourcesFingerprint
 		out.SourcesFingerprint = &s
 	}
-	if out.Provenance == nil && out.EffectiveGeneration == nil && out.SourcesFingerprint == nil {
+	if m.EnvironmentType != "" {
+		et := m.EnvironmentType
+		out.EnvironmentType = &et
+	}
+	if m.MaterializedUpdatedAt != "" {
+		if t, err := time.Parse(time.RFC3339Nano, m.MaterializedUpdatedAt); err == nil {
+			out.MaterializedUpdatedAt = &t
+		} else if t, err := time.Parse(time.RFC3339, m.MaterializedUpdatedAt); err == nil {
+			out.MaterializedUpdatedAt = &t
+		}
+	}
+	if m.MaterializedSchemaVersion != nil {
+		sv := *m.MaterializedSchemaVersion
+		out.MaterializedSchemaVersion = &sv
+	}
+	if m.MaterializedMismatch != nil {
+		mm := *m.MaterializedMismatch
+		out.MaterializedMismatch = &mm
+	}
+	if out.Provenance == nil && out.EffectiveGeneration == nil && out.SourcesFingerprint == nil && out.EnvironmentType == nil && out.MaterializedUpdatedAt == nil && out.MaterializedSchemaVersion == nil && out.MaterializedMismatch == nil {
 		return nil
 	}
 	return out
 }
 
 func provenanceToAPI(p *models.Provenance) *apiserver.Provenance {
-	if p == nil || p.ConfigSource == "" {
+	if p == nil {
 		return nil
 	}
-	if cs := modelConfigSourceToAPI(p.ConfigSource); cs != nil {
-		return &apiserver.Provenance{ConfigSource: cs}
+	var out apiserver.Provenance
+	if p.ConfigSource != "" {
+		if cs := modelConfigSourceToAPI(p.ConfigSource); cs != nil {
+			out.ConfigSource = cs
+		}
 	}
-	return nil
+	if p.LayerDetail != "" {
+		d := p.LayerDetail
+		out.LayerDetail = &d
+	}
+	if out.ConfigSource == nil && out.LayerDetail == nil {
+		return nil
+	}
+	return &out
 }
 
 func staticServiceToAPI(s models.ServiceInfo) apiserver.RegistryService {
 	n, u := s.Name, s.Upstream
 	out := apiserver.RegistryService{Name: n, Upstream: u}
+	if s.Scope != "" {
+		scope := apiserver.ServiceLineScope(s.Scope)
+		if scope.Valid() {
+			out.Scope = &scope
+		} else {
+			unspec := apiserver.ServiceLineScopeUnspecified
+			out.Scope = &unspec
+		}
+	}
 	if sm := s.Meta; sm != nil {
-		if p := provenanceToAPI(sm.Provenance); p != nil {
-			out.Meta = &apiserver.ServiceMeta{Provenance: p}
+		if p := provenanceToAPI(sm.Provenance); p != nil || sm.K8sServiceRef != "" {
+			m := &apiserver.ServiceMeta{}
+			if p != nil {
+				m.Provenance = p
+			}
+			if sm.K8sServiceRef != "" {
+				ksr := sm.K8sServiceRef
+				m.K8sServiceRef = &ksr
+			}
+			if m.Provenance != nil || m.K8sServiceRef != nil {
+				out.Meta = m
+			}
 		}
 	}
 	return out
@@ -489,8 +543,33 @@ func bundleToAPI(b models.BundleInfo) apiserver.Bundle {
 		Path:       &path,
 	}
 	if bm := b.Meta; bm != nil {
-		if p := provenanceToAPI(bm.Provenance); p != nil {
-			out.Meta = &apiserver.BundleMeta{Provenance: p}
+		if p := provenanceToAPI(bm.Provenance); p != nil || bm.ResolvedRef != "" || bm.LastSyncUTC != "" || bm.SyncError != "" || bm.K8SResourceRef != "" {
+			m := &apiserver.BundleMeta{}
+			if p != nil {
+				m.Provenance = p
+			}
+			if bm.ResolvedRef != "" {
+				r := bm.ResolvedRef
+				m.ResolvedRef = &r
+			}
+			if bm.LastSyncUTC != "" {
+				if t, err := time.Parse(time.RFC3339Nano, bm.LastSyncUTC); err == nil {
+					m.LastSyncUtc = &t
+				} else if t, err := time.Parse(time.RFC3339, bm.LastSyncUTC); err == nil {
+					m.LastSyncUtc = &t
+				}
+			}
+			if bm.SyncError != "" {
+				se := bm.SyncError
+				m.SyncError = &se
+			}
+			if bm.K8SResourceRef != "" {
+				k := bm.K8SResourceRef
+				m.K8sResourceRef = &k
+			}
+			if m.Provenance != nil || m.ResolvedRef != nil || m.LastSyncUtc != nil || m.SyncError != nil || m.K8sResourceRef != nil {
+				out.Meta = m
+			}
 		}
 	}
 	return out
@@ -503,13 +582,13 @@ func modelConfigSourceToAPI(s string) *apiserver.ConfigSource {
 	var c apiserver.ConfigSource
 	switch s {
 	case "file":
-		c = apiserver.File
+		c = apiserver.ConfigSourceFile
 	case "kubernetes":
-		c = apiserver.Kubernetes
+		c = apiserver.ConfigSourceKubernetes
 	case "etcd_grpc":
-		c = apiserver.EtcdGrpc
+		c = apiserver.ConfigSourceEtcdGrpc
 	case "unspecified":
-		c = apiserver.Unspecified
+		c = apiserver.ConfigSourceUnspecified
 	default:
 		c = apiserver.ConfigSource(s)
 	}

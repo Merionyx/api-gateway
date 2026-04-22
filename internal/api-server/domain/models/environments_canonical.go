@@ -56,8 +56,18 @@ func CanonicalEnvironmentsForStorage(envs []EnvironmentInfo) []EnvironmentInfo {
 				g := *e.Meta.EffectiveGeneration
 				em.EffectiveGeneration = &g
 			}
+			em.EnvironmentType = e.Meta.EnvironmentType
+			em.MaterializedUpdatedAt = e.Meta.MaterializedUpdatedAt
+			if e.Meta.MaterializedSchemaVersion != nil {
+				sv := *e.Meta.MaterializedSchemaVersion
+				em.MaterializedSchemaVersion = &sv
+			}
+			if e.Meta.MaterializedMismatch != nil {
+				mm := *e.Meta.MaterializedMismatch
+				em.MaterializedMismatch = &mm
+			}
 		}
-		if em != nil && em.Provenance == nil && em.EffectiveGeneration == nil && em.SourcesFingerprint == "" {
+		if em != nil && em.Provenance == nil && em.EffectiveGeneration == nil && em.SourcesFingerprint == "" && em.EnvironmentType == "" && em.MaterializedUpdatedAt == "" && em.MaterializedSchemaVersion == nil && em.MaterializedMismatch == nil {
 			em = nil
 		}
 		out = append(out, EnvironmentInfo{

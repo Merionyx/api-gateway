@@ -24,5 +24,6 @@ type ControllerRepository interface {
 	ListControllers(ctx context.Context) ([]models.ControllerInfo, error)
 	// UpdateControllerHeartbeat returns true if the main controller record in etcd was rewritten
 	// (environments or other fields changed). Heartbeat subkey is always updated.
-	UpdateControllerHeartbeat(ctx context.Context, controllerID string, environments []models.EnvironmentInfo) (mainKeyUpdated bool, err error)
+	// registryPayloadVersion, when positive, is stored on the controller record.
+	UpdateControllerHeartbeat(ctx context.Context, controllerID string, environments []models.EnvironmentInfo, registryPayloadVersion int32) (mainKeyUpdated bool, err error)
 }

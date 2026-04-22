@@ -145,9 +145,10 @@ func (l *leaderAPIServerStream) registerController(ctx context.Context, client p
 	}
 
 	_, err = client.RegisterController(ctx, &pb.RegisterControllerRequest{
-		ControllerId: l.controllerID,
-		Tenant:       l.config.Tenant,
-		Environments: environments,
+		ControllerId:            l.controllerID,
+		Tenant:                  l.config.Tenant,
+		Environments:            environments,
+		RegistryPayloadVersion:  RegistryPayloadVersionV1,
 	})
 	if err != nil {
 		return err
@@ -174,8 +175,9 @@ func (l *leaderAPIServerStream) startHeartbeat(ctx context.Context, client pb.Co
 			}
 
 			_, err = client.Heartbeat(ctx, &pb.HeartbeatRequest{
-				ControllerId: l.controllerID,
-				Environments: environments,
+				ControllerId:            l.controllerID,
+				Environments:            environments,
+				RegistryPayloadVersion:  RegistryPayloadVersionV1,
 			})
 			if err != nil {
 				slog.Error("send heartbeat", "error", err)

@@ -124,11 +124,13 @@ func (r *Runner) syncOnce(ctx context.Context) error {
 		if envs[id] == nil {
 			envs[id] = newEnvModel(id)
 		}
+		disc := b.Namespace + "/" + b.Name
 		envs[id].Bundles.Static = append(envs[id].Bundles.Static, models.StaticContractBundleConfig{
-			Name:       b.Spec.Name,
-			Repository: b.Spec.Repository,
-			Ref:        b.Spec.Ref,
-			Path:       b.Spec.Path,
+			Name:         b.Spec.Name,
+			Repository:   b.Spec.Repository,
+			Ref:          b.Spec.Ref,
+			Path:         b.Spec.Path,
+			DiscoveryRef: disc,
 		})
 	}
 
@@ -138,8 +140,14 @@ func (r *Runner) syncOnce(ctx context.Context) error {
 	}
 	for i := range ulist.Items {
 		u := &ulist.Items[i]
+		ug := u.Namespace + "/" + u.Name
+		uref := "GatewayUpstream:" + ug
 		if u.Spec.EnvironmentID == "" {
-			globals = append(globals, models.StaticServiceConfig{Name: u.Spec.Name, Upstream: u.Spec.Upstream})
+			globals = append(globals, models.StaticServiceConfig{
+				Name:         u.Spec.Name,
+				Upstream:     u.Spec.Upstream,
+				DiscoveryRef: uref,
+			})
 			continue
 		}
 		id := u.Spec.EnvironmentID
@@ -147,8 +155,9 @@ func (r *Runner) syncOnce(ctx context.Context) error {
 			envs[id] = newEnvModel(id)
 		}
 		envs[id].Services.Static = append(envs[id].Services.Static, models.StaticServiceConfig{
-			Name:     u.Spec.Name,
-			Upstream: u.Spec.Upstream,
+			Name:         u.Spec.Name,
+			Upstream:     u.Spec.Upstream,
+			DiscoveryRef: uref,
 		})
 	}
 
@@ -173,9 +182,11 @@ func (r *Runner) syncOnce(ctx context.Context) error {
 		if envs[envID] == nil {
 			envs[envID] = newEnvModel(envID)
 		}
+		sref := "core/Service:" + svc.Namespace + "/" + svc.Name
 		envs[envID].Services.Static = append(envs[envID].Services.Static, models.StaticServiceConfig{
-			Name:     svcName,
-			Upstream: up,
+			Name:         svcName,
+			Upstream:     up,
+			DiscoveryRef: sref,
 		})
 	}
 

@@ -2,8 +2,10 @@ package usecase
 
 import (
 	"context"
+	"strings"
 
 	pb "github.com/merionyx/api-gateway/pkg/grpc/controller_registry/v1"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 	"github.com/merionyx/api-gateway/internal/controller/envmodel"
@@ -34,6 +36,75 @@ func provenancePB(src envmodel.StaticConfigSource) *pb.Provenance {
 	}
 	return &pb.Provenance{ConfigSource: v}
 }
+
+// provenanceWithLayer adds a human layer_detail while preserving ADR-0001 config_source.
+func provenanceWithLayer(src envmodel.StaticConfigSource, layerDetail string) *pb.Provenance {
+	v := staticConfigToPB(src)
+	if v == pb.ConfigSource_CONFIG_SOURCE_UNSPECIFIED && layerDetail == "" {
+		return nil
+	}
+	if v == pb.ConfigSource_CONFIG_SOURCE_UNSPECIFIED {
+		return &pb.Provenance{LayerDetail: proto.String(layerDetail)}
+	}
+	out := &pb.Provenance{ConfigSource: v}
+	if layerDetail != "" {
+		out.LayerDetail = proto.String(layerDetail)
+	}
+	return out
+}
+
+func environmentDominantLayerDetail(inF, inK, inE bool) string {
+	switch {
+	case inE:
+		return "dominant:etcd_grpc"
+	case inK:
+		return "dominant:memory_kubernetes"
+	case inF:
+		return "dominant:file"
+	default:
+		return "dominant:unspecified"
+	}
+}
+
+func staticBundleProvenanceLayer(src envmodel.StaticConfigSource, k8sCrdRef string) string {
+	switch src {
+	case envmodel.StaticConfigEtcdGRPC:
+		return "static:etcd_grpc"
+	case envmodel.StaticConfigFile:
+		return "static:file"
+	case envmodel.StaticConfigKubernetes:
+		if k8sCrdRef != "" {
+			return "crd/ContractBundle:" + k8sCrdRef
+		}
+		return "static:kubernetes"
+	default:
+		return ""
+	}
+}
+
+// staticServiceProvenanceLayer enriches merge provenance with optional K8s discovery ref.
+func staticServiceProvenanceLayer(src envmodel.StaticConfigSource, discoveryRef string) string {
+	var b strings.Builder
+	switch src {
+	case envmodel.StaticConfigEtcdGRPC:
+		b.WriteString("static:etcd_grpc")
+	case envmodel.StaticConfigFile:
+		b.WriteString("static:file")
+	case envmodel.StaticConfigKubernetes:
+		b.WriteString("static:kubernetes")
+	default:
+	}
+	if discoveryRef != "" {
+		if b.Len() > 0 {
+			b.WriteString(";")
+		}
+		b.WriteString("discovery:")
+		b.WriteString(discoveryRef)
+	}
+	return b.String()
+}
+
+func ptrServiceScope(s pb.ServiceLineScope) *pb.ServiceLineScope { return &s }
 
 // fileK8sSlices returns unmerged file and K8s static bundles if the in-memory implementation supports it.
 func (b *registryEnvironmentsBuilder) fileK8sSlices(ctx context.Context, envName string) (file, k8s []models.StaticContractBundleConfig) {

@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"sort"
+	"time"
 
 	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
@@ -120,14 +121,15 @@ func environmentMetaIsEmpty(m *models.EnvironmentMeta) bool {
 	if m == nil {
 		return true
 	}
-	return m.Provenance == nil && m.EffectiveGeneration == nil && m.SourcesFingerprint == ""
+	return m.Provenance == nil && m.EffectiveGeneration == nil && m.SourcesFingerprint == "" &&
+		m.EnvironmentType == "" && m.MaterializedUpdatedAt == "" && m.MaterializedSchemaVersion == nil && m.MaterializedMismatch == nil
 }
 
 func cloneEnvironmentMetaForMerge(m *models.EnvironmentMeta) *models.EnvironmentMeta {
 	if m == nil {
 		return nil
 	}
-	out := &models.EnvironmentMeta{SourcesFingerprint: m.SourcesFingerprint}
+	out := &models.EnvironmentMeta{SourcesFingerprint: m.SourcesFingerprint, EnvironmentType: m.EnvironmentType, MaterializedUpdatedAt: m.MaterializedUpdatedAt}
 	if p := m.Provenance; p != nil {
 		cp := *p
 		out.Provenance = &cp
@@ -135,6 +137,14 @@ func cloneEnvironmentMetaForMerge(m *models.EnvironmentMeta) *models.Environment
 	if m.EffectiveGeneration != nil {
 		g := *m.EffectiveGeneration
 		out.EffectiveGeneration = &g
+	}
+	if m.MaterializedSchemaVersion != nil {
+		sv := *m.MaterializedSchemaVersion
+		out.MaterializedSchemaVersion = &sv
+	}
+	if m.MaterializedMismatch != nil {
+		mm := *m.MaterializedMismatch
+		out.MaterializedMismatch = &mm
 	}
 	if environmentMetaIsEmpty(out) {
 		return nil
@@ -160,18 +170,62 @@ func mergeEnvironmentMetasForTenant(a, b *models.EnvironmentMeta) *models.Enviro
 			if b.SourcesFingerprint != "" {
 				out.SourcesFingerprint = b.SourcesFingerprint
 			}
+			// Newer materialization wins on observability row.
+			out.MaterializedUpdatedAt = b.MaterializedUpdatedAt
+			if b.MaterializedSchemaVersion != nil {
+				sv := *b.MaterializedSchemaVersion
+				out.MaterializedSchemaVersion = &sv
+			}
 		}
 	} else if out.SourcesFingerprint == "" && b.SourcesFingerprint != "" {
 		out.SourcesFingerprint = b.SourcesFingerprint
 	}
-	src := strongerConfigSource(models.EnvironmentMetaConfigSource(a), models.EnvironmentMetaConfigSource(b))
-	if src != "" {
-		if out.Provenance == nil {
-			out.Provenance = &models.Provenance{ConfigSource: src}
-		} else {
-			cp := *out.Provenance
-			cp.ConfigSource = src
-			out.Provenance = &cp
+	// Favor the newer `materialized_updated_at` (RFC3339) when both set.
+	if b.MaterializedUpdatedAt != "" && a.MaterializedUpdatedAt != "" {
+		if t2, e2 := time.Parse(time.RFC3339Nano, b.MaterializedUpdatedAt); e2 == nil {
+			if t1, e1 := time.Parse(time.RFC3339Nano, a.MaterializedUpdatedAt); e1 == nil {
+				if t2.After(t1) {
+					out.MaterializedUpdatedAt = b.MaterializedUpdatedAt
+					if b.MaterializedSchemaVersion != nil {
+						sv := *b.MaterializedSchemaVersion
+						out.MaterializedSchemaVersion = &sv
+					}
+				}
+			}
+		}
+	}
+	// Mismatch: OR across controllers for the same env.
+	if a.MaterializedMismatch != nil && *a.MaterializedMismatch {
+		m := true
+		out.MaterializedMismatch = &m
+	} else if b.MaterializedMismatch != nil && *b.MaterializedMismatch {
+		m := true
+		out.MaterializedMismatch = &m
+	}
+	if out.EnvironmentType == "" && b.EnvironmentType != "" {
+		out.EnvironmentType = b.EnvironmentType
+	} else if out.EnvironmentType == "" {
+		out.EnvironmentType = a.EnvironmentType
+	}
+	ra := configSourceRank(models.EnvironmentMetaConfigSource(a))
+	rb := configSourceRank(models.EnvironmentMetaConfigSource(b))
+	stronger := a
+	if rb > ra {
+		stronger = b
+	}
+	if stronger != nil && stronger.Provenance != nil {
+		p := *stronger.Provenance
+		out.Provenance = &p
+	} else {
+		src := strongerConfigSource(models.EnvironmentMetaConfigSource(a), models.EnvironmentMetaConfigSource(b))
+		if src != "" {
+			if out.Provenance == nil {
+				out.Provenance = &models.Provenance{ConfigSource: src}
+			} else {
+				cp := *out.Provenance
+				cp.ConfigSource = src
+				out.Provenance = &cp
+			}
 		}
 	}
 	if environmentMetaIsEmpty(out) {

@@ -405,6 +405,10 @@ components:
         config_source:
           $ref: '#/components/schemas/ConfigSource'
           description: Declared winning source for this entity in the static merge.
+        layer_detail:
+          type: string
+          description: |
+            Finer sub-classification (e.g. dominant:etcd_grpc, crd/ContractBundle, pool:controller_root, discovery:…).
 
     EnvironmentMeta:
       type: object
@@ -421,6 +425,22 @@ components:
         sources_fingerprint:
           type: string
           description: Hex SHA-256 fingerprint of static effective (name, type, bundle/service lists) from the controller.
+        environment_type:
+          type: string
+          description: Environment kind in the effective (e.g. `kubernetes` from K8s discovery, file bootstrap).
+        materialized_updated_at:
+          type: string
+          format: date-time
+          description: When the materialized v1 document was last written in controller etcd (if available).
+        materialized_schema_version:
+          type: integer
+          format: int32
+          description: schema_version in the materialized v1 document when available.
+        materialized_mismatch:
+          type: boolean
+          description: |
+            `true` when the live effective fingerprint (controller merge) does not match the last materialized
+            document (reconcile lag or error).
 
     BundleMeta:
       type: object
@@ -428,6 +448,27 @@ components:
       properties:
         provenance:
           $ref: '#/components/schemas/Provenance'
+        resolved_ref:
+          type: string
+          description: Optional resolved Git identifier (e.g. commit) when the sync pipeline exposes it.
+        last_sync_utc:
+          type: string
+          format: date-time
+          description: Optional timestamp of the last successful bundle-to-etcd sync.
+        sync_error:
+          type: string
+          description: Last known sync error for the bundle, if any.
+        k8s_resource_ref:
+          type: string
+          description: K8s object that carried this static line, when from discovery.
+
+    ServiceLineScope:
+      type: string
+      description: Whether a service line belongs to the per-environment static merge or the controller root pool.
+      enum:
+        - environment
+        - controller_root
+        - unspecified
 
     ServiceMeta:
       type: object
@@ -435,6 +476,9 @@ components:
       properties:
         provenance:
           $ref: '#/components/schemas/Provenance'
+        k8s_service_ref:
+          type: string
+          description: Declared or discovered K8s backend reference (format may vary, e.g. `ns/svc` or `GatewayUpstream:...`).
 
     Bundle:
       type: object
@@ -491,6 +535,8 @@ components:
         upstream:
           type: string
           description: Upstream base URL or host as in controller static config.
+        scope:
+          $ref: '#/components/schemas/ServiceLineScope'
         meta:
           $ref: '#/components/schemas/ServiceMeta'
           description: |
@@ -507,6 +553,10 @@ components:
           type: string
         tenant:
           type: string
+        registry_payload_version:
+          type: integer
+          format: int32
+          description: DTO / schema version the controller used when last registering (extended meta fields in v1).
         environments:
           type: array
           items:
