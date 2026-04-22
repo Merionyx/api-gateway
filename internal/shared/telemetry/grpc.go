@@ -64,10 +64,11 @@ func OutgoingContextWithTrace(ctx context.Context) context.Context {
 
 // ServerSpan runs [ExtractIncomingGRPC] on [metadata.FromIncomingContext] and
 // [Start] for a gRPC server method. [defer trace.Span.End] in the handler.
-// importPath is usually the full Go import path of the handler package; funcName
-// is the exported method name (e.g. "RegisterController").
-func ServerSpan(ctx context.Context, importPath, funcName string) (context.Context, trace.Span) {
+// packagePath is the path of the handler package within the module (no module
+// prefix; e.g. internal/.../handler). funcName is the exported method name
+// (e.g. "RegisterController").
+func ServerSpan(ctx context.Context, packagePath, funcName string) (context.Context, trace.Span) {
 	md, _ := metadata.FromIncomingContext(ctx)
 	ctx = ExtractIncomingGRPC(ctx, md)
-	return Start(ctx, SpanName(importPath, funcName))
+	return Start(ctx, SpanName(packagePath, funcName))
 }

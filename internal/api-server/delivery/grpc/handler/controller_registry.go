@@ -14,8 +14,8 @@ import (
 	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
 
-// spanHandlerPkg is the import path of this package (span names: {importPath}.MethodName).
-const spanHandlerPkg = "github.com/merionyx/api-gateway/internal/api-server/delivery/grpc/handler"
+// spanHandlerPkg is the path of this package within the module (span names: {path}.MethodName).
+const spanHandlerPkg = "internal/api-server/delivery/grpc/handler"
 
 type ControllerRegistryHandler struct {
 	pb.UnimplementedControllerRegistryServiceServer

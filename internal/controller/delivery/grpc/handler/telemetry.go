@@ -1,4 +1,4 @@
 package handler
 
-// spanHandlerPkg is the import path of this package for OpenTelemetry span names.
-const spanHandlerPkg = "github.com/merionyx/api-gateway/internal/controller/delivery/grpc/handler"
+// spanHandlerPkg is the path of this package within the module (span names: {path}.MethodName).
+const spanHandlerPkg = "internal/controller/delivery/grpc/handler"

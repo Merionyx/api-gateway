@@ -25,8 +25,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// spanUsecaseAPIPkg is the import path of this file for [telemetry.SpanName].
-const spanUsecaseAPIPkg = "github.com/merionyx/api-gateway/internal/controller/usecase"
+// spanUsecaseAPIPkg is the package path within the module for [telemetry.SpanName].
+const spanUsecaseAPIPkg = "internal/controller/usecase"
 
 // leaderAPIServerStream runs the long-lived gRPC session to the API Server (this replica when
 // it is the cluster leader): register, heartbeat, snapshot stream, save to schema etcd, xDS nudge.

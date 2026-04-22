@@ -31,8 +31,8 @@
 //
 // # Span names
 //
-// Use [SpanName] with the Go import path (or a stable path segment) and the
-// function or method name, e.g. telemetry.SpanName("internal/.../usecase/bundle", "Sync").
+// Use [SpanName] with the path of the package within the module (no module
+// prefix) and the function or method name, e.g. telemetry.SpanName("internal/.../usecase/bundle", "Sync").
 //
 // # Errors
 //

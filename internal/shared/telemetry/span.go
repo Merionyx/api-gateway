@@ -10,7 +10,7 @@ import (
 
 // instrumentationScope is the name of the [trace.Tracer] this package returns.
 // Spans in application code should use stable names; see [SpanName].
-const instrumentationScope = "github.com/merionyx/api-gateway/internal/shared/telemetry"
+const instrumentationScope = "internal/shared/telemetry"
 
 // Tracer returns the global OpenTelemetry [trace.Tracer] (after [Init]).
 func Tracer() trace.Tracer {
@@ -25,9 +25,9 @@ func Start(ctx context.Context, spanName string) (context.Context, trace.Span) {
 	return Tracer().Start(ctx, spanName)
 }
 
-// SpanName returns a span name in the form "{importPath}.{funcName}".
-func SpanName(importPath, funcName string) string {
-	return importPath + "." + funcName
+// SpanName returns a span name in the form "{packagePathWithinModule}.{funcName}".
+func SpanName(packagePath, funcName string) string {
+	return packagePath + "." + funcName
 }
 
 // MarkError sets [codes.Error] on the span if err is non-nil. It does not call
