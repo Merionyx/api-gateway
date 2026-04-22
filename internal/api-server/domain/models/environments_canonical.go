@@ -23,11 +23,15 @@ func CanonicalEnvironmentsForStorage(envs []EnvironmentInfo) []EnvironmentInfo {
 			}
 			return bunds[i].Name < bunds[j].Name
 		})
+		svcs := append([]ServiceInfo(nil), e.Services...)
+		sort.Slice(svcs, func(i, j int) bool { return svcs[i].Name < svcs[j].Name })
 		out = append(out, EnvironmentInfo{
-			Name:                 e.Name,
-			Bundles:              bunds,
-			EffectiveGeneration:  e.EffectiveGeneration,
-			SourcesFingerprint:   e.SourcesFingerprint,
+			Name:                    e.Name,
+			Bundles:                 bunds,
+			EffectiveGeneration:     e.EffectiveGeneration,
+			SourcesFingerprint:      e.SourcesFingerprint,
+			EnvironmentConfigSource: e.EnvironmentConfigSource,
+			Services:                svcs,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {

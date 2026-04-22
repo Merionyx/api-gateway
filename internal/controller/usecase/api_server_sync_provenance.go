@@ -48,3 +48,43 @@ func etcdStaticBundles(etcd *models.Environment) []models.StaticContractBundleCo
 	}
 	return etcd.Bundles.Static
 }
+
+func etcdStaticServices(etcd *models.Environment) []models.StaticServiceConfig {
+	if etcd == nil || etcd.Services == nil {
+		return nil
+	}
+	return etcd.Services.Static
+}
+
+type fileK8sServicePartials interface {
+	FileAndK8sStaticServices(ctx context.Context, environmentName string) (file, k8s []models.StaticServiceConfig)
+}
+
+// fileK8sServiceSlices returns unmerged file and K8s static service lists.
+func (uc *APIServerSyncUseCase) fileK8sServiceSlices(ctx context.Context, envName string) (file, k8s []models.StaticServiceConfig) {
+	if uc.inMemoryEnvironmentsRepo == nil {
+		return nil, nil
+	}
+	if m, ok := uc.inMemoryEnvironmentsRepo.(*memory.EnvironmentsRepository); ok {
+		return m.FileAndK8sStaticServices(ctx, envName)
+	}
+	if p, ok := uc.inMemoryEnvironmentsRepo.(fileK8sServicePartials); ok {
+		return p.FileAndK8sStaticServices(ctx, envName)
+	}
+	return nil, nil
+}
+
+type environmentLayersPartials interface {
+	EnvironmentLayersPresent(environmentName string) (inFile, inK8s bool)
+}
+
+// environmentInMemoryLayers returns (inFile, inK8s) for environment name, or (false, false) if not supported.
+func (uc *APIServerSyncUseCase) environmentInMemoryLayers(envName string) (inFile, inK8s bool) {
+	if uc.inMemoryEnvironmentsRepo == nil {
+		return false, false
+	}
+	if p, ok := uc.inMemoryEnvironmentsRepo.(environmentLayersPartials); ok {
+		return p.EnvironmentLayersPresent(envName)
+	}
+	return false, false
+}

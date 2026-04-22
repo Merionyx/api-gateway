@@ -220,3 +220,25 @@ func (r *EnvironmentsRepository) FileAndK8sStaticBundles(_ context.Context, name
 	}
 	return file, k8s
 }
+
+// FileAndK8sStaticServices returns unmerged static service lists (same layering as FileAndK8sStaticBundles).
+func (r *EnvironmentsRepository) FileAndK8sStaticServices(_ context.Context, name string) (file, k8s []models.StaticServiceConfig) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if e, ok := r.fromFile[name]; ok && e != nil && e.Services != nil {
+		file = e.Services.Static
+	}
+	if e, ok := r.fromK8s[name]; ok && e != nil && e.Services != nil {
+		k8s = e.Services.Static
+	}
+	return file, k8s
+}
+
+// EnvironmentLayersPresent returns whether the environment name is declared in static file and/or K8s maps.
+func (r *EnvironmentsRepository) EnvironmentLayersPresent(name string) (inFile, inK8s bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	_, inFile = r.fromFile[name]
+	_, inK8s = r.fromK8s[name]
+	return inFile, inK8s
+}

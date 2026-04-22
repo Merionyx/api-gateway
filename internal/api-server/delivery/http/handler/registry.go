@@ -406,7 +406,16 @@ func environmentToAPI(e models.EnvironmentInfo) apiserver.Environment {
 	for _, b := range e.Bundles {
 		bundles = append(bundles, bundleToAPI(b))
 	}
-	out := apiserver.Environment{Name: e.Name, Bundles: &bundles}
+	svcs := make([]apiserver.RegistryService, 0, len(e.Services))
+	for _, s := range e.Services {
+		svcs = append(svcs, staticServiceToAPI(s))
+	}
+	out := apiserver.Environment{Name: e.Name, Bundles: &bundles, Services: &svcs}
+	if e.EnvironmentConfigSource != "" {
+		if cs := modelConfigSourceToAPI(e.EnvironmentConfigSource); cs != nil {
+			out.EnvironmentConfigSource = cs
+		}
+	}
 	if e.EffectiveGeneration != nil {
 		g := *e.EffectiveGeneration
 		out.EffectiveGeneration = &g
@@ -414,6 +423,15 @@ func environmentToAPI(e models.EnvironmentInfo) apiserver.Environment {
 	if e.SourcesFingerprint != "" {
 		s := e.SourcesFingerprint
 		out.SourcesFingerprint = &s
+	}
+	return out
+}
+
+func staticServiceToAPI(s models.ServiceInfo) apiserver.RegistryService {
+	n, u := s.Name, s.Upstream
+	out := apiserver.RegistryService{Name: n, Upstream: u}
+	if cs := modelConfigSourceToAPI(s.ConfigSource); cs != nil {
+		out.ConfigSource = cs
 	}
 	return out
 }

@@ -36,6 +36,17 @@ message EnvironmentInfo {
   optional int64 effective_generation = 3;
   // Fingerprint of static name/type/bundles/services (hex SHA-256) matching materialized `sources_fingerprint` when in sync.
   optional string sources_fingerprint = 4;
+  // Which layer “owns” the environment name: etcd (gRPC CRUD) if present, else in-memory: kubernetes over file.
+  optional ConfigSource environment_config_source = 5;
+  // Effective static services (merged) with per-service provenance.
+  repeated ServiceInfo services = 6;
+}
+
+// ServiceInfo is a static service line with provenance (which layer supplied the name).
+message ServiceInfo {
+  string name = 1;
+  string upstream = 2;
+  BundleProvenance provenance = 3;
 }
 
 // BundleInfo information about bundle

@@ -56,14 +56,17 @@ func (u *TenantReadUseCase) ListEnvironmentsByTenant(ctx context.Context, tenant
 			prev, ok := byName[env.Name]
 			if !ok {
 				byName[env.Name] = models.EnvironmentInfo{
-					Name:                 env.Name,
-					Bundles:              dedupeBundles(env.Bundles),
-					EffectiveGeneration:  env.EffectiveGeneration,
-					SourcesFingerprint:   env.SourcesFingerprint,
+					Name:                    env.Name,
+					Bundles:                 dedupeBundles(env.Bundles),
+					Services:                dedupeServices(env.Services),
+					EffectiveGeneration:     env.EffectiveGeneration,
+					SourcesFingerprint:      env.SourcesFingerprint,
+					EnvironmentConfigSource: env.EnvironmentConfigSource,
 				}
 				continue
 			}
 			prev.Bundles = dedupeBundles(append(append([]models.BundleInfo{}, prev.Bundles...), env.Bundles...))
+			prev.Services = dedupeServices(append(append([]models.ServiceInfo{}, prev.Services...), env.Services...))
 			if env.EffectiveGeneration != nil {
 				if prev.EffectiveGeneration == nil || *env.EffectiveGeneration > *prev.EffectiveGeneration {
 					g := *env.EffectiveGeneration
@@ -74,6 +77,9 @@ func (u *TenantReadUseCase) ListEnvironmentsByTenant(ctx context.Context, tenant
 				}
 			} else if prev.SourcesFingerprint == "" && env.SourcesFingerprint != "" {
 				prev.SourcesFingerprint = env.SourcesFingerprint
+			}
+			if env.EnvironmentConfigSource != "" {
+				prev.EnvironmentConfigSource = strongerConfigSource(prev.EnvironmentConfigSource, env.EnvironmentConfigSource)
 			}
 			byName[env.Name] = prev
 		}
@@ -123,6 +129,44 @@ func (u *TenantReadUseCase) ListBundlesByTenant(ctx context.Context, tenant stri
 	}
 	lim := pagination.ResolveLimit(limit)
 	return pagination.PageSlice(out, lim, cursor)
+}
+
+func dedupeServices(in []models.ServiceInfo) []models.ServiceInfo {
+	if len(in) <= 1 {
+		return in
+	}
+	seen := make(map[string]struct{}, len(in))
+	out := make([]models.ServiceInfo, 0, len(in))
+	for _, s := range in {
+		if _, ok := seen[s.Name]; ok {
+			continue
+		}
+		seen[s.Name] = struct{}{}
+		out = append(out, s)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
+// strongerConfigSource returns the higher-precedence origin (etcd > kubernetes > file) when both are set.
+func strongerConfigSource(a, b string) string {
+	if configSourceRank(b) > configSourceRank(a) {
+		return b
+	}
+	return a
+}
+
+func configSourceRank(s string) int {
+	switch s {
+	case "etcd_grpc":
+		return 3
+	case "kubernetes":
+		return 2
+	case "file":
+		return 1
+	default:
+		return 0
+	}
 }
 
 func dedupeBundles(in []models.BundleInfo) []models.BundleInfo {

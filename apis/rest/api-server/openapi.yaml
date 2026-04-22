@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: API Gateway — API Server HTTP API
-  version: 1.1.0
+  version: 1.2.0
   description: |
     HTTP API for the **API Server** control plane: authentication material (JWT, JWKS), contract export,
     registry views backed by **etcd** (controllers, tenants, bundles), and operational endpoints.
@@ -11,8 +11,9 @@ info:
 
     **JSON naming:** request and response bodies use **snake_case** field names unless noted.
 
-    **v1.1.0** adds optional `config_source` on static bundles, `sources_fingerprint` and `effective_generation` on
-    environments (provenance of effective config as reported by Gateway Controllers; see ADR 0001).
+    **v1.1.0** added optional `config_source` on static bundles, `sources_fingerprint` and `effective_generation` on
+    environments. **v1.2.0** adds `environment_config_source` (dominant layer for the environment name), `services`
+    (static upstreams with per-line `config_source`).
 
     **Errors:** all failed requests use **`application/problem+json`** (RFC 9457 / RFC 7807 Problem Details).
   contact:
@@ -425,10 +426,20 @@ components:
       properties:
         name:
           type: string
+        environment_config_source:
+          $ref: '#/components/schemas/ConfigSource'
+          description: |
+            Dominant declaration layer for the environment *name*: `etcd` (gRPC CRUD in controller etcd)
+            if a record exists; else in-memory — `kubernetes` over `file`.
         bundles:
           type: array
           items:
             $ref: '#/components/schemas/Bundle'
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/RegistryService'
+          description: Static upstream services in the effective environment (as reported by the controller).
         effective_generation:
           type: integer
           format: int64
@@ -436,6 +447,24 @@ components:
         sources_fingerprint:
           type: string
           description: Hex SHA-256 fingerprint of static effective (name, type, bundle/service lists) from the controller.
+
+    RegistryService:
+      type: object
+      required:
+      - name
+      - upstream
+      properties:
+        name:
+          type: string
+          description: Logical service name in the environment.
+        upstream:
+          type: string
+          description: Upstream base URL or host as in controller static config.
+        config_source:
+          $ref: '#/components/schemas/ConfigSource'
+          description: |
+            Winning static layer for this service *name* (etcd gRPC &gt; kubernetes &gt; file; same
+            policy as for bundles, ADR 0001).
 
     Controller:
       type: object

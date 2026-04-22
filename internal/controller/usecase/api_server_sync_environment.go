@@ -79,11 +79,23 @@ func (uc *APIServerSyncUseCase) buildEnvironmentsForAPIServer(ctx context.Contex
 			continue
 		}
 		file, k8s := uc.fileK8sSlices(ctx, n)
-		var etcdB []models.StaticContractBundleConfig
+		fileS, k8sS := uc.fileK8sServiceSlices(ctx, n)
+		inF, inK8 := uc.environmentInMemoryLayers(n)
+		var etcdE *models.Environment
 		if uc.environmentRepo != nil {
 			if e, err := uc.environmentRepo.GetEnvironment(ctx, n); err == nil {
-				etcdB = etcdStaticBundles(e)
+				etcdE = e
 			}
+		}
+		etcdB := etcdStaticBundles(etcdE)
+		etcdS := etcdStaticServices(etcdE)
+		inEtcd := etcdE != nil
+		envLayer := envmodel.ConfigSourceForEnvironmentLayers(inF, inK8, inEtcd)
+		ecs := staticConfigToPB(envLayer)
+		pbEnv := &pb.EnvironmentInfo{
+			Name:                     skel.Name,
+			SourcesFingerprint:       proto.String(envmodel.FingerprintStaticEnvironment(skel)),
+			EnvironmentConfigSource:  &ecs,
 		}
 		var bundles []*pb.BundleInfo
 		if skel.Bundles != nil {
@@ -99,12 +111,19 @@ func (uc *APIServerSyncUseCase) buildEnvironmentsForAPIServer(ctx context.Contex
 				bundles = append(bundles, bi)
 			}
 		}
-		fp := envmodel.FingerprintStaticEnvironment(skel)
-		pbEnv := &pb.EnvironmentInfo{
-			Name:               skel.Name,
-			Bundles:            bundles,
-			SourcesFingerprint: proto.String(fp),
+		pbEnv.Bundles = bundles
+		var services []*pb.ServiceInfo
+		if skel.Services != nil {
+			for _, s := range skel.Services.Static {
+				src := envmodel.ConfigSourceForStaticService(s, fileS, k8sS, etcdS)
+				services = append(services, &pb.ServiceInfo{
+					Name:       s.Name,
+					Upstream:   s.Upstream,
+					Provenance: &pb.BundleProvenance{Source: staticConfigToPB(src)},
+				})
+			}
 		}
+		pbEnv.Services = services
 		if uc.materialized != nil {
 			if doc, err := uc.materialized.Get(ctx, n); err != nil {
 				slog.Warn("buildEnvironmentsForAPIServer: read materialized generation", "environment", n, "error", err)

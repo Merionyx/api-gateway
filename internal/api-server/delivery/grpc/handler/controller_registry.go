@@ -58,13 +58,24 @@ func (h *ControllerRegistryHandler) RegisterController(ctx context.Context, req 
 			}
 			bundles = append(bundles, bi)
 		}
-		env := models.EnvironmentInfo{Name: pbEnv.Name, Bundles: bundles}
+		var services []models.ServiceInfo
+		for _, ps := range pbEnv.GetServices() {
+			si := models.ServiceInfo{Name: ps.GetName(), Upstream: ps.GetUpstream()}
+			if p := ps.GetProvenance(); p != nil {
+				si.ConfigSource = registryConfigSourceString(p.GetSource())
+			}
+			services = append(services, si)
+		}
+		env := models.EnvironmentInfo{Name: pbEnv.Name, Bundles: bundles, Services: services}
 		if pbEnv.GetSourcesFingerprint() != "" {
 			env.SourcesFingerprint = pbEnv.GetSourcesFingerprint()
 		}
 		if pbEnv.EffectiveGeneration != nil {
 			g := pbEnv.GetEffectiveGeneration()
 			env.EffectiveGeneration = &g
+		}
+		if s := pbEnv.GetEnvironmentConfigSource(); s != pb.ConfigSource_CONFIG_SOURCE_UNSPECIFIED {
+			env.EnvironmentConfigSource = registryConfigSourceString(s)
 		}
 		environments = append(environments, env)
 	}
@@ -150,13 +161,24 @@ func (h *ControllerRegistryHandler) Heartbeat(ctx context.Context, req *pb.Heart
 			}
 			bundles = append(bundles, bi)
 		}
-		env := models.EnvironmentInfo{Name: pbEnv.Name, Bundles: bundles}
+		var services []models.ServiceInfo
+		for _, ps := range pbEnv.GetServices() {
+			si := models.ServiceInfo{Name: ps.GetName(), Upstream: ps.GetUpstream()}
+			if p := ps.GetProvenance(); p != nil {
+				si.ConfigSource = registryConfigSourceString(p.GetSource())
+			}
+			services = append(services, si)
+		}
+		env := models.EnvironmentInfo{Name: pbEnv.Name, Bundles: bundles, Services: services}
 		if pbEnv.GetSourcesFingerprint() != "" {
 			env.SourcesFingerprint = pbEnv.GetSourcesFingerprint()
 		}
 		if pbEnv.EffectiveGeneration != nil {
 			g := pbEnv.GetEffectiveGeneration()
 			env.EffectiveGeneration = &g
+		}
+		if s := pbEnv.GetEnvironmentConfigSource(); s != pb.ConfigSource_CONFIG_SOURCE_UNSPECIFIED {
+			env.EnvironmentConfigSource = registryConfigSourceString(s)
 		}
 		environments = append(environments, env)
 	}

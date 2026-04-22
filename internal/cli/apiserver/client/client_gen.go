@@ -180,7 +180,14 @@ type Environment struct {
 
 	// EffectiveGeneration Materialized effective document generation when available (controller etcd /effective/.../v1).
 	EffectiveGeneration *int64 `json:"effective_generation,omitempty"`
-	Name                string `json:"name"`
+
+	// EnvironmentConfigSource Which input layer’s static entry won for this bundle key in the effective merge
+	// (controller → API Server; ADR 0001).
+	EnvironmentConfigSource *ConfigSource `json:"environment_config_source,omitempty"`
+	Name                    string        `json:"name"`
+
+	// Services Static upstream services in the effective environment (as reported by the controller).
+	Services *[]RegistryService `json:"services,omitempty"`
 
 	// SourcesFingerprint Hex SHA-256 fingerprint of static effective (name, type, bundle/service lists) from the controller.
 	SourcesFingerprint *string `json:"sources_fingerprint,omitempty"`
@@ -275,6 +282,19 @@ type ReadinessStatus struct {
 
 	// Status ok if all required dependency checks passed
 	Status string `json:"status"`
+}
+
+// RegistryService defines model for RegistryService.
+type RegistryService struct {
+	// ConfigSource Which input layer’s static entry won for this bundle key in the effective merge
+	// (controller → API Server; ADR 0001).
+	ConfigSource *ConfigSource `json:"config_source,omitempty"`
+
+	// Name Logical service name in the environment.
+	Name string `json:"name"`
+
+	// Upstream Upstream base URL or host as in controller static config.
+	Upstream string `json:"upstream"`
 }
 
 // SigningKey defines model for SigningKey.
