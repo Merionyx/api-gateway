@@ -46,7 +46,12 @@ func NewAPIServerSyncUseCase(
 		if err != nil {
 			slog.Error("Failed to get hostname", "error", err)
 			controllerID = "unknown"
+		} else {
+			slog.Info("controller_id from OS hostname (ha.controller_id пуст; для пула с leader_election — задать id в конфиге)",
+				"controller_id", controllerID, "source", "hostname")
 		}
+	} else {
+		slog.Info("controller_id из конфига (API Server / registry sync)", "controller_id", controllerID, "source", "ha.controller_id")
 	}
 
 	reg := newRegistryEnvironmentsBuilder(

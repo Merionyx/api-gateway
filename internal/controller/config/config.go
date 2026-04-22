@@ -51,7 +51,9 @@ type KubernetesDiscoveryConfig struct {
 
 // HAConfig groups settings shared by all replicas of one logical Gateway Controller pool.
 type HAConfig struct {
-	// ControllerID is the id registered with API Server. Set the same value on every replica (default: hostname).
+	// ControllerID is the id registered with API Server; must be the same on every replica of the pool.
+	// When leader_election.enabled is true, this field is required (see LoadConfig / validateHAControllerID).
+	// When leader election is off, an empty value falls back to the OS hostname at use case init (Info log).
 	ControllerID string `mapstructure:"controller_id" json:"controller_id"`
 }
 
@@ -191,7 +193,25 @@ func LoadConfig(configFile ...string) (*Config, error) {
 		}
 	}
 
+	if err := validateHAControllerID(&config); err != nil {
+		return nil, err
+	}
+
 	return &config, nil
+}
+
+// validateHAControllerID returns an error if leader election is enabled but ha.controller_id is empty.
+func validateHAControllerID(c *Config) error {
+	if c == nil {
+		return nil
+	}
+	if !c.LeaderElection.Enabled {
+		return nil
+	}
+	if strings.TrimSpace(c.HA.ControllerID) == "" {
+		return fmt.Errorf("ha.controller_id is required when leader_election.enabled is true; set a stable unique id for the controller pool, or for single-replica local dev set leader_election.enabled: false (hostname fallback is then logged at startup)")
+	}
+	return nil
 }
 
 // patchViperKubernetesDiscoverySelectors fixes YAML where dotted label keys (e.g. gateway.merionyx.com/team)

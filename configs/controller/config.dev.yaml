@@ -19,9 +19,10 @@ etcd:
 
 tenant: "dev-cluster"
 
-# Same logical id on every replica so API Server keeps one snapshot stream per pool (default: hostname).
+# Один id на пул; при leader_election.enabled: true пустой ha.controller_id запрещён (см. LoadConfig).
+# Для single-replica dev без id можно выставить leader_election.enabled: false.
 ha:
-  controller_id: ""
+  controller_id: "gateway-controller-dev"
 
 leader_election:
   enabled: true
