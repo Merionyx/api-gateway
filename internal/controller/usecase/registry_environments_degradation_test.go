@@ -27,6 +27,10 @@ func TestRegistryEnvironmentsBuildReportAddWarning(t *testing.T) {
 	if len(r.Warnings) != 0 {
 		t.Fatalf("expected nil err to skip, got %d", len(r.Warnings))
 	}
+	r.addWarning("", "qa", errors.New("boom"))
+	if len(r.Warnings) != 0 {
+		t.Fatalf("expected empty kind to skip, got %d", len(r.Warnings))
+	}
 	r.addWarning(RegistryBuildWarningEnvMerge, "stg", errors.New("boom"))
 	if len(r.Warnings) != 1 || r.Warnings[0].Kind != RegistryBuildWarningEnvMerge {
 		t.Fatalf("unexpected %#v", r.Warnings)
