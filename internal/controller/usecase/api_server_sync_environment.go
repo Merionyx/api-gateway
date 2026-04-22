@@ -9,7 +9,7 @@ import (
 	pb "github.com/merionyx/api-gateway/pkg/grpc/controller_registry/v1"
 
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
-	"github.com/merionyx/api-gateway/internal/controller/repository/memory"
+	"github.com/merionyx/api-gateway/internal/controller/envmodel"
 	xdssnapshot "github.com/merionyx/api-gateway/internal/controller/xds/snapshot"
 	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
 	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
@@ -77,73 +77,12 @@ func (uc *APIServerSyncUseCase) effectiveEnvironmentSkeleton(ctx context.Context
 		return nil, fmt.Errorf("environment %s not found", name)
 	}
 	if mem == nil {
-		return skeletonFromEtcdOnly(etcdEnv), nil
+		return envmodel.ToAPIServerSkeleton(etcdEnv), nil
 	}
 	if etcdEnv == nil {
-		return skeletonFromMemory(mem), nil
+		return envmodel.ToAPIServerSkeleton(mem), nil
 	}
-
-	uB := memory.UnionStaticContractBundles(staticBundles(mem), staticBundles(etcdEnv))
-	uS := memory.UnionStaticServices(staticServices(mem), staticServices(etcdEnv))
-	return &models.Environment{
-		Name:      mem.Name,
-		Type:      mem.Type,
-		Bundles:   &models.EnvironmentBundleConfig{Static: uB},
-		Services:  &models.EnvironmentServiceConfig{Static: uS},
-		Snapshots: nil,
-	}, nil
-}
-
-func skeletonFromMemory(mem *models.Environment) *models.Environment {
-	return &models.Environment{
-		Name:      mem.Name,
-		Type:      mem.Type,
-		Bundles:   cloneBundlesConfig(mem.Bundles),
-		Services:  cloneServicesConfig(mem.Services),
-		Snapshots: nil,
-	}
-}
-
-func skeletonFromEtcdOnly(etcdEnv *models.Environment) *models.Environment {
-	return &models.Environment{
-		Name:      etcdEnv.Name,
-		Type:      etcdEnv.Type,
-		Bundles:   cloneBundlesConfig(etcdEnv.Bundles),
-		Services:  cloneServicesConfig(etcdEnv.Services),
-		Snapshots: nil,
-	}
-}
-
-func staticBundles(e *models.Environment) []models.StaticContractBundleConfig {
-	if e == nil || e.Bundles == nil {
-		return nil
-	}
-	return e.Bundles.Static
-}
-
-func staticServices(e *models.Environment) []models.StaticServiceConfig {
-	if e == nil || e.Services == nil {
-		return nil
-	}
-	return e.Services.Static
-}
-
-func cloneBundlesConfig(b *models.EnvironmentBundleConfig) *models.EnvironmentBundleConfig {
-	if b == nil {
-		return &models.EnvironmentBundleConfig{Static: nil}
-	}
-	cp := make([]models.StaticContractBundleConfig, len(b.Static))
-	copy(cp, b.Static)
-	return &models.EnvironmentBundleConfig{Static: cp}
-}
-
-func cloneServicesConfig(s *models.EnvironmentServiceConfig) *models.EnvironmentServiceConfig {
-	if s == nil {
-		return &models.EnvironmentServiceConfig{Static: nil}
-	}
-	cp := make([]models.StaticServiceConfig, len(s.Static))
-	copy(cp, s.Static)
-	return &models.EnvironmentServiceConfig{Static: cp}
+	return envmodel.MergeInMemoryWithEtcd(mem, etcdEnv), nil
 }
 
 // buildEnvironmentsForAPIServer returns the full declared environment set for Register/Heartbeat

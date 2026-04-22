@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"sort"
 	"sync"
 	"time"
 
 	"github.com/merionyx/api-gateway/internal/controller/config"
 	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/controller/envmodel"
 	"github.com/merionyx/api-gateway/internal/controller/index/bundleenv"
 	ctrlmetrics "github.com/merionyx/api-gateway/internal/controller/metrics"
 	xdscache "github.com/merionyx/api-gateway/internal/controller/xds/cache"
@@ -116,96 +116,14 @@ func (r *EnvironmentsRepository) Initialize(config *config.Config) error {
 	return nil
 }
 
-func bundleDedupeKey(b models.StaticContractBundleConfig) string {
-	return b.Repository + "\x00" + b.Ref + "\x00" + b.Path + "\x00" + b.Name
-}
-
 // UnionStaticContractBundles returns the union of two bundle lists keyed by repository, ref, path, and name.
 func UnionStaticContractBundles(a, b []models.StaticContractBundleConfig) []models.StaticContractBundleConfig {
-	return unionStaticBundles(a, b)
+	return envmodel.UnionStaticBundles(a, b)
 }
 
 // UnionStaticServices returns the union of two service lists by name (later entries override same name).
 func UnionStaticServices(a, b []models.StaticServiceConfig) []models.StaticServiceConfig {
-	return unionStaticServices(a, b)
-}
-
-func unionStaticBundles(file, k8s []models.StaticContractBundleConfig) []models.StaticContractBundleConfig {
-	byKey := make(map[string]models.StaticContractBundleConfig)
-	for _, b := range file {
-		byKey[bundleDedupeKey(b)] = b
-	}
-	for _, b := range k8s {
-		byKey[bundleDedupeKey(b)] = b
-	}
-	keys := make([]string, 0, len(byKey))
-	for k := range byKey {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	out := make([]models.StaticContractBundleConfig, 0, len(keys))
-	for _, k := range keys {
-		out = append(out, byKey[k])
-	}
-	return out
-}
-
-func unionStaticServices(file, k8s []models.StaticServiceConfig) []models.StaticServiceConfig {
-	byName := make(map[string]models.StaticServiceConfig)
-	for _, s := range file {
-		byName[s.Name] = s
-	}
-	for _, s := range k8s {
-		byName[s.Name] = s
-	}
-	names := make([]string, 0, len(byName))
-	for n := range byName {
-		names = append(names, n)
-	}
-	sort.Strings(names)
-	out := make([]models.StaticServiceConfig, 0, len(names))
-	for _, n := range names {
-		out = append(out, byName[n])
-	}
-	return out
-}
-
-// mergeEnvironment overlays Kubernetes-discovered bundles/services onto static config for the same logical environment.
-func mergeEnvironment(file, k8s *models.Environment) *models.Environment {
-	var fBundles, kBundles []models.StaticContractBundleConfig
-	if file != nil && file.Bundles != nil {
-		fBundles = file.Bundles.Static
-	}
-	if k8s != nil && k8s.Bundles != nil {
-		kBundles = k8s.Bundles.Static
-	}
-	var fSvc, kSvc []models.StaticServiceConfig
-	if file != nil && file.Services != nil {
-		fSvc = file.Services.Static
-	}
-	if k8s != nil && k8s.Services != nil {
-		kSvc = k8s.Services.Static
-	}
-	name := ""
-	typ := "kubernetes"
-	if k8s != nil {
-		name = k8s.Name
-		typ = k8s.Type
-	} else if file != nil {
-		name = file.Name
-		typ = file.Type
-	}
-	return &models.Environment{
-		Name: name,
-		Type: typ,
-		Bundles: &models.EnvironmentBundleConfig{
-			Static: unionStaticBundles(fBundles, kBundles),
-		},
-		Services: &models.EnvironmentServiceConfig{
-			Static: unionStaticServices(fSvc, kSvc),
-		},
-		Snapshots: nil,
-	}
+	return envmodel.UnionStaticServices(a, b)
 }
 
 func (r *EnvironmentsRepository) mergedLocked() map[string]*models.Environment {
@@ -215,7 +133,7 @@ func (r *EnvironmentsRepository) mergedLocked() map[string]*models.Environment {
 	}
 	for k, k8s := range r.fromK8s {
 		if fileEnv, ok := r.fromFile[k]; ok {
-			out[k] = mergeEnvironment(fileEnv, k8s)
+			out[k] = envmodel.MergeFileAndK8s(fileEnv, k8s)
 		} else {
 			out[k] = k8s
 		}
@@ -287,7 +205,7 @@ func (r *EnvironmentsRepository) GetEnvironment(ctx context.Context, name string
 	fileEnv, fromFile := r.fromFile[name]
 	k8sEnv, fromK8s := r.fromK8s[name]
 	if fromFile && fromK8s {
-		return mergeEnvironment(fileEnv, k8sEnv), nil
+		return envmodel.MergeFileAndK8s(fileEnv, k8sEnv), nil
 	}
 	if fromK8s {
 		return k8sEnv, nil

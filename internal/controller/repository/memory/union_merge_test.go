@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/controller/envmodel"
 )
 
 func TestUnionStaticContractBundles(t *testing.T) {
@@ -49,7 +50,7 @@ func TestMergeEnvironment(t *testing.T) {
 			Static: []models.StaticServiceConfig{{Name: "sk", Upstream: "http://k:2"}},
 		},
 	}
-	m := mergeEnvironment(file, k8s)
+	m := envmodel.MergeFileAndK8s(file, k8s)
 	if m.Name != "e1" || len(m.Bundles.Static) != 2 || len(m.Services.Static) != 2 {
 		t.Fatalf("%+v", m)
 	}
