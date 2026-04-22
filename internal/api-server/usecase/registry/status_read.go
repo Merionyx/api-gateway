@@ -27,34 +27,51 @@ func NewStatusReadUseCase(
 	}
 }
 
-// CheckEtcd performs a lightweight read against the API Server key prefix.
-func (u *StatusReadUseCase) CheckEtcd(ctx context.Context) string {
-	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseRegistryPkg, "CheckEtcd"))
-	defer span.End()
+// doEtcdCheck is the shared etcd read used by [StatusReadUseCase.Readiness] and [StatusReadUseCase.CheckEtcd].
+func (u *StatusReadUseCase) doEtcdCheck(ctx context.Context) (status string, checkErr error) {
 	if u.etcdClient == nil {
-		return "error"
+		return "error", nil
 	}
 	tctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 	_, err := u.etcdClient.Get(tctx, "/api-gateway/api-server/", clientv3.WithPrefix(), clientv3.WithLimit(1))
 	if err != nil {
-		telemetry.MarkError(span, err)
-		return "error"
+		return "error", err
 	}
-	return "ok"
+	return "ok", nil
+}
+
+// CheckEtcd performs a lightweight read against the API Server key prefix.
+func (u *StatusReadUseCase) CheckEtcd(ctx context.Context) string {
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseRegistryPkg, "CheckEtcd"))
+	defer span.End()
+	etcd, err := u.doEtcdCheck(ctx)
+	if err != nil {
+		telemetry.MarkError(span, err)
+	}
+	return etcd
+}
+
+// doContractSyncerCheck is the shared reachability test used by [StatusReadUseCase.Readiness] and
+// [StatusReadUseCase.CheckContractSyncer].
+func (u *StatusReadUseCase) doContractSyncerCheck(ctx context.Context) (status string, checkErr error) {
+	tctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	if err := u.contractSyncerPing.Ping(tctx); err != nil {
+		return "error", err
+	}
+	return "ok", nil
 }
 
 // CheckContractSyncer verifies gRPC connectivity to the Contract Syncer.
 func (u *StatusReadUseCase) CheckContractSyncer(ctx context.Context) string {
 	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseRegistryPkg, "CheckContractSyncer"))
 	defer span.End()
-	tctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-	if err := u.contractSyncerPing.Ping(tctx); err != nil {
+	s, err := u.doContractSyncerCheck(ctx)
+	if err != nil {
 		telemetry.MarkError(span, err)
-		return "error"
 	}
-	return "ok"
+	return s
 }
 
 // ReadinessResult is the outcome of checks for GET /ready.
@@ -65,10 +82,9 @@ type ReadinessResult struct {
 }
 
 // Readiness evaluates etcd (always) and optionally Contract Syncer for Kubernetes readiness.
+// Intentionally does not create spans: GET /ready is a high-frequency probe; trace noise only.
 func (u *StatusReadUseCase) Readiness(ctx context.Context, requireContractSyncer bool) ReadinessResult {
-	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseRegistryPkg, "Readiness"))
-	defer span.End()
-	etcd := u.CheckEtcd(ctx)
+	etcd, _ := u.doEtcdCheck(ctx)
 	if etcd != "ok" {
 		return ReadinessResult{
 			Status:         "not_ready",
@@ -83,7 +99,7 @@ func (u *StatusReadUseCase) Readiness(ctx context.Context, requireContractSyncer
 			ContractSyncer: "skipped",
 		}
 	}
-	cs := u.CheckContractSyncer(ctx)
+	cs, _ := u.doContractSyncerCheck(ctx)
 	if cs != "ok" {
 		return ReadinessResult{
 			Status:         "not_ready",
