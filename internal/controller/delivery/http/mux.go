@@ -10,42 +10,8 @@ import (
 // NewMux returns HTTP routes for the Gateway Controller: operational probes only (no REST control plane).
 func NewMux() http.Handler {
 	mux := http.NewServeMux()
-	mux.Handle("/health", withHTTPTrace(http.HandlerFunc(health)))
+	mux.Handle("/health", telemetry.WrapHandlerHTTP(http.HandlerFunc(health), nil))
 	return mux
-}
-
-// withHTTPTrace is a minimal W3C TraceContext + request span for std [net/http] handlers
-// (extract parent, [telemetry.Start], pass ctx on the request, record status, end).
-// The span name is "{METHOD} {path}" (same idea as the api-server Fiber HTTP middleware).
-func withHTTPTrace(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := telemetry.ExtractIncomingHTTP(r.Context(), r.Header)
-		name := r.Method + " " + r.URL.Path
-		ctx, span := telemetry.Start(ctx, name)
-		defer span.End()
-		rw := &captureStatus{ResponseWriter: w}
-		h.ServeHTTP(rw, r.WithContext(ctx))
-		telemetry.SetHTTPStatus(span, rw.status())
-	})
-}
-
-type captureStatus struct {
-	http.ResponseWriter
-	code int
-}
-
-func (c *captureStatus) WriteHeader(status int) {
-	c.code = status
-	c.ResponseWriter.WriteHeader(status)
-}
-
-// status is the first status passed to [http.ResponseWriter.WriteHeader], or
-// 200 if the handler never set one (e.g. JSON body with implicit 200).
-func (c *captureStatus) status() int {
-	if c.code == 0 {
-		return http.StatusOK
-	}
-	return c.code
 }
 
 func health(w http.ResponseWriter, r *http.Request) {
