@@ -104,7 +104,7 @@ func (rm *RepositoryManager) exportContractFilesFromGit(managedRepo *ManagedRepo
 		checkoutOptions = &gogit.CheckoutOptions{Hash: hash}
 	} else {
 		checkoutOptions = &gogit.CheckoutOptions{
-			Branch: plumbing.ReferenceName("refs/" + ref),
+			Branch: plumbing.NewBranchReferenceName(ref),
 		}
 	}
 
