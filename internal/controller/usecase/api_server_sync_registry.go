@@ -10,48 +10,47 @@ import (
 	pb "github.com/merionyx/api-gateway/pkg/grpc/controller_registry/v1"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 	"github.com/merionyx/api-gateway/internal/controller/effective"
 	"github.com/merionyx/api-gateway/internal/controller/envmodel"
-	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
+	ctrlrepoetcd "github.com/merionyx/api-gateway/internal/controller/repository/etcd"
 	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 )
 
-func (uc *APIServerSyncUseCase) saveSnapshotsToEtcd(ctx context.Context, bundleKey string, snapshots []sharedgit.ContractSnapshot) error {
-	repository, ref, bundlePath, err := bundlekey.Parse(bundleKey)
-	if err != nil {
-		return err
-	}
-
-	for _, s := range snapshots {
-		cs := sharedToControllerSnapshot(s)
-		slog.Info("Saving snapshot to etcd", "repository", repository, "ref", ref, "path", bundlePath, "contract", s.Name)
-		if err := uc.schemaRepo.SaveContractSnapshot(ctx, repository, ref, bundlePath, s.Name, cs); err != nil {
-			return fmt.Errorf("save snapshot %s: %w", s.Name, err)
-		}
-	}
-	return nil
+// registryEnvironmentsBuilder assembles controller_registry proto environments (static merge,
+// provenance, materialized generation) for Register/Heartbeat. It is independent of the gRPC stream.
+type registryEnvironmentsBuilder struct {
+	inMemoryEnvironmentsRepo interfaces.InMemoryEnvironmentsRepository
+	environmentRepo        interfaces.EnvironmentRepository
+	materialized             *ctrlrepoetcd.MaterializedStore
+	schemaRepo               interfaces.SchemaRepository
 }
 
-func (uc *APIServerSyncUseCase) updateXDSSnapshot(ctx context.Context, environment string) error {
-	slog.Info("Updating xDS snapshot", "environment", environment)
-	if uc.reconciler == nil {
-		return nil
+func newRegistryEnvironmentsBuilder(
+	inMem interfaces.InMemoryEnvironmentsRepository,
+	environmentRepo interfaces.EnvironmentRepository,
+	materialized *ctrlrepoetcd.MaterializedStore,
+	schema interfaces.SchemaRepository,
+) *registryEnvironmentsBuilder {
+	return &registryEnvironmentsBuilder{
+		inMemoryEnvironmentsRepo: inMem,
+		environmentRepo:        environmentRepo,
+		materialized:           materialized,
+		schemaRepo:             schema,
 	}
-	// No materialized writes on follower / hot path (leader CRUD and memory rebuild use writeMaterialized).
-	return uc.reconciler.ReconcileOne(ctx, environment, false)
 }
 
 // effectiveEnvironmentSkeleton uses [effective.MergeMemoryAndControllerEtcd] (ADR 0001) for this name.
-func (uc *APIServerSyncUseCase) effectiveEnvironmentSkeleton(ctx context.Context, name string) (*models.Environment, error) {
+func (b *registryEnvironmentsBuilder) effectiveEnvironmentSkeleton(ctx context.Context, name string) (*models.Environment, error) {
 	var mem *models.Environment
-	if m, err := uc.inMemoryEnvironmentsRepo.GetEnvironment(ctx, name); err == nil {
+	if m, err := b.inMemoryEnvironmentsRepo.GetEnvironment(ctx, name); err == nil {
 		mem = m
 	}
 
 	var etcdEnv *models.Environment
-	if uc.environmentRepo != nil {
-		if e, err := uc.environmentRepo.GetEnvironment(ctx, name); err == nil {
+	if b.environmentRepo != nil {
+		if e, err := b.environmentRepo.GetEnvironment(ctx, name); err == nil {
 			etcdEnv = e
 		}
 	}
@@ -68,22 +67,22 @@ func (uc *APIServerSyncUseCase) effectiveEnvironmentSkeleton(ctx context.Context
 
 // buildEnvironmentsForAPIServer returns the full declared environment set for Register/Heartbeat
 // (union of names from in-memory and etcd CRUD), with merged bundles per name.
-func (uc *APIServerSyncUseCase) buildEnvironmentsForAPIServer(ctx context.Context) ([]*pb.EnvironmentInfo, error) {
-	names := uc.collectEnvironmentNames(ctx)
+func (b *registryEnvironmentsBuilder) buildEnvironmentsForAPIServer(ctx context.Context) ([]*pb.EnvironmentInfo, error) {
+	names := b.collectEnvironmentNames(ctx)
 	sort.Strings(names)
 	out := make([]*pb.EnvironmentInfo, 0, len(names))
 	for _, n := range names {
-		skel, err := uc.effectiveEnvironmentSkeleton(ctx, n)
+		skel, err := b.effectiveEnvironmentSkeleton(ctx, n)
 		if err != nil {
 			slog.Warn("buildEnvironmentsForAPIServer: skip environment", "name", n, "error", err)
 			continue
 		}
-		file, k8s := uc.fileK8sSlices(ctx, n)
-		fileS, k8sS := uc.fileK8sServiceSlices(ctx, n)
-		inF, inK8 := uc.environmentInMemoryLayers(n)
+		file, k8s := b.fileK8sSlices(ctx, n)
+		fileS, k8sS := b.fileK8sServiceSlices(ctx, n)
+		inF, inK8 := b.environmentInMemoryLayers(n)
 		var etcdE *models.Environment
-		if uc.environmentRepo != nil {
-			if e, err := uc.environmentRepo.GetEnvironment(ctx, n); err == nil {
+		if b.environmentRepo != nil {
+			if e, err := b.environmentRepo.GetEnvironment(ctx, n); err == nil {
 				etcdE = e
 			}
 		}
@@ -96,8 +95,8 @@ func (uc *APIServerSyncUseCase) buildEnvironmentsForAPIServer(ctx context.Contex
 			Provenance:         provenancePB(envLayer),
 			SourcesFingerprint: proto.String(fp),
 		}
-		if uc.materialized != nil {
-			if doc, err := uc.materialized.Get(ctx, n); err != nil {
+		if b.materialized != nil {
+			if doc, err := b.materialized.Get(ctx, n); err != nil {
 				slog.Warn("buildEnvironmentsForAPIServer: read materialized generation", "environment", n, "error", err)
 			} else if doc != nil {
 				g := doc.Generation
@@ -110,10 +109,10 @@ func (uc *APIServerSyncUseCase) buildEnvironmentsForAPIServer(ctx context.Contex
 		}
 		var bundles []*pb.BundleInfo
 		if skel.Bundles != nil {
-			for _, b := range skel.Bundles.Static {
-				src := envmodel.ConfigSourceForStaticBundle(b, file, k8s, etcdB)
+			for _, bndl := range skel.Bundles.Static {
+				src := envmodel.ConfigSourceForStaticBundle(bndl, file, k8s, etcdB)
 				bi := &pb.BundleInfo{
-					Name: b.Name, Repository: b.Repository, Ref: b.Ref, Path: b.Path,
+					Name: bndl.Name, Repository: bndl.Repository, Ref: bndl.Ref, Path: bndl.Path,
 				}
 				if p := provenancePB(src); p != nil {
 					bi.Meta = &pb.BundleMeta{Provenance: p}
@@ -139,17 +138,17 @@ func (uc *APIServerSyncUseCase) buildEnvironmentsForAPIServer(ctx context.Contex
 	return out, nil
 }
 
-func (uc *APIServerSyncUseCase) collectEnvironmentNames(ctx context.Context) []string {
+func (b *registryEnvironmentsBuilder) collectEnvironmentNames(ctx context.Context) []string {
 	names := make(map[string]struct{})
-	if m, err := uc.inMemoryEnvironmentsRepo.ListEnvironments(ctx); err != nil {
+	if m, err := b.inMemoryEnvironmentsRepo.ListEnvironments(ctx); err != nil {
 		slog.Warn("collectEnvironmentNames: in-memory list failed", "error", err)
 	} else {
 		for k := range m {
 			names[k] = struct{}{}
 		}
 	}
-	if uc.environmentRepo != nil {
-		if m, err := uc.environmentRepo.ListEnvironments(ctx); err != nil {
+	if b.environmentRepo != nil {
+		if m, err := b.environmentRepo.ListEnvironments(ctx); err != nil {
 			slog.Warn("collectEnvironmentNames: etcd environments list failed", "error", err)
 		} else {
 			for k := range m {
@@ -164,7 +163,8 @@ func (uc *APIServerSyncUseCase) collectEnvironmentNames(ctx context.Context) []s
 	return out
 }
 
-func (uc *APIServerSyncUseCase) environmentWithSnapshotsFromSchema(ctx context.Context, src *models.Environment) *models.Environment {
+// environmentWithSnapshotsFromSchema is unused in the hot path but kept for symmetry with other merge passes.
+func (b *registryEnvironmentsBuilder) environmentWithSnapshotsFromSchema(ctx context.Context, src *models.Environment) *models.Environment {
 	out := &models.Environment{
 		Name:      src.Name,
 		Type:      src.Type,
@@ -172,8 +172,11 @@ func (uc *APIServerSyncUseCase) environmentWithSnapshotsFromSchema(ctx context.C
 		Services:  src.Services,
 		Snapshots: nil,
 	}
+	if src.Bundles == nil {
+		return out
+	}
 	for _, bundle := range src.Bundles.Static {
-		snaps, err := uc.schemaRepo.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref, bundle.Path)
+		snaps, err := b.schemaRepo.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref, bundle.Path)
 		if err != nil {
 			slog.Warn("ListContractSnapshots failed", "environment", src.Name, "repository", bundle.Repository, "ref", bundle.Ref, "path", bundle.Path, "error", err)
 			continue

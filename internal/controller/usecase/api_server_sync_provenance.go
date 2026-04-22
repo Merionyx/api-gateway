@@ -36,15 +36,15 @@ func provenancePB(src envmodel.StaticConfigSource) *pb.Provenance {
 }
 
 // fileK8sSlices returns unmerged file and K8s static bundles if the in-memory implementation supports it.
-func (uc *APIServerSyncUseCase) fileK8sSlices(ctx context.Context, envName string) (file, k8s []models.StaticContractBundleConfig) {
-	if uc.inMemoryEnvironmentsRepo == nil {
+func (b *registryEnvironmentsBuilder) fileK8sSlices(ctx context.Context, envName string) (file, k8s []models.StaticContractBundleConfig) {
+	if b.inMemoryEnvironmentsRepo == nil {
 		return nil, nil
 	}
 	// direct method on *memory.EnvironmentsRepository
-	if m, ok := uc.inMemoryEnvironmentsRepo.(*memory.EnvironmentsRepository); ok {
+	if m, ok := b.inMemoryEnvironmentsRepo.(*memory.EnvironmentsRepository); ok {
 		return m.FileAndK8sStaticBundles(ctx, envName)
 	}
-	if p, ok := uc.inMemoryEnvironmentsRepo.(fileK8sPartials); ok {
+	if p, ok := b.inMemoryEnvironmentsRepo.(fileK8sPartials); ok {
 		return p.FileAndK8sStaticBundles(ctx, envName)
 	}
 	return nil, nil
@@ -69,14 +69,14 @@ type fileK8sServicePartials interface {
 }
 
 // fileK8sServiceSlices returns unmerged file and K8s static service lists.
-func (uc *APIServerSyncUseCase) fileK8sServiceSlices(ctx context.Context, envName string) (file, k8s []models.StaticServiceConfig) {
-	if uc.inMemoryEnvironmentsRepo == nil {
+func (b *registryEnvironmentsBuilder) fileK8sServiceSlices(ctx context.Context, envName string) (file, k8s []models.StaticServiceConfig) {
+	if b.inMemoryEnvironmentsRepo == nil {
 		return nil, nil
 	}
-	if m, ok := uc.inMemoryEnvironmentsRepo.(*memory.EnvironmentsRepository); ok {
+	if m, ok := b.inMemoryEnvironmentsRepo.(*memory.EnvironmentsRepository); ok {
 		return m.FileAndK8sStaticServices(ctx, envName)
 	}
-	if p, ok := uc.inMemoryEnvironmentsRepo.(fileK8sServicePartials); ok {
+	if p, ok := b.inMemoryEnvironmentsRepo.(fileK8sServicePartials); ok {
 		return p.FileAndK8sStaticServices(ctx, envName)
 	}
 	return nil, nil
@@ -87,11 +87,11 @@ type environmentLayersPartials interface {
 }
 
 // environmentInMemoryLayers returns (inFile, inK8s) for environment name, or (false, false) if not supported.
-func (uc *APIServerSyncUseCase) environmentInMemoryLayers(envName string) (inFile, inK8s bool) {
-	if uc.inMemoryEnvironmentsRepo == nil {
+func (b *registryEnvironmentsBuilder) environmentInMemoryLayers(envName string) (inFile, inK8s bool) {
+	if b.inMemoryEnvironmentsRepo == nil {
 		return false, false
 	}
-	if p, ok := uc.inMemoryEnvironmentsRepo.(environmentLayersPartials); ok {
+	if p, ok := b.inMemoryEnvironmentsRepo.(environmentLayersPartials); ok {
 		return p.EnvironmentLayersPresent(envName)
 	}
 	return false, false
