@@ -105,18 +105,18 @@ func (rm *RepositoryManager) exportContractFilesFromGit(managedRepo *ManagedRepo
 		return nil, fmt.Errorf("failed to checkout repository %s: %w", managedRepo.Name, err)
 	}
 
-	auth, err := rm.getAuth(managedRepo.Name)
+	clientOpts, err := rm.getClientOptions(managedRepo.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get auth for repository %s: %w", managedRepo.Name, err)
 	}
 
 	switch managedRepo.Source {
 	case RepositorySourceGit:
-		if err = syncRemoteGitRepo(repo, w, auth, managedRepo.Name, ref); err != nil {
+		if err = syncRemoteGitRepo(repo, w, clientOpts, managedRepo.Name, ref); err != nil {
 			return nil, err
 		}
 	default:
-		if err = syncLocalGitWorktree(w, auth, managedRepo.Name); err != nil {
+		if err = syncLocalGitWorktree(w, clientOpts, managedRepo.Name); err != nil {
 			return nil, err
 		}
 	}

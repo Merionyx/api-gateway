@@ -4,25 +4,25 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/go-git/go-git/v6/plumbing/transport"
+	gitclient "github.com/go-git/go-git/v6/plumbing/client"
 	"github.com/go-git/go-git/v6/plumbing/transport/http"
 	"github.com/go-git/go-git/v6/plumbing/transport/ssh"
 )
 
-func resolveTransportAuth(cfg AuthConfig, repoName string) (transport.AuthMethod, error) {
+func resolveTransportAuth(cfg AuthConfig, repoName string) ([]gitclient.Option, error) {
 	switch cfg.Type {
 	case "ssh":
-		auth, err := setupSSHAuth(cfg)
+		opts, err := setupSSHAuth(cfg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to setup SSH auth for repository %s: %w", repoName, err)
 		}
-		return auth, nil
+		return opts, nil
 	case "token":
-		auth, err := setupTokenAuth(cfg)
+		opts, err := setupTokenAuth(cfg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to setup token auth for repository %s: %w", repoName, err)
 		}
-		return auth, nil
+		return opts, nil
 	case "none", "":
 		return nil, nil
 	default:
@@ -30,7 +30,7 @@ func resolveTransportAuth(cfg AuthConfig, repoName string) (transport.AuthMethod
 	}
 }
 
-func setupSSHAuth(config AuthConfig) (transport.AuthMethod, error) {
+func setupSSHAuth(config AuthConfig) ([]gitclient.Option, error) {
 	var privateKeyPath string
 
 	if config.SSHKeyPath != "" {
@@ -41,15 +41,15 @@ func setupSSHAuth(config AuthConfig) (transport.AuthMethod, error) {
 		return nil, fmt.Errorf("no SSH key path or environment variable specified")
 	}
 
-	auth, err := ssh.NewPublicKeysFromFile("git", privateKeyPath, "")
+	pk, err := ssh.NewPublicKeysFromFile("git", privateKeyPath, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to load SSH key: %w", err)
 	}
 
-	return auth, nil
+	return []gitclient.Option{gitclient.WithSSHAuth(pk)}, nil
 }
 
-func setupTokenAuth(config AuthConfig) (transport.AuthMethod, error) {
+func setupTokenAuth(config AuthConfig) ([]gitclient.Option, error) {
 	if config.TokenEnv == "" {
 		return nil, fmt.Errorf("no token environment variable specified")
 	}
@@ -59,8 +59,10 @@ func setupTokenAuth(config AuthConfig) (transport.AuthMethod, error) {
 		return nil, fmt.Errorf("token environment variable %s is empty", config.TokenEnv)
 	}
 
-	return &http.BasicAuth{
-		Username: "git",
-		Password: token,
+	return []gitclient.Option{
+		gitclient.WithHTTPAuth(&http.BasicAuth{
+			Username: "git",
+			Password: token,
+		}),
 	}, nil
 }
