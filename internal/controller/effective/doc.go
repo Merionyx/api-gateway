@@ -35,4 +35,6 @@
 //
 //	- ADR: docs/adr/0001-effective-environments-and-materialized-state.md
 //	- Short overview: docs/architecture-environments.md
+//	- Сценарные тесты merge+reconcile (in-memory, etcd, xDS, materialized): пакет reconcile, файл
+//	  adr_merge_reconcile_test.go (см. бэклог п.8 / gateway-controller).
 package effective
