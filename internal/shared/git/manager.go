@@ -43,8 +43,8 @@ func (rm *RepositoryManager) InitializeRepositories(repos []RepositoryConfig) er
 			}
 
 			repo, err := gogit.Clone(memory.NewStorage(), memfs.New(), &gogit.CloneOptions{
-				URL:             repository.URL,
-				ClientOptions:   clientOpts,
+				URL:           repository.URL,
+				ClientOptions: clientOpts,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to clone repository %s: %w", repository.Name, err)
@@ -120,7 +120,7 @@ func (rm *RepositoryManager) getClientOptions(name string) ([]gitclient.Option, 
 }
 
 func (rm *RepositoryManager) GetRepositorySnapshots(ctx context.Context, name string, ref string, path string) (out []ContractSnapshot, err error) {
-	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanGitPkg, "GetRepositorySnapshots"))
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanGitPkg, "GetRepositorySnapshots"))
 	defer func() {
 		telemetry.MarkError(span, err)
 		span.End()

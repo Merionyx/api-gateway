@@ -27,7 +27,7 @@ type ExportedContractFile struct {
 // contractNameFilter empty means all contracts; otherwise only that name.
 // Duplicate contract names across different files under the same walk root return an error.
 func (rm *RepositoryManager) ExportContractFiles(ctx context.Context, name string, ref string, path string, contractNameFilter string) (out []ExportedContractFile, err error) {
-	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanGitPkg, "ExportContractFiles"))
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanGitPkg, "ExportContractFiles"))
 	defer func() {
 		telemetry.MarkError(span, err)
 		span.End()
