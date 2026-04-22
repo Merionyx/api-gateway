@@ -43,28 +43,27 @@ func newRegistryEnvironmentsBuilder(
 	}
 }
 
-// effectiveEnvironmentSkeleton uses [effective.MergeMemoryAndControllerEtcd] (ADR 0001) for this name.
-func (b *registryEnvironmentsBuilder) effectiveEnvironmentSkeleton(ctx context.Context, name string) (*models.Environment, error) {
+// loadMergedEnvironment loads the in-memory layer and the controller-etcd copy for name, merges
+// with [effective.MergeMemoryAndControllerEtcd] (ADR 0001), and returns the raw etcd environment
+// (if any) for provenance slices. A single Get per name avoids duplicate etcd I/O in the build loop.
+func (b *registryEnvironmentsBuilder) loadMergedEnvironment(ctx context.Context, name string) (skel *models.Environment, etcd *models.Environment, err error) {
 	var mem *models.Environment
-	if m, err := b.inMemoryEnvironmentsRepo.GetEnvironment(ctx, name); err == nil {
+	if m, err2 := b.inMemoryEnvironmentsRepo.GetEnvironment(ctx, name); err2 == nil {
 		mem = m
 	}
-
-	var etcdEnv *models.Environment
 	if b.environmentRepo != nil {
-		if e, err := b.environmentRepo.GetEnvironment(ctx, name); err == nil {
-			etcdEnv = e
+		if e, err2 := b.environmentRepo.GetEnvironment(ctx, name); err2 == nil {
+			etcd = e
 		}
 	}
-
-	skel, err := effective.MergeMemoryAndControllerEtcd(mem, etcdEnv)
+	skel, err = effective.MergeMemoryAndControllerEtcd(mem, etcd)
 	if err != nil {
 		if errors.Is(err, effective.ErrNotFound) {
-			return nil, fmt.Errorf("environment %s not found", name)
+			return nil, nil, fmt.Errorf("environment %s not found", name)
 		}
-		return nil, err
+		return nil, nil, err
 	}
-	return skel, nil
+	return skel, etcd, nil
 }
 
 // buildEnvironmentsForAPIServer — full payload Register/Heartbeat (union of in-memory + etcd names) with provenance
@@ -83,150 +82,167 @@ func (b *registryEnvironmentsBuilder) buildEnvironmentsForAPIServer(ctx context.
 		if err := ctx.Err(); err != nil {
 			return out, report, err
 		}
-		skel, err := b.effectiveEnvironmentSkeleton(ctx, n)
+		skel, etcd, err := b.loadMergedEnvironment(ctx, n)
 		if err != nil {
 			report.addWarning(RegistryBuildWarningEnvMerge, n, err)
 			continue
 		}
-		file, k8s := b.fileK8sSlices(ctx, n)
-		fileS, k8sS := b.fileK8sServiceSlices(ctx, n)
-		inF, inK8 := b.environmentInMemoryLayers(n)
-		var etcdE *models.Environment
-		if b.environmentRepo != nil {
-			if e, err := b.environmentRepo.GetEnvironment(ctx, n); err == nil {
-				etcdE = e
-			}
-		}
-		etcdB := etcdStaticBundles(etcdE)
-		etcdS := etcdStaticServices(etcdE)
-		inEtcd := etcdE != nil
-		envLayer := envmodel.ConfigSourceForEnvironmentLayers(inF, inK8, inEtcd)
-		fp := envmodel.FingerprintStaticEnvironment(skel)
-		em := &pb.EnvironmentMeta{
-			Provenance:         provenanceWithLayer(envLayer, environmentDominantLayerDetail(inF, inK8, inEtcd)),
-			SourcesFingerprint: proto.String(fp),
-		}
-		if skel.Type != "" {
-			em.EnvironmentType = proto.String(skel.Type)
-		}
-		if b.materialized != nil {
-			if doc, err := b.materialized.Get(ctx, n); err != nil {
-				report.addWarning(RegistryBuildWarningMaterializedGet, n, err)
-			} else if doc != nil {
-				g := doc.Generation
-				em.EffectiveGeneration = &g
-				em.MaterializedUpdatedAt = proto.String(doc.UpdatedAt)
-				sv := int32(doc.SchemaVersion)
-				em.MaterializedSchemaVersion = &sv
-				if doc.SourcesFingerprint != "" && doc.SourcesFingerprint != fp {
-					m := true
-					em.MaterializedMismatch = &m
-				}
-			}
-		}
-		pbEnv := &pb.EnvironmentInfo{
-			Name: skel.Name,
-			Meta: em,
-		}
-		var bundles []*pb.BundleInfo
-		if skel.Bundles != nil {
-			for _, bndl := range skel.Bundles.Static {
-				src := envmodel.ConfigSourceForStaticBundle(bndl, file, k8s, etcdB)
-				bi := &pb.BundleInfo{
-					Name: bndl.Name, Repository: bndl.Repository, Ref: bndl.Ref, Path: bndl.Path,
-				}
-				if p := provenanceWithLayer(src, staticBundleProvenanceLayer(src, bndl.DiscoveryRef)); p != nil {
-					bm := &pb.BundleMeta{Provenance: p}
-					if bndl.DiscoveryRef != "" {
-						bm.K8SResourceRef = proto.String(bndl.DiscoveryRef)
-					}
-					bi.Meta = bm
-				} else {
-					// e.g. only k8s_resource_ref without a resolved provenance
-					if bndl.DiscoveryRef != "" {
-						bi.Meta = &pb.BundleMeta{K8SResourceRef: proto.String(bndl.DiscoveryRef)}
-					}
-				}
-				bundles = append(bundles, bi)
-			}
-		}
-		pbEnv.Bundles = bundles
-		seenService := make(map[string]struct{})
-		var services []*pb.ServiceInfo
-		if skel.Services != nil {
-			for _, s := range skel.Services.Static {
-				seenService[s.Name] = struct{}{}
-				src := envmodel.ConfigSourceForStaticService(s, fileS, k8sS, etcdS)
-				si := &pb.ServiceInfo{
-					Name:     s.Name,
-					Upstream: s.Upstream,
-					Scope:    ptrServiceScope(pb.ServiceLineScope_SERVICE_LINE_SCOPE_ENVIRONMENT),
-				}
-				layer := staticServiceProvenanceLayer(src, s.DiscoveryRef)
-				if p := provenanceWithLayer(src, layer); p != nil {
-					sm := &pb.ServiceMeta{Provenance: p}
-					if s.DiscoveryRef != "" {
-						sm.K8SServiceRef = proto.String(s.DiscoveryRef)
-					}
-					si.Meta = sm
-				} else if s.DiscoveryRef != "" {
-					si.Meta = &pb.ServiceMeta{K8SServiceRef: proto.String(s.DiscoveryRef)}
-				}
-				services = append(services, si)
-			}
-		}
-		// Controller root pool (config services.static + K8s global upstreams), same policy as xDS
-		// [builder.BuildClusters]: per-environment static wins; then add global names not present.
-		if b.rootServicePool != nil {
-			f, k := b.rootServicePool.ListRootPoolDeduplicated()
-			for _, s := range f {
-				if _, ok := seenService[s.Name]; ok {
-					continue
-				}
-				seenService[s.Name] = struct{}{}
-				si := &pb.ServiceInfo{
-					Name:     s.Name,
-					Upstream: s.Upstream,
-					Scope:    ptrServiceScope(pb.ServiceLineScope_SERVICE_LINE_SCOPE_CONTROLLER_ROOT),
-				}
-				if p := provenanceWithLayer(envmodel.StaticConfigFile, "pool:controller_root:file"); p != nil {
-					sm := &pb.ServiceMeta{Provenance: p}
-					if s.DiscoveryRef != "" {
-						sm.K8SServiceRef = proto.String(s.DiscoveryRef)
-					}
-					si.Meta = sm
-				} else if s.DiscoveryRef != "" {
-					si.Meta = &pb.ServiceMeta{K8SServiceRef: proto.String(s.DiscoveryRef)}
-				}
-				services = append(services, si)
-			}
-			for _, s := range k {
-				if _, ok := seenService[s.Name]; ok {
-					continue
-				}
-				seenService[s.Name] = struct{}{}
-				si := &pb.ServiceInfo{
-					Name:     s.Name,
-					Upstream: s.Upstream,
-					Scope:    ptrServiceScope(pb.ServiceLineScope_SERVICE_LINE_SCOPE_CONTROLLER_ROOT),
-				}
-				if p := provenanceWithLayer(envmodel.StaticConfigKubernetes, "pool:controller_root:kubernetes"); p != nil {
-					sm := &pb.ServiceMeta{Provenance: p}
-					if s.DiscoveryRef != "" {
-						sm.K8SServiceRef = proto.String(s.DiscoveryRef)
-					}
-					si.Meta = sm
-				} else if s.DiscoveryRef != "" {
-					si.Meta = &pb.ServiceMeta{K8SServiceRef: proto.String(s.DiscoveryRef)}
-				}
-				services = append(services, si)
-			}
-		}
-		sort.Slice(services, func(i, j int) bool { return services[i].Name < services[j].Name })
-		pbEnv.Services = services
-		out = append(out, pbEnv)
+		out = append(out, b.buildOneEnvironmentForAPIServer(ctx, n, skel, etcd, &report))
 	}
 	return out, report, nil
+}
+
+// buildOneEnvironmentForAPIServer assembles a single [pb.EnvironmentInfo] with provenance and optional root pool.
+func (b *registryEnvironmentsBuilder) buildOneEnvironmentForAPIServer(
+	ctx context.Context,
+	name string,
+	skel *models.Environment,
+	etcdE *models.Environment,
+	report *RegistryEnvironmentsBuildReport,
+) *pb.EnvironmentInfo {
+	file, k8s := b.fileK8sSlices(ctx, name)
+	fileS, k8sS := b.fileK8sServiceSlices(ctx, name)
+	inF, inK8 := b.environmentInMemoryLayers(name)
+	etcdB := etcdStaticBundles(etcdE)
+	etcdS := etcdStaticServices(etcdE)
+	inEtcd := etcdE != nil
+	envLayer := envmodel.ConfigSourceForEnvironmentLayers(inF, inK8, inEtcd)
+	fp := envmodel.FingerprintStaticEnvironment(skel)
+	em := &pb.EnvironmentMeta{
+		Provenance:         provenanceWithLayer(envLayer, environmentDominantLayerDetail(inF, inK8, inEtcd)),
+		SourcesFingerprint: proto.String(fp),
+	}
+	if skel.Type != "" {
+		em.EnvironmentType = proto.String(skel.Type)
+	}
+	if b.materialized != nil {
+		if doc, err := b.materialized.Get(ctx, name); err != nil {
+			report.addWarning(RegistryBuildWarningMaterializedGet, name, err)
+		} else if doc != nil {
+			g := doc.Generation
+			em.EffectiveGeneration = &g
+			em.MaterializedUpdatedAt = proto.String(doc.UpdatedAt)
+			sv := int32(doc.SchemaVersion)
+			em.MaterializedSchemaVersion = &sv
+			if doc.SourcesFingerprint != "" && doc.SourcesFingerprint != fp {
+				m := true
+				em.MaterializedMismatch = &m
+			}
+		}
+	}
+	pbEnv := &pb.EnvironmentInfo{
+		Name: skel.Name,
+		Meta: em,
+	}
+	pbEnv.Bundles = b.buildBundleInfosForRegistry(skel, file, k8s, etcdB)
+	pbEnv.Services = b.buildServiceInfosForRegistry(skel, fileS, k8sS, etcdS)
+	return pbEnv
+}
+
+func (b *registryEnvironmentsBuilder) buildBundleInfosForRegistry(
+	skel *models.Environment,
+	file, k8s, etcdB []models.StaticContractBundleConfig,
+) []*pb.BundleInfo {
+	if skel == nil || skel.Bundles == nil {
+		return nil
+	}
+	bundles := make([]*pb.BundleInfo, 0, len(skel.Bundles.Static))
+	for _, bndl := range skel.Bundles.Static {
+		src := envmodel.ConfigSourceForStaticBundle(bndl, file, k8s, etcdB)
+		bi := &pb.BundleInfo{
+			Name: bndl.Name, Repository: bndl.Repository, Ref: bndl.Ref, Path: bndl.Path,
+		}
+		if p := provenanceWithLayer(src, staticBundleProvenanceLayer(src, bndl.DiscoveryRef)); p != nil {
+			bm := &pb.BundleMeta{Provenance: p}
+			if bndl.DiscoveryRef != "" {
+				bm.K8SResourceRef = proto.String(bndl.DiscoveryRef)
+			}
+			bi.Meta = bm
+		} else if bndl.DiscoveryRef != "" {
+			bi.Meta = &pb.BundleMeta{K8SResourceRef: proto.String(bndl.DiscoveryRef)}
+		}
+		bundles = append(bundles, bi)
+	}
+	return bundles
+}
+
+func (b *registryEnvironmentsBuilder) buildServiceInfosForRegistry(
+	skel *models.Environment,
+	fileS, k8sS, etcdS []models.StaticServiceConfig,
+) []*pb.ServiceInfo {
+	seenService := make(map[string]struct{})
+	var services []*pb.ServiceInfo
+	if skel != nil && skel.Services != nil {
+		for _, s := range skel.Services.Static {
+			seenService[s.Name] = struct{}{}
+			src := envmodel.ConfigSourceForStaticService(s, fileS, k8sS, etcdS)
+			si := &pb.ServiceInfo{
+				Name:     s.Name,
+				Upstream: s.Upstream,
+				Scope:    ptrServiceScope(pb.ServiceLineScope_SERVICE_LINE_SCOPE_ENVIRONMENT),
+			}
+			layer := staticServiceProvenanceLayer(src, s.DiscoveryRef)
+			if p := provenanceWithLayer(src, layer); p != nil {
+				sm := &pb.ServiceMeta{Provenance: p}
+				if s.DiscoveryRef != "" {
+					sm.K8SServiceRef = proto.String(s.DiscoveryRef)
+				}
+				si.Meta = sm
+			} else if s.DiscoveryRef != "" {
+				si.Meta = &pb.ServiceMeta{K8SServiceRef: proto.String(s.DiscoveryRef)}
+			}
+			services = append(services, si)
+		}
+	}
+	// Controller root pool (config services.static + K8s global upstreams), same policy as xDS
+	// [builder.BuildClusters]: per-environment static wins; then add global names not present.
+	if b.rootServicePool != nil {
+		f, k := b.rootServicePool.ListRootPoolDeduplicated()
+		for _, s := range f {
+			if _, ok := seenService[s.Name]; ok {
+				continue
+			}
+			seenService[s.Name] = struct{}{}
+			si := &pb.ServiceInfo{
+				Name:     s.Name,
+				Upstream: s.Upstream,
+				Scope:    ptrServiceScope(pb.ServiceLineScope_SERVICE_LINE_SCOPE_CONTROLLER_ROOT),
+			}
+			if p := provenanceWithLayer(envmodel.StaticConfigFile, "pool:controller_root:file"); p != nil {
+				sm := &pb.ServiceMeta{Provenance: p}
+				if s.DiscoveryRef != "" {
+					sm.K8SServiceRef = proto.String(s.DiscoveryRef)
+				}
+				si.Meta = sm
+			} else if s.DiscoveryRef != "" {
+				si.Meta = &pb.ServiceMeta{K8SServiceRef: proto.String(s.DiscoveryRef)}
+			}
+			services = append(services, si)
+		}
+		for _, s := range k {
+			if _, ok := seenService[s.Name]; ok {
+				continue
+			}
+			seenService[s.Name] = struct{}{}
+			si := &pb.ServiceInfo{
+				Name:     s.Name,
+				Upstream: s.Upstream,
+				Scope:    ptrServiceScope(pb.ServiceLineScope_SERVICE_LINE_SCOPE_CONTROLLER_ROOT),
+			}
+			if p := provenanceWithLayer(envmodel.StaticConfigKubernetes, "pool:controller_root:kubernetes"); p != nil {
+				sm := &pb.ServiceMeta{Provenance: p}
+				if s.DiscoveryRef != "" {
+					sm.K8SServiceRef = proto.String(s.DiscoveryRef)
+				}
+				si.Meta = sm
+			} else if s.DiscoveryRef != "" {
+				si.Meta = &pb.ServiceMeta{K8SServiceRef: proto.String(s.DiscoveryRef)}
+			}
+			services = append(services, si)
+		}
+	}
+	sort.Slice(services, func(i, j int) bool { return services[i].Name < services[j].Name })
+	return services
 }
 
 // collectEnvironmentNames — union of names from two sources; failure of one — warnings + data from the other.
