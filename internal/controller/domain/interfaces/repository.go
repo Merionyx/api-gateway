@@ -58,8 +58,8 @@ type MaterializedEffectiveStore interface {
 }
 
 // EffectiveReconciler reconciles the effective environment (in-memory file∪K8s ∪ controller etcd) into
-// xDS and optionally materialized JSON in etcd (ADR 0001). Used by the memory repository, Environments
-// and API Server sync use cases. May be nil in unit tests.
+// xDS and optionally materialized JSON in etcd (ADR 0001). In-memory binding is documented in
+// internal/controller/repository/memory (NewEnvironmentsRepository, AttachEffectiveReconciler).
 type EffectiveReconciler interface {
 	RebuildAllFromMemory(ctx context.Context, memoryMergedByName map[string]*models.Environment)
 	// ReconcileOne is one environment by name. writeMaterialized: true for CRUD paths (leader + flag); false for hot-path follower watch.

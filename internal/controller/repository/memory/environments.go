@@ -26,27 +26,47 @@ type EnvironmentsRepository struct {
 	bundleEnvIndex     *bundleenv.Index
 	bundleEnvMetrics   bool
 
-	// Effective (ADR 0001): optional; wired from container after xDS + schema + reconciler.
+	// Effective (ADR 0001): from [NewEnvironmentsRepository] and/or
+	// [AttachEffectiveReconciler] in production; tests may pass a non-nil
+	// reconciler in New and never call Attach.
 	eff interfaces.EffectiveReconciler
 }
 
-func NewEnvironmentsRepository() interfaces.InMemoryEnvironmentsRepository {
+// NewEnvironmentsRepository creates an in-memory file ∪ Kubernetes environment store. If
+// eff is non-nil, it is used for RebuildAllFromMemory / ReconcileOne. If nil, call
+// [AttachEffectiveReconciler] once after [reconcile.New] with the same
+// [interfaces.InMemoryEnvironmentsRepository] in ReconcilerDeps (circular ref), and before
+// [EnvironmentsRepository.Initialize].
+func NewEnvironmentsRepository(eff interfaces.EffectiveReconciler) interfaces.InMemoryEnvironmentsRepository {
 	return &EnvironmentsRepository{
 		fromFile: make(map[string]*models.Environment),
 		fromK8s:  make(map[string]*models.Environment),
+		eff:      eff,
 	}
+}
+
+// AttachEffectiveReconciler binds the effective reconciler created after the repository
+// (solves the memory↔reconcile cycle in one place). Must be called at most once when
+// [NewEnvironmentsRepository] was called with eff == nil, before Initialize. Panics if
+// the concrete type is wrong, eff is nil, or a reconciler is already set.
+func AttachEffectiveReconciler(ier interfaces.InMemoryEnvironmentsRepository, eff interfaces.EffectiveReconciler) {
+	if eff == nil {
+		panic("controller/memory: AttachEffectiveReconciler: eff is nil")
+	}
+	r, ok := ier.(*EnvironmentsRepository)
+	if !ok {
+		panic("controller/memory: AttachEffectiveReconciler: wrong concrete type")
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.eff != nil {
+		panic("controller/memory: AttachEffectiveReconciler: already set (pass reconciler in New, or use Attach only from nil start)")
+	}
+	r.eff = eff
 }
 
 func (r *EnvironmentsRepository) SetDependencies(xdsSnapshotManager *xdscache.SnapshotManager, _ interfaces.XDSBuilder, _ interfaces.SchemaRepository) {
 	r.xdsSnapshotManager = xdsSnapshotManager
-}
-
-// SetEnvironmentReconciler wires 3-way merge (memory ∪ etcd) xDS and optional materialized. Call
-// after SetDependencies and before Initialize when etcd and leader are available. May be nil (tests).
-func (r *EnvironmentsRepository) SetEnvironmentReconciler(eff interfaces.EffectiveReconciler) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.eff = eff
 }
 
 // SetBundleEnvIndex wires the bundle→environment index refreshed after Kubernetes or static config changes.

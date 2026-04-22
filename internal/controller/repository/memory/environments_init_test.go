@@ -22,7 +22,7 @@ func TestEnvironmentsRepository_Initialize_RebuildsXDS(t *testing.T) {
 	xb := builder.NewXDSBuilder(memSvc)
 	sm := xdscache.NewSnapshotManager(false)
 
-	repo := NewEnvironmentsRepository().(*EnvironmentsRepository)
+	repo := NewEnvironmentsRepository(nil).(*EnvironmentsRepository)
 	repo.SetDependencies(sm, xb, nil)
 	eff := reconcile.New(reconcile.ReconcilerDeps{
 		InMemory:                 repo,
@@ -31,7 +31,7 @@ func TestEnvironmentsRepository_Initialize_RebuildsXDS(t *testing.T) {
 		XDSB:                     xb,
 		MaterializedWriteEnabled: false,
 	})
-	repo.SetEnvironmentReconciler(eff)
+	AttachEffectiveReconciler(repo, eff)
 
 	cfg := &config.Config{
 		Services: config.ServicesConfig{

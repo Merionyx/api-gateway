@@ -95,9 +95,7 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 		Leader:                   c.LeaderGate,
 		MaterializedWriteEnabled: c.Config.EffectiveMaterialized.WriteEnabled,
 	})
-	if mem, ok := c.InMemoryEnvironmentsRepository.(*memory.EnvironmentsRepository); ok {
-		mem.SetEnvironmentReconciler(effRecon)
-	}
+	memory.AttachEffectiveReconciler(c.InMemoryEnvironmentsRepository, effRecon)
 
 	c.initUseCasesWithDeps(effRecon, mat)
 	c.initHandlers()
@@ -137,7 +135,7 @@ func (c *Container) initLeaderGate() {
 
 func (c *Container) createInMemoryServiceRepository() {
 	c.InMemoryServiceRepository = memory.NewServiceRepository()
-	c.InMemoryEnvironmentsRepository = memory.NewEnvironmentsRepository()
+	c.InMemoryEnvironmentsRepository = memory.NewEnvironmentsRepository(nil)
 }
 
 func (c *Container) initInMemoryRepositories() error {
