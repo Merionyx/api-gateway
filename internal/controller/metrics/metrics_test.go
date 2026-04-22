@@ -11,6 +11,9 @@ func TestRecordXDSAndSession(t *testing.T) {
 	RecordXDSnapshotUpdate(true, XDSResultError)
 	RecordAPIServerSessionEnd(false, SessionReasonCanceled)
 	RecordAPIServerSessionEnd(true, SessionReasonError)
+	RecordRegistryEnvironmentsBuildWarning(false, "in_memory_env_list")
+	RecordRegistryEnvironmentsBuildWarning(true, "etcd_env_list")
+	RecordRegistryEnvironmentsBuildWarning(true, "")
 }
 
 func TestEtcdAndRebuildMetrics(t *testing.T) {

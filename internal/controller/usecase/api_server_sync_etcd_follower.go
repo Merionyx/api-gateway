@@ -205,7 +205,10 @@ func (f *etcdFollowerWatch) environmentsForBundleKey(ctx context.Context, bundle
 }
 
 func (f *etcdFollowerWatch) rebuildAllXDS(ctx context.Context) error {
-	names := f.reg.collectEnvironmentNames(ctx)
+	names, listWarns := f.reg.collectEnvironmentNames(ctx)
+	if len(listWarns) > 0 {
+		observeNameListDegradationForFollower(ctx, f.config, listWarns)
+	}
 	return f.rebuildXDSForEnvironments(ctx, names)
 }
 

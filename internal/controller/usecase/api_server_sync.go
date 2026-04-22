@@ -18,6 +18,8 @@ import (
 // APIServerSyncUseCase keeps the Gateway Controller in sync with API Server (leader stream) and
 // reconciles xDS from controller-local etcd on every replica (follower watch). Internally it
 // composes a registry DTO builder, gRPC leader stream, and etcd follower watch.
+// Деградация (частичные списки имён, skip env, read materialized): RegistryEnvironmentsBuildReport, счётчик
+// gateway_controller_registry_environments_build_warnings_total и агрегированные логи (P.5 бэклога).
 type APIServerSyncUseCase struct {
 	config *config.Config
 

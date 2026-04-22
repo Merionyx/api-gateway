@@ -138,7 +138,8 @@ func (l *leaderAPIServerStream) runAPIServerSession(parentCtx context.Context) e
 }
 
 func (l *leaderAPIServerStream) registerController(ctx context.Context, client pb.ControllerRegistryServiceClient) error {
-	environments, err := l.reg.buildEnvironmentsForAPIServer(ctx)
+	environments, report, err := l.reg.buildEnvironmentsForAPIServer(ctx)
+	observeRegistryEnvironmentsBuildDegradation(ctx, l.config, registryOpRegister, &report)
 	if err != nil {
 		return err
 	}
@@ -165,7 +166,8 @@ func (l *leaderAPIServerStream) startHeartbeat(ctx context.Context, client pb.Co
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			environments, err := l.reg.buildEnvironmentsForAPIServer(ctx)
+			environments, report, err := l.reg.buildEnvironmentsForAPIServer(ctx)
+			observeRegistryEnvironmentsBuildDegradation(ctx, l.config, registryOpHeartbeat, &report)
 			if err != nil {
 				slog.Error("build environments for heartbeat", "error", err)
 				continue

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"sort"
 
 	pb "github.com/merionyx/api-gateway/pkg/grpc/controller_registry/v1"
@@ -65,16 +64,25 @@ func (b *registryEnvironmentsBuilder) effectiveEnvironmentSkeleton(ctx context.C
 	return skel, nil
 }
 
-// buildEnvironmentsForAPIServer returns the full declared environment set for Register/Heartbeat
-// (union of names from in-memory and etcd CRUD), with merged bundles per name.
-func (b *registryEnvironmentsBuilder) buildEnvironmentsForAPIServer(ctx context.Context) ([]*pb.EnvironmentInfo, error) {
-	names := b.collectEnvironmentNames(ctx)
+// buildEnvironmentsForAPIServer — полный пейлоад Register/Heartbeat (союз имён in-memory + etcd) с provenance
+// per env. RegistryEnvironmentsBuildReport перечисляет деградации; пустой пейлоад + нет Warnings — «нормально
+// пусто», иначе Warnings. Отмена ctx — ошибка вверх.
+func (b *registryEnvironmentsBuilder) buildEnvironmentsForAPIServer(ctx context.Context) ([]*pb.EnvironmentInfo, RegistryEnvironmentsBuildReport, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, RegistryEnvironmentsBuildReport{}, err
+	}
+	var report RegistryEnvironmentsBuildReport
+	names, nameList := b.collectEnvironmentNames(ctx)
 	sort.Strings(names)
+	report.appendNameListWarnings(nameList)
 	out := make([]*pb.EnvironmentInfo, 0, len(names))
 	for _, n := range names {
+		if err := ctx.Err(); err != nil {
+			return out, report, err
+		}
 		skel, err := b.effectiveEnvironmentSkeleton(ctx, n)
 		if err != nil {
-			slog.Warn("buildEnvironmentsForAPIServer: skip environment", "name", n, "error", err)
+			report.addWarning(RegistryBuildWarningEnvMerge, n, err)
 			continue
 		}
 		file, k8s := b.fileK8sSlices(ctx, n)
@@ -97,7 +105,7 @@ func (b *registryEnvironmentsBuilder) buildEnvironmentsForAPIServer(ctx context.
 		}
 		if b.materialized != nil {
 			if doc, err := b.materialized.Get(ctx, n); err != nil {
-				slog.Warn("buildEnvironmentsForAPIServer: read materialized generation", "environment", n, "error", err)
+				report.addWarning(RegistryBuildWarningMaterializedGet, n, err)
 			} else if doc != nil {
 				g := doc.Generation
 				em.EffectiveGeneration = &g
@@ -135,13 +143,17 @@ func (b *registryEnvironmentsBuilder) buildEnvironmentsForAPIServer(ctx context.
 		pbEnv.Services = services
 		out = append(out, pbEnv)
 	}
-	return out, nil
+	return out, report, nil
 }
 
-func (b *registryEnvironmentsBuilder) collectEnvironmentNames(ctx context.Context) []string {
+// collectEnvironmentNames — объединение имён из двух источников; сбой одного — предупреждения + данные с другого.
+func (b *registryEnvironmentsBuilder) collectEnvironmentNames(ctx context.Context) ([]string, []RegistryEnvironmentsBuildWarning) {
 	names := make(map[string]struct{})
+	var warns []RegistryEnvironmentsBuildWarning
 	if m, err := b.inMemoryEnvironmentsRepo.ListEnvironments(ctx); err != nil {
-		slog.Warn("collectEnvironmentNames: in-memory list failed", "error", err)
+		warns = append(warns, RegistryEnvironmentsBuildWarning{
+			Kind: RegistryBuildWarningInMemoryList, Subject: "in_memory", Err: err,
+		})
 	} else {
 		for k := range m {
 			names[k] = struct{}{}
@@ -149,7 +161,9 @@ func (b *registryEnvironmentsBuilder) collectEnvironmentNames(ctx context.Contex
 	}
 	if b.environmentRepo != nil {
 		if m, err := b.environmentRepo.ListEnvironments(ctx); err != nil {
-			slog.Warn("collectEnvironmentNames: etcd environments list failed", "error", err)
+			warns = append(warns, RegistryEnvironmentsBuildWarning{
+				Kind: RegistryBuildWarningEtcdList, Subject: "etcd", Err: err,
+			})
 		} else {
 			for k := range m {
 				names[k] = struct{}{}
@@ -160,11 +174,12 @@ func (b *registryEnvironmentsBuilder) collectEnvironmentNames(ctx context.Contex
 	for k := range names {
 		out = append(out, k)
 	}
-	return out
+	return out, warns
 }
 
-// environmentWithSnapshotsFromSchema is unused in the hot path but kept for symmetry with other merge passes.
-func (b *registryEnvironmentsBuilder) environmentWithSnapshotsFromSchema(ctx context.Context, src *models.Environment) *models.Environment {
+// environmentWithSnapshotsFromSchema is unused in the hot path but kept for symmetry; второе значение — деградации по снапшотам.
+func (b *registryEnvironmentsBuilder) environmentWithSnapshotsFromSchema(ctx context.Context, src *models.Environment) (*models.Environment, []RegistryEnvironmentsBuildWarning) {
+	var warns []RegistryEnvironmentsBuildWarning
 	out := &models.Environment{
 		Name:      src.Name,
 		Type:      src.Type,
@@ -173,17 +188,24 @@ func (b *registryEnvironmentsBuilder) environmentWithSnapshotsFromSchema(ctx con
 		Snapshots: nil,
 	}
 	if src.Bundles == nil {
-		return out
+		return out, nil
 	}
 	for _, bundle := range src.Bundles.Static {
 		snaps, err := b.schemaRepo.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref, bundle.Path)
 		if err != nil {
-			slog.Warn("ListContractSnapshots failed", "environment", src.Name, "repository", bundle.Repository, "ref", bundle.Ref, "path", bundle.Path, "error", err)
+			warns = append(warns, RegistryEnvironmentsBuildWarning{
+				Kind:    RegistryBuildWarningListContractSnapshots,
+				Subject: src.Name + "/" + bundle.Repository,
+				Err:     err,
+			})
 			continue
 		}
 		out.Snapshots = append(out.Snapshots, snaps...)
 	}
-	return out
+	if len(warns) == 0 {
+		return out, nil
+	}
+	return out, warns
 }
 
 func sharedToControllerSnapshot(s sharedgit.ContractSnapshot) *models.ContractSnapshot {
