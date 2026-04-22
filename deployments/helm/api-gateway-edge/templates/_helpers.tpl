@@ -162,9 +162,10 @@ metrics_http:
 {{- end -}}
 {{- end -}}
 
-{{/* service.name in Envoy resource attributes */}}
+{{/* service.name in Envoy bootstrap OpenTelemetry (Jaeger, etc.): api-gateway-edge-<environment> by default. */}}
 {{- define "agwedge.tracing.serviceName" -}}
-{{- $def := printf "%s-envoy" (include "agwedge.fullname" .) -}}
+{{- $env := (default "" .Values.connectivity.environment) | toString | trim -}}
+{{- $def := ternary (printf "api-gateway-edge-%s" $env) (printf "%s-envoy" (include "agwedge.fullname" .)) (ne $env "") -}}
 {{- default $def .Values.envoy.tracing.openTelemetry.serviceName -}}
 {{- end -}}
 

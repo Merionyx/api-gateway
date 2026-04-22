@@ -51,7 +51,7 @@ envoy:
       host: ""
       port: 4317
     openTelemetry:
-      # Resource service.name in spans; default in template: {fullname}-envoy
+      # Resource service.name; default: api-gateway-edge-<connectivity.environment> (else {fullname}-envoy)
       serviceName: ""
       # gRPC to collector (per OpenTelemetryConfig in bootstrap)
       grpcTimeout: 3s
