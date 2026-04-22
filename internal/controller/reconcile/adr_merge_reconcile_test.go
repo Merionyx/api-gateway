@@ -19,13 +19,14 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
-// ADR-0001 сценарии: in-memory + controller etcd → [effective.MergeMemoryAndControllerEtcd] → Reconciler
-// (xDS; materialized при leader+флаге). Документация в коде для п.8 / п.1 — см. [effective.doc] в пакете effective.
+// ADR-0001 scenarios: in-memory + controller etcd → [effective.MergeMemoryAndControllerEtcd] → Reconciler
+// (xDS; materialized when leader+flag). Documentation in code for p.8 / p.1 — see [effective.doc] in package effective.
 //
-// Сценарии намеренно узкие: фиксируем merge+reconcile контракт, а не полный production wiring.
+// Narrow scenarios intentionally: we fix the merge+reconcile contract, not the full production wiring.
 
 var errTestNotFound = errors.New("not found")
 
+// testInMem — in-memory environments repository for tests.
 type testInMem struct {
 	byName map[string]*models.Environment
 }
@@ -83,9 +84,9 @@ func (e *testEtcd) ListEnvironments(_ context.Context) (map[string]*models.Envir
 	}
 	return out, nil
 }
-func (*testEtcd) SaveEnvironment(context.Context, *models.Environment) error   { return nil }
-func (*testEtcd) DeleteEnvironment(context.Context, string) error              { return nil }
-func (*testEtcd) WatchEnvironments(context.Context) clientv3.WatchChan         { return nil }
+func (*testEtcd) SaveEnvironment(context.Context, *models.Environment) error { return nil }
+func (*testEtcd) DeleteEnvironment(context.Context, string) error            { return nil }
+func (*testEtcd) WatchEnvironments(context.Context) clientv3.WatchChan       { return nil }
 
 var _ interfaces.EnvironmentRepository = (*testEtcd)(nil)
 
@@ -95,7 +96,9 @@ type stubXDSBuilder struct{}
 func (stubXDSBuilder) BuildListeners(*models.Environment) ([]*listenerv3.Listener, error) {
 	return nil, nil
 }
-func (stubXDSBuilder) BuildClusters(*models.Environment) ([]*clusterv3.Cluster, error) { return nil, nil }
+func (stubXDSBuilder) BuildClusters(*models.Environment) ([]*clusterv3.Cluster, error) {
+	return nil, nil
+}
 func (stubXDSBuilder) BuildRoutes(*models.Environment) ([]*routev3.RouteConfiguration, error) {
 	return nil, nil
 }
@@ -132,7 +135,7 @@ var _ interfaces.MaterializedEffectiveStore = (*recordMaterialized)(nil)
 
 func nodeIDForEnv(name string) string { return "envoy-" + name }
 
-// TestReconcileOne_ADR0001_MergeScenarios: таблица путей mem∪etcd → ожидаемый merge и эффект на xDS.
+// TestReconcileOne_ADR0001_MergeScenarios: table of paths mem∪etcd → expected merge and effect on xDS.
 func TestReconcileOne_ADR0001_MergeScenarios(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -143,7 +146,7 @@ func TestReconcileOne_ADR0001_MergeScenarios(t *testing.T) {
 		etcd         *testEtcd
 		envName      string
 		wantMergeErr bool
-		// wantXDS: после ReconcileOne(follower, writeMaterialized false) снапшот для node присутствует
+		// wantXDS: after ReconcileOne(follower, writeMaterialized false) snapshot for node is present
 		wantXDS      bool
 		writeMat     bool
 		wantMatRecon int // len(reconciled) if leader+mat
@@ -270,7 +273,7 @@ func TestReconcileOne_ADR0001_MergeScenarios(t *testing.T) {
 	}
 }
 
-// TestSnapshotBuild_UsesSameBuilderAsReconciler — регресс: пустой stub + env == то, что отдаёт merge.
+// TestSnapshotBuild_UsesSameBuilderAsReconciler — regression: empty stub + env == what merge returns.
 func TestSnapshotBuild_UsesSameBuilderAsReconciler(t *testing.T) {
 	t.Parallel()
 	merged, err := effective.MergeMemoryAndControllerEtcd(

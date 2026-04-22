@@ -14,9 +14,9 @@ import (
 	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/controller/metrics"
 	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
+	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
 	"github.com/merionyx/api-gateway/internal/shared/grpcutil"
-	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -28,12 +28,12 @@ import (
 // it is the cluster leader): register, heartbeat, snapshot stream, save to schema etcd, xDS nudge.
 // See [etcdFollowerWatch] for the every-replica path that watches controller etcd.
 type leaderAPIServerStream struct {
-	config     *config.Config
-	apiAddress string
+	config       *config.Config
+	apiAddress   string
 	controllerID string
-	reg        *registryEnvironmentsBuilder
-	schema     interfaces.SchemaRepository
-	reconciler interfaces.EffectiveReconciler
+	reg          *registryEnvironmentsBuilder
+	schema       interfaces.SchemaRepository
+	reconciler   interfaces.EffectiveReconciler
 }
 
 func newLeaderAPIServerStream(
@@ -53,8 +53,8 @@ func newLeaderAPIServerStream(
 	}
 }
 
-// registerAndStream — внешний цикл (backoff → connect → runAPIServerSession).
-// Исходы итерации: afterRegisterAndStreamSession, документ docs/refactor/api-server-sync-register-and-stream.md.
+// registerAndStream — outer loop (backoff → connect → runAPIServerSession).
+// Iteration outcomes: afterRegisterAndStreamSession.
 func (l *leaderAPIServerStream) registerAndStream(ctx context.Context) error {
 	const (
 		initialBackoff = time.Second
@@ -145,10 +145,10 @@ func (l *leaderAPIServerStream) registerController(ctx context.Context, client p
 	}
 
 	_, err = client.RegisterController(ctx, &pb.RegisterControllerRequest{
-		ControllerId:            l.controllerID,
-		Tenant:                  l.config.Tenant,
-		Environments:            environments,
-		RegistryPayloadVersion:  RegistryPayloadVersionV1,
+		ControllerId:           l.controllerID,
+		Tenant:                 l.config.Tenant,
+		Environments:           environments,
+		RegistryPayloadVersion: RegistryPayloadVersionV1,
 	})
 	if err != nil {
 		return err
@@ -175,9 +175,9 @@ func (l *leaderAPIServerStream) startHeartbeat(ctx context.Context, client pb.Co
 			}
 
 			_, err = client.Heartbeat(ctx, &pb.HeartbeatRequest{
-				ControllerId:            l.controllerID,
-				Environments:            environments,
-				RegistryPayloadVersion:  RegistryPayloadVersionV1,
+				ControllerId:           l.controllerID,
+				Environments:           environments,
+				RegistryPayloadVersion: RegistryPayloadVersionV1,
 			})
 			if err != nil {
 				slog.Error("send heartbeat", "error", err)

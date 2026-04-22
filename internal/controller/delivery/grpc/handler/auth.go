@@ -18,7 +18,8 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
-// AuthHandler — gRPC: stream SyncAccess, watch etcd, нотификация подписчиков. Сборка пейлоада — AuthConfigBuilder.
+// AuthHandler — gRPC: stream SyncAccess, watch etcd, notification of subscribers. Payload build — AuthConfigBuilder.
+// See auth_config_builder.go.
 type AuthHandler struct {
 	authv1.UnimplementedAuthServiceServer
 	configBuilder  *AuthConfigBuilder
@@ -31,6 +32,7 @@ type AuthHandler struct {
 	mu          sync.RWMutex
 }
 
+// NewAuthHandler — dependencies for AuthHandler.
 func NewAuthHandler(
 	environmentRepo interfaces.EnvironmentRepository,
 	inMemoryEnvironmentsRepository interfaces.InMemoryEnvironmentsRepository,
@@ -47,7 +49,7 @@ func NewAuthHandler(
 		bundleIndex:    bundleIndex,
 		metricsEnabled: metricsEnabled,
 		etcdClient:     etcdClient,
-		subscribers:      make(map[string]chan *authv1.SyncAccessResponse),
+		subscribers:    make(map[string]chan *authv1.SyncAccessResponse),
 	}
 
 	go handler.watchEtcdChanges()
@@ -63,7 +65,7 @@ func NewAuthHandler(
 	return handler
 }
 
-// SyncAccess bidirectional streaming for synchronization
+// SyncAccess — bidirectional streaming for synchronization.
 func (h *AuthHandler) SyncAccess(stream authv1.AuthService_SyncAccessServer) error {
 	ctx := stream.Context()
 
@@ -141,7 +143,7 @@ func (h *AuthHandler) SyncAccess(stream authv1.AuthService_SyncAccessServer) err
 	}
 }
 
-// GetAccessConfig get the current configuration (unary)
+// GetAccessConfig — get the current configuration (unary).
 func (h *AuthHandler) GetAccessConfig(ctx context.Context, req *authv1.GetAccessConfigRequest) (*authv1.GetAccessConfigResponse, error) {
 	cfg, err := h.buildAccessConfig(ctx, req.Environment)
 	if err != nil {

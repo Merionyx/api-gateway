@@ -18,8 +18,8 @@ import (
 // APIServerSyncUseCase keeps the Gateway Controller in sync with API Server (leader stream) and
 // reconciles xDS from controller-local etcd on every replica (follower watch). Internally it
 // composes a registry DTO builder, gRPC leader stream, and etcd follower watch.
-// Деградация (частичные списки имён, skip env, read materialized): RegistryEnvironmentsBuildReport, счётчик
-// gateway_controller_registry_environments_build_warnings_total и агрегированные логи (P.5 бэклога).
+// Degradation (partial name lists, skip env, read materialized): RegistryEnvironmentsBuildReport, counter
+// gateway_controller_registry_environments_build_warnings_total and aggregated logs (P.5 backlog).
 type APIServerSyncUseCase struct {
 	config *config.Config
 
@@ -48,11 +48,11 @@ func NewAPIServerSyncUseCase(
 			slog.Error("Failed to get hostname", "error", err)
 			controllerID = "unknown"
 		} else {
-			slog.Info("controller_id from OS hostname (ha.controller_id пуст; для пула с leader_election — задать id в конфиге)",
+			slog.Info("controller_id from OS hostname (ha.controller_id empty; for leader_election pool — set id in config)",
 				"controller_id", controllerID, "source", "hostname")
 		}
 	} else {
-		slog.Info("controller_id из конфига (API Server / registry sync)", "controller_id", controllerID, "source", "ha.controller_id")
+		slog.Info("controller_id from config (API Server / registry sync)", "controller_id", controllerID, "source", "ha.controller_id")
 	}
 
 	reg := newRegistryEnvironmentsBuilder(
@@ -64,7 +64,7 @@ func NewAPIServerSyncUseCase(
 	)
 
 	return &APIServerSyncUseCase{
-		config: cfg,
+		config:   cfg,
 		registry: reg,
 		leader: newLeaderAPIServerStream(
 			cfg,

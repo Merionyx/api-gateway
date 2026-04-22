@@ -8,13 +8,13 @@ import (
 	ctrlmetrics "github.com/merionyx/api-gateway/internal/controller/metrics"
 )
 
-// Констаны kind — метрики (labels) и сравнения в тестах; стабильные строки, не просачивайте PII.
+// Constants kind — metrics (labels) and comparisons in tests; stable strings, do not leak PII.
 const (
 	// RegistryBuildWarningInMemoryList — in-memory [interfaces.InMemoryEnvironmentsRepository.ListEnvironments] failed.
 	RegistryBuildWarningInMemoryList = "in_memory_env_list"
 	// RegistryBuildWarningEtcdList — controller etcd [interfaces.EnvironmentRepository.ListEnvironments] failed.
 	RegistryBuildWarningEtcdList = "etcd_env_list"
-	// RegistryBuildWarningEnvMerge — merge effective env для имени невозможен (skip, частичный пейлоад).
+	// RegistryBuildWarningEnvMerge — merge effective env for name is not possible (skip, partial payload).
 	RegistryBuildWarningEnvMerge = "environment_merge_skip"
 	// RegistryBuildWarningMaterializedGet — read materialized generation in EnvironmentMeta.
 	RegistryBuildWarningMaterializedGet = "materialized_get"
@@ -22,15 +22,15 @@ const (
 	RegistryBuildWarningListContractSnapshots = "list_contract_snapshots"
 )
 
-// RegistryEnvironmentsBuildWarning — одна деградация при сборке: метрика по kind; Subject — env или подсистема.
+// RegistryEnvironmentsBuildWarning — one degradation during build: metric by kind; Subject — env or subsystem.
 type RegistryEnvironmentsBuildWarning struct {
 	Kind    string
 	Subject string
 	Err     error
 }
 
-// RegistryEnvironmentsBuildReport сопровождает [registryEnvironmentsBuilder.buildEnvironmentsForAPIServer] и
-// список имён в follower: Warnings != nil — частичный/ослабленный срез, не путать с «нормально пусто».
+// RegistryEnvironmentsBuildReport accompanies [registryEnvironmentsBuilder.buildEnvironmentsForAPIServer] and
+// list of names in follower: Warnings != nil — partial/weakened slice, not to be confused with «normally empty».
 type RegistryEnvironmentsBuildReport struct {
 	Warnings []RegistryEnvironmentsBuildWarning
 }
@@ -61,15 +61,15 @@ func countWarningKinds(w []RegistryEnvironmentsBuildWarning) map[string]int {
 	return m
 }
 
-// registryOp* — op для агрегированного лога: heartbeat не спамит Warn, только метрика + debug.
+// registryOp* — op for aggregated log: heartbeat does not spam Warn, only metric + debug.
 const (
-	registryOpRegister  = "register"
+	registryOpRegister    = "register"
 	registryOpHeartbeat   = "heartbeat"
 	registryOpFollowerXDS = "follower_rebuild"
 )
 
-// observeRegistryEnvironmentsBuildDegradation: **метрика** на каждый kind; **лог** — одна агрегированная строка
-// (не дублируем per-warning в slog на том же пути, что и счётчики). П.5 бэклога.
+// observeRegistryEnvironmentsBuildDegradation: **metric** per kind; **log** — one aggregated string
+// (do not duplicate per-warning in slog on the same path as counters). P.5 backlog.
 func observeRegistryEnvironmentsBuildDegradation(ctx context.Context, cfg *config.Config, op string, report *RegistryEnvironmentsBuildReport) {
 	if cfg == nil || report == nil || !report.degraded() {
 		return
@@ -107,7 +107,7 @@ func firstWarningErrString(r *RegistryEnvironmentsBuildReport) any {
 	return nil
 }
 
-// follower's collectEnvironmentNames: один лог + метрики по путям, если списки частичны.
+// follower's collectEnvironmentNames: one log + metrics per path, if lists are partial.
 func observeNameListDegradationForFollower(_ context.Context, cfg *config.Config, nameListSource []RegistryEnvironmentsBuildWarning) {
 	if len(nameListSource) == 0 || cfg == nil {
 		return

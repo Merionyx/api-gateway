@@ -13,15 +13,15 @@ import (
 	"github.com/merionyx/api-gateway/internal/shared/utils"
 )
 
-// AuthConfigBuilder строит authv1.AccessConfig для sidecar: controller etcd, затем in-memory, затем срез
-// по бандлам из schema repo (паттерны env). См. auth_config_builder_test.go.
+// AuthConfigBuilder builds authv1.AccessConfig for sidecar: controller etcd, then in-memory, then slice
+// from schema repo (env patterns). See auth_config_builder_test.go.
 type AuthConfigBuilder struct {
 	environmentRepo interfaces.EnvironmentRepository
 	inMemory        interfaces.InMemoryEnvironmentsRepository
 	schemaRepo      interfaces.SchemaRepository
 }
 
-// NewAuthConfigBuilder — зависимости для сборки; без gRPC, подписок и watch.
+// NewAuthConfigBuilder — dependencies for building; without gRPC, subscriptions and watch.
 func NewAuthConfigBuilder(
 	environmentRepo interfaces.EnvironmentRepository,
 	inMemory interfaces.InMemoryEnvironmentsRepository,
@@ -34,7 +34,7 @@ func NewAuthConfigBuilder(
 	}
 }
 
-// BuildAccessConfig — логика бывшего AuthHandler.buildAccessConfig (вынесена в п.7).
+// BuildAccessConfig — logic of former AuthHandler.buildAccessConfig (moved to p.7).
 func (b *AuthConfigBuilder) BuildAccessConfig(ctx context.Context, environment string) (*authv1.AccessConfig, error) {
 	var env *models.Environment
 
@@ -71,10 +71,10 @@ func (b *AuthConfigBuilder) BuildAccessConfig(ctx context.Context, environment s
 	return config, nil
 }
 
-// appMatchMode — сопоставление app.Environments с именем окружения (in-memory срез vs schema).
+// appMatchMode — matching app.Environments with environment name (in-memory slice vs schema).
 type appMatchMode int
 
-// Семантика: in-memory срез — точное равенство [models.App] env-ячеек; schema — [utils.MatchesEnvironmentPattern].
+// Semantics: in-memory slice — exact equality of [models.App] env cells; schema — [utils.MatchesEnvironmentPattern].
 const (
 	appMatchSnapshotFromMemory appMatchMode = iota
 	appMatchSchemaBundle

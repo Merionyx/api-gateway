@@ -8,7 +8,7 @@ import (
 )
 
 // MaterializedWritePolicy is the only gate for writing or deleting the **materialized effective**
-// JSON under the controller’s etcd prefix (ADR 0001, docs/adr/0001-…). It composes: feature flag,
+// JSON under the controller’s etcd prefix (ADR 0001). It composes: feature flag,
 // non-nil store, and this replica being the elected leader.
 type MaterializedWritePolicy struct {
 	enabled bool
@@ -17,7 +17,7 @@ type MaterializedWritePolicy struct {
 }
 
 // NewMaterializedWritePolicy builds a policy. A nil store means no materialized I/O regardless of
-// other fields.
+// other fields (see isNilishMaterializedStore).
 func NewMaterializedWritePolicy(
 	enabled bool,
 	store interfaces.MaterializedEffectiveStore,

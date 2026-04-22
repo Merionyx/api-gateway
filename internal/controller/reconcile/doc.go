@@ -4,5 +4,5 @@
 // → schema snapshot list → [github.com/merionyx/api-gateway/internal/controller/xds/snapshot] → cache update.
 //
 // For the full pipeline description, read [github.com/merionyx/api-gateway/internal/controller/effective] first
-// and docs/adr/0001-effective-environments-and-materialized-state.md.
+// and ADR 0001.
 package reconcile

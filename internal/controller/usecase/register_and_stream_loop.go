@@ -7,26 +7,25 @@ import (
 	"github.com/merionyx/api-gateway/internal/controller/metrics"
 )
 
-// Register-and-stream (внешний цикл) задокументирован в
-// docs/refactor/api-server-sync-register-and-stream.md.
+// Register-and-stream (outer loop) documented in
 //
-// afterRegisterAndStreamSession — тонкий шаг FSM после одного leaderAPIServerStream.runAPIServerSession
-// (backoff, выход, метрика конца сессии).
+// afterRegisterAndStreamSession — thin FSM step after one leaderAPIServerStream.runAPIServerSession
+// (backoff, exit, session end metric).
 //
-// «Смена лидера» (HA) здесь не моделируется: оркестратор снимает RegisterAndStream через
-// context.Cancel и снова запускает, когда снова стали лидером.
+// «Leader change» (HA) is not modeled here: the orchestrator cancels RegisterAndStream through
+// context.Cancel and restarts when it becomes the leader again.
 
-// registerAndStreamStep — результат одной итерации внешнего цикла (после попытки сессии).
-// Поле sessionEnd: непустое значение → один вызов [metrics.RecordAPIServerSessionEnd].
+// registerAndStreamStep — result of one iteration of the outer loop (after session attempt).
+// sessionEnd field: non-empty value → one call [metrics.RecordAPIServerSessionEnd].
 type registerAndStreamStep struct {
-	// returnErr: значение для return из [leaderAPIServerStream.registerAndStream] при endLoop.
+	// returnErr: value for return from [leaderAPIServerStream.registerAndStream] at endLoop.
 	returnErr  error
 	endLoop    bool
 	sessionEnd string // metrics.SessionReasonCanceled, SessionReasonError, or "".
 }
 
-// afterRegisterAndStreamSession классифицирует исход, совпадая с прежним порядком проверок
-// (сначала отмена ctx, затем nil, затем context.Canceled, иначе — повтор с backoff).
+// afterRegisterAndStreamSession classifies the outcome, matching the previous order of checks
+// (first cancel ctx, then nil, then context.Canceled, otherwise — repeat with backoff).
 func afterRegisterAndStreamSession(ctx context.Context, sessErr error) registerAndStreamStep {
 	if err := ctx.Err(); err != nil {
 		return registerAndStreamStep{

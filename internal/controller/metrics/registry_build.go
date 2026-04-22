@@ -15,7 +15,7 @@ var (
 	)
 )
 
-// RecordRegistryEnvironmentsBuildWarning counts one degraded step. kind — стабильная метка, см. usecase.
+// RecordRegistryEnvironmentsBuildWarning counts one degraded step. kind — stable label, see usecase.
 func RecordRegistryEnvironmentsBuildWarning(enabled bool, kind string) {
 	if !enabled || kind == "" {
 		return

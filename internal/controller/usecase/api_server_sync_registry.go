@@ -67,9 +67,9 @@ func (b *registryEnvironmentsBuilder) effectiveEnvironmentSkeleton(ctx context.C
 	return skel, nil
 }
 
-// buildEnvironmentsForAPIServer — полный пейлоад Register/Heartbeat (союз имён in-memory + etcd) с provenance
-// per env. RegistryEnvironmentsBuildReport перечисляет деградации; пустой пейлоад + нет Warnings — «нормально
-// пусто», иначе Warnings. Отмена ctx — ошибка вверх.
+// buildEnvironmentsForAPIServer — full payload Register/Heartbeat (union of in-memory + etcd names) with provenance
+// per env. RegistryEnvironmentsBuildReport lists degradations; empty payload + no Warnings — «normal empty»,
+// otherwise Warnings. Cancellation ctx — error upwards.
 func (b *registryEnvironmentsBuilder) buildEnvironmentsForAPIServer(ctx context.Context) ([]*pb.EnvironmentInfo, RegistryEnvironmentsBuildReport, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, RegistryEnvironmentsBuildReport{}, err
@@ -158,9 +158,9 @@ func (b *registryEnvironmentsBuilder) buildEnvironmentsForAPIServer(ctx context.
 				seenService[s.Name] = struct{}{}
 				src := envmodel.ConfigSourceForStaticService(s, fileS, k8sS, etcdS)
 				si := &pb.ServiceInfo{
-					Name:   s.Name,
+					Name:     s.Name,
 					Upstream: s.Upstream,
-					Scope:  ptrServiceScope(pb.ServiceLineScope_SERVICE_LINE_SCOPE_ENVIRONMENT),
+					Scope:    ptrServiceScope(pb.ServiceLineScope_SERVICE_LINE_SCOPE_ENVIRONMENT),
 				}
 				layer := staticServiceProvenanceLayer(src, s.DiscoveryRef)
 				if p := provenanceWithLayer(src, layer); p != nil {
@@ -185,9 +185,9 @@ func (b *registryEnvironmentsBuilder) buildEnvironmentsForAPIServer(ctx context.
 				}
 				seenService[s.Name] = struct{}{}
 				si := &pb.ServiceInfo{
-					Name:   s.Name,
+					Name:     s.Name,
 					Upstream: s.Upstream,
-					Scope:  ptrServiceScope(pb.ServiceLineScope_SERVICE_LINE_SCOPE_CONTROLLER_ROOT),
+					Scope:    ptrServiceScope(pb.ServiceLineScope_SERVICE_LINE_SCOPE_CONTROLLER_ROOT),
 				}
 				if p := provenanceWithLayer(envmodel.StaticConfigFile, "pool:controller_root:file"); p != nil {
 					sm := &pb.ServiceMeta{Provenance: p}
@@ -206,9 +206,9 @@ func (b *registryEnvironmentsBuilder) buildEnvironmentsForAPIServer(ctx context.
 				}
 				seenService[s.Name] = struct{}{}
 				si := &pb.ServiceInfo{
-					Name:   s.Name,
+					Name:     s.Name,
 					Upstream: s.Upstream,
-					Scope:  ptrServiceScope(pb.ServiceLineScope_SERVICE_LINE_SCOPE_CONTROLLER_ROOT),
+					Scope:    ptrServiceScope(pb.ServiceLineScope_SERVICE_LINE_SCOPE_CONTROLLER_ROOT),
 				}
 				if p := provenanceWithLayer(envmodel.StaticConfigKubernetes, "pool:controller_root:kubernetes"); p != nil {
 					sm := &pb.ServiceMeta{Provenance: p}
@@ -229,7 +229,7 @@ func (b *registryEnvironmentsBuilder) buildEnvironmentsForAPIServer(ctx context.
 	return out, report, nil
 }
 
-// collectEnvironmentNames — объединение имён из двух источников; сбой одного — предупреждения + данные с другого.
+// collectEnvironmentNames — union of names from two sources; failure of one — warnings + data from the other.
 func (b *registryEnvironmentsBuilder) collectEnvironmentNames(ctx context.Context) ([]string, []RegistryEnvironmentsBuildWarning) {
 	names := make(map[string]struct{})
 	var warns []RegistryEnvironmentsBuildWarning
@@ -260,7 +260,7 @@ func (b *registryEnvironmentsBuilder) collectEnvironmentNames(ctx context.Contex
 	return out, warns
 }
 
-// environmentWithSnapshotsFromSchema is unused in the hot path but kept for symmetry; второе значение — деградации по снапшотам.
+// environmentWithSnapshotsFromSchema is unused in the hot path but kept for symmetry; second value — degradations by snapshots.
 func (b *registryEnvironmentsBuilder) environmentWithSnapshotsFromSchema(ctx context.Context, src *models.Environment) (*models.Environment, []RegistryEnvironmentsBuildWarning) {
 	var warns []RegistryEnvironmentsBuildWarning
 	out := &models.Environment{

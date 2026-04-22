@@ -4,19 +4,19 @@
 // # Pipeline (order of steps)
 //
 //  1. In-process static inputs are merged per environment name: configuration loaded from
-//  local file and from Kubernetes (Custom Resources) is combined into one in-memory
-//  [github.com/merionyx/api-gateway/internal/controller/domain/models.Environment] per name
-//  (see [github.com/merionyx/api-gateway/internal/controller/repository/memory] and
-//  [github.com/merionyx/api-gateway/internal/controller/envmodel.InMemoryEffective]).
+//     local file and from Kubernetes (Custom Resources) is combined into one in-memory
+//     [github.com/merionyx/api-gateway/internal/controller/domain/models.Environment] per name
+//     (see [github.com/merionyx/api-gateway/internal/controller/repository/memory] and
+//     [github.com/merionyx/api-gateway/internal/controller/envmodel.InMemoryEffective]).
 //
 //  2. That in-memory view is merged with the optional copy of the same name stored in
-//  controller-local etcd (gRPC CRUD). The public entry point for this merge is
-//  [MergeMemoryAndControllerEtcd]; the algorithm lives in [github.com/merionyx/api-gateway/internal/controller/envmodel]
-//  ([github.com/merionyx/api-gateway/internal/controller/envmodel.BuildOptionalEffectiveEnvironment]).
+//     controller-local etcd (gRPC CRUD). The public entry point for this merge is
+//     [MergeMemoryAndControllerEtcd]; the algorithm lives in [github.com/merionyx/api-gateway/internal/controller/envmodel]
+//     ([github.com/merionyx/api-gateway/internal/controller/envmodel.BuildOptionalEffectiveEnvironment]).
 //
 //  3. The reconciler enriches the result with contract snapshots, builds the Envoy xDS snapshot,
-//  and — when the process is leader and materialization is enabled — updates the
-//  materialized effective document (see [github.com/merionyx/api-gateway/internal/controller/reconcile]).
+//     and — when the process is leader and materialization is enabled — updates the
+//     materialized effective document (see [github.com/merionyx/api-gateway/internal/controller/reconcile]).
 //
 // # Diagram (Mermaid, for renderers that support it)
 //
@@ -33,8 +33,7 @@
 //
 // # References
 //
-//	- ADR: docs/adr/0001-effective-environments-and-materialized-state.md
-//	- Short overview: docs/architecture-environments.md
-//	- Сценарные тесты merge+reconcile (in-memory, etcd, xDS, materialized): пакет reconcile, файл
-//	  adr_merge_reconcile_test.go (см. бэклог п.8 / gateway-controller).
+//   - ADR: ADR 0001
+//   - Scenario tests merge+reconcile (in-memory, etcd, xDS, materialized): package reconcile, file
+//     adr_merge_reconcile_test.go (see backlog p.8 / gateway-controller).
 package effective
