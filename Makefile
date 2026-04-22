@@ -90,6 +90,7 @@ docker-up:
 		-f ./deployments/dev/docker/compose.etcd.yaml \
 		-f ./deployments/dev/docker/compose.envoy.yaml \
 		-f ./deployments/dev/docker/compose.mock-service.yaml \
+		-f ./deployments/dev/docker/compose.jaeger.yaml \
 		up --build
 
 docker-down:
@@ -100,6 +101,7 @@ docker-down:
 		-f ./deployments/dev/docker/compose.etcd.yaml \
 		-f ./deployments/dev/docker/compose.envoy.yaml \
 		-f ./deployments/dev/docker/compose.mock-service.yaml \
+		-f ./deployments/dev/docker/compose.jaeger.yaml \
 		down
 
 docker-up-dev: ## Docker dev stack (single replicas) + watch
@@ -110,6 +112,7 @@ docker-up-dev: ## Docker dev stack (single replicas) + watch
 		-f ./deployments/dev/docker/compose.etcd.yaml \
 		-f ./deployments/dev/docker/compose.envoy.yaml \
 		-f ./deployments/dev/docker/compose.mock-service.yaml \
+		-f ./deployments/dev/docker/compose.jaeger.yaml \
 		up --build --watch
 
 docker-down-dev: ## Stop docker dev stack
@@ -120,6 +123,7 @@ docker-down-dev: ## Stop docker dev stack
 		-f ./deployments/dev/docker/compose.etcd.yaml \
 		-f ./deployments/dev/docker/compose.envoy.yaml \
 		-f ./deployments/dev/docker/compose.mock-service.yaml \
+		-f ./deployments/dev/docker/compose.jaeger.yaml \
 		down
 
 docker-up-dev-ha: ## HA dev: 3 API Server, 6 controllers, 6 Envoy, HAProxy (project merionyx-api-gateway-ha)
@@ -130,6 +134,7 @@ docker-up-dev-ha: ## HA dev: 3 API Server, 6 controllers, 6 Envoy, HAProxy (proj
 		-f ./deployments/dev/docker/compose.etcd.yaml \
 		-f ./deployments/dev/docker/compose.envoy.ha.dev.yaml \
 		-f ./deployments/dev/docker/compose.mock-service.yaml \
+		-f ./deployments/dev/docker/compose.jaeger.yaml \
 		up --build
 
 docker-down-dev-ha: ## Stop HA dev stack
@@ -140,6 +145,7 @@ docker-down-dev-ha: ## Stop HA dev stack
 		-f ./deployments/dev/docker/compose.etcd.yaml \
 		-f ./deployments/dev/docker/compose.envoy.ha.dev.yaml \
 		-f ./deployments/dev/docker/compose.mock-service.yaml \
+		-f ./deployments/dev/docker/compose.jaeger.yaml \
 		down
 
 PROTO_MODULE ?= github.com/merionyx/api-gateway

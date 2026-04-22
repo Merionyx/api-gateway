@@ -1,0 +1,21 @@
+# Jaeger v2 all-in-one (in-memory storage) for local dev and OpenTelemetry export.
+# UI: http://localhost:16686
+# OTLP: gRPC :4317, HTTP :4318 (use these from services in a follow-up)
+# See https://www.jaegertracing.io/docs/latest/getting-started/
+
+networks:
+  default:
+
+services:
+  jaeger:
+    image: jaegertracing/jaeger:latest
+    container_name: merionyx-jaeger
+    ports:
+      - "16686:16686" # UI
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "5778:5778"   # Remote sampling / agent
+      - "9411:9411"   # Zipkin
+    networks:
+      - default
+    restart: unless-stopped
