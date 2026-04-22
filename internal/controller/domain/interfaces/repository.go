@@ -53,6 +53,17 @@ type InMemoryServiceRepository interface {
 // MaterializedEffectiveStore persists idempotent materialized effective (static) to etcd (ADR 0001). Optional; may be nil.
 type MaterializedEffectiveStore interface {
 	ReconcileIfChanged(ctx context.Context, skel *models.Environment) error
+	// Delete removes the materialized v1 key for the environment. No-op for nil/invalid name or if the store is nil.
+	Delete(ctx context.Context, environmentName string) error
+}
+
+// EffectiveReconciler reconciles the effective environment (in-memory file∪K8s ∪ controller etcd) into
+// xDS and optionally materialized JSON in etcd (ADR 0001). Used by the memory repository, Environments
+// and API Server sync use cases. May be nil in unit tests.
+type EffectiveReconciler interface {
+	RebuildAllFromMemory(ctx context.Context, memoryMergedByName map[string]*models.Environment)
+	// ReconcileOne is one environment by name. writeMaterialized: true for CRUD paths (leader + flag); false for hot-path follower watch.
+	ReconcileOne(ctx context.Context, name string, writeMaterialized bool) error
 }
 
 type InMemoryEnvironmentsRepository interface {

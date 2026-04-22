@@ -11,6 +11,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/controller/discovery/kubernetes"
 	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/controller/index/bundleenv"
+	"github.com/merionyx/api-gateway/internal/controller/reconcile"
 	"github.com/merionyx/api-gateway/internal/controller/repository/cache"
 	ctrlrepoetcd "github.com/merionyx/api-gateway/internal/controller/repository/etcd"
 	"github.com/merionyx/api-gateway/internal/controller/repository/memory"
@@ -83,16 +84,25 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 
 	c.initXDSBuilder()
 
-	c.initUseCases()
+	mat := ctrlrepoetcd.NewMaterializedStore(c.EtcdClient)
+	effRecon := reconcile.New(reconcile.ReconcilerDeps{
+		Etcd:                     c.EnvironmentRepository,
+		InMemory:                 c.InMemoryEnvironmentsRepository,
+		Schema:                   c.SchemaRepository,
+		XDSM:                     c.XDSSnapshotManager,
+		XDSB:                     c.XDSBuilder,
+		Materialized:             mat,
+		Leader:                   c.LeaderGate,
+		MaterializedWriteEnabled: c.Config.EffectiveMaterialized.WriteEnabled,
+	})
+	if mem, ok := c.InMemoryEnvironmentsRepository.(*memory.EnvironmentsRepository); ok {
+		mem.SetEnvironmentReconciler(effRecon)
+	}
+
+	c.initUseCasesWithDeps(effRecon, mat)
 	c.initHandlers()
 	if mem, ok := c.InMemoryEnvironmentsRepository.(*memory.EnvironmentsRepository); ok {
 		mem.SetBundleEnvIndex(c.BundleEnvIndex, c.Config.MetricsHTTP.Enabled)
-		mem.SetEffectiveReconcile(
-			c.EnvironmentRepository,
-			c.LeaderGate,
-			ctrlrepoetcd.NewMaterializedStore(c.EtcdClient),
-			c.Config.EffectiveMaterialized.WriteEnabled,
-		)
 	}
 	if err := c.initInMemoryRepositories(); err != nil {
 		return nil, err
@@ -161,13 +171,13 @@ func (c *Container) initRepositories() {
 	slog.Info("etcd repositories initialized")
 }
 
-func (c *Container) initUseCases() {
+func (c *Container) initUseCasesWithDeps(effRecon interfaces.EffectiveReconciler, mat *ctrlrepoetcd.MaterializedStore) {
 	c.SnapshotsUseCase = usecase.NewSnapshotsUseCase()
 	c.EnvironmentsUseCase = usecase.NewEnvironmentsUseCase()
 	c.SchemasUseCase = usecase.NewSchemasUseCase()
 
 	// Two-phase wiring: use cases reference each other; order matches dependency direction (schemas → env → snapshots).
-	c.EnvironmentsUseCase.SetDependencies(c.EnvironmentRepository, c.InMemoryEnvironmentsRepository, c.SchemasUseCase, c.XDSSnapshotManager, c.XDSBuilder)
+	c.EnvironmentsUseCase.SetDependencies(c.EnvironmentRepository, c.InMemoryEnvironmentsRepository, c.SchemasUseCase, effRecon)
 	c.SnapshotsUseCase.SetDependencies(c.EnvironmentsUseCase, c.XDSSnapshotManager, c.XDSBuilder)
 	c.SchemasUseCase.SetDependencies(c.SchemaRepository, c.EnvironmentRepository)
 
@@ -176,12 +186,11 @@ func (c *Container) initUseCases() {
 		c.SchemaRepository,
 		c.InMemoryEnvironmentsRepository,
 		c.EnvironmentRepository,
-		c.XDSSnapshotManager,
-		c.XDSBuilder,
 		c.EtcdClient,
 		c.BundleEnvIndex,
 		c.SchemaCache,
-		ctrlrepoetcd.NewMaterializedStore(c.EtcdClient),
+		mat,
+		effRecon,
 	)
 
 	slog.Info("use cases initialized")

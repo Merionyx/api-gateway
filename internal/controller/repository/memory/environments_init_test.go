@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/merionyx/api-gateway/internal/controller/config"
+	"github.com/merionyx/api-gateway/internal/controller/reconcile"
 	"github.com/merionyx/api-gateway/internal/controller/xds/builder"
 	xdscache "github.com/merionyx/api-gateway/internal/controller/xds/cache"
 )
@@ -23,6 +24,14 @@ func TestEnvironmentsRepository_Initialize_RebuildsXDS(t *testing.T) {
 
 	repo := NewEnvironmentsRepository().(*EnvironmentsRepository)
 	repo.SetDependencies(sm, xb, nil)
+	eff := reconcile.New(reconcile.ReconcilerDeps{
+		InMemory:                 repo,
+		Schema:                   nil,
+		XDSM:                     sm,
+		XDSB:                     xb,
+		MaterializedWriteEnabled: false,
+	})
+	repo.SetEnvironmentReconciler(eff)
 
 	cfg := &config.Config{
 		Services: config.ServicesConfig{

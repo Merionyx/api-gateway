@@ -9,7 +9,6 @@ import (
 	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 	"github.com/merionyx/api-gateway/internal/controller/index/bundleenv"
-	xdscache "github.com/merionyx/api-gateway/internal/controller/xds/cache"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -17,7 +16,7 @@ import (
 
 type noopEnvUC struct{}
 
-func (noopEnvUC) SetDependencies(interfaces.EnvironmentRepository, interfaces.InMemoryEnvironmentsRepository, interfaces.SchemasUseCase, *xdscache.SnapshotManager, interfaces.XDSBuilder) {
+func (noopEnvUC) SetDependencies(interfaces.EnvironmentRepository, interfaces.InMemoryEnvironmentsRepository, interfaces.SchemasUseCase, interfaces.EffectiveReconciler) {
 }
 
 func (noopEnvUC) CreateEnvironment(context.Context, *models.CreateEnvironmentRequest) (*models.Environment, error) {

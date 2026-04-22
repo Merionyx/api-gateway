@@ -12,7 +12,6 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 	"github.com/merionyx/api-gateway/internal/controller/envmodel"
-	xdssnapshot "github.com/merionyx/api-gateway/internal/controller/xds/snapshot"
 	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
 	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 )
@@ -35,29 +34,11 @@ func (uc *APIServerSyncUseCase) saveSnapshotsToEtcd(ctx context.Context, bundleK
 
 func (uc *APIServerSyncUseCase) updateXDSSnapshot(ctx context.Context, environment string) error {
 	slog.Info("Updating xDS snapshot", "environment", environment)
-
-	env, err := uc.environmentForXDS(ctx, environment)
-	if err != nil {
-		return err
+	if uc.reconciler == nil {
+		return nil
 	}
-
-	xdsSnap, err := xdssnapshot.BuildEnvoySnapshot(uc.xdsBuilder, env)
-	if err != nil {
-		return fmt.Errorf("build envoy snapshot: %w", err)
-	}
-	nodeID := fmt.Sprintf("envoy-%s", environment)
-	if err := uc.xdsSnapshotManager.UpdateSnapshot(nodeID, xdsSnap); err != nil {
-		return fmt.Errorf("failed to push xDS snapshot: %w", err)
-	}
-	return nil
-}
-
-func (uc *APIServerSyncUseCase) environmentForXDS(ctx context.Context, name string) (*models.Environment, error) {
-	skel, err := uc.effectiveEnvironmentSkeleton(ctx, name)
-	if err != nil {
-		return nil, err
-	}
-	return uc.environmentWithSnapshotsFromSchema(ctx, skel), nil
+	// No materialized writes on follower / hot path (leader CRUD and memory rebuild use writeMaterialized).
+	return uc.reconciler.ReconcileOne(ctx, environment, false)
 }
 
 // effectiveEnvironmentSkeleton merges static+Kubernetes (in-memory) with controller etcd CRUD:

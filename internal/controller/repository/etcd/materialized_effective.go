@@ -112,6 +112,22 @@ func (s *MaterializedStore) ReconcileIfChanged(ctx context.Context, skel *models
 	return nil
 }
 
+// Delete removes the materialized v1 key. No-op if store/client is nil or name is invalid.
+func (s *MaterializedStore) Delete(ctx context.Context, environmentName string) error {
+	if s == nil || s.client == nil {
+		return nil
+	}
+	key := materializedV1Key(environmentName)
+	if key == "" {
+		return nil
+	}
+	_, err := s.client.Delete(ctx, key)
+	if err != nil {
+		return fmt.Errorf("delete materialized: %w", err)
+	}
+	return nil
+}
+
 // Get returns the current materialized document, or nil if missing.
 func (s *MaterializedStore) Get(ctx context.Context, environmentName string) (*MaterializedEffectiveV1, error) {
 	if s == nil || s.client == nil {

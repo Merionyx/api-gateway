@@ -14,7 +14,6 @@ import (
 	ctrlmetrics "github.com/merionyx/api-gateway/internal/controller/metrics"
 	"github.com/merionyx/api-gateway/internal/controller/repository/cache"
 	ctrlrepoetcd "github.com/merionyx/api-gateway/internal/controller/repository/etcd"
-	xdscache "github.com/merionyx/api-gateway/internal/controller/xds/cache"
 	"github.com/merionyx/api-gateway/internal/shared/grpcutil"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -27,14 +26,13 @@ type APIServerSyncUseCase struct {
 	schemaRepo               interfaces.SchemaRepository
 	inMemoryEnvironmentsRepo interfaces.InMemoryEnvironmentsRepository
 	environmentRepo          interfaces.EnvironmentRepository
-	xdsSnapshotManager       *xdscache.SnapshotManager
 	apiServerAddress         string
 	controllerID             string
-	xdsBuilder               interfaces.XDSBuilder
 	etcdClient               *clientv3.Client
 	bundleEnvIndex           *bundleenv.Index
 	schemaCache              *cache.SchemaCache
 	materialized             *ctrlrepoetcd.MaterializedStore
+	reconciler               interfaces.EffectiveReconciler
 }
 
 func NewAPIServerSyncUseCase(
@@ -42,12 +40,11 @@ func NewAPIServerSyncUseCase(
 	schemaRepo interfaces.SchemaRepository,
 	inMemoryEnvironmentsRepo interfaces.InMemoryEnvironmentsRepository,
 	environmentRepo interfaces.EnvironmentRepository,
-	xdsSnapshotManager *xdscache.SnapshotManager,
-	xdsBuilder interfaces.XDSBuilder,
 	etcdClient *clientv3.Client,
 	bundleEnvIndex *bundleenv.Index,
 	schemaCache *cache.SchemaCache,
 	materialized *ctrlrepoetcd.MaterializedStore,
+	effectiveReconciler interfaces.EffectiveReconciler,
 ) *APIServerSyncUseCase {
 	controllerID := strings.TrimSpace(cfg.HA.ControllerID)
 	if controllerID == "" {
@@ -64,14 +61,13 @@ func NewAPIServerSyncUseCase(
 		schemaRepo:               schemaRepo,
 		inMemoryEnvironmentsRepo: inMemoryEnvironmentsRepo,
 		environmentRepo:          environmentRepo,
-		xdsSnapshotManager:       xdsSnapshotManager,
 		apiServerAddress:         cfg.APIServer.Address,
-		xdsBuilder:               xdsBuilder,
 		controllerID:             controllerID,
 		etcdClient:               etcdClient,
 		bundleEnvIndex:           bundleEnvIndex,
 		schemaCache:              schemaCache,
 		materialized:             materialized,
+		reconciler:               effectiveReconciler,
 	}
 }
 

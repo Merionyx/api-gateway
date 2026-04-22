@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"sort"
 	"sync"
 	"time"
 
@@ -15,8 +14,6 @@ import (
 	"github.com/merionyx/api-gateway/internal/controller/index/bundleenv"
 	ctrlmetrics "github.com/merionyx/api-gateway/internal/controller/metrics"
 	xdscache "github.com/merionyx/api-gateway/internal/controller/xds/cache"
-	"github.com/merionyx/api-gateway/internal/controller/xds/snapshot"
-	"github.com/merionyx/api-gateway/internal/shared/election"
 )
 
 type EnvironmentsRepository struct {
@@ -26,16 +23,11 @@ type EnvironmentsRepository struct {
 	fromK8s  map[string]*models.Environment
 
 	xdsSnapshotManager *xdscache.SnapshotManager
-	xdsBuilder         interfaces.XDSBuilder
-	schemaRepo         interfaces.SchemaRepository
 	bundleEnvIndex     *bundleenv.Index
 	bundleEnvMetrics   bool
 
-	// Effective reconcile (ADR 0001, phase 2); optional, wired from container.
-	etcdEnv                  interfaces.EnvironmentRepository
-	leader                   election.LeaderGate
-	materialized             interfaces.MaterializedEffectiveStore
-	materializedWriteEnabled bool
+	// Effective (ADR 0001): optional; wired from container after xDS + schema + reconciler.
+	eff interfaces.EffectiveReconciler
 }
 
 func NewEnvironmentsRepository() interfaces.InMemoryEnvironmentsRepository {
@@ -45,10 +37,16 @@ func NewEnvironmentsRepository() interfaces.InMemoryEnvironmentsRepository {
 	}
 }
 
-func (r *EnvironmentsRepository) SetDependencies(xdsSnapshotManager *xdscache.SnapshotManager, xdsBuilder interfaces.XDSBuilder, schemaRepo interfaces.SchemaRepository) {
+func (r *EnvironmentsRepository) SetDependencies(xdsSnapshotManager *xdscache.SnapshotManager, _ interfaces.XDSBuilder, _ interfaces.SchemaRepository) {
 	r.xdsSnapshotManager = xdsSnapshotManager
-	r.xdsBuilder = xdsBuilder
-	r.schemaRepo = schemaRepo
+}
+
+// SetEnvironmentReconciler wires 3-way merge (memory ∪ etcd) xDS and optional materialized. Call
+// after SetDependencies and before Initialize when etcd and leader are available. May be nil (tests).
+func (r *EnvironmentsRepository) SetEnvironmentReconciler(eff interfaces.EffectiveReconciler) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.eff = eff
 }
 
 // SetBundleEnvIndex wires the bundle→environment index refreshed after Kubernetes or static config changes.
@@ -57,22 +55,6 @@ func (r *EnvironmentsRepository) SetBundleEnvIndex(idx *bundleenv.Index, metrics
 	defer r.mu.Unlock()
 	r.bundleEnvIndex = idx
 	r.bundleEnvMetrics = metricsEnabled
-}
-
-// SetEffectiveReconcile wires 3-way merge (memory ∪ etcd) for xDS, optional materialized writes, and leader gate.
-// Call after SetDependencies, when etcd EnvironmentRepository is available. Nil etcdEnv disables etcd merge in xDS.
-func (r *EnvironmentsRepository) SetEffectiveReconcile(
-	etcdEnv interfaces.EnvironmentRepository,
-	leader election.LeaderGate,
-	materialized interfaces.MaterializedEffectiveStore,
-	writeEnabled bool,
-) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.etcdEnv = etcdEnv
-	r.leader = leader
-	r.materialized = materialized
-	r.materializedWriteEnabled = writeEnabled
 }
 
 func (r *EnvironmentsRepository) scheduleBundleEnvIndexRebuildLocked() {
@@ -177,114 +159,19 @@ func (r *EnvironmentsRepository) mergedLocked() map[string]*models.Environment {
 	return out
 }
 
-func (r *EnvironmentsRepository) listEtcdEnvironments(ctx context.Context) map[string]*models.Environment {
-	if r.etcdEnv == nil {
-		return nil
-	}
-	m, err := r.etcdEnv.ListEnvironments(ctx)
-	if err != nil {
-		slog.Error("xDS rebuild: list etcd environments", "error", err)
-		return nil
-	}
-	return m
-}
-
-// unionEnvNames returns sorted names from memory-merged and optional etcd map.
-func unionEnvNames(merged map[string]*models.Environment, etcd map[string]*models.Environment) []string {
-	seen := make(map[string]struct{})
-	for n := range merged {
-		seen[n] = struct{}{}
-	}
-	for n := range etcd {
-		seen[n] = struct{}{}
-	}
-	names := make([]string, 0, len(seen))
-	for n := range seen {
-		names = append(names, n)
-	}
-	sort.Strings(names)
-	return names
-}
-
-func (r *EnvironmentsRepository) envWithSnapshotsFromEtcd(ctx context.Context, env *models.Environment) (*models.Environment, error) {
-	if env == nil {
-		return nil, nil
-	}
-	if r.schemaRepo == nil {
-		return env, nil
-	}
-	out := *env
-	out.Snapshots = nil
-	if env.Bundles == nil {
-		return &out, nil
-	}
-	for _, bundle := range env.Bundles.Static {
-		snaps, err := r.schemaRepo.ListContractSnapshots(ctx, bundle.Repository, bundle.Ref, bundle.Path)
-		if err != nil {
-			return nil, fmt.Errorf("list contract snapshots for bundle %q (repo %q ref %q path %q): %w", bundle.Name, bundle.Repository, bundle.Ref, bundle.Path, err)
-		}
-		out.Snapshots = append(out.Snapshots, snaps...)
-	}
-	return &out, nil
-}
-
-// rebuildMergedXDSSnapshots runs without holding r.mu. It merges the in-memory view
-// (file ∪ k8s) with etcd gRPC environment config, same as API Server / sync use case.
+// rebuildMergedXDSSnapshots runs without holding r.mu. Delegates to the effective reconciler
+// (file ∪ k8s ∪ controller etcd) → xDS + optional materialized.
 func (r *EnvironmentsRepository) rebuildMergedXDSSnapshots(ctx context.Context) {
-	if r.xdsSnapshotManager == nil || r.xdsBuilder == nil {
+	if r.eff == nil {
+		return
+	}
+	if r.xdsSnapshotManager == nil {
 		return
 	}
 	r.mu.RLock()
 	merged := r.mergedLocked()
 	r.mu.RUnlock()
-
-	etcdByName := r.listEtcdEnvironments(ctx)
-	for _, envName := range unionEnvNames(merged, etcdByName) {
-		var mem, etcdEnv *models.Environment
-		if merged != nil {
-			mem = merged[envName]
-		}
-		if etcdByName != nil {
-			etcdEnv = etcdByName[envName]
-		}
-		eff, err := envmodel.BuildOptionalEffectiveEnvironment(mem, etcdEnv)
-		if err != nil {
-			continue
-		}
-		buildEnv, err := r.envWithSnapshotsFromEtcd(ctx, eff)
-		if err != nil {
-			slog.Error("xDS rebuild from memory: enrich snapshots from etcd", "environment", envName, "error", err)
-			continue
-		}
-		envoySnap, err := snapshot.BuildEnvoySnapshot(r.xdsBuilder, buildEnv)
-		if err != nil {
-			slog.Error("xDS rebuild from memory: build envoy snapshot", "environment", envName, "error", err)
-			continue
-		}
-		nodeID := fmt.Sprintf("envoy-%s", envName)
-		if err := r.xdsSnapshotManager.UpdateSnapshot(nodeID, envoySnap); err != nil {
-			slog.Error("xDS snapshot update failed", "node_id", nodeID, "error", err)
-			continue
-		}
-		slog.Info("updated xDS snapshot", "environment", envName, "node_id", nodeID, "reconcile", "memory_etcd_merged")
-		if r.shouldWriteMaterialized() {
-			if err := r.materialized.ReconcileIfChanged(ctx, eff); err != nil {
-				slog.Error("materialized effective write failed", "environment", envName, "error", err)
-			} else {
-				slog.Info("materialized effective reconciled", "environment", envName)
-			}
-		}
-	}
-}
-
-func (r *EnvironmentsRepository) shouldWriteMaterialized() bool {
-	if !r.materializedWriteEnabled || r.materialized == nil {
-		return false
-	}
-	if r.leader == nil {
-		return false
-	}
-	return r.leader.IsLeader()
+	r.eff.RebuildAllFromMemory(ctx, merged)
 }
 
 // ApplyKubernetesEnvironments replaces the Kubernetes-sourced environment map and rebuilds xDS.
