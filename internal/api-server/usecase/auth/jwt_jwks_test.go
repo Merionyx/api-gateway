@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -16,14 +17,14 @@ func TestJWTUseCase_GetJWKS_GetSigningKeys_generated(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	jwks, err := uc.GetJWKS()
+	jwks, err := uc.GetJWKS(context.Background())
 	if err != nil || len(jwks.Keys) != 1 {
 		t.Fatalf("jwks: %v len=%d", err, len(jwks.Keys))
 	}
 	if jwks.Keys[0].Kty != "OKP" {
 		t.Fatalf("want EdDSA JWK, got %q", jwks.Keys[0].Kty)
 	}
-	keys := uc.GetSigningKeys()
+	keys := uc.GetSigningKeys(context.Background())
 	if len(keys) != 1 || !keys[0].Active {
 		t.Fatalf("signing keys: %#v", keys)
 	}
@@ -50,7 +51,7 @@ func TestJWTUseCase_GetJWKS_rsaKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	jwks, err := uc.GetJWKS()
+	jwks, err := uc.GetJWKS(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

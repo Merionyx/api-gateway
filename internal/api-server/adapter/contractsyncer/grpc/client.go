@@ -13,10 +13,13 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 )
+
+const spanClientPkg = "internal/api-server/adapter/contractsyncer/grpc"
 
 // Client is the gRPC adapter for Contract Syncer (implements domain ports).
 type Client struct {
@@ -47,12 +50,15 @@ func (c *Client) FetchContractSnapshots(ctx context.Context, bundle models.Bundl
 	}()
 
 	client := pb.NewContractSyncerServiceClient(conn)
-	resp, err := client.Sync(ctx, &pb.SyncRequest{
+	rpcCtx, span := telemetry.OutgoingCall(ctx, telemetry.SpanName(spanClientPkg, "Sync"))
+	defer span.End()
+	resp, err := client.Sync(rpcCtx, &pb.SyncRequest{
 		Repository: bundle.Repository,
 		Ref:        bundle.Ref,
 		Path:       bundle.Path,
 	})
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return nil, apierrors.JoinContractSyncer("sync rpc", err)
 	}
 	if resp.GetError() != "" {
@@ -75,13 +81,16 @@ func (c *Client) ExportContractFiles(ctx context.Context, repository, ref, path,
 	defer func() { _ = conn.Close() }()
 
 	client := pb.NewContractSyncerServiceClient(conn)
-	resp, err := client.ExportContracts(ctx, &pb.ExportContractsRequest{
+	rpcCtx, span := telemetry.OutgoingCall(ctx, telemetry.SpanName(spanClientPkg, "ExportContracts"))
+	defer span.End()
+	resp, err := client.ExportContracts(rpcCtx, &pb.ExportContractsRequest{
 		Repository:   repository,
 		Ref:          ref,
 		Path:         path,
 		ContractName: contractName,
 	})
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return nil, apierrors.JoinContractSyncer("export contracts rpc", err)
 	}
 	if resp.GetError() != "" {
@@ -101,15 +110,21 @@ func (c *Client) ExportContractFiles(ctx context.Context, repository, ref, path,
 
 // Ping implements interfaces.ContractSyncerReachability.
 func (c *Client) Ping(ctx context.Context) error {
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanClientPkg, "Ping"))
+	defer span.End()
 	if c.addr == "" {
-		return fmt.Errorf("%w: contract syncer address not configured", apierrors.ErrInvalidInput)
+		err := fmt.Errorf("%w: contract syncer address not configured", apierrors.ErrInvalidInput)
+		telemetry.MarkError(span, err)
+		return err
 	}
 	opts, err := DialOptions(c.tls)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return apierrors.JoinContractSyncer("contract syncer dial options", err)
 	}
 	conn, err := grpc.NewClient(c.addr, opts...)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return apierrors.JoinContractSyncer("dial contract syncer", err)
 	}
 	defer func() { _ = conn.Close() }()
@@ -120,9 +135,12 @@ func (c *Client) Ping(ctx context.Context) error {
 			return nil
 		}
 		if st == connectivity.Shutdown {
-			return apierrors.JoinContractSyncer("wait for ready", errors.New("connection shutdown"))
+			err = apierrors.JoinContractSyncer("wait for ready", errors.New("connection shutdown"))
+			telemetry.MarkError(span, err)
+			return err
 		}
 		if !conn.WaitForStateChange(ctx, st) {
+			telemetry.MarkError(span, ctx.Err())
 			return ctx.Err()
 		}
 	}

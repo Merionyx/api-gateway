@@ -38,7 +38,10 @@ func RunHTTPServer(ctx context.Context, c *container.Container) error {
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: []string{"*"},
 		AllowMethods: []string{"GET", "POST", "OPTIONS"},
-		AllowHeaders: []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		AllowHeaders: []string{
+			"Origin", "Content-Type", "Accept", "Authorization",
+			"Traceparent", "Tracestate", // W3C TraceContext (CORS to browser/edge)
+		},
 	}))
 
 	app.Use(apimetrics.HTTPMiddleware(c.Config.MetricsHTTP.Enabled))
@@ -73,6 +76,7 @@ func setupRoutes(app *fiber.App, c *container.Container) error {
 	// Skip matching request Host/scheme to spec servers (same pattern as oapi-codegen petstore examples).
 	swagger.Servers = nil
 
+	app.Use(httpTraceMiddleware())
 	app.Use(oapimw.OapiRequestValidator(swagger))
 	apiserver.RegisterHandlers(app, NewOpenAPIServer(c))
 	return nil

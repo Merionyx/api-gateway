@@ -1,3 +1,14 @@
+# Same chart as values.edge.dev.yaml; example upgrade from repo root:
+#   helm upgrade <release-name> ./deployments/helm/api-gateway-edge -n api-gateway -f ./deployments/dev/helm/values.edge.dyn-qa.yaml
+#
+# Jaeger: deployments/dev/kubernetes/manifests/telemetry (default/jaeger:4317).
+
+telemetry:
+  enabled: true
+  otlp_endpoint: "http://jaeger.default.svc.cluster.local:4317"
+  otlp_insecure: true
+  otlp_protocol: grpc
+
 connectivity:
   envoyNodeId: envoy-dyn-qa
   controllerGrpcAddress: local-cp-api-gateway-control-plane-controller:19090
@@ -21,6 +32,9 @@ certManager:
 envoy:
   image:
     pullPolicy: IfNotPresent
+  tracing:
+    enabled: true
+    inheritCollectorFromTelemetry: true
 
 authSidecar:
   image:

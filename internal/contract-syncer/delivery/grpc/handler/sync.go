@@ -10,6 +10,7 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/contract-syncer/domain/interfaces"
 	syncmetrics "github.com/merionyx/api-gateway/internal/contract-syncer/metrics"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
 
 type SyncHandler struct {
@@ -27,11 +28,15 @@ func NewSyncHandler(syncUseCase interfaces.SyncUseCase, metricsEnabled bool) *Sy
 
 // Sync is stateless: safe behind TCP load balancing; callers (API Server leader) retry on failure.
 func (h *SyncHandler) Sync(ctx context.Context, req *pb.SyncRequest) (*pb.SyncResponse, error) {
+	ctx, span := telemetry.ServerSpan(ctx, spanHandlerPkg, "Sync")
+	defer span.End()
+
 	slog.Info("Received sync request", "repository", req.Repository, "ref", req.Ref, "path", req.Path)
 
 	start := time.Now()
-	snapshots, err := h.syncUseCase.Sync(req.Repository, req.Ref, req.Path)
+	snapshots, err := h.syncUseCase.Sync(ctx, req.Repository, req.Ref, req.Path)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		slog.Error("Failed to sync repository", "error", err)
 		syncmetrics.RecordSync(h.metricsEnabled, syncmetrics.OutcomeResponseError, time.Since(start))
 		return &pb.SyncResponse{
@@ -70,11 +75,15 @@ func (h *SyncHandler) Sync(ctx context.Context, req *pb.SyncRequest) (*pb.SyncRe
 }
 
 func (h *SyncHandler) ExportContracts(ctx context.Context, req *pb.ExportContractsRequest) (*pb.ExportContractsResponse, error) {
+	ctx, span := telemetry.ServerSpan(ctx, spanHandlerPkg, "ExportContracts")
+	defer span.End()
+
 	slog.Info("Received export request", "repository", req.Repository, "ref", req.Ref, "path", req.Path, "contract", req.ContractName)
 
 	start := time.Now()
-	files, err := h.syncUseCase.ExportContracts(req.Repository, req.Ref, req.Path, req.ContractName)
+	files, err := h.syncUseCase.ExportContracts(ctx, req.Repository, req.Ref, req.Path, req.ContractName)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		slog.Error("Export contracts failed", "error", err)
 		syncmetrics.RecordSync(h.metricsEnabled, syncmetrics.OutcomeResponseError, time.Since(start))
 		return &pb.ExportContractsResponse{Error: err.Error()}, nil

@@ -8,6 +8,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 	apimetrics "github.com/merionyx/api-gateway/internal/api-server/metrics"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 
 	"github.com/gofiber/fiber/v3"
 )
@@ -24,8 +25,11 @@ func NewJWTHandler(jwtUseCase *auth.JWTUseCase, metricsEnabled bool) *JWTHandler
 // GenerateToken generates a JWT token
 // POST /api/v1/tokens
 func (h *JWTHandler) GenerateToken(c fiber.Ctx) error {
+	span := beginHandlerSpan(c, "GenerateToken")
+	defer span.End()
 	var req models.GenerateTokenRequest
 	if err := c.Bind().Body(&req); err != nil {
+		telemetry.MarkError(span, err)
 		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationBind)
 		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidJSONBody, "", problem.DetailInvalidJSONBody))
 	}
@@ -52,8 +56,9 @@ func (h *JWTHandler) GenerateToken(c fiber.Ctx) error {
 		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeTokenExpiresAtPast, "", problem.DetailTokenExpiresAtPast))
 	}
 
-	token, err := h.jwtUseCase.GenerateToken(&req)
+	token, err := h.jwtUseCase.GenerateToken(c.Context(), &req)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultInternalError)
 		return problem.RespondError(c, err)
 	}
@@ -65,8 +70,11 @@ func (h *JWTHandler) GenerateToken(c fiber.Ctx) error {
 // GetJWKS returns a JSON Web Key Set
 // GET /.well-known/jwks.json
 func (h *JWTHandler) GetJWKS(c fiber.Ctx) error {
-	jwks, err := h.jwtUseCase.GetJWKS()
+	span := beginHandlerSpan(c, "GetJWKS")
+	defer span.End()
+	jwks, err := h.jwtUseCase.GetJWKS(c.Context())
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.RespondError(c, err)
 	}
 
@@ -76,6 +84,8 @@ func (h *JWTHandler) GetJWKS(c fiber.Ctx) error {
 // GetSigningKeys returns a list of signing keys
 // GET /api/v1/keys
 func (h *JWTHandler) GetSigningKeys(c fiber.Ctx) error {
-	keys := h.jwtUseCase.GetSigningKeys()
+	span := beginHandlerSpan(c, "GetSigningKeys")
+	defer span.End()
+	keys := h.jwtUseCase.GetSigningKeys(c.Context())
 	return c.JSON(keys)
 }

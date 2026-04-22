@@ -3,12 +3,16 @@ package httpdelivery
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
 
 // NewMux returns HTTP routes for the Gateway Controller: operational probes only (no REST control plane).
 func NewMux() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/health", health)
+	mux.Handle("/health", telemetry.WrapHandlerHTTP(http.HandlerFunc(health), func(r *http.Request) bool {
+		return telemetry.SkipProbePath(r.URL.Path)
+	}))
 	return mux
 }
 

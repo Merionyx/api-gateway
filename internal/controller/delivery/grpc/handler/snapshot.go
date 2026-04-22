@@ -7,6 +7,7 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -22,6 +23,9 @@ func NewSnapshotHandler(snapshotsUseCase interfaces.SnapshotsUseCase) *SnapshotH
 }
 
 func (h *SnapshotHandler) UpdateSnapshot(ctx context.Context, req *snapshotsv1.UpdateSnapshotRequest) (*snapshotsv1.UpdateSnapshotResponse, error) {
+	ctx, span := telemetry.ServerSpan(ctx, spanHandlerPkg, "UpdateSnapshot")
+	defer span.End()
+
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "request cannot be empty")
 	}
@@ -30,6 +34,7 @@ func (h *SnapshotHandler) UpdateSnapshot(ctx context.Context, req *snapshotsv1.U
 		Environment: req.Environment,
 	})
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -40,6 +45,9 @@ func (h *SnapshotHandler) UpdateSnapshot(ctx context.Context, req *snapshotsv1.U
 }
 
 func (h *SnapshotHandler) GetSnapshotStatus(ctx context.Context, req *snapshotsv1.GetSnapshotStatusRequest) (*snapshotsv1.GetSnapshotStatusResponse, error) {
+	ctx, span := telemetry.ServerSpan(ctx, spanHandlerPkg, "GetSnapshotStatus")
+	defer span.End()
+
 	if req == nil || req.Environment == "" {
 		return nil, status.Error(codes.InvalidArgument, "environment is required")
 	}
@@ -48,6 +56,7 @@ func (h *SnapshotHandler) GetSnapshotStatus(ctx context.Context, req *snapshotsv
 		Environment: req.Environment,
 	})
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 

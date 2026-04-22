@@ -8,6 +8,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/pagination"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
 
 // ControllerReadUseCase serves HTTP registry reads for controllers.
@@ -20,8 +21,11 @@ func NewControllerReadUseCase(controllers interfaces.ControllerRepository) *Cont
 }
 
 func (u *ControllerReadUseCase) ListControllers(ctx context.Context, limit *int, cursor *string) ([]models.ControllerInfo, *string, bool, error) {
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseRegistryPkg, "ListControllers"))
+	defer span.End()
 	all, err := u.controllers.ListControllers(ctx)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return nil, nil, false, err
 	}
 	sort.Slice(all, func(i, j int) bool { return all[i].ControllerID < all[j].ControllerID })
@@ -30,8 +34,11 @@ func (u *ControllerReadUseCase) ListControllers(ctx context.Context, limit *int,
 }
 
 func (u *ControllerReadUseCase) ListControllersByTenant(ctx context.Context, tenant string, limit *int, cursor *string) ([]models.ControllerInfo, *string, bool, error) {
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseRegistryPkg, "ListControllersByTenant"))
+	defer span.End()
 	all, err := u.controllers.ListControllers(ctx)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return nil, nil, false, err
 	}
 	filtered := make([]models.ControllerInfo, 0, len(all))
@@ -46,9 +53,21 @@ func (u *ControllerReadUseCase) ListControllersByTenant(ctx context.Context, ten
 }
 
 func (u *ControllerReadUseCase) GetController(ctx context.Context, controllerID string) (*models.ControllerInfo, error) {
-	return u.controllers.GetController(ctx, controllerID)
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseRegistryPkg, "GetController"))
+	defer span.End()
+	info, err := u.controllers.GetController(ctx, controllerID)
+	if err != nil {
+		telemetry.MarkError(span, err)
+	}
+	return info, err
 }
 
 func (u *ControllerReadUseCase) GetHeartbeat(ctx context.Context, controllerID string) (time.Time, error) {
-	return u.controllers.GetHeartbeat(ctx, controllerID)
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseRegistryPkg, "GetHeartbeat"))
+	defer span.End()
+	t, err := u.controllers.GetHeartbeat(ctx, controllerID)
+	if err != nil {
+		telemetry.MarkError(span, err)
+	}
+	return t, err
 }

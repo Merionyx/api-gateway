@@ -9,6 +9,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 	"github.com/merionyx/api-gateway/internal/controller/xds/cache"
 	"github.com/merionyx/api-gateway/internal/controller/xds/snapshot"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 
 	xdsResource "github.com/envoyproxy/go-control-plane/pkg/resource/v3"
 )
@@ -30,12 +31,15 @@ func (uc *snapshotsUseCase) SetDependencies(environmentUseCase interfaces.Enviro
 }
 
 func (uc *snapshotsUseCase) UpdateSnapshot(ctx context.Context, req *models.UpdateSnapshotRequest) (*models.UpdateSnapshotResponse, error) {
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseControllerPkg, "UpdateSnapshot"))
+	defer span.End()
 	var updatedEnvironments []string
 
 	if req.Environment == "" {
 		// Update all environments
 		environments, err := uc.environmentUseCase.ListEnvironments(ctx)
 		if err != nil {
+			telemetry.MarkError(span, err)
 			return nil, fmt.Errorf("failed to list environments: %w", err)
 		}
 
@@ -50,10 +54,12 @@ func (uc *snapshotsUseCase) UpdateSnapshot(ctx context.Context, req *models.Upda
 		// Update specific environment
 		env, err := uc.environmentUseCase.GetEnvironment(ctx, req.Environment)
 		if err != nil {
+			telemetry.MarkError(span, err)
 			return nil, fmt.Errorf("environment %s not found: %w", req.Environment, err)
 		}
 
 		if err := uc.rebuildSnapshot(ctx, req.Environment, env); err != nil {
+			telemetry.MarkError(span, err)
 			return nil, fmt.Errorf("failed to rebuild snapshot: %w", err)
 		}
 		updatedEnvironments = append(updatedEnvironments, req.Environment)
@@ -66,14 +72,18 @@ func (uc *snapshotsUseCase) UpdateSnapshot(ctx context.Context, req *models.Upda
 }
 
 func (uc *snapshotsUseCase) GetSnapshotStatus(ctx context.Context, req *models.GetSnapshotStatusRequest) (*models.GetSnapshotStatusResponse, error) {
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseControllerPkg, "GetSnapshotStatus"))
+	defer span.End()
 	env, err := uc.environmentUseCase.GetEnvironment(ctx, req.Environment)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return nil, fmt.Errorf("environment %s not found: %w", req.Environment, err)
 	}
 
 	nodeID := fmt.Sprintf("envoy-%s", req.Environment)
 	xdsSnapshot, err := uc.xdsSnapshotManager.GetSnapshot(nodeID)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return nil, fmt.Errorf("failed to get xDS snapshot: %w", err)
 	}
 
@@ -91,13 +101,17 @@ func (uc *snapshotsUseCase) GetSnapshotStatus(ctx context.Context, req *models.G
 }
 
 func (uc *snapshotsUseCase) rebuildSnapshot(ctx context.Context, envName string, env *models.Environment) error {
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseControllerPkg, "rebuildSnapshot"))
+	defer span.End()
 	xdsSnapshot, err := snapshot.BuildEnvoySnapshot(uc.xdsBuilder, env)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return fmt.Errorf("build envoy snapshot: %w", err)
 	}
 	nodeID := fmt.Sprintf("envoy-%s", envName)
 
 	if err := uc.xdsSnapshotManager.UpdateSnapshot(nodeID, xdsSnapshot); err != nil {
+		telemetry.MarkError(span, err)
 		return fmt.Errorf("failed to update xDS snapshot: %w", err)
 	}
 

@@ -23,3 +23,9 @@ repositories:
 
 api_server:
   address: "gateway-api-server:19093"
+
+# OpenTelemetry (optional); env TELEMETRY_ENABLED and OTEL_* can override.
+# telemetry:
+#   enabled: false
+#   otlp_endpoint: "http://jaeger:4317"
+#   otlp_insecure: true

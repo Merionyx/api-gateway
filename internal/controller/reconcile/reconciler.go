@@ -13,7 +13,11 @@ import (
 	xdscache "github.com/merionyx/api-gateway/internal/controller/xds/cache"
 	"github.com/merionyx/api-gateway/internal/controller/xds/snapshot"
 	"github.com/merionyx/api-gateway/internal/shared/election"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
+
+// spanReconcilePkg is the package path for [telemetry.SpanName] in the reconciler.
+const spanReconcilePkg = "internal/controller/reconcile"
 
 // ReconcilerDeps are dependencies for the effective reconciler. Nil etcd is allowed (in-memory xDS only).
 type ReconcilerDeps struct {
@@ -159,8 +163,11 @@ func (r *Reconciler) ReconcileOne(ctx context.Context, name string, writeMateria
 }
 
 func (r *Reconciler) reconcileOneBuilt(ctx context.Context, name string, eff *models.Environment, writeMat bool) error {
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanReconcilePkg, "reconcileOneBuilt"))
+	defer span.End()
 	buildEnv, err := r.envWithSnapshotsFromSchema(ctx, eff)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return fmt.Errorf("enrich with snapshots: %w", err)
 	}
 	if buildEnv == nil {
@@ -168,10 +175,12 @@ func (r *Reconciler) reconcileOneBuilt(ctx context.Context, name string, eff *mo
 	}
 	envoySnap, err := snapshot.BuildEnvoySnapshot(r.xb, buildEnv)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return fmt.Errorf("build envoy snapshot: %w", err)
 	}
 	nodeID := fmt.Sprintf("envoy-%s", name)
 	if err := r.xm.UpdateSnapshot(nodeID, envoySnap); err != nil {
+		telemetry.MarkError(span, err)
 		return fmt.Errorf("update xDS snapshot: %w", err)
 	}
 	slog.Info("updated xDS snapshot", "environment", name, "node_id", nodeID, "reconcile", "memory_etcd_merged")

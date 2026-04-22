@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -14,7 +15,7 @@ func TestJWTUseCase_GenerateToken(t *testing.T) {
 		t.Fatal(err)
 	}
 	exp := time.Now().Add(time.Hour)
-	resp, err := uc.GenerateToken(&models.GenerateTokenRequest{
+	resp, err := uc.GenerateToken(context.Background(), &models.GenerateTokenRequest{
 		AppID:        "app-1",
 		Environments: []string{"dev"},
 		ExpiresAt:    exp,
@@ -33,7 +34,7 @@ func TestJWTUseCase_GenerateToken_NoActiveKey(t *testing.T) {
 		signingKeys: map[string]*KeyPair{},
 		activeKeyID: "missing",
 	}
-	_, err := uc.GenerateToken(&models.GenerateTokenRequest{
+	_, err := uc.GenerateToken(context.Background(), &models.GenerateTokenRequest{
 		AppID:        "a",
 		Environments: []string{"e"},
 		ExpiresAt:    time.Now().Add(time.Hour),

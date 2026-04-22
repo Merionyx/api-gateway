@@ -227,6 +227,7 @@ func (c *Container) initXDS() error {
 		c.XDSSnapshotManager.GetCache(),
 		c.Config.GRPCXDS.Observability.ReflectionEnabled,
 		c.Config.MetricsHTTP.Enabled,
+		c.Config.XDSTraceCallbacks,
 		xdsOpts...,
 	)
 

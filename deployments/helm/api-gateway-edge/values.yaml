@@ -10,6 +10,15 @@ global:
 
 replicaCount: 1
 
+# OpenTelemetry; merged as top-level `telemetry` into the auth sidecar app config
+# (same keys as internal/shared/telemetry FileBlock). Overridden by `authSidecar.telemetry`.
+telemetry:
+  enabled: false
+  # service_name: ""
+  # otlp_endpoint: ""
+  # otlp_insecure: true
+  # otlp_protocol: "grpc"
+
 defaultPodAntiAffinity: true
 defaultTopologySpreadConstraints: true
 
@@ -27,6 +36,30 @@ envoy:
   pdb:
     enabled: true
     minAvailable: 1
+  # OpenTelemetry (Envoy → OTLP gRPC). Independent sampling vs application `telemetry` — most knobs
+  # live in the bootstrap (ConfigMap) so you can tune tracers, cluster, and optional `appendBootstrap`.
+  # Set `enabled: true` and a collector (or `inheritCollectorFromTelemetry: true` with a parseable
+  # `telemetry.otlp_endpoint`). The auth sidecar can still use the same `telemetry` block to send
+  # to the same backend.
+  tracing:
+    enabled: false
+    # If true, parse host:port from top-level .telemetry.otlp_endpoint (http(s)://host:port) when
+    # .envoy.tracing.collector.host is empty.
+    inheritCollectorFromTelemetry: true
+    collector:
+      # Required when enabled unless inherit + valid otlp_endpoint.
+      host: ""
+      port: 4317
+    openTelemetry:
+      # Resource service.name; default: api-gateway-edge-<connectivity.environment> (else {fullname}-envoy)
+      serviceName: ""
+      # gRPC to collector (per OpenTelemetryConfig in bootstrap)
+      grpcTimeout: 3s
+      # static cluster name; must match grpc_service.envoy_grpc.cluster_name
+      clusterName: ""
+    # Appended to the end of the bootstrap file (raw YAML, additional top-level keys only; avoid
+    # duplicating `tracing` / `static_resources` unless you know what you are doing).
+    appendBootstrap: ""
 
 authSidecar:
   image:
@@ -41,6 +74,8 @@ authSidecar:
   topologySpreadConstraints: []
   hostAliases: []
   config: {}
+  # Merged over global .telemetry for the auth sidecar only.
+  telemetry: {}
 
 # Explicit connectivity (set to your control-plane Services / cross-cluster DNS)
 connectivity:

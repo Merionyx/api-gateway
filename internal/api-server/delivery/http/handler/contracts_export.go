@@ -8,6 +8,7 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/problem"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/bundle"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
 
 type ContractsExportHandler struct {
@@ -37,8 +38,11 @@ type contractsExportResponse struct {
 
 // Export POST /api/v1/contracts/export — forwards to Contract Syncer (no etcd).
 func (h *ContractsExportHandler) Export(c fiber.Ctx) error {
+	span := beginHandlerSpan(c, "Export")
+	defer span.End()
 	var req contractsExportRequest
 	if err := c.Bind().Body(&req); err != nil {
+		telemetry.MarkError(span, err)
 		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidJSONBody, "", problem.DetailInvalidJSONBody))
 	}
 	if req.Repository == "" || req.Ref == "" {
@@ -47,6 +51,7 @@ func (h *ContractsExportHandler) Export(c fiber.Ctx) error {
 
 	files, err := h.exportUC.Export(c.Context(), req.Repository, req.Ref, req.Path, req.ContractName)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return problem.WriteContractSync(c, err)
 	}
 

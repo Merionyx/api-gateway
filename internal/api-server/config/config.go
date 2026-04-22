@@ -7,6 +7,7 @@ import (
 	sharedetcd "github.com/merionyx/api-gateway/internal/shared/etcd"
 	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
 	"github.com/merionyx/api-gateway/internal/shared/metricshttp"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 
 	"github.com/spf13/viper"
 )
@@ -26,6 +27,8 @@ type Config struct {
 	MetricsHTTP              metricshttp.Config      `mapstructure:"metrics_http" json:"metrics_http"`
 	// Idempotency configures POST /api/v1/bundles/sync replay when Idempotency-Key is sent.
 	Idempotency IdempotencyConfig `mapstructure:"idempotency" json:"idempotency"`
+	// Telemetry: OpenTelemetry trace export (optional). Merged with env; see FileBlock in the telemetry package.
+	Telemetry telemetry.FileBlock `mapstructure:"telemetry" json:"telemetry"`
 }
 
 // IdempotencyConfig controls POST /bundles/sync idempotency (memory or etcd).

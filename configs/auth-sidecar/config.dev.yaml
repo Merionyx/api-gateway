@@ -8,3 +8,9 @@ controller:
 
 jwt:
   jwks_url: "http://gateway-ha-lb:8080/.well-known/jwks.json"
+
+# OpenTelemetry (optional)
+# telemetry:
+#   enabled: false
+#   otlp_endpoint: "http://jaeger:4317"
+#   otlp_insecure: true

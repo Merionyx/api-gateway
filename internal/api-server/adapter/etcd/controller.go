@@ -9,6 +9,7 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
@@ -31,7 +32,12 @@ type HeartbeatInfo struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
-func (r *ControllerRepository) RegisterController(ctx context.Context, info models.ControllerInfo) error {
+func (r *ControllerRepository) RegisterController(ctx context.Context, info models.ControllerInfo) (err error) {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanAPIEtcdPkg, "RegisterController"))
+	defer func() {
+		telemetry.MarkError(span, err)
+		span.End()
+	}()
 	slog.Info("Registering controller", "controller_id", info.ControllerID, "tenant", info.Tenant)
 
 	key := fmt.Sprintf("%s%s", controllerPrefix, info.ControllerID)
@@ -65,7 +71,12 @@ func (r *ControllerRepository) RegisterController(ctx context.Context, info mode
 	return nil
 }
 
-func (r *ControllerRepository) GetController(ctx context.Context, controllerID string) (*models.ControllerInfo, error) {
+func (r *ControllerRepository) GetController(ctx context.Context, controllerID string) (info *models.ControllerInfo, err error) {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanAPIEtcdPkg, "GetController"))
+	defer func() {
+		telemetry.MarkError(span, err)
+		span.End()
+	}()
 	key := fmt.Sprintf("%s%s", controllerPrefix, controllerID)
 
 	resp, err := r.client.Get(ctx, key)
@@ -77,38 +88,47 @@ func (r *ControllerRepository) GetController(ctx context.Context, controllerID s
 		return nil, fmt.Errorf("%w", apierrors.ErrNotFound)
 	}
 
-	var info models.ControllerInfo
-	if err := json.Unmarshal(resp.Kvs[0].Value, &info); err != nil {
+	var parsed models.ControllerInfo
+	if err := json.Unmarshal(resp.Kvs[0].Value, &parsed); err != nil {
 		return nil, apierrors.JoinStore("unmarshal controller info", err)
 	}
 
-	return &info, nil
+	return &parsed, nil
 }
 
-func (r *ControllerRepository) ListControllers(ctx context.Context) ([]models.ControllerInfo, error) {
+func (r *ControllerRepository) ListControllers(ctx context.Context) (out []models.ControllerInfo, err error) {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanAPIEtcdPkg, "ListControllers"))
+	defer func() {
+		telemetry.MarkError(span, err)
+		span.End()
+	}()
 	resp, err := r.client.Get(ctx, controllerPrefix, clientv3.WithPrefix())
 	if err != nil {
 		return nil, apierrors.JoinStore("list controllers from etcd", err)
 	}
 
-	var controllers []models.ControllerInfo
 	for _, kv := range resp.Kvs {
 		if string(kv.Key)[len(string(kv.Key))-10:] == "/heartbeat" {
 			continue
 		}
 
-		var info models.ControllerInfo
-		if err := json.Unmarshal(kv.Value, &info); err != nil {
+		var row models.ControllerInfo
+		if err := json.Unmarshal(kv.Value, &row); err != nil {
 			slog.Error("Failed to unmarshal controller info", "key", string(kv.Key), "error", err)
 			continue
 		}
-		controllers = append(controllers, info)
+		out = append(out, row)
 	}
 
-	return controllers, nil
+	return out, nil
 }
 
-func (r *ControllerRepository) GetHeartbeat(ctx context.Context, controllerID string) (time.Time, error) {
+func (r *ControllerRepository) GetHeartbeat(ctx context.Context, controllerID string) (t time.Time, err error) {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanAPIEtcdPkg, "GetHeartbeat"))
+	defer func() {
+		telemetry.MarkError(span, err)
+		span.End()
+	}()
 	mainKey := fmt.Sprintf("%s%s", controllerPrefix, controllerID)
 	resp, err := r.client.Get(ctx, mainKey)
 	if err != nil {
@@ -138,6 +158,11 @@ func (r *ControllerRepository) GetHeartbeat(ctx context.Context, controllerID st
 }
 
 func (r *ControllerRepository) UpdateControllerHeartbeat(ctx context.Context, controllerID string, environments []models.EnvironmentInfo, registryPayloadVersion int32) (mainKeyUpdated bool, err error) {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanAPIEtcdPkg, "UpdateControllerHeartbeat"))
+	defer func() {
+		telemetry.MarkError(span, err)
+		span.End()
+	}()
 	heartbeatKey := fmt.Sprintf("%s%s/heartbeat", controllerPrefix, controllerID)
 	heartbeatData, err := json.Marshal(HeartbeatInfo{
 		Timestamp: time.Now(),

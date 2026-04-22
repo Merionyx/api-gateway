@@ -34,6 +34,13 @@ leader_election:
 api_server:
   address: "gateway-api-server:19093"
 
+# OpenTelemetry (optional)
+# telemetry:
+#   enabled: false
+#   service_name: "controller"
+#   otlp_endpoint: "http://jaeger:4317"
+#   otlp_insecure: true
+
 environments:
 
 services:

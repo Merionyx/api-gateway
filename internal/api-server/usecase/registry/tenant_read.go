@@ -9,6 +9,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/pagination"
 	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
 
 // TenantReadUseCase aggregates tenant-scoped registry views from controller registrations.
@@ -21,8 +22,11 @@ func NewTenantReadUseCase(controllers interfaces.ControllerRepository) *TenantRe
 }
 
 func (u *TenantReadUseCase) ListTenants(ctx context.Context, limit *int, cursor *string) ([]string, *string, bool, error) {
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseRegistryPkg, "ListTenants"))
+	defer span.End()
 	all, err := u.controllers.ListControllers(ctx)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return nil, nil, false, err
 	}
 	seen := make(map[string]struct{}, len(all))
@@ -44,8 +48,11 @@ func (u *TenantReadUseCase) ListTenants(ctx context.Context, limit *int, cursor 
 
 // ListEnvironmentsByTenant merges environments for the tenant across controllers (same name → combined bundles, de-duplicated by bundle key).
 func (u *TenantReadUseCase) ListEnvironmentsByTenant(ctx context.Context, tenant string, limit *int, cursor *string) ([]models.EnvironmentInfo, *string, bool, error) {
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseRegistryPkg, "ListEnvironmentsByTenant"))
+	defer span.End()
 	all, err := u.controllers.ListControllers(ctx)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return nil, nil, false, err
 	}
 	byName := make(map[string]models.EnvironmentInfo)
@@ -85,8 +92,11 @@ func (u *TenantReadUseCase) ListEnvironmentsByTenant(ctx context.Context, tenant
 
 // ListBundlesByTenant returns distinct static bundle descriptors for the tenant (union across environments and controllers).
 func (u *TenantReadUseCase) ListBundlesByTenant(ctx context.Context, tenant string, limit *int, cursor *string) ([]models.BundleInfo, *string, bool, error) {
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseRegistryPkg, "ListBundlesByTenant"))
+	defer span.End()
 	all, err := u.controllers.ListControllers(ctx)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return nil, nil, false, err
 	}
 	seen := make(map[string]models.BundleInfo)

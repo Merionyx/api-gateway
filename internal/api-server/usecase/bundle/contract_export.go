@@ -5,6 +5,7 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
 	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
 
 // ContractExportUseCase proxies contract file export to Contract Syncer (no etcd).
@@ -17,5 +18,11 @@ func NewContractExportUseCase(remote interfaces.ContractExportRemote) *ContractE
 }
 
 func (u *ContractExportUseCase) Export(ctx context.Context, repository, ref, path, contractName string) ([]sharedgit.ExportedContractFile, error) {
-	return u.remote.ExportContractFiles(ctx, repository, ref, path, contractName)
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseBundlePkg, "Export"))
+	defer span.End()
+	files, err := u.remote.ExportContractFiles(ctx, repository, ref, path, contractName)
+	if err != nil {
+		telemetry.MarkError(span, err)
+	}
+	return files, err
 }

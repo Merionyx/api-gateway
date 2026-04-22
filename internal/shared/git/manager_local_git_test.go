@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -61,7 +62,7 @@ x-api-gateway:
 
 	ref := "heads/main"
 	sub := "openapi"
-	snaps1, err := rm.GetRepositorySnapshots("lg", ref, sub)
+	snaps1, err := rm.GetRepositorySnapshots(context.Background(), "lg", ref, sub)
 	if err != nil {
 		t.Fatalf("GetRepositorySnapshots 1: %v", err)
 	}
@@ -69,7 +70,7 @@ x-api-gateway:
 		t.Fatalf("unexpected %+v", snaps1)
 	}
 
-	snaps2, err := rm.GetRepositorySnapshots("lg", ref, sub)
+	snaps2, err := rm.GetRepositorySnapshots(context.Background(), "lg", ref, sub)
 	if err != nil {
 		t.Fatalf("GetRepositorySnapshots 2: %v", err)
 	}

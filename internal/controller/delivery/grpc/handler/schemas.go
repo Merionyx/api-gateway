@@ -10,6 +10,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 	"github.com/merionyx/api-gateway/internal/controller/usecase"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -25,6 +26,9 @@ func NewSchemasHandler(schemasUseCase interfaces.SchemasUseCase) *SchemasHandler
 }
 
 func (h *SchemasHandler) SyncContractBundle(ctx context.Context, req *schemasv1.SyncContractBundleRequest) (*schemasv1.SyncContractBundleResponse, error) {
+	ctx, span := telemetry.ServerSpan(ctx, spanHandlerPkg, "SyncContractBundle")
+	defer span.End()
+
 	if req == nil || req.Repository == "" || req.Ref == "" || req.Bundle == "" {
 		return nil, status.Error(codes.InvalidArgument, "repository, ref, and bundle are required")
 	}
@@ -36,6 +40,7 @@ func (h *SchemasHandler) SyncContractBundle(ctx context.Context, req *schemasv1.
 		Force:      req.Force,
 	})
 	if err != nil {
+		telemetry.MarkError(span, err)
 		if errors.Is(err, usecase.ErrContractsManagedByAPIServer) {
 			return nil, status.Error(codes.Unimplemented, err.Error())
 		}
@@ -49,12 +54,16 @@ func (h *SchemasHandler) SyncContractBundle(ctx context.Context, req *schemasv1.
 }
 
 func (h *SchemasHandler) GetContractSnapshot(ctx context.Context, req *schemasv1.GetContractSnapshotRequest) (*schemasv1.GetContractSnapshotResponse, error) {
+	ctx, span := telemetry.ServerSpan(ctx, spanHandlerPkg, "GetContractSnapshot")
+	defer span.End()
+
 	if req == nil || req.Repository == "" || req.Ref == "" || req.Contract == "" {
 		return nil, status.Error(codes.InvalidArgument, "repository, ref, and contract are required")
 	}
 
 	snapshot, err := h.schemasUseCase.GetContractSnapshot(ctx, req.Repository, req.Ref, req.Path, req.Contract)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
 
@@ -64,12 +73,16 @@ func (h *SchemasHandler) GetContractSnapshot(ctx context.Context, req *schemasv1
 }
 
 func (h *SchemasHandler) ListContractSnapshots(ctx context.Context, req *schemasv1.ListContractSnapshotsRequest) (*schemasv1.ListContractSnapshotsResponse, error) {
+	ctx, span := telemetry.ServerSpan(ctx, spanHandlerPkg, "ListContractSnapshots")
+	defer span.End()
+
 	if req == nil || req.Repository == "" || req.Ref == "" {
 		return nil, status.Error(codes.InvalidArgument, "repository and ref are required")
 	}
 
 	snapshots, err := h.schemasUseCase.ListContractSnapshots(ctx, req.Repository, req.Ref, req.Path)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -84,10 +97,14 @@ func (h *SchemasHandler) ListContractSnapshots(ctx context.Context, req *schemas
 }
 
 func (h *SchemasHandler) SyncAllContracts(ctx context.Context, req *schemasv1.SyncAllContractsRequest) (*schemasv1.SyncAllContractsResponse, error) {
+	ctx, span := telemetry.ServerSpan(ctx, spanHandlerPkg, "SyncAllContracts")
+	defer span.End()
+
 	response, err := h.schemasUseCase.SyncAllContracts(ctx, &models.SyncAllContractsRequest{
 		Environment: req.Environment,
 	})
 	if err != nil {
+		telemetry.MarkError(span, err)
 		if errors.Is(err, usecase.ErrContractsManagedByAPIServer) {
 			return nil, status.Error(codes.Unimplemented, err.Error())
 		}

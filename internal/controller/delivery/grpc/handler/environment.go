@@ -10,8 +10,9 @@ import (
 	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 	"github.com/merionyx/api-gateway/internal/controller/index/bundleenv"
-	ctrlmetrics "github.com/merionyx/api-gateway/internal/controller/metrics"
+	ctrlmetrics 	"github.com/merionyx/api-gateway/internal/controller/metrics"
 	"github.com/merionyx/api-gateway/internal/shared/election"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -55,6 +56,9 @@ func (h *EnvironmentsHandler) rebuildBundleIndexAsync() {
 }
 
 func (h *EnvironmentsHandler) CreateEnvironment(ctx context.Context, req *environmentsv1.CreateEnvironmentRequest) (*environmentsv1.CreateEnvironmentResponse, error) {
+	ctx, span := telemetry.ServerSpan(ctx, spanHandlerPkg, "CreateEnvironment")
+	defer span.End()
+
 	if req == nil || req.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "name is required")
 	}
@@ -69,6 +73,7 @@ func (h *EnvironmentsHandler) CreateEnvironment(ctx context.Context, req *enviro
 		Services: protoToModelServicesConfig(req.Services),
 	})
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -80,12 +85,16 @@ func (h *EnvironmentsHandler) CreateEnvironment(ctx context.Context, req *enviro
 }
 
 func (h *EnvironmentsHandler) GetEnvironment(ctx context.Context, req *environmentsv1.GetEnvironmentRequest) (*environmentsv1.GetEnvironmentResponse, error) {
+	ctx, span := telemetry.ServerSpan(ctx, spanHandlerPkg, "GetEnvironment")
+	defer span.End()
+
 	if req == nil || req.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "name is required")
 	}
 
 	env, err := h.environmentsUseCase.GetEnvironment(ctx, req.Name)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
 
@@ -95,8 +104,12 @@ func (h *EnvironmentsHandler) GetEnvironment(ctx context.Context, req *environme
 }
 
 func (h *EnvironmentsHandler) ListEnvironments(ctx context.Context, req *environmentsv1.ListEnvironmentsRequest) (*environmentsv1.ListEnvironmentsResponse, error) {
+	ctx, span := telemetry.ServerSpan(ctx, spanHandlerPkg, "ListEnvironments")
+	defer span.End()
+
 	environments, err := h.environmentsUseCase.ListEnvironments(ctx)
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -111,6 +124,9 @@ func (h *EnvironmentsHandler) ListEnvironments(ctx context.Context, req *environ
 }
 
 func (h *EnvironmentsHandler) UpdateEnvironment(ctx context.Context, req *environmentsv1.UpdateEnvironmentRequest) (*environmentsv1.UpdateEnvironmentResponse, error) {
+	ctx, span := telemetry.ServerSpan(ctx, spanHandlerPkg, "UpdateEnvironment")
+	defer span.End()
+
 	if req == nil || req.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "name is required")
 	}
@@ -124,6 +140,7 @@ func (h *EnvironmentsHandler) UpdateEnvironment(ctx context.Context, req *enviro
 		Services: protoToModelServicesConfig(req.Services),
 	})
 	if err != nil {
+		telemetry.MarkError(span, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -135,6 +152,9 @@ func (h *EnvironmentsHandler) UpdateEnvironment(ctx context.Context, req *enviro
 }
 
 func (h *EnvironmentsHandler) DeleteEnvironment(ctx context.Context, req *environmentsv1.DeleteEnvironmentRequest) (*environmentsv1.DeleteEnvironmentResponse, error) {
+	ctx, span := telemetry.ServerSpan(ctx, spanHandlerPkg, "DeleteEnvironment")
+	defer span.End()
+
 	if req == nil || req.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "name is required")
 	}
@@ -143,6 +163,7 @@ func (h *EnvironmentsHandler) DeleteEnvironment(ctx context.Context, req *enviro
 	}
 
 	if err := h.environmentsUseCase.DeleteEnvironment(ctx, req.Name); err != nil {
+		telemetry.MarkError(span, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 

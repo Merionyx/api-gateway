@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"time"
@@ -21,11 +22,11 @@ func NewSyncUseCase(gitManager *sharedgit.RepositoryManager, metricsEnabled bool
 	}
 }
 
-func (u *SyncUseCase) Sync(repository, ref, path string) ([]sharedgit.ContractSnapshot, error) {
+func (u *SyncUseCase) Sync(ctx context.Context, repository, ref, path string) ([]sharedgit.ContractSnapshot, error) {
 	slog.Info("Syncing repository", "repository", repository, "ref", ref, "path", path)
 
 	start := time.Now()
-	snapshots, err := u.gitManager.GetRepositorySnapshots(repository, ref, path)
+	snapshots, err := u.gitManager.GetRepositorySnapshots(ctx, repository, ref, path)
 	if err != nil {
 		syncmetrics.RecordGitSyncDuration(u.metricsEnabled, syncmetrics.GitResultError, time.Since(start))
 		return nil, fmt.Errorf("failed to get repository snapshots: %w", err)
@@ -39,10 +40,10 @@ func (u *SyncUseCase) Sync(repository, ref, path string) ([]sharedgit.ContractSn
 	return snapshots, nil
 }
 
-func (u *SyncUseCase) ExportContracts(repository, ref, path, contractName string) ([]sharedgit.ExportedContractFile, error) {
+func (u *SyncUseCase) ExportContracts(ctx context.Context, repository, ref, path, contractName string) ([]sharedgit.ExportedContractFile, error) {
 	slog.Info("Exporting contracts", "repository", repository, "ref", ref, "path", path, "contract", contractName)
 	start := time.Now()
-	files, err := u.gitManager.ExportContractFiles(repository, ref, path, contractName)
+	files, err := u.gitManager.ExportContractFiles(ctx, repository, ref, path, contractName)
 	if err != nil {
 		syncmetrics.RecordGitSyncDuration(u.metricsEnabled, syncmetrics.GitResultError, time.Since(start))
 		return nil, err

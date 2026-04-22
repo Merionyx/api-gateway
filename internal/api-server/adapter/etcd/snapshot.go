@@ -10,9 +10,12 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
+
+const spanAPIEtcdPkg = "internal/api-server/adapter/etcd"
 
 const (
 	snapshotPrefix    = "/api-gateway/api-server/snapshots/"
@@ -61,6 +64,11 @@ func buildSnapshotSavePlan(bundleKey string, existingByName map[string][]byte, s
 }
 
 func (r *SnapshotRepository) SaveSnapshots(ctx context.Context, bundleKey string, snapshots []sharedgit.ContractSnapshot) (written bool, err error) {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanAPIEtcdPkg, "SaveSnapshots"))
+	defer func() {
+		telemetry.MarkError(span, err)
+		span.End()
+	}()
 	slog.Info("Saving snapshots to etcd", "bundle_key", bundleKey, "count", len(snapshots))
 
 	contractsPrefix := fmt.Sprintf("%s%s/contracts/", snapshotPrefix, bundleKey)
@@ -121,7 +129,12 @@ func (r *SnapshotRepository) SaveSnapshots(ctx context.Context, bundleKey string
 	return true, nil
 }
 
-func (r *SnapshotRepository) GetSnapshots(ctx context.Context, bundleKey string) ([]sharedgit.ContractSnapshot, error) {
+func (r *SnapshotRepository) GetSnapshots(ctx context.Context, bundleKey string) (snapshots []sharedgit.ContractSnapshot, err error) {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanAPIEtcdPkg, "GetSnapshots"))
+	defer func() {
+		telemetry.MarkError(span, err)
+		span.End()
+	}()
 	prefix := fmt.Sprintf("%s%s/contracts/", snapshotPrefix, bundleKey)
 
 	slog.Debug("Getting snapshots from etcd", "prefix", prefix)
@@ -133,7 +146,6 @@ func (r *SnapshotRepository) GetSnapshots(ctx context.Context, bundleKey string)
 
 	slog.Debug("Got response from etcd", "keys_count", len(resp.Kvs))
 
-	var snapshots []sharedgit.ContractSnapshot
 	for _, kv := range resp.Kvs {
 		slog.Debug("Processing snapshot", "key", string(kv.Key))
 
@@ -150,7 +162,12 @@ func (r *SnapshotRepository) GetSnapshots(ctx context.Context, bundleKey string)
 	return snapshots, nil
 }
 
-func (r *SnapshotRepository) ListBundleKeys(ctx context.Context) ([]string, error) {
+func (r *SnapshotRepository) ListBundleKeys(ctx context.Context) (out []string, err error) {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanAPIEtcdPkg, "ListBundleKeys"))
+	defer func() {
+		telemetry.MarkError(span, err)
+		span.End()
+	}()
 	resp, err := r.client.Get(ctx, snapshotPrefix, clientv3.WithPrefix(), clientv3.WithKeysOnly())
 	if err != nil {
 		return nil, apierrors.JoinStore("list bundle keys from etcd", err)
@@ -166,12 +183,11 @@ func (r *SnapshotRepository) ListBundleKeys(ctx context.Context) ([]string, erro
 		bundleKeysMap[bk] = true
 	}
 
-	var bundleKeys []string
+	out = make([]string, 0, len(bundleKeysMap))
 	for bundleKey := range bundleKeysMap {
-		bundleKeys = append(bundleKeys, bundleKey)
+		out = append(out, bundleKey)
 	}
-
-	return bundleKeys, nil
+	return out, nil
 }
 
 // bundleKeyFromSnapshotRelativeKey returns the bundle key from a key path relative to snapshotPrefix

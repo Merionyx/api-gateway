@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -8,6 +9,8 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
 
 func Run() error {
@@ -21,6 +24,12 @@ func Run() error {
 		environment = "unknown"
 	}
 
+	tele, err := telemetry.Init(context.Background(), telemetry.BuildConfig("mock-service", telemetry.FileBlock{}))
+	if err != nil {
+		return fmt.Errorf("telemetry: %w", err)
+	}
+	defer telemetry.Shutdown(tele)
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -28,7 +37,8 @@ func Run() error {
 
 	hostname, _ := os.Hostname()
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if timeoutStr := r.URL.Query().Get("timeout"); timeoutStr != "" {
 			if timeoutMs, err := strconv.Atoi(timeoutStr); err == nil && timeoutMs > 0 {
 				duration := time.Duration(timeoutMs) * time.Millisecond
@@ -75,17 +85,19 @@ func Run() error {
 		}
 	})
 
-	http.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		if _, err := fmt.Fprintf(w, "OK"); err != nil {
 			slog.Error("mock service health write", "error", err)
 		}
 	})
 
+	handler := telemetry.WrapHandlerHTTP(mux, func(r *http.Request) bool { return r.URL.Path == "/health" })
+
 	addr := ":" + port
 	slog.Info("starting mock service", "service", serviceName, "environment", environment, "addr", addr)
 
-	if err := http.ListenAndServe(addr, nil); err != nil {
+	if err := http.ListenAndServe(addr, handler); err != nil {
 		return fmt.Errorf("listen and serve: %w", err)
 	}
 	return nil

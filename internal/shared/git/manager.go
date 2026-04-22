@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -13,7 +14,10 @@ import (
 	"github.com/go-git/go-git/v6/plumbing"
 	gitclient "github.com/go-git/go-git/v6/plumbing/client"
 	"github.com/go-git/go-git/v6/storage/memory"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
+
+const spanGitPkg = "internal/shared/git"
 
 func NewRepositoryManager() *RepositoryManager {
 	return &RepositoryManager{
@@ -115,7 +119,12 @@ func (rm *RepositoryManager) getClientOptions(name string) ([]gitclient.Option, 
 	return repo.ClientOptions, nil
 }
 
-func (rm *RepositoryManager) GetRepositorySnapshots(name string, ref string, path string) ([]ContractSnapshot, error) {
+func (rm *RepositoryManager) GetRepositorySnapshots(ctx context.Context, name string, ref string, path string) (out []ContractSnapshot, err error) {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanGitPkg, "GetRepositorySnapshots"))
+	defer func() {
+		telemetry.MarkError(span, err)
+		span.End()
+	}()
 	rm.mu.RLock()
 	managedRepo := rm.repos[name]
 	rm.mu.RUnlock()
