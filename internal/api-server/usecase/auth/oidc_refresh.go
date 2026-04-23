@@ -16,6 +16,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/merionyx/api-gateway/internal/api-server/adapter/etcd"
+	"github.com/merionyx/api-gateway/internal/api-server/auth/idpcache"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/kvvalue"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/oidc"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/sessioncrypto"
@@ -41,6 +42,8 @@ type OIDCRefreshUseCase struct {
 	hc              *http.Client
 	accessTTL       time.Duration
 	metricsEnabled  bool
+	idpCache        *idpcache.Cache
+	idpOpaqueMaxTTL time.Duration
 }
 
 // NewOIDCRefreshUseCase wires refresh; accessTTL<=0 defaults to 5m; hc nil uses http.DefaultClient.
@@ -52,6 +55,8 @@ func NewOIDCRefreshUseCase(
 	hc *http.Client,
 	accessTTL time.Duration,
 	metricsEnabled bool,
+	idpCache *idpcache.Cache,
+	idpOpaqueMaxTTL time.Duration,
 ) *OIDCRefreshUseCase {
 	by := make(map[string]config.OIDCProviderConfig, len(providers))
 	for _, p := range providers {
@@ -64,13 +69,15 @@ func NewOIDCRefreshUseCase(
 		hc = http.DefaultClient
 	}
 	return &OIDCRefreshUseCase{
-		byID:           by,
-		sessions:       sessions,
-		sealer:         sealer,
-		jwt:            jwtUC,
-		hc:             hc,
-		accessTTL:      accessTTL,
-		metricsEnabled: metricsEnabled,
+		byID:            by,
+		sessions:        sessions,
+		sealer:          sealer,
+		jwt:             jwtUC,
+		hc:              hc,
+		accessTTL:       accessTTL,
+		metricsEnabled:  metricsEnabled,
+		idpCache:        idpCache,
+		idpOpaqueMaxTTL: idpOpaqueMaxTTL,
 	}
 }
 
@@ -118,10 +125,12 @@ func (u *OIDCRefreshUseCase) completeSessionRefresh(
 	modRev int64,
 	nextEncryptedIDP, nextClaims json.RawMessage,
 	subject string,
+	idpAccessForCache string,
+	idpExpiresInSec int,
 	metricResult string,
 ) (apiserver.AuthSessionTokensResponse, error) {
 	var out apiserver.AuthSessionTokensResponse
-	accessJWT, _, _, err := u.jwt.MintInteractiveAPIAccessJWTFromSnapshot(ctx, subject, nextClaims, u.accessTTL)
+	accessJWT, _, ourAccessExp, err := u.jwt.MintInteractiveAPIAccessJWTFromSnapshot(ctx, subject, nextClaims, u.accessTTL)
 	if err != nil {
 		return out, err
 	}
@@ -154,6 +163,17 @@ func (u *OIDCRefreshUseCase) completeSessionRefresh(
 			return out, apierrors.ErrSessionRefreshConflict
 		}
 		return out, err
+	}
+
+	if u.idpCache != nil {
+		u.idpCache.Invalidate(sessionID)
+		at := strings.TrimSpace(idpAccessForCache)
+		if at != "" {
+			ttl, ok := idpcache.EntryTTL(u.idpCache.Now(), ourAccessExp, at, idpExpiresInSec, u.idpOpaqueMaxTTL)
+			if ok {
+				u.idpCache.Put(sessionID, at, ttl)
+			}
+		}
 	}
 
 	metrics.RecordAuthRefresh(u.metricsEnabled, metricResult)
@@ -243,7 +263,7 @@ func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, ourRefreshHex string) 
 			return out, apierrors.ErrSessionAuthFailed
 		}
 		return u.completeSessionRefresh(ctx, sessionID, verifier, sess, modRev,
-			sess.EncryptedIDPRefresh, claimsSnap, subj, metrics.AuthRefreshDegraded)
+			sess.EncryptedIDPRefresh, claimsSnap, subj, "", 0, metrics.AuthRefreshDegraded)
 	}
 	if dErr != nil {
 		return out, dErr
@@ -257,7 +277,7 @@ func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, ourRefreshHex string) 
 			return out, apierrors.ErrSessionAuthFailed
 		}
 		return u.completeSessionRefresh(ctx, sessionID, verifier, sess, modRev,
-			sess.EncryptedIDPRefresh, claimsSnap, subj, metrics.AuthRefreshDegraded)
+			sess.EncryptedIDPRefresh, claimsSnap, subj, "", 0, metrics.AuthRefreshDegraded)
 	}
 	if tErr != nil {
 		return out, tErr
@@ -304,7 +324,7 @@ func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, ourRefreshHex string) 
 	}
 
 	return u.completeSessionRefresh(ctx, sessionID, verifier, sess, modRev,
-		json.RawMessage(envBytes), claimsSnap, subject, metrics.AuthRefreshIDPUp)
+		json.RawMessage(envBytes), claimsSnap, subject, strings.TrimSpace(tr.AccessToken), tr.ExpiresIn, metrics.AuthRefreshIDPUp)
 }
 
 // MapRefreshError maps Refresh errors to HTTP status and stable problem codes.

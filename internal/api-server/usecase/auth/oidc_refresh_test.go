@@ -17,6 +17,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
+	"github.com/merionyx/api-gateway/internal/api-server/auth/idpcache"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/kvvalue"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/sessioncrypto"
 	"github.com/merionyx/api-gateway/internal/api-server/config"
@@ -170,12 +171,15 @@ func TestOIDCRefresh_degraded_discovery503(t *testing.T) {
 		verifier:  verifier,
 	}
 
+	cache := idpcache.New(nil)
+	cache.Put("sid-1", "stale-idp-access", time.Hour)
+
 	uc := NewOIDCRefreshUseCase([]config.OIDCProviderConfig{{
 		ID:           "p1",
 		Issuer:       srv.URL,
 		ClientID:     "cid",
 		ClientSecret: "sec",
-	}}, st, kr, jwtUC, srv.Client(), 5*time.Minute, false)
+	}}, st, kr, jwtUC, srv.Client(), 5*time.Minute, false, cache, 0)
 
 	out, err := uc.Refresh(context.Background(), ourHex)
 	if err != nil {
@@ -213,6 +217,9 @@ func TestOIDCRefresh_degraded_discovery503(t *testing.T) {
 	}
 	if mc["idp_iss"] != "http://issuer" || mc["idp_sub"] != "idp-sub-1" {
 		t.Fatalf("idp claims %+v", mc)
+	}
+	if _, ok := cache.Get("sid-1"); ok {
+		t.Fatal("expected idp access cache cleared after refresh CAS (degraded does not repopulate)")
 	}
 }
 

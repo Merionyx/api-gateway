@@ -49,6 +49,9 @@ type AuthConfig struct {
 
 	// InteractiveAccessTokenTTL is our API-profile access JWT lifetime after OIDC login (default 5m; roadmap).
 	InteractiveAccessTokenTTL time.Duration `mapstructure:"interactive_access_token_ttl" json:"interactive_access_token_ttl"`
+
+	// IdpAccessCacheOpaqueMaxTTL caps inferred IdP access lifetime for opaque tokens without expires_in/JWT exp (ADR 0002, roadmap ш. 19). Zero uses idpcache.DefaultOpaqueMaxTTL for that branch only.
+	IdpAccessCacheOpaqueMaxTTL time.Duration `mapstructure:"idp_access_cache_opaque_max_ttl" json:"idp_access_cache_opaque_max_ttl"`
 }
 
 // ValidateOIDCProviders returns an error if the slice is inconsistent (duplicate id, missing fields, empty allowlist).

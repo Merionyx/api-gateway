@@ -19,6 +19,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 
+	"github.com/merionyx/api-gateway/internal/api-server/auth/idpcache"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/kvvalue"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/oidc"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/pkce"
@@ -176,13 +177,14 @@ func TestOIDCCallbackUseCase_Complete_HappyPath(t *testing.T) {
 	}
 	t.Cleanup(func() { kr.Close() })
 
+	cache := idpcache.New(nil)
 	uc := NewOIDCCallbackUseCase([]config.OIDCProviderConfig{{
 		ID:                   "p1",
 		Issuer:               srv.URL,
 		ClientID:             clientID,
 		ClientSecret:         clientSecret,
 		RedirectURIAllowlist: []string{redirectURI},
-	}}, intents, sessions, kr, jwtUC, srv.Client(), 5*time.Minute)
+	}}, intents, sessions, kr, jwtUC, srv.Client(), 5*time.Minute, cache, 2*time.Minute)
 
 	out, err := uc.Complete(t.Context(), authCode, intentID)
 	if err != nil {
@@ -196,6 +198,12 @@ func TestOIDCCallbackUseCase_Complete_HappyPath(t *testing.T) {
 	}
 	if sessions.last.LoginIntentID != intentID {
 		t.Fatalf("login_intent_id %q", sessions.last.LoginIntentID)
+	}
+	sessions.mu.Lock()
+	sid := sessions.lastID
+	sessions.mu.Unlock()
+	if tok, ok := cache.Get(sid); !ok || tok != "idp-access" {
+		t.Fatalf("idp access cache: ok=%v tok=%q", ok, tok)
 	}
 	intents.mu.Lock()
 	_, ok := intents.m[intentID]
@@ -227,7 +235,7 @@ func TestOIDCCallbackUseCase_Complete_UnknownIntent(t *testing.T) {
 		ClientID:             "c",
 		ClientSecret:         "s",
 		RedirectURIAllowlist: []string{"http://x"},
-	}}, &memIntentRepo{m: map[string]kvvalue.LoginIntentValue{}}, &memSessionRepo{}, kr, jwtUC, http.DefaultClient, time.Minute)
+	}}, &memIntentRepo{m: map[string]kvvalue.LoginIntentValue{}}, &memSessionRepo{}, kr, jwtUC, http.DefaultClient, time.Minute, nil, 0)
 	_, err = uc.Complete(t.Context(), "code", uuid.NewString())
 	if err == nil {
 		t.Fatal("expected error")

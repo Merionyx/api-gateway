@@ -11,6 +11,7 @@ import (
 
 	contractsyncergrpc "github.com/merionyx/api-gateway/internal/api-server/adapter/contractsyncer/grpc"
 	"github.com/merionyx/api-gateway/internal/api-server/adapter/etcd"
+	"github.com/merionyx/api-gateway/internal/api-server/auth/idpcache"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/sessioncrypto"
 	"github.com/merionyx/api-gateway/internal/api-server/config"
 	grpchandler "github.com/merionyx/api-gateway/internal/api-server/delivery/grpc/handler"
@@ -48,6 +49,7 @@ type Container struct {
 	OIDCRefreshUseCase  *auth.OIDCRefreshUseCase
 
 	SessionSealer             *sessioncrypto.Keyring
+	IdpAccessCache            *idpcache.Cache
 	ControllerRegistryUseCase interfaces.ControllerRegistryUseCase
 	BundleSyncUseCase         interfaces.BundleSyncUseCase
 
@@ -160,6 +162,12 @@ func (c *Container) initUseCases() error {
 		c.SessionSealer = kr
 	}
 
+	var idpAccessCache *idpcache.Cache
+	if c.SessionSealer != nil && len(c.Config.Auth.OIDCProviders) > 0 {
+		idpAccessCache = idpcache.New(nil)
+		c.IdpAccessCache = idpAccessCache
+	}
+
 	c.OIDCLoginUseCase = auth.NewOIDCLoginUseCase(
 		c.Config.Auth.OIDCProviders,
 		c.Config.Auth.LoginIntentLeaseTTL,
@@ -175,6 +183,8 @@ func (c *Container) initUseCases() error {
 		c.JWTUseCase,
 		&http.Client{Timeout: 20 * time.Second},
 		c.Config.Auth.InteractiveAccessTokenTTL,
+		idpAccessCache,
+		c.Config.Auth.IdpAccessCacheOpaqueMaxTTL,
 	)
 
 	if len(c.Config.Auth.OIDCProviders) > 0 && c.SessionSealer != nil {
@@ -186,6 +196,8 @@ func (c *Container) initUseCases() error {
 			&http.Client{Timeout: 25 * time.Second},
 			c.Config.Auth.InteractiveAccessTokenTTL,
 			c.Config.MetricsHTTP.Enabled,
+			idpAccessCache,
+			c.Config.Auth.IdpAccessCacheOpaqueMaxTTL,
 		)
 	}
 
@@ -259,6 +271,10 @@ func (c *Container) StartBackgroundWork(ctx context.Context) {
 
 // Close closes all resources in the container
 func (c *Container) Close() {
+	if c.IdpAccessCache != nil {
+		c.IdpAccessCache.Close()
+		c.IdpAccessCache = nil
+	}
 	if c.SessionSealer != nil {
 		c.SessionSealer.Close()
 		c.SessionSealer = nil

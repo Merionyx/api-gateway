@@ -117,6 +117,7 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("auth.allow_insecure_bootstrap", false)
 	v.SetDefault("auth.login_intent_lease_ttl", 15*time.Minute)
 	v.SetDefault("auth.interactive_access_token_ttl", 5*time.Minute)
+	v.SetDefault("auth.idp_access_cache_opaque_max_ttl", 2*time.Minute)
 
 	v.AutomaticEnv()
 	v.SetEnvPrefix("API_SERVER_")

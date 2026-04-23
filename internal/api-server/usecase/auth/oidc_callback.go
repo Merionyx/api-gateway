@@ -15,6 +15,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 
+	"github.com/merionyx/api-gateway/internal/api-server/auth/idpcache"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/kvvalue"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/oidc"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/sessioncrypto"
@@ -43,13 +44,15 @@ const defaultInteractiveAccessTTL = 5 * time.Minute
 
 // OIDCCallbackUseCase completes GET /api/v1/auth/callback (roadmap ш. 14).
 type OIDCCallbackUseCase struct {
-	byID      map[string]config.OIDCProviderConfig
-	intents   loginIntentReadDeleter
-	sessions  sessionCreator
-	sealer    envelopeSealer
-	jwt       *JWTUseCase
-	hc        *http.Client
-	accessTTL time.Duration
+	byID            map[string]config.OIDCProviderConfig
+	intents         loginIntentReadDeleter
+	sessions        sessionCreator
+	sealer          envelopeSealer
+	jwt             *JWTUseCase
+	hc              *http.Client
+	accessTTL       time.Duration
+	idpCache        *idpcache.Cache
+	idpOpaqueMaxTTL time.Duration
 }
 
 // NewOIDCCallbackUseCase wires callback dependencies. accessTTL<=0 defaults to 5m; hc nil uses http.DefaultClient.
@@ -61,6 +64,8 @@ func NewOIDCCallbackUseCase(
 	jwtUC *JWTUseCase,
 	hc *http.Client,
 	accessTTL time.Duration,
+	idpCache *idpcache.Cache,
+	idpOpaqueMaxTTL time.Duration,
 ) *OIDCCallbackUseCase {
 	by := make(map[string]config.OIDCProviderConfig, len(providers))
 	for _, p := range providers {
@@ -73,13 +78,15 @@ func NewOIDCCallbackUseCase(
 		hc = http.DefaultClient
 	}
 	return &OIDCCallbackUseCase{
-		byID:      by,
-		intents:   intents,
-		sessions:  sessions,
-		sealer:    sealer,
-		jwt:       jwtUC,
-		hc:        hc,
-		accessTTL: accessTTL,
+		byID:            by,
+		intents:         intents,
+		sessions:        sessions,
+		sealer:          sealer,
+		jwt:             jwtUC,
+		hc:              hc,
+		accessTTL:       accessTTL,
+		idpCache:        idpCache,
+		idpOpaqueMaxTTL: idpOpaqueMaxTTL,
 	}
 }
 
@@ -140,7 +147,7 @@ func (u *OIDCCallbackUseCase) Complete(ctx context.Context, code, state string) 
 		return out, fmt.Errorf("%w: cannot derive subject from id_token (need email or sub)", apierrors.ErrInvalidInput)
 	}
 
-	accessJWT, _, _, err := u.jwt.MintInteractiveAPIAccessJWT(ctx, subject, u.accessTTL)
+	accessJWT, _, ourAccessExp, err := u.jwt.MintInteractiveAPIAccessJWT(ctx, subject, u.accessTTL)
 	if err != nil {
 		return out, err
 	}
@@ -179,6 +186,15 @@ func (u *OIDCCallbackUseCase) Complete(ctx context.Context, code, state string) 
 	}
 	if err := u.sessions.Create(ctx, sessionID, sess); err != nil {
 		return out, err
+	}
+
+	if u.idpCache != nil {
+		at := strings.TrimSpace(tr.AccessToken)
+		if at != "" {
+			if ttl, ok := idpcache.EntryTTL(u.idpCache.Now(), ourAccessExp, at, tr.ExpiresIn, u.idpOpaqueMaxTTL); ok {
+				u.idpCache.Put(sessionID, at, ttl)
+			}
+		}
 	}
 
 	if err := u.intents.Delete(ctx, state); err != nil {
