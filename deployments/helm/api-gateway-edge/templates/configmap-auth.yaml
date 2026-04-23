@@ -5,5 +5,5 @@ metadata:
   labels:
     {{- include "agwedge.labels" . | nindent 4 }}
 data:
-  auth-sidecar.yaml: |
+  sidecar.yaml: |
 {{ include "agwedge.auth.config.merged" . | nindent 4 }}

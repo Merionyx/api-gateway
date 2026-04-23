@@ -3,10 +3,10 @@ package container
 import (
 	"log/slog"
 
-	"github.com/merionyx/api-gateway/internal/auth-sidecar/config"
-	"github.com/merionyx/api-gateway/internal/auth-sidecar/jwt"
-	"github.com/merionyx/api-gateway/internal/auth-sidecar/storage"
-	"github.com/merionyx/api-gateway/internal/auth-sidecar/sync"
+	"github.com/merionyx/api-gateway/internal/sidecar/config"
+	"github.com/merionyx/api-gateway/internal/sidecar/jwt"
+	"github.com/merionyx/api-gateway/internal/sidecar/storage"
+	"github.com/merionyx/api-gateway/internal/sidecar/sync"
 )
 
 type Container struct {

@@ -11,23 +11,23 @@ telemetry:
 
 connectivity:
   envoyNodeId: envoy-dyn-qa
-  controllerGrpcAddress: local-cp-api-gateway-control-plane-controller:19090
-  controllerServerName: local-cp-api-gateway-control-plane-controller.api-gateway.svc.cluster.local
-  jwksUrl: http://local-cp-api-gateway-control-plane-api-server:8080/.well-known/jwks.json
+  controllerGrpcAddress: local-cp-api-gateway-controller:19090
+  controllerServerName: local-cp-api-gateway-controller.api-gateway.svc.cluster.local
+  jwksUrl: http://local-cp-api-gateway-api-server:8080/.well-known/jwks.json
   environment: dyn-qa
   tenant: dev-cluster
-  xdsHost: local-cp-api-gateway-control-plane-controller
+  xdsHost: local-cp-api-gateway-controller
   xdsPort: 19091
-  xdsSni: local-cp-api-gateway-control-plane-controller.api-gateway.svc.cluster.local
+  xdsSni: local-cp-api-gateway-controller.api-gateway.svc.cluster.local
 
 tls:
-  internalCASecret: local-cp-api-gateway-control-plane-grpc-internal-ca-tls
+  internalCASecret: local-cp-api-gateway-grpc-internal-ca-tls
 
 certManager:
   createCertificates: true
   issuerRef:
     kind: Issuer
-    name: local-cp-api-gateway-control-plane-grpc-ca-issuer
+    name: local-cp-api-gateway-grpc-ca-issuer
 
 envoy:
   image:
@@ -36,6 +36,6 @@ envoy:
     enabled: true
     inheritCollectorFromTelemetry: true
 
-authSidecar:
+sidecar:
   image:
     pullPolicy: IfNotPresent

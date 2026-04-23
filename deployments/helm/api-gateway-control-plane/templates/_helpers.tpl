@@ -1,5 +1,5 @@
 {{- define "agwcp.name" -}}
-{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
+{{- default "api-gateway" .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
 {{- end }}
 
 {{- define "agwcp.fullname" -}}

@@ -4,4 +4,3 @@ namespace: default
 resources:
 - grpc-certificates.yaml
 - certificates.yaml
-- issuer.yaml

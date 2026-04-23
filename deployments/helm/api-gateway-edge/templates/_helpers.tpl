@@ -29,12 +29,12 @@ app.kubernetes.io/component: edge
 {{- end }}
 
 {{/*
-  Merionyx auth-sidecar image. Empty tag → Chart.AppVersion (like in api-gateway-control-plane).
+  Merionyx sidecar image. Empty tag → Chart.AppVersion (like in api-gateway-control-plane).
   Envoy — separate stream; tag only from .Values.envoy.image.tag.
 */}}
-{{- define "agwedge.authSidecarImage" -}}
-{{- $tag := .Values.authSidecar.image.tag | default .Chart.AppVersion -}}
-{{- printf "%s:%s" .Values.authSidecar.image.repository $tag -}}
+{{- define "agwedge.sidecarImage" -}}
+{{- $tag := .Values.sidecar.image.tag | default .Chart.AppVersion -}}
+{{- printf "%s:%s" .Values.sidecar.image.repository $tag -}}
 {{- end }}
 
 {{- define "agwedge.secret.internalCA" -}}
@@ -45,19 +45,19 @@ app.kubernetes.io/component: edge
 {{- end -}}
 {{- end }}
 
-{{- define "agwedge.secret.authSidecarGrpc" -}}
-{{- if .Values.tls.authSidecarGrpcServerSecret -}}
-{{- .Values.tls.authSidecarGrpcServerSecret -}}
+{{- define "agwedge.secret.sidecarGrpc" -}}
+{{- if .Values.tls.sidecarGrpcServerSecret -}}
+{{- .Values.tls.sidecarGrpcServerSecret -}}
 {{- else -}}
-{{- printf "%s-auth-sidecar-grpc-tls" (include "agwedge.fullname" .) -}}
+{{- printf "%s-sidecar-grpc-tls" (include "agwedge.fullname" .) -}}
 {{- end -}}
 {{- end }}
 
-{{- define "agwedge.secret.grpcClientAuthSidecar" -}}
-{{- if .Values.tls.grpcClientAuthSidecarSecret -}}
-{{- .Values.tls.grpcClientAuthSidecarSecret -}}
+{{- define "agwedge.secret.grpcClientsidecar" -}}
+{{- if .Values.tls.grpcClientsidecarSecret -}}
+{{- .Values.tls.grpcClientsidecarSecret -}}
 {{- else -}}
-{{- printf "%s-grpc-client-auth-sidecar-tls" (include "agwedge.fullname" .) -}}
+{{- printf "%s-grpc-client-sidecar-tls" (include "agwedge.fullname" .) -}}
 {{- end -}}
 {{- end }}
 
@@ -123,7 +123,7 @@ metrics_http:
 
 {{- define "agwedge.telemetry.merged" -}}
 {{- $g := .Values.telemetry | default dict -}}
-{{- $p := .Values.authSidecar.telemetry | default dict -}}
+{{- $p := .Values.sidecar.telemetry | default dict -}}
 {{- toYaml (mergeOverwrite (mergeOverwrite (dict) $g) $p) -}}
 {{- end }}
 
@@ -131,7 +131,7 @@ metrics_http:
 {{- $def := fromYaml (include "agwedge.auth.config.defaults" .) -}}
 {{- $tel := fromYaml (include "agwedge.telemetry.merged" .) -}}
 {{- $withTel := mergeOverwrite $def (dict "telemetry" $tel) -}}
-{{- $usr := .Values.authSidecar.config | default dict -}}
+{{- $usr := .Values.sidecar.config | default dict -}}
 {{- toYaml (mergeOverwrite $withTel $usr) -}}
 {{- end }}
 

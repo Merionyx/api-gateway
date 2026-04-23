@@ -17,7 +17,7 @@ DOCKER_BUILD_METADATA := --build-arg GIT_REVISION=$(GIT_REVISION) --build-arg BU
 build: ## Build binary
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=0 go build -a -installsuffix cgo -o $(BUILD_DIR)/api-server cmd/api-server/main.go
-	CGO_ENABLED=0 go build -a -installsuffix cgo -o $(BUILD_DIR)/auth-sidecar cmd/auth-sidecar/main.go
+	CGO_ENABLED=0 go build -a -installsuffix cgo -o $(BUILD_DIR)/sidecar cmd/sidecar/main.go
 	CGO_ENABLED=0 go build -a -installsuffix cgo -o $(BUILD_DIR)/controller cmd/controller/main.go
 	CGO_ENABLED=0 go build -a -installsuffix cgo -o $(BUILD_DIR)/contract-syncer cmd/contract-syncer/main.go
 	CGO_ENABLED=0 go build -a -installsuffix cgo -o $(BUILD_DIR)/mock-service cmd/mock-service/main.go
@@ -72,14 +72,14 @@ docker-build: ## Build Docker images (default target: Alpine; set DOCKER_BUILD_T
 	@DOCKER_BUILDKIT=1 docker build --target $(DOCKER_BUILD_TARGET) $(DOCKER_BUILD_METADATA) --build-arg SERVICE=controller      --build-arg OCI_NAME=Controller        -t $(DOCKER_REPO)/api-gateway-controller:$(DOCKER_TAG) -f build/release/Dockerfile .
 	@DOCKER_BUILDKIT=1 docker build --target $(DOCKER_BUILD_TARGET) $(DOCKER_BUILD_METADATA) --build-arg SERVICE=api-server      --build-arg OCI_NAME='API Server'      -t $(DOCKER_REPO)/api-gateway-api-server:$(DOCKER_TAG) -f build/release/Dockerfile .
 	@DOCKER_BUILDKIT=1 docker build --target $(DOCKER_BUILD_TARGET) $(DOCKER_BUILD_METADATA) --build-arg SERVICE=contract-syncer --build-arg OCI_NAME='Contract Syncer' -t $(DOCKER_REPO)/api-gateway-contract-syncer:$(DOCKER_TAG) -f build/release/Dockerfile .
-	@DOCKER_BUILDKIT=1 docker build --target $(DOCKER_BUILD_TARGET) $(DOCKER_BUILD_METADATA) --build-arg SERVICE=auth-sidecar    --build-arg OCI_NAME='Auth Sidecar'    -t $(DOCKER_REPO)/api-gateway-auth-sidecar:$(DOCKER_TAG) -f build/release/Dockerfile .
+	@DOCKER_BUILDKIT=1 docker build --target $(DOCKER_BUILD_TARGET) $(DOCKER_BUILD_METADATA) --build-arg SERVICE=sidecar    --build-arg OCI_NAME='Auth Sidecar'    -t $(DOCKER_REPO)/api-gateway-sidecar:$(DOCKER_TAG) -f build/release/Dockerfile .
 	@DOCKER_BUILDKIT=1 docker build --target $(DOCKER_BUILD_TARGET) $(DOCKER_BUILD_METADATA) --build-arg SERVICE=mock-service    --build-arg OCI_NAME='Mock Service'    -t $(DOCKER_REPO)/api-gateway-mock-service:$(DOCKER_TAG) -f build/release/Dockerfile .
 
 docker-push: ## Push Docker image
 	@docker push $(DOCKER_REPO)/api-gateway-controller:$(DOCKER_TAG)
 	@docker push $(DOCKER_REPO)/api-gateway-api-server:$(DOCKER_TAG)
 	@docker push $(DOCKER_REPO)/api-gateway-contract-syncer:$(DOCKER_TAG)
-	@docker push $(DOCKER_REPO)/api-gateway-auth-sidecar:$(DOCKER_TAG)
+	@docker push $(DOCKER_REPO)/api-gateway-sidecar:$(DOCKER_TAG)
 	@docker push $(DOCKER_REPO)/api-gateway-mock-service:$(DOCKER_TAG)
 
 docker-up:

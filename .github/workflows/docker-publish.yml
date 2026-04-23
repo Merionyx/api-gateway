@@ -46,10 +46,10 @@ jobs:
       version: ${{ inputs.version || 'latest' }}
     secrets: inherit
 
-  auth-sidecar:
+  sidecar:
     uses: ./.github/workflows/docker-publish-component.yml
     with:
-      component: auth-sidecar
+      component: sidecar
       dockerfile: build/release/Dockerfile
       checkout_ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || inputs.checkout_ref }}
       version: ${{ inputs.version || 'latest' }}

@@ -169,7 +169,7 @@ data:
     api_server:
       address: "gateway-api-server:19093"
 
-  auth-sidecar.yaml: |
+  sidecar.yaml: |
     server:
       grpc_port: "9001"
       host: "0.0.0.0"

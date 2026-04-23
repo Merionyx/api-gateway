@@ -6,24 +6,24 @@ networks:
     external: true
 
 services:
-  auth-sidecar-dev:
+  sidecar-dev:
     build:
       context: ../../..
-      dockerfile: build/dev/Dockerfile.auth-sidecar
-    container_name: auth-sidecar-dev
+      dockerfile: build/dev/Dockerfile.sidecar
+    container_name: sidecar-dev
     develop:
       watch:
-        - path: ../../internal/auth-sidecar
-          target: /app/internal/auth-sidecar
+        - path: ../../internal/sidecar
+          target: /app/internal/sidecar
           action: sync
         - path: ../../internal/shared
           target: /app/internal/shared
           action: sync
-        - path: ../../cmd/auth-sidecar
-          target: /app/cmd/auth-sidecar
+        - path: ../../cmd/sidecar
+          target: /app/cmd/sidecar
           action: sync
-        - path: ../../configs/auth-sidecar
-          target: /app/configs/auth-sidecar
+        - path: ../../configs/sidecar
+          target: /app/configs/sidecar
           action: sync
         - path: ../../pkg
           target: /app/pkg
@@ -31,7 +31,7 @@ services:
     ports:
       - "9101:9001"
     environment:
-      - CONFIG_PATH=./configs/auth-sidecar/config.dev.yaml
+      - CONFIG_PATH=./configs/sidecar/config.dev.yaml
       - AUTH_SIDECAR_CONTROLLER_ADDRESS=gateway-controller-dev:19090
       - AUTH_SIDECAR_CONTROLLER_ENVIRONMENT=dev
       - AUTH_SIDECAR_JWT_JWKS_URL=http://api-server:8080/.well-known/jwks.json
@@ -39,29 +39,29 @@ services:
       default:
       dev-network:
         aliases:
-          - auth-sidecar
+          - sidecar
     depends_on:
       - gateway-controller-dev
       - gateway-api-server
     restart: unless-stopped
-  auth-sidecar-prod:
+  sidecar-prod:
     build:
       context: ../../..
-      dockerfile: build/dev/Dockerfile.auth-sidecar
-    container_name: auth-sidecar-prod
+      dockerfile: build/dev/Dockerfile.sidecar
+    container_name: sidecar-prod
     develop:
       watch:
-        - path: ../../internal/auth-sidecar
-          target: /app/internal/auth-sidecar
+        - path: ../../internal/sidecar
+          target: /app/internal/sidecar
           action: sync
         - path: ../../internal/shared
           target: /app/internal/shared
           action: sync
-        - path: ../../cmd/auth-sidecar
-          target: /app/cmd/auth-sidecar
+        - path: ../../cmd/sidecar
+          target: /app/cmd/sidecar
           action: sync
-        - path: ../../configs/auth-sidecar
-          target: /app/configs/auth-sidecar
+        - path: ../../configs/sidecar
+          target: /app/configs/sidecar
           action: sync
         - path: ../../pkg
           target: /app/pkg
@@ -69,7 +69,7 @@ services:
     ports:
       - "9102:9001"
     environment:
-      - CONFIG_PATH=./configs/auth-sidecar/config.prod.yaml
+      - CONFIG_PATH=./configs/sidecar/config.prod.yaml
       - AUTH_SIDECAR_CONTROLLER_ADDRESS=gateway-controller-prod:19090
       - AUTH_SIDECAR_CONTROLLER_ENVIRONMENT=dev
       - AUTH_SIDECAR_JWT_JWKS_URL=http://api-server:8080/.well-known/jwks.json
@@ -77,7 +77,7 @@ services:
       default:
       prod-network:
         aliases:
-          - auth-sidecar
+          - sidecar
     depends_on:
       - gateway-controller-prod
       - gateway-api-server
