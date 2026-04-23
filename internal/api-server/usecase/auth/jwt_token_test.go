@@ -10,7 +10,7 @@ import (
 
 func TestJWTUseCase_GenerateToken(t *testing.T) {
 	dir := t.TempDir()
-	uc, err := NewJWTUseCase(dir, "test-issuer")
+	uc, err := NewJWTUseCase(dir, "test-issuer", "")
 	if err != nil {
 		t.Fatal(err)
 	}

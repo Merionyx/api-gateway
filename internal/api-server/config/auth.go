@@ -14,6 +14,8 @@ type OIDCProviderConfig struct {
 	Issuer string `mapstructure:"issuer" json:"issuer"`
 	// ClientID is the OAuth client_id sent to the authorization server.
 	ClientID string `mapstructure:"client_id" json:"client_id"`
+	// ClientSecret is the OAuth client_secret for the token endpoint (confidential client). Prefer env/K8s secret in prod.
+	ClientSecret string `mapstructure:"client_secret" json:"client_secret"`
 	// RedirectURIAllowlist is the exact set of allowed redirect_uri values for this provider.
 	RedirectURIAllowlist []string `mapstructure:"redirect_uri_allowlist" json:"redirect_uri_allowlist"`
 	// ExtraScopes are appended after "openid" (e.g. "email", "profile").
@@ -40,6 +42,13 @@ type AuthConfig struct {
 
 	// LoginIntentLeaseTTL is the etcd lease for login-intent keys (short-lived; default 15m).
 	LoginIntentLeaseTTL time.Duration `mapstructure:"login_intent_lease_ttl" json:"login_intent_lease_ttl"`
+
+	// SessionKEKBase64 is standard base64 of 32 bytes (AES-256) used to seal IdP refresh material in session values.
+	// Required when oidc_providers is non-empty (roadmap ш. 8–11, ш. 14).
+	SessionKEKBase64 string `mapstructure:"session_kek_base64" json:"session_kek_base64"`
+
+	// InteractiveAccessTokenTTL is our API-profile access JWT lifetime after OIDC login (default 5m; roadmap).
+	InteractiveAccessTokenTTL time.Duration `mapstructure:"interactive_access_token_ttl" json:"interactive_access_token_ttl"`
 }
 
 // ValidateOIDCProviders returns an error if the slice is inconsistent (duplicate id, missing fields, empty allowlist).

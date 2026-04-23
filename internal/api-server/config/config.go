@@ -78,6 +78,8 @@ type ServerConfig struct {
 type JWTConfig struct {
 	KeysDir string `mapstructure:"keys_dir" validate:"required" json:"keys_dir"`
 	Issuer  string `mapstructure:"issuer" validate:"required" json:"issuer"`
+	// APIAudience is the JWT aud claim for interactive API access tokens (Edge≠API refined in roadmap ш. 15).
+	APIAudience string `mapstructure:"api_audience" json:"api_audience"`
 }
 
 func LoadConfig(configFile ...string) (*Config, error) {
@@ -88,6 +90,7 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("etcd.dial_timeout", "5s")
 	v.SetDefault("jwt.keys_dir", "./secrets/keys/jwt")
 	v.SetDefault("jwt.issuer", "api-gateway-api-server")
+	v.SetDefault("jwt.api_audience", "api-gateway-api-http")
 	v.SetDefault("leader_election.enabled", true)
 	v.SetDefault("leader_election.key_prefix", "/api-gateway/api-server/election/leader")
 	v.SetDefault("leader_election.session_ttl_seconds", 5)
@@ -106,6 +109,7 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("auth.environment", "development")
 	v.SetDefault("auth.allow_insecure_bootstrap", false)
 	v.SetDefault("auth.login_intent_lease_ttl", 15*time.Minute)
+	v.SetDefault("auth.interactive_access_token_ttl", 5*time.Minute)
 
 	v.AutomaticEnv()
 	v.SetEnvPrefix("API_SERVER_")

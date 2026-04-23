@@ -3,6 +3,7 @@ package auth
 import (
 	"crypto"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -13,11 +14,12 @@ const (
 
 // JWTUseCase issues app tokens and exposes JWKS for verification (e.g. sidecar).
 type JWTUseCase struct {
-	keysDir      string
-	issuer       string
-	signingKeys  map[string]*KeyPair // kid -> KeyPair
-	activeKeyID  string
-	activeKeyAlg string
+	keysDir       string
+	issuer        string
+	apiAudience   string
+	signingKeys   map[string]*KeyPair // kid -> KeyPair
+	activeKeyID   string
+	activeKeyAlg  string
 }
 
 // KeyPair holds a signing identity loaded from disk or generated at startup.
@@ -29,11 +31,17 @@ type KeyPair struct {
 	CreatedAt  time.Time
 }
 
-func NewJWTUseCase(keysDir, issuer string) (*JWTUseCase, error) {
+// NewJWTUseCase loads signing keys. apiAudience is the aud claim for interactive API JWTs (see jwt.api_audience); empty defaults to issuer+"#api".
+func NewJWTUseCase(keysDir, issuer, apiAudience string) (*JWTUseCase, error) {
+	aud := strings.TrimSpace(apiAudience)
+	if aud == "" {
+		aud = strings.TrimSpace(issuer) + "#api"
+	}
 	uc := &JWTUseCase{
-		keysDir:     keysDir,
-		issuer:      issuer,
-		signingKeys: make(map[string]*KeyPair),
+		keysDir:      keysDir,
+		issuer:       issuer,
+		apiAudience:  aud,
+		signingKeys:  make(map[string]*KeyPair),
 	}
 
 	if err := uc.loadKeys(); err != nil {

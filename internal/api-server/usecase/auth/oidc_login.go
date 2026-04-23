@@ -2,8 +2,6 @@ package auth
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
@@ -98,12 +96,9 @@ func (u *OIDCLoginUseCase) Start(ctx context.Context, providerID, redirectURI, n
 	}
 	chal := pkce.ChallengeS256(ver)
 
+	// state doubles as opaque login-intent id so callback can load login-intents/{state} (ш. 14).
 	intentID := uuid.NewString()
-	stateBuf := make([]byte, 32)
-	if _, err := rand.Read(stateBuf); err != nil {
-		return "", fmt.Errorf("oidc login: state: %w", err)
-	}
-	state := hex.EncodeToString(stateBuf)
+	state := intentID
 
 	val := kvvalue.LoginIntentValue{
 		ProviderID:   strings.TrimSpace(p.ID),

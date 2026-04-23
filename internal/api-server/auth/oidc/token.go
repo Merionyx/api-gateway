@@ -21,7 +21,8 @@ type TokenResponse struct {
 }
 
 // ExchangeAuthorizationCode calls the token endpoint (grant_type=authorization_code, client_secret in body).
-func ExchangeAuthorizationCode(ctx context.Context, hc *http.Client, tokenEndpoint, clientID, clientSecret, code, redirectURI string) (*TokenResponse, error) {
+// codeVerifier is the PKCE code_verifier when using S256 (RFC 7636); pass empty if PKCE is not used.
+func ExchangeAuthorizationCode(ctx context.Context, hc *http.Client, tokenEndpoint, clientID, clientSecret, code, redirectURI, codeVerifier string) (*TokenResponse, error) {
 	if hc == nil {
 		hc = http.DefaultClient
 	}
@@ -31,6 +32,9 @@ func ExchangeAuthorizationCode(ctx context.Context, hc *http.Client, tokenEndpoi
 	form.Set("redirect_uri", redirectURI)
 	form.Set("client_id", clientID)
 	form.Set("client_secret", clientSecret)
+	if strings.TrimSpace(codeVerifier) != "" {
+		form.Set("code_verifier", codeVerifier)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenEndpoint, strings.NewReader(form.Encode()))
 	if err != nil {

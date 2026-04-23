@@ -19,10 +19,12 @@ import (
 )
 
 type stubIntentStore struct {
-	last kvvalue.LoginIntentValue
+	last         kvvalue.LoginIntentValue
+	lastIntentID string
 }
 
-func (s *stubIntentStore) Create(_ context.Context, _ string, v kvvalue.LoginIntentValue, _ time.Duration) error {
+func (s *stubIntentStore) Create(_ context.Context, intentID string, v kvvalue.LoginIntentValue, _ time.Duration) error {
+	s.lastIntentID = intentID
 	s.last = v
 	return nil
 }
@@ -90,8 +92,8 @@ func TestOIDCLoginUseCase_Start_HappyPath(t *testing.T) {
 	if q.Get("code_challenge") != wantChal {
 		t.Fatalf("code_challenge got %q want %q", q.Get("code_challenge"), wantChal)
 	}
-	if q.Get("state") != stub.last.OAuthState {
-		t.Fatal("state mismatch")
+	if q.Get("state") != stub.lastIntentID || stub.lastIntentID != stub.last.OAuthState {
+		t.Fatalf("state: query=%q intent_id=%q oauth_state=%q", q.Get("state"), stub.lastIntentID, stub.last.OAuthState)
 	}
 	if stub.last.OAuthState == "" || stub.last.PKCEVerifier == "" {
 		t.Fatalf("intent: %+v", stub.last)

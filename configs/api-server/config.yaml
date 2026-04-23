@@ -47,10 +47,12 @@ auth:
   environment: "production"
   allow_insecure_bootstrap: false
   # login_intent_lease_ttl: "15m"   # default if omitted
+  # session_kek_base64: "<openssl rand -base64 32>"  # required when oidc_providers is set (32 bytes after decode)
   # oidc_providers:                 # browser GET /api/v1/auth/login; see docs/etcd-auth-paths.md
   #   - id: "dev-oidc"
   #     issuer: "https://your-idp.example"
   #     client_id: "your-client-id"
+  #     client_secret: "from-secret-manager"
   #     redirect_uri_allowlist:
   #       - "http://127.0.0.1:8080/api/v1/auth/callback"
   #     extra_scopes: ["email"]

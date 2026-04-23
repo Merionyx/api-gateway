@@ -100,7 +100,7 @@ func TestDiscovery_TokenExchange_ValidateIDToken(t *testing.T) {
 		t.Fatalf("discovery: %+v", disc)
 	}
 
-	tr, err := ExchangeAuthorizationCode(t.Context(), hc, disc.TokenEndpoint, clientID, clientSecret, authCode, redirectURI)
+	tr, err := ExchangeAuthorizationCode(t.Context(), hc, disc.TokenEndpoint, clientID, clientSecret, authCode, redirectURI, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,6 +118,32 @@ func TestDiscovery_TokenExchange_ValidateIDToken(t *testing.T) {
 	}
 	if mc["sub"] != "subject-1" {
 		t.Fatalf("claims: %v", mc)
+	}
+}
+
+func TestExchangeAuthorizationCode_SendsPKCEVerifier(t *testing.T) {
+	t.Parallel()
+	var gotVerifier string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/token" {
+			http.NotFound(w, r)
+			return
+		}
+		_ = r.ParseForm()
+		gotVerifier = r.FormValue("code_verifier")
+		_ = json.NewEncoder(w).Encode(TokenResponse{
+			AccessToken: "x",
+			TokenType:   "Bearer",
+			IDToken:     "not-valid-for-this-test",
+		})
+	}))
+	t.Cleanup(srv.Close)
+	_, err := ExchangeAuthorizationCode(context.Background(), srv.Client(), srv.URL+"/token", "cid", "sec", "code", "http://cb", "verifier-xyz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotVerifier != "verifier-xyz" {
+		t.Fatalf("code_verifier: got %q", gotVerifier)
 	}
 }
 

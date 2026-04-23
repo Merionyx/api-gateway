@@ -13,7 +13,7 @@ import (
 
 func TestJWTUseCase_GetJWKS_GetSigningKeys_generated(t *testing.T) {
 	t.Parallel()
-	uc, err := NewJWTUseCase(t.TempDir(), "iss")
+	uc, err := NewJWTUseCase(t.TempDir(), "iss", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestJWTUseCase_GetJWKS_rsaKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uc, err := NewJWTUseCase(dir, "iss")
+	uc, err := NewJWTUseCase(dir, "iss", "")
 	if err != nil {
 		t.Fatal(err)
 	}

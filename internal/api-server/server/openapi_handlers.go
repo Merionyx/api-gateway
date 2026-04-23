@@ -34,8 +34,8 @@ func (s *OpenAPIServer) LoginOidc(c fiber.Ctx, params apiserver.LoginOidcParams)
 	return s.c.OIDCLoginHandler.Login(c, params)
 }
 
-func (s *OpenAPIServer) CallbackOidc(c fiber.Ctx, _ apiserver.CallbackOidcParams) error {
-	return authFlowNotImplemented(c, "OIDC callback is not implemented yet (roadmap steps 13–14).")
+func (s *OpenAPIServer) CallbackOidc(c fiber.Ctx, params apiserver.CallbackOidcParams) error {
+	return s.c.OIDCCallbackHandler.Callback(c, params)
 }
 
 func (s *OpenAPIServer) RefreshSession(c fiber.Ctx) error {

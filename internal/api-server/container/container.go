@@ -2,6 +2,7 @@ package container
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 
 	contractsyncergrpc "github.com/merionyx/api-gateway/internal/api-server/adapter/contractsyncer/grpc"
 	"github.com/merionyx/api-gateway/internal/api-server/adapter/etcd"
+	"github.com/merionyx/api-gateway/internal/api-server/auth/sessioncrypto"
 	"github.com/merionyx/api-gateway/internal/api-server/config"
 	grpchandler "github.com/merionyx/api-gateway/internal/api-server/delivery/grpc/handler"
 	httphandler "github.com/merionyx/api-gateway/internal/api-server/delivery/http/handler"
@@ -42,12 +44,17 @@ type Container struct {
 
 	JWTUseCase                *auth.JWTUseCase
 	OIDCLoginUseCase          *auth.OIDCLoginUseCase
+	OIDCCallbackUseCase       *auth.OIDCCallbackUseCase
+
+	SessionSealer *sessioncrypto.Keyring
 	ControllerRegistryUseCase interfaces.ControllerRegistryUseCase
 	BundleSyncUseCase         interfaces.BundleSyncUseCase
 
 	JWTHandler *httphandler.JWTHandler
 
 	OIDCLoginHandler *httphandler.OIDCLoginHandler
+
+	OIDCCallbackHandler *httphandler.OIDCCallbackHandler
 
 	ContractsExportHandler *httphandler.ContractsExportHandler
 
@@ -69,6 +76,9 @@ type Container struct {
 func NewContainer(cfg *config.Config) (*Container, error) {
 	if err := config.ValidateOIDCProviders(cfg.Auth.OIDCProviders); err != nil {
 		return nil, err
+	}
+	if len(cfg.Auth.OIDCProviders) > 0 && strings.TrimSpace(cfg.Auth.SessionKEKBase64) == "" {
+		return nil, fmt.Errorf("auth.session_kek_base64 is required when auth.oidc_providers is configured")
 	}
 
 	c := &Container{
@@ -132,17 +142,41 @@ func (c *Container) initUseCases() error {
 	jwtUC, err := auth.NewJWTUseCase(
 		c.Config.JWT.KeysDir,
 		c.Config.JWT.Issuer,
+		c.Config.JWT.APIAudience,
 	)
 	if err != nil {
 		return fmt.Errorf("initialize JWT use case: %w", err)
 	}
 	c.JWTUseCase = jwtUC
 
+	if len(c.Config.Auth.OIDCProviders) > 0 {
+		raw, decErr := base64.StdEncoding.DecodeString(strings.TrimSpace(c.Config.Auth.SessionKEKBase64))
+		if decErr != nil || len(raw) != 32 {
+			return fmt.Errorf("auth.session_kek_base64: need 32-byte AES-256 key (standard base64): %w", decErr)
+		}
+		kr, kerr := sessioncrypto.NewKeyring(sessioncrypto.KEK{ID: "default", Key: raw})
+		sessioncrypto.ZeroBytes(raw)
+		if kerr != nil {
+			return fmt.Errorf("session KEK keyring: %w", kerr)
+		}
+		c.SessionSealer = kr
+	}
+
 	c.OIDCLoginUseCase = auth.NewOIDCLoginUseCase(
 		c.Config.Auth.OIDCProviders,
 		c.Config.Auth.LoginIntentLeaseTTL,
 		c.LoginIntentRepository,
 		&http.Client{Timeout: 12 * time.Second},
+	)
+
+	c.OIDCCallbackUseCase = auth.NewOIDCCallbackUseCase(
+		c.Config.Auth.OIDCProviders,
+		c.LoginIntentRepository,
+		c.SessionRepository,
+		c.SessionSealer,
+		c.JWTUseCase,
+		&http.Client{Timeout: 20 * time.Second},
+		c.Config.Auth.InteractiveAccessTokenTTL,
 	)
 
 	c.ControllerRegistryUseCase = registry.NewControllerRegistryUseCase(
@@ -186,6 +220,7 @@ func (c *Container) initHandlers() {
 	}
 	c.JWTHandler = httphandler.NewJWTHandler(c.JWTUseCase, c.Config.MetricsHTTP.Enabled)
 	c.OIDCLoginHandler = httphandler.NewOIDCLoginHandler(c.OIDCLoginUseCase)
+	c.OIDCCallbackHandler = httphandler.NewOIDCCallbackHandler(c.OIDCCallbackUseCase)
 	exportUC := bundle.NewContractExportUseCase(c.ContractSyncerGRPC)
 	c.ContractsExportHandler = httphandler.NewContractsExportHandler(exportUC)
 	c.RegistryHandler = httphandler.NewRegistryHandler(
@@ -211,5 +246,9 @@ func (c *Container) StartBackgroundWork(ctx context.Context) {
 
 // Close closes all resources in the container
 func (c *Container) Close() {
+	if c.SessionSealer != nil {
+		c.SessionSealer.Close()
+		c.SessionSealer = nil
+	}
 	bootstrap.CloseEtcdClient(c.EtcdClient)
 }

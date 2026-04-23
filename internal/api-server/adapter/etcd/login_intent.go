@@ -100,3 +100,54 @@ func (r *LoginIntentRepository) Create(ctx context.Context, intentID string, v k
 	}
 	return nil
 }
+
+// Get returns the login-intent value or apierrors.ErrNotFound.
+func (r *LoginIntentRepository) Get(ctx context.Context, intentID string) (kvvalue.LoginIntentValue, error) {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanLoginIntentRepo, "Get"))
+	var err error
+	defer func() {
+		if err != nil && !errors.Is(err, apierrors.ErrNotFound) {
+			telemetry.MarkError(span, err)
+		}
+		span.End()
+	}()
+
+	key, err := r.intentKey(intentID)
+	if err != nil {
+		return kvvalue.LoginIntentValue{}, err
+	}
+	resp, err := r.client.Get(ctx, key)
+	if err != nil {
+		return kvvalue.LoginIntentValue{}, apierrors.JoinStore("etcd get login-intent", err)
+	}
+	if len(resp.Kvs) == 0 {
+		err = apierrors.ErrNotFound
+		return kvvalue.LoginIntentValue{}, err
+	}
+	var v kvvalue.LoginIntentValue
+	v, err = kvvalue.ParseLoginIntentValueJSON(resp.Kvs[0].Value)
+	if err != nil {
+		return kvvalue.LoginIntentValue{}, apierrors.JoinStore("parse login-intent value", err)
+	}
+	return v, nil
+}
+
+// Delete removes the login-intent key (best-effort idempotent).
+func (r *LoginIntentRepository) Delete(ctx context.Context, intentID string) error {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanLoginIntentRepo, "Delete"))
+	var err error
+	defer func() {
+		telemetry.MarkError(span, err)
+		span.End()
+	}()
+
+	key, err := r.intentKey(intentID)
+	if err != nil {
+		return err
+	}
+	_, err = r.client.Delete(ctx, key)
+	if err != nil {
+		return apierrors.JoinStore("etcd delete login-intent", err)
+	}
+	return nil
+}
