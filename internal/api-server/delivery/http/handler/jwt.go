@@ -23,7 +23,7 @@ func NewJWTHandler(jwtUseCase *auth.JWTUseCase, metricsEnabled bool) *JWTHandler
 }
 
 // GenerateToken generates a JWT token
-// POST /api/v1/tokens
+// POST /api/v1/tokens/edge (Edge profile; OpenAPI operation issueEdgeToken).
 func (h *JWTHandler) GenerateToken(c fiber.Ctx) error {
 	span := beginHandlerSpan(c, "GenerateToken")
 	defer span.End()

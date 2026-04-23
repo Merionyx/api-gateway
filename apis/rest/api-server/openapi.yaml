@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: API Gateway — API Server HTTP API
-  version: 1.4.0
+  version: 1.5.0
   description: |
     HTTP API for the **API Server** control plane: authentication material (JWT, JWKS), contract export,
     registry views backed by **etcd** (controllers, tenants, bundles), and operational endpoints.
@@ -10,6 +10,9 @@ info:
     lifecycle is owned by the **Gateway Controller**; this API does not expose CRUD for environments.
 
     **JSON naming:** request and response bodies use **snake_case** field names unless noted.
+
+    **v1.5.0 (roadmap step 5):** removes deprecated `POST /api/v1/tokens`; **Edge** issuance is **`POST /api/v1/tokens/edge`**
+    only. **API**-profile issuance remains **`POST /api/v1/tokens/api`** (contract stabilized for codegen; handler **ш. 22**).
 
     **v1.4.0 (roadmap step 4 — OpenAPI draft):** per-operation `security` (public vs `bearerAuth` **or** `apiKey`);
     split **Edge** vs **API** JWKS and token issuance paths; OIDC **login** / **callback** / **refresh** (draft contracts —
@@ -1109,7 +1112,7 @@ paths:
         - apiKey: []
       summary: Issue Edge profile JWT (data plane / ExtAuthz)
       description: |
-        Mints an **Edge profile** JWT (distinct `iss` / `aud` / JWKS from API tokens). Request/response mirror the legacy application token shape until DTOs are narrowed in **roadmap step 5**.
+        Mints an **Edge profile** JWT (distinct `iss` / `aud` / JWKS from API tokens). Request/response use **`GenerateTokenRequest`** / **`GenerateTokenResponse`** (same shape as pre-v1.5.0 application tokens; narrowing is **ш. 22**).
       requestBody:
         required: true
         content:
@@ -1139,7 +1142,7 @@ paths:
         - apiKey: []
       summary: Issue API profile access JWT
       description: |
-        Mints a short-lived **API profile** JWT for calling this HTTP API. Draft body/response — stabilize in **roadmap step 5** together with codegen.
+        Mints a short-lived **API profile** JWT for calling this HTTP API. Request **`IssueApiAccessTokenRequest`** and **201** body **`ApiAccessTokenIssued`** are stable for codegen; semantics/RBAC land in **roadmap step 22**.
       requestBody:
         required: true
         content:
@@ -1159,36 +1162,6 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/InternalError'
-
-  /api/v1/tokens:
-    post:
-      tags: [ Authentication ]
-      operationId: createToken
-      security:
-        - bearerAuth: []
-        - apiKey: []
-      deprecated: true
-      summary: Issue application JWT (deprecated)
-      description: |
-        **Deprecated in v1.4.0:** use `POST /api/v1/tokens/edge` for the same **Edge profile** issuance (or `POST /api/v1/tokens/api` for API-profile tokens). This path remains in the spec temporarily so generated clients can migrate (**roadmap step 5** removes it).
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenerateTokenRequest'
-      responses:
-        '201':
-          description: Token created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GenerateTokenResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '500':
-          $ref: '#/components/responses/InternalError'
-
 
   /api/v1/contracts/export:
     post:

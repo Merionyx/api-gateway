@@ -115,10 +115,6 @@ func (s *OpenAPIServer) ListEnvironmentsByTenant(c fiber.Ctx, tenant apiserver.T
 	return s.c.RegistryHandler.ListEnvironmentsByTenant(c, tenant, params)
 }
 
-func (s *OpenAPIServer) CreateToken(c fiber.Ctx) error {
-	return s.c.JWTHandler.GenerateToken(c)
-}
-
 func (s *OpenAPIServer) GetVersion(c fiber.Ctx) error {
 	body := apiserver.VersionResponse{
 		ApiSchemaVersion: version.APISchemaVersion(),

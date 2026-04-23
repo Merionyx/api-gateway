@@ -756,9 +756,6 @@ type SyncBundleJSONRequestBody = BundleSyncRequest
 // ExportContractsJSONRequestBody defines body for ExportContracts for application/json ContentType.
 type ExportContractsJSONRequestBody = ContractsExportRequest
 
-// CreateTokenJSONRequestBody defines body for CreateToken for application/json ContentType.
-type CreateTokenJSONRequestBody = GenerateTokenRequest
-
 // IssueApiAccessTokenJSONRequestBody defines body for IssueApiAccessToken for application/json ContentType.
 type IssueApiAccessTokenJSONRequestBody = IssueApiAccessTokenRequest
 
@@ -900,11 +897,6 @@ type ClientInterface interface {
 
 	// ListEnvironmentsByTenant request
 	ListEnvironmentsByTenant(ctx context.Context, tenant Tenant, params *ListEnvironmentsByTenantParams, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// CreateTokenWithBody request with any body
-	CreateTokenWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	CreateToken(ctx context.Context, body CreateTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// IssueApiAccessTokenWithBody request with any body
 	IssueApiAccessTokenWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1180,30 +1172,6 @@ func (c *Client) ListControllersByTenant(ctx context.Context, tenant Tenant, par
 
 func (c *Client) ListEnvironmentsByTenant(ctx context.Context, tenant Tenant, params *ListEnvironmentsByTenantParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListEnvironmentsByTenantRequest(c.Server, tenant, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) CreateTokenWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateTokenRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) CreateToken(ctx context.Context, body CreateTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateTokenRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -2563,46 +2531,6 @@ func NewListEnvironmentsByTenantRequest(server string, tenant Tenant, params *Li
 	return req, nil
 }
 
-// NewCreateTokenRequest calls the generic CreateToken builder with application/json body
-func NewCreateTokenRequest(server string, body CreateTokenJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateTokenRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewCreateTokenRequestWithBody generates requests for CreateToken with any type of body
-func NewCreateTokenRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/v1/tokens")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
 // NewIssueApiAccessTokenRequest calls the generic IssueApiAccessToken builder with application/json body
 func NewIssueApiAccessTokenRequest(server string, body IssueApiAccessTokenJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -2869,11 +2797,6 @@ type ClientWithResponsesInterface interface {
 
 	// ListEnvironmentsByTenantWithResponse request
 	ListEnvironmentsByTenantWithResponse(ctx context.Context, tenant Tenant, params *ListEnvironmentsByTenantParams, reqEditors ...RequestEditorFn) (*ListEnvironmentsByTenantResponse, error)
-
-	// CreateTokenWithBodyWithResponse request with any body
-	CreateTokenWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateTokenResponse, error)
-
-	CreateTokenWithResponse(ctx context.Context, body CreateTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateTokenResponse, error)
 
 	// IssueApiAccessTokenWithBodyWithResponse request with any body
 	IssueApiAccessTokenWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*IssueApiAccessTokenResponse, error)
@@ -3357,30 +3280,6 @@ func (r ListEnvironmentsByTenantResponse) StatusCode() int {
 	return 0
 }
 
-type CreateTokenResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON201                   *GenerateTokenResponse
-	ApplicationproblemJSON400 *BadRequest
-	ApplicationproblemJSON500 *InternalError
-}
-
-// Status returns HTTPResponse.Status
-func (r CreateTokenResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r CreateTokenResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
 type IssueApiAccessTokenResponse struct {
 	Body                      []byte
 	HTTPResponse              *http.Response
@@ -3694,23 +3593,6 @@ func (c *ClientWithResponses) ListEnvironmentsByTenantWithResponse(ctx context.C
 		return nil, err
 	}
 	return ParseListEnvironmentsByTenantResponse(rsp)
-}
-
-// CreateTokenWithBodyWithResponse request with arbitrary body returning *CreateTokenResponse
-func (c *ClientWithResponses) CreateTokenWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateTokenResponse, error) {
-	rsp, err := c.CreateTokenWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateTokenResponse(rsp)
-}
-
-func (c *ClientWithResponses) CreateTokenWithResponse(ctx context.Context, body CreateTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateTokenResponse, error) {
-	rsp, err := c.CreateToken(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateTokenResponse(rsp)
 }
 
 // IssueApiAccessTokenWithBodyWithResponse request with arbitrary body returning *IssueApiAccessTokenResponse
@@ -4556,46 +4438,6 @@ func ParseListEnvironmentsByTenantResponse(rsp *http.Response) (*ListEnvironment
 			return nil, err
 		}
 		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest InternalError
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseCreateTokenResponse parses an HTTP response from a CreateTokenWithResponse call
-func ParseCreateTokenResponse(rsp *http.Response) (*CreateTokenResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &CreateTokenResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
-		var dest GenerateTokenResponse
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON201 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest BadRequest
