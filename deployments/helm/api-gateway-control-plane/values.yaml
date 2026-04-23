@@ -101,13 +101,23 @@ components:
       enabled: true
       minAvailable: 1
     jwt:
-      existingSecret: ""
+      # Two Kubernetes Secret names (release namespace): API vs Edge signing keys (*.key PEM). Must differ.
+      # If empty, chart defaults to <releaseFullname>-jwt-api-keys and <releaseFullname>-jwt-edge-keys.
+      apiKeysSecret: ""
+      edgeKeysSecret: ""
+      # Which key signs new JWTs when several *.key files exist in a mount: set under merged API config (not here):
+      #   components.apiServer.config.jwt.api_signing_kid
+      #   components.apiServer.config.jwt.edge_signing_kid
+      # kid = file basename without .key; all keys still appear in JWKS for verifying old tokens.
     # Session KEK for encrypting IdP refresh tokens at rest (auth.session_kek_base64).
     # Set existingSecret to a Secret name in the release namespace; never commit raw key material in values.
     # Injects API_SERVER_AUTH_SESSION_KEK_BASE64 from secretKeyRef (see docs/operator-api-server-auth.md).
     sessionKek:
       existingSecret: ""
       secretKey: "kek"
+    # Optional: map auth.oidc_providers[].id → Secret keys for client_id / client_secret (injected as AGWCP_OIDC_* env).
+    # Keys must match provider id in components.apiServer.config.auth.oidc_providers. See chart README.
+    oidcProviderCredentials: {}
     # Merged over chart defaults (e.g. readiness.require_contract_syncer for GET /ready).
     config: {}
     # Merged over global .telemetry; use to override tracing for this component only.

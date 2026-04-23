@@ -19,6 +19,11 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
+      {{- $jwtApiSecret := include "agwcp.secret.jwtApiKeys" . }}
+      {{- $jwtEdgeSecret := include "agwcp.secret.jwtEdgeKeys" . }}
+      {{- if eq $jwtApiSecret $jwtEdgeSecret }}
+      {{- fail "components.apiServer.jwt: apiKeysSecret and edgeKeysSecret must name different Kubernetes Secrets" }}
+      {{- end }}
       {{- with .Values.global.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -39,6 +44,21 @@ spec:
             secretKeyRef:
               name: {{ $sessionKekSecret | quote }}
               key: {{ (.Values.components.apiServer.sessionKek.secretKey | default "kek") | quote }}
+        {{- end }}
+        {{- range $pid, $cref := (.Values.components.apiServer.oidcProviderCredentials | default dict) }}
+        {{- if and $cref (hasKey $cref "secretName") (hasKey $cref "clientIdKey") (hasKey $cref "clientSecretKey") }}
+        {{- $suf := include "agwcp.oidcEnvSuffix" $pid }}
+        - name: AGWCP_OIDC_{{ $suf }}_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: {{ $cref.secretName | quote }}
+              key: {{ $cref.clientIdKey | quote }}
+        - name: AGWCP_OIDC_{{ $suf }}_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ $cref.secretName | quote }}
+              key: {{ $cref.clientSecretKey | quote }}
+        {{- end }}
         {{- end }}
         ports:
         - name: http
@@ -66,8 +86,12 @@ spec:
         - name: grpc-client-contract-syncer-tls
           mountPath: /etc/grpc-client-contract-syncer
           readOnly: true
-        - name: jwt-keys
+        - name: jwt-api-keys
           mountPath: /api-server/secrets/api-server/keys/jwt
+          readOnly: true
+        - name: jwt-edge-keys
+          mountPath: /api-server/secrets/api-server/keys/jwt-edge
+          readOnly: true
         readinessProbe:
           httpGet:
             path: /ready
@@ -107,9 +131,12 @@ spec:
       - name: grpc-client-contract-syncer-tls
         secret:
           secretName: {{ include "agwcp.secret.grpcClientApiServer" . }}
-      - name: jwt-keys
+      - name: jwt-api-keys
         secret:
-          secretName: {{ include "agwcp.secret.jwtKeys" . }}
+          secretName: {{ $jwtApiSecret | quote }}
+      - name: jwt-edge-keys
+        secret:
+          secretName: {{ $jwtEdgeSecret | quote }}
       {{- with .Values.components.apiServer.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
