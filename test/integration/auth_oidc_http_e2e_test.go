@@ -3,6 +3,7 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -36,7 +37,8 @@ import (
 	"github.com/merionyx/api-gateway/internal/shared/metricshttp"
 )
 
-// Roadmap ш. 28: HTTP happy path against real etcd — mock IdP (httptest), GET login → 302, GET callback → JSON tokens.
+// Roadmap ш. 28–29: OIDC E2E against real etcd (httptest mock IdP).
+// ш. 28 — login + callback; ш. 29 — POST refresh when IdP token endpoint returns 5xx (degraded refresh, roadmap ш. 18).
 
 const (
 	e2eOIDCProviderID = "mock-idp"
@@ -81,6 +83,11 @@ func newMockOIDCProvider(t *testing.T, priv *rsa.PrivateKey) *httptest.Server {
 			}
 			if r.FormValue("client_secret") != e2eClientSecret {
 				http.Error(w, "bad secret", http.StatusUnauthorized)
+				return
+			}
+			// Callback uses authorization_code; refresh uses refresh_token (ш. 29 simulates IdP down via 503).
+			if r.FormValue("grant_type") == "refresh_token" {
+				http.Error(w, "idp unavailable", http.StatusServiceUnavailable)
 				return
 			}
 			if r.FormValue("code") != e2eAuthCode {
@@ -191,35 +198,9 @@ func fiberAppFromContainer(t *testing.T, c *container.Container) *fiber.App {
 	return app
 }
 
-func TestE2E_OIDCLoginCallback_HappyPath(t *testing.T) {
-	t.Parallel()
-
-	etcdCli := NewEtcdClient(t)
-	defer etcdCli.Close()
-
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
-	idp := newMockOIDCProvider(t, priv)
-	t.Cleanup(idp.Close)
-
-	authPrefix := fmt.Sprintf("/api-gateway/integration-oidc-e2e/%s", strings.ReplaceAll(uuid.NewString(), "-", ""))
-	defer func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer cancel()
-		_, _ = etcdCli.Delete(ctx, authPrefix, clientv3.WithPrefix())
-	}()
-
-	cfg := e2eAPIConfig(t, EtcdEndpoints(), idp.URL, authPrefix)
-	cnt, err := container.NewContainer(cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cnt.Close()
-
-	app := fiberAppFromContainer(t, cnt)
-
+// performOIDCLoginCallback runs GET login → GET callback and returns access + refresh tokens (roadmap ш. 28).
+func performOIDCLoginCallback(t *testing.T, app *fiber.App) (accessToken, refreshToken string) {
+	t.Helper()
 	loginURL := fmt.Sprintf("http://example.com/api/v1/auth/login?provider_id=%s&redirect_uri=%s",
 		url.QueryEscape(e2eOIDCProviderID), url.QueryEscape(e2eRedirectURI))
 	loginResp, err := app.Test(httptest.NewRequest(http.MethodGet, loginURL, nil))
@@ -262,11 +243,100 @@ func TestE2E_OIDCLoginCallback_HappyPath(t *testing.T) {
 	if err := json.NewDecoder(cbResp.Body).Decode(&tokens); err != nil {
 		t.Fatal(err)
 	}
-	if tokens["access_token"] == nil || tokens["refresh_token"] == nil {
+	at, _ := tokens["access_token"].(string)
+	rt, _ := tokens["refresh_token"].(string)
+	if at == "" || rt == "" {
 		t.Fatalf("tokens: %+v", tokens)
 	}
-	access, _ := tokens["access_token"].(string)
-	if access == "" {
-		t.Fatal("empty access_token")
+	return at, rt
+}
+
+func TestE2E_OIDCLoginCallback_HappyPath(t *testing.T) {
+	t.Parallel()
+
+	etcdCli := NewEtcdClient(t)
+	defer etcdCli.Close()
+
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	idp := newMockOIDCProvider(t, priv)
+	t.Cleanup(idp.Close)
+
+	authPrefix := fmt.Sprintf("/api-gateway/integration-oidc-e2e/%s", strings.ReplaceAll(uuid.NewString(), "-", ""))
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		_, _ = etcdCli.Delete(ctx, authPrefix, clientv3.WithPrefix())
+	}()
+
+	cfg := e2eAPIConfig(t, EtcdEndpoints(), idp.URL, authPrefix)
+	cnt, err := container.NewContainer(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cnt.Close()
+
+	app := fiberAppFromContainer(t, cnt)
+	performOIDCLoginCallback(t, app)
+}
+
+func TestE2E_OIDCRefresh_IdPUnavailable_Degraded(t *testing.T) {
+	t.Parallel()
+
+	etcdCli := NewEtcdClient(t)
+	defer etcdCli.Close()
+
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	idp := newMockOIDCProvider(t, priv)
+	t.Cleanup(idp.Close)
+
+	authPrefix := fmt.Sprintf("/api-gateway/integration-oidc-e2e/%s", strings.ReplaceAll(uuid.NewString(), "-", ""))
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		_, _ = etcdCli.Delete(ctx, authPrefix, clientv3.WithPrefix())
+	}()
+
+	cfg := e2eAPIConfig(t, EtcdEndpoints(), idp.URL, authPrefix)
+	cnt, err := container.NewContainer(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cnt.Close()
+
+	app := fiberAppFromContainer(t, cnt)
+	access1, refresh1 := performOIDCLoginCallback(t, app)
+
+	refreshBody := fmt.Sprintf(`{"refresh_token":%q}`, refresh1)
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/auth/refresh", bytes.NewReader([]byte(refreshBody)))
+	req.Header.Set("Content-Type", "application/json")
+	refreshResp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = refreshResp.Body.Close() }()
+	if refreshResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(refreshResp.Body)
+		t.Fatalf("refresh status %d body %s", refreshResp.StatusCode, string(body))
+	}
+	var out map[string]any
+	if err := json.NewDecoder(refreshResp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	access2, _ := out["access_token"].(string)
+	refresh2, _ := out["refresh_token"].(string)
+	if access2 == "" || refresh2 == "" {
+		t.Fatalf("refresh response: %+v", out)
+	}
+	if access2 == access1 {
+		t.Fatal("expected new access_token after degraded refresh")
+	}
+	if refresh2 == refresh1 {
+		t.Fatal("expected rotated refresh_token after degraded refresh")
 	}
 }
