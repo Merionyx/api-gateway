@@ -393,8 +393,10 @@ components:
             type: string
           description: Optional hints; the server may ignore or narrow scopes.
 
-    IssueApiAccessTokenResponse:
+    ApiAccessTokenIssued:
       type: object
+      description: |
+        JSON body for **201** from `POST /api/v1/tokens/api` (name avoids clashing with client codegen type `IssueApiAccessTokenResponse`).
       required:
       - access_token
       - expires_at
@@ -1150,7 +1152,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/IssueApiAccessTokenResponse'
+                $ref: '#/components/schemas/ApiAccessTokenIssued'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':

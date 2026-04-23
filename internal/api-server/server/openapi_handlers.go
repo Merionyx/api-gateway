@@ -1,9 +1,12 @@
 package server
 
 import (
+	"net/http"
+
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/merionyx/api-gateway/internal/api-server/container"
+	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/problem"
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
 	"github.com/merionyx/api-gateway/internal/api-server/version"
 )
@@ -20,6 +23,40 @@ func NewOpenAPIServer(c *container.Container) apiserver.ServerInterface {
 
 func (s *OpenAPIServer) GetJwks(c fiber.Ctx, _ apiserver.GetJwksParams) error {
 	return s.c.JWTHandler.GetJWKS(c)
+}
+
+func (s *OpenAPIServer) GetJwksEdge(c fiber.Ctx, _ apiserver.GetJwksEdgeParams) error {
+	// TODO(roadmap): separate Edge signing JWKS; until then reuse the same material as the API JWKS endpoint.
+	return s.c.JWTHandler.GetJWKS(c)
+}
+
+func (s *OpenAPIServer) LoginOidc(c fiber.Ctx, _ apiserver.LoginOidcParams) error {
+	return authFlowNotImplemented(c, "OIDC login is not implemented yet (roadmap steps 13–14).")
+}
+
+func (s *OpenAPIServer) CallbackOidc(c fiber.Ctx, _ apiserver.CallbackOidcParams) error {
+	return authFlowNotImplemented(c, "OIDC callback is not implemented yet (roadmap steps 13–14).")
+}
+
+func (s *OpenAPIServer) RefreshSession(c fiber.Ctx) error {
+	return authFlowNotImplemented(c, "Session refresh is not implemented yet (roadmap steps 17–18).")
+}
+
+func (s *OpenAPIServer) IssueEdgeToken(c fiber.Ctx) error {
+	return s.c.JWTHandler.GenerateToken(c)
+}
+
+func (s *OpenAPIServer) IssueApiAccessToken(c fiber.Ctx) error {
+	return authFlowNotImplemented(c, "API-profile token issuance via this endpoint is not implemented yet (roadmap step 22).")
+}
+
+func authFlowNotImplemented(c fiber.Ctx, detail string) error {
+	return problem.Write(c, http.StatusNotImplemented, problem.WithCode(
+		http.StatusNotImplemented,
+		"FEATURE_NOT_IMPLEMENTED",
+		"Not Implemented",
+		detail,
+	))
 }
 
 func (s *OpenAPIServer) ListBundleKeys(c fiber.Ctx, params apiserver.ListBundleKeysParams) error {
