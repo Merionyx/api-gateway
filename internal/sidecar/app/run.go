@@ -10,12 +10,12 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/merionyx/api-gateway/internal/auth-sidecar/config"
-	"github.com/merionyx/api-gateway/internal/auth-sidecar/container"
-	"github.com/merionyx/api-gateway/internal/auth-sidecar/server"
 	"github.com/merionyx/api-gateway/internal/shared/metricshttp"
 	"github.com/merionyx/api-gateway/internal/shared/serviceapp"
 	"github.com/merionyx/api-gateway/internal/shared/telemetry"
+	"github.com/merionyx/api-gateway/internal/sidecar/config"
+	"github.com/merionyx/api-gateway/internal/sidecar/container"
+	"github.com/merionyx/api-gateway/internal/sidecar/server"
 )
 
 func Run() error {
@@ -28,7 +28,7 @@ func Run() error {
 	}
 	logger.Info("config loaded", "config", cfg)
 
-	tele, err := telemetry.Init(context.Background(), telemetry.BuildConfig("auth-sidecar", cfg.Telemetry))
+	tele, err := telemetry.Init(context.Background(), telemetry.BuildConfig("sidecar", cfg.Telemetry))
 	if err != nil {
 		return fmt.Errorf("telemetry: %w", err)
 	}

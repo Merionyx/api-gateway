@@ -13,15 +13,15 @@ import (
 
 	authv1 "github.com/merionyx/api-gateway/pkg/grpc/auth/v1"
 
-	"github.com/merionyx/api-gateway/internal/auth-sidecar/config"
-	authmetrics "github.com/merionyx/api-gateway/internal/auth-sidecar/metrics"
-	"github.com/merionyx/api-gateway/internal/auth-sidecar/storage"
 	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
 	"github.com/merionyx/api-gateway/internal/shared/grpcutil"
 	"github.com/merionyx/api-gateway/internal/shared/telemetry"
+	"github.com/merionyx/api-gateway/internal/sidecar/config"
+	authmetrics "github.com/merionyx/api-gateway/internal/sidecar/metrics"
+	"github.com/merionyx/api-gateway/internal/sidecar/storage"
 )
 
-const spanSyncPkg = "internal/auth-sidecar/sync"
+const spanSyncPkg = "internal/sidecar/sync"
 
 type SyncClient struct {
 	config    *config.Config

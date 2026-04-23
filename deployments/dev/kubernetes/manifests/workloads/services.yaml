@@ -175,14 +175,14 @@ spec:
     targetPort: metrics
     nodePort: 30112
 ---
-# auth-sidecar runs in envoy-dev Pod; it binds :9090 for Prometheus (Envoy does not use that port).
+# sidecar runs in envoy-dev Pod; it binds :9090 for Prometheus (Envoy does not use that port).
 apiVersion: v1
 kind: Service
 metadata:
-  name: gateway-auth-sidecar-metrics-nodeport
+  name: gateway-sidecar-metrics-nodeport
   namespace: default
   labels:
-    app.kubernetes.io/name: gateway-auth-sidecar-metrics-nodeport
+    app.kubernetes.io/name: gateway-sidecar-metrics-nodeport
     app.kubernetes.io/part-of: api-gateway-dev
 spec:
   type: NodePort

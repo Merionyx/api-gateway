@@ -2,17 +2,17 @@
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: {{ include "agwedge.fullname" . }}-auth-sidecar-grpc
+  name: {{ include "agwedge.fullname" . }}-sidecar-grpc
   labels:
     {{- include "agwedge.labels" . | nindent 4 }}
 spec:
-  secretName: {{ include "agwedge.secret.authSidecarGrpc" . }}
+  secretName: {{ include "agwedge.secret.sidecarGrpc" . }}
   duration: {{ .Values.certManager.duration }}
   renewBefore: {{ .Values.certManager.renewBefore }}
   privateKey:
     {{- toYaml .Values.certManager.privateKey | nindent 4 }}
   dnsNames:
-  - auth-sidecar
+  - sidecar
   - localhost
   ipAddresses:
   - 127.0.0.1
@@ -25,12 +25,12 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: {{ include "agwedge.fullname" . }}-grpc-client-auth-sidecar
+  name: {{ include "agwedge.fullname" . }}-grpc-client-sidecar
   labels:
     {{- include "agwedge.labels" . | nindent 4 }}
 spec:
-  secretName: {{ include "agwedge.secret.grpcClientAuthSidecar" . }}
-  commonName: grpc-client-auth-sidecar
+  secretName: {{ include "agwedge.secret.grpcClientsidecar" . }}
+  commonName: grpc-client-sidecar
   duration: {{ .Values.certManager.duration }}
   renewBefore: {{ .Values.certManager.renewBefore }}
   privateKey:

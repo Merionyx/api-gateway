@@ -71,12 +71,12 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: auth-sidecar-grpc
+  name: sidecar-grpc
   namespace: default
 spec:
-  secretName: auth-sidecar-grpc-tls
+  secretName: sidecar-grpc-tls
   dnsNames:
-  - auth-sidecar
+  - sidecar
   - localhost
   ipAddresses:
   - 127.0.0.1
@@ -119,11 +119,11 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: grpc-client-auth-sidecar
+  name: grpc-client-sidecar
   namespace: default
 spec:
-  secretName: grpc-client-auth-sidecar-tls
-  commonName: grpc-client-auth-sidecar
+  secretName: grpc-client-sidecar-tls
+  commonName: grpc-client-sidecar
   usages:
   - digital signature
   - key encipherment

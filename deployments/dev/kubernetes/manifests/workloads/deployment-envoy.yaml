@@ -19,7 +19,7 @@ spec:
       hostAliases:
       - ip: 127.0.0.1
         hostnames:
-        - auth-sidecar
+        - sidecar
       containers:
       - name: envoy
         image: envoyproxy/envoy:v1.33-latest
@@ -43,21 +43,21 @@ spec:
         - name: grpc-xds-client-tls
           mountPath: /etc/grpc-xds-client-tls
           readOnly: true
-      - name: auth-sidecar
-        image: merionyx/api-gateway-auth-sidecar:latest
+      - name: sidecar
+        image: merionyx/api-gateway-sidecar:latest
         imagePullPolicy: Never
         env:
         - name: CONFIG_PATH
-          value: /auth-sidecar/config/k8s.yaml
+          value: /sidecar/config/k8s.yaml
         ports:
         - name: grpc
           containerPort: 9001
         - name: metrics
           containerPort: 9090
         volumeMounts:
-        - name: auth-sidecar-config
-          mountPath: /auth-sidecar/config/k8s.yaml
-          subPath: auth-sidecar.yaml
+        - name: sidecar-config
+          mountPath: /sidecar/config/k8s.yaml
+          subPath: sidecar.yaml
           readOnly: true
         - name: grpc-ext-authz-tls
           mountPath: /etc/grpc-ext-authz-tls
@@ -83,12 +83,12 @@ spec:
       - name: grpc-xds-client-tls
         secret:
           secretName: grpc-client-envoy-tls
-      - name: auth-sidecar-config
+      - name: sidecar-config
         configMap:
           name: api-gateway-dev-apps-config
       - name: grpc-ext-authz-tls
         secret:
-          secretName: auth-sidecar-grpc-tls
+          secretName: sidecar-grpc-tls
       - name: grpc-client-controller-tls
         secret:
-          secretName: grpc-client-auth-sidecar-tls
+          secretName: grpc-client-sidecar-tls

@@ -17,7 +17,7 @@ func repoRoot(t *testing.T) string {
 
 func TestLoadConfig_FromRepoDev(t *testing.T) {
 	root := repoRoot(t)
-	path := filepath.Join(root, "configs", "auth-sidecar", "config.dev.yaml")
+	path := filepath.Join(root, "configs", "sidecar", "config.dev.yaml")
 	cfg, err := LoadConfig(path)
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)

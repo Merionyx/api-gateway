@@ -14,10 +14,10 @@ RUN go mod download
 COPY pkg/ pkg/
 COPY internal/shared/grpcutil/ internal/shared/grpcutil/
 COPY internal/shared/utils/ internal/shared/utils/
-COPY internal/auth-sidecar/ internal/auth-sidecar/
-COPY cmd/auth-sidecar/ cmd/auth-sidecar/
-COPY deployments/dev/air/auth-sidecar.toml deployments/dev/air/auth-sidecar.toml
+COPY internal/sidecar/ internal/sidecar/
+COPY cmd/sidecar/ cmd/sidecar/
+COPY deployments/dev/air/sidecar.toml deployments/dev/air/sidecar.toml
 
 EXPOSE 8080 8443 8444
 
-CMD ["air", "-c", "deployments/dev/air/auth-sidecar.toml"]
+CMD ["air", "-c", "deployments/dev/air/sidecar.toml"]

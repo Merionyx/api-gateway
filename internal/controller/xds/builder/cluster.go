@@ -20,11 +20,11 @@ import (
 func (b *xdsBuilder) BuildClusters(env *models.Environment) ([]*clusterv3.Cluster, error) {
 	clusters := make([]*clusterv3.Cluster, 0)
 
-	authSidecarCluster, err := buildAuthSidecarCluster()
+	sidecarCluster, err := buildsidecarCluster()
 	if err != nil {
 		return nil, err
 	}
-	clusters = append(clusters, authSidecarCluster)
+	clusters = append(clusters, sidecarCluster)
 
 	// 2–3. Add services from the effective environment, then the controller root pool (config + K8s globals),
 	// with the same merge policy as the API registry: [portservices.MergeEnvStaticWithRootPoolUpstreams].
@@ -42,7 +42,7 @@ func (b *xdsBuilder) BuildClusters(env *models.Environment) ([]*clusterv3.Cluste
 	return clusters, nil
 }
 
-func buildAuthSidecarCluster() (*clusterv3.Cluster, error) {
+func buildsidecarCluster() (*clusterv3.Cluster, error) {
 	httpProtoOpts, err := anypb.New(
 		&upstreamhttpv3.HttpProtocolOptions{
 			UpstreamProtocolOptions: &upstreamhttpv3.HttpProtocolOptions_ExplicitHttpConfig_{
@@ -61,7 +61,7 @@ func buildAuthSidecarCluster() (*clusterv3.Cluster, error) {
 		Name:           "auth_sidecar",
 		ConnectTimeout: durationpb.New(1 * time.Second),
 
-		// Envoy and auth-sidecar run in the same pod (edge chart): gRPC ext_authz to loopback, not a K8s Service name.
+		// Envoy and sidecar run in the same pod (edge chart): gRPC ext_authz to loopback, not a K8s Service name.
 		ClusterDiscoveryType: &clusterv3.Cluster_Type{
 			Type: clusterv3.Cluster_STATIC,
 		},

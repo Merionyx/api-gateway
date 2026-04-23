@@ -13,7 +13,7 @@ spec:
     metadata:
       labels:
         {{- include "agwedge.selectorLabels" . | nindent 8 }}
-      {{- $podAnn := mergeOverwrite (.Values.envoy.podAnnotations | default dict) (.Values.authSidecar.podAnnotations | default dict) }}
+      {{- $podAnn := mergeOverwrite (.Values.envoy.podAnnotations | default dict) (.Values.sidecar.podAnnotations | default dict) }}
       annotations:
         checksum/envoy-configmap: {{ include "agwedge.envoy.bootstrapYaml" . | sha256sum }}
         checksum/auth-configmap: {{ include "agwedge.auth.config.merged" . | sha256sum }}
@@ -25,7 +25,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.authSidecar.hostAliases }}
+      {{- with .Values.sidecar.hostAliases }}
       hostAliases:
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -56,21 +56,21 @@ spec:
         resources:
           {{- toYaml . | nindent 10 }}
         {{- end }}
-      - name: auth-sidecar
-        image: {{ include "agwedge.authSidecarImage" . | quote }}
-        imagePullPolicy: {{ .Values.authSidecar.image.pullPolicy }}
+      - name: sidecar
+        image: {{ include "agwedge.sidecarImage" . | quote }}
+        imagePullPolicy: {{ .Values.sidecar.image.pullPolicy }}
         env:
         - name: CONFIG_PATH
-          value: /auth-sidecar/config/k8s.yaml
+          value: /sidecar/config/k8s.yaml
         ports:
         - name: grpc
           containerPort: 9001
         - name: metrics
           containerPort: 9090
         volumeMounts:
-        - name: auth-sidecar-config
-          mountPath: /auth-sidecar/config/k8s.yaml
-          subPath: auth-sidecar.yaml
+        - name: sidecar-config
+          mountPath: /sidecar/config/k8s.yaml
+          subPath: sidecar.yaml
           readOnly: true
         - name: grpc-ext-authz-tls
           mountPath: /etc/grpc-ext-authz-tls
@@ -81,7 +81,7 @@ spec:
         - name: grpc-internal-ca
           mountPath: /etc/grpc-internal-ca
           readOnly: true
-        {{- with .Values.authSidecar.resources }}
+        {{- with .Values.sidecar.resources }}
         resources:
           {{- toYaml . | nindent 10 }}
         {{- end }}
@@ -100,41 +100,41 @@ spec:
       - name: grpc-xds-client-tls
         secret:
           secretName: {{ include "agwedge.secret.grpcClientEnvoy" . }}
-      - name: auth-sidecar-config
+      - name: sidecar-config
         configMap:
           name: {{ include "agwedge.fullname" . }}-auth
       - name: grpc-ext-authz-tls
         secret:
-          secretName: {{ include "agwedge.secret.authSidecarGrpc" . }}
+          secretName: {{ include "agwedge.secret.sidecarGrpc" . }}
       - name: grpc-client-controller-tls
         secret:
-          secretName: {{ include "agwedge.secret.grpcClientAuthSidecar" . }}
-      {{- $nsel := mergeOverwrite (.Values.envoy.nodeSelector | default dict) (.Values.authSidecar.nodeSelector | default dict) }}
+          secretName: {{ include "agwedge.secret.grpcClientsidecar" . }}
+      {{- $nsel := mergeOverwrite (.Values.envoy.nodeSelector | default dict) (.Values.sidecar.nodeSelector | default dict) }}
       {{- if $nsel }}
       nodeSelector:
         {{- toYaml $nsel | nindent 8 }}
       {{- end }}
-      {{- $tol := concat (.Values.envoy.tolerations | default list) (.Values.authSidecar.tolerations | default list) }}
+      {{- $tol := concat (.Values.envoy.tolerations | default list) (.Values.sidecar.tolerations | default list) }}
       {{- if $tol }}
       tolerations:
         {{- toYaml $tol | nindent 8 }}
       {{- end }}
-      {{- if or .Values.envoy.affinity .Values.authSidecar.affinity (and .Values.defaultPodAntiAffinity (gt (int .Values.replicaCount) 1)) }}
+      {{- if or .Values.envoy.affinity .Values.sidecar.affinity (and .Values.defaultPodAntiAffinity (gt (int .Values.replicaCount) 1)) }}
       affinity:
         {{- if .Values.envoy.affinity }}
         {{- toYaml .Values.envoy.affinity | nindent 8 }}
-        {{- else if .Values.authSidecar.affinity }}
-        {{- toYaml .Values.authSidecar.affinity | nindent 8 }}
+        {{- else if .Values.sidecar.affinity }}
+        {{- toYaml .Values.sidecar.affinity | nindent 8 }}
         {{- else }}
         {{- include "agwedge.defaultAntiAffinity" . | nindent 8 }}
         {{- end }}
       {{- end }}
-      {{- if or .Values.envoy.topologySpreadConstraints .Values.authSidecar.topologySpreadConstraints (and .Values.defaultTopologySpreadConstraints (gt (int .Values.replicaCount) 1)) }}
+      {{- if or .Values.envoy.topologySpreadConstraints .Values.sidecar.topologySpreadConstraints (and .Values.defaultTopologySpreadConstraints (gt (int .Values.replicaCount) 1)) }}
       topologySpreadConstraints:
         {{- if .Values.envoy.topologySpreadConstraints }}
         {{- toYaml .Values.envoy.topologySpreadConstraints | nindent 8 }}
-        {{- else if .Values.authSidecar.topologySpreadConstraints }}
-        {{- toYaml .Values.authSidecar.topologySpreadConstraints | nindent 8 }}
+        {{- else if .Values.sidecar.topologySpreadConstraints }}
+        {{- toYaml .Values.sidecar.topologySpreadConstraints | nindent 8 }}
         {{- else }}
         {{- include "agwedge.defaultTopologySpread" . | nindent 8 }}
         {{- end }}

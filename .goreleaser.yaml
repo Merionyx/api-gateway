@@ -38,9 +38,9 @@ builds:
   - amd64
   - arm64
 
-- id: auth-sidecar
-  binary: auth-sidecar
-  main: ./cmd/auth-sidecar
+- id: sidecar
+  binary: sidecar
+  main: ./cmd/sidecar
   env:
   - CGO_ENABLED=0
   goos:
@@ -105,16 +105,16 @@ archives:
     - zip
   name_template: "controller_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
 
-- id: auth-sidecar
+- id: sidecar
   ids:
-  - auth-sidecar
+  - sidecar
   formats:
   - tar.gz
   format_overrides:
   - goos: windows
     formats:
     - zip
-  name_template: "auth-sidecar_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
+  name_template: "sidecar_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}"
 
 - id: agwctl
   ids:
@@ -143,7 +143,7 @@ release:
     **Docker Hub**
     ```
     docker pull merionyx/api-gateway-api-server:{{ .Tag }}
-    docker pull merionyx/api-gateway-auth-sidecar:{{ .Tag }}
+    docker pull merionyx/api-gateway-sidecar:{{ .Tag }}
     docker pull merionyx/api-gateway-contract-syncer:{{ .Tag }}
     docker pull merionyx/api-gateway-controller:{{ .Tag }}
     ```
@@ -151,7 +151,7 @@ release:
     **GitHub Container Registry** (mirror)
     ```
     docker pull ghcr.io/merionyx/api-gateway-api-server:{{ .Tag }}
-    docker pull ghcr.io/merionyx/api-gateway-auth-sidecar:{{ .Tag }}
+    docker pull ghcr.io/merionyx/api-gateway-sidecar:{{ .Tag }}
     docker pull ghcr.io/merionyx/api-gateway-contract-syncer:{{ .Tag }}
     docker pull ghcr.io/merionyx/api-gateway-controller:{{ .Tag }}
     ```

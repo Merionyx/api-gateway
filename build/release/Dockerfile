@@ -1,5 +1,5 @@
 # Build any Go service in the monorepo. Required build-args:
-#   SERVICE   — directory name: api-server | controller | auth-sidecar | contract-syncer | mock-service
+#   SERVICE   — directory name: api-server | controller | sidecar | contract-syncer | mock-service
 #   OCI_NAME  — short name for org.opencontainers.image.title (e.g. "API Server")
 #
 # Examples:
