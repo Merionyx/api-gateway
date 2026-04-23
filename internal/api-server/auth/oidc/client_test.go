@@ -121,6 +121,47 @@ func TestDiscovery_TokenExchange_ValidateIDToken(t *testing.T) {
 	}
 }
 
+func TestExchangeAuthorizationCode_MissingIDToken(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(TokenResponse{
+			AccessToken: "ghu_only",
+			TokenType:   "bearer",
+		})
+	}))
+	t.Cleanup(srv.Close)
+	got, err := ExchangeAuthorizationCode(context.Background(), srv.Client(), srv.URL+"/token", "cid", "sec", "code", "http://cb", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil || got.AccessToken != "ghu_only" || got.IDToken != "" {
+		t.Fatalf("unexpected token response: %+v", got)
+	}
+}
+
+func TestExchangeAuthorizationCode_OAuth2ErrorJSON(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"error":             "redirect_uri_mismatch",
+			"error_description": "The redirect_uri MUST match the registered callback URL for this application.",
+		})
+	}))
+	t.Cleanup(srv.Close)
+	_, err := ExchangeAuthorizationCode(context.Background(), srv.Client(), srv.URL+"/token", "cid", "sec", "code", "http://cb", "")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !errors.Is(err, ErrTokenExchange) {
+		t.Fatalf("want ErrTokenExchange, got %v", err)
+	}
+	var te *OAuth2TokenError
+	if !errors.As(err, &te) || te.Code != "redirect_uri_mismatch" {
+		t.Fatalf("want OAuth2TokenError, got %v", err)
+	}
+}
+
 func TestExchangeAuthorizationCode_SendsPKCEVerifier(t *testing.T) {
 	t.Parallel()
 	var gotVerifier string

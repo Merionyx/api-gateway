@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -105,7 +106,8 @@ func TestOIDCCallbackUseCase_Complete_HappyPath(t *testing.T) {
 	}}
 	sessions := &memSessionRepo{}
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/.well-known/openid-configuration"):
 			base := "http://" + r.Host
@@ -242,5 +244,107 @@ func TestOIDCCallbackUseCase_Complete_UnknownIntent(t *testing.T) {
 	}
 	if !errors.Is(err, apierrors.ErrNotFound) {
 		t.Fatalf("got %v", err)
+	}
+}
+
+func TestMapCallbackError_MissingIDTokenDetail(t *testing.T) {
+	t.Parallel()
+	wrapped := fmt.Errorf("%w: %w", oidc.ErrTokenExchange, oidc.ErrMissingIDTokenInTokenResponse)
+	st, code, detail := MapCallbackError(wrapped)
+	if st != 401 || code != "OIDC_TOKEN_EXCHANGE_FAILED" {
+		t.Fatalf("got status=%d code=%q", st, code)
+	}
+	if !strings.Contains(detail, "id_token") || !strings.Contains(detail, "OAuth Apps") {
+		t.Fatalf("unexpected detail: %s", detail)
+	}
+}
+
+func TestOIDCCallbackUseCase_Complete_GitHubFallbackWithoutIDToken(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	jwtUC, err := NewJWTUseCase(jwtTestCfg(t, dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	k := make([]byte, 32)
+	for i := range k {
+		k[i] = 7
+	}
+	kr, err := sessioncrypto.NewKeyring(sessioncrypto.KEK{ID: "k", Key: k})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { kr.Close() })
+
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/.well-known/openid-configuration":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"issuer":                 srv.URL,
+				"authorization_endpoint": srv.URL + "/authorize",
+				"token_endpoint":         srv.URL + "/token",
+				"jwks_uri":               srv.URL + "/jwks",
+			})
+		case r.URL.Path == "/token" && r.Method == http.MethodPost:
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"access_token": "gho_live_like",
+				"token_type":   "bearer",
+				"scope":        "read:org",
+			})
+		case r.URL.Path == "/user":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":    42,
+				"login": "octocat",
+				"name":  "Mona Octocat",
+				"email": "octo@example.com",
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	oldBase := githubRESTBaseURL
+	githubRESTBaseURL = srv.URL
+	t.Cleanup(func() { githubRESTBaseURL = oldBase })
+
+	intentID := uuid.NewString()
+	intents := &memIntentRepo{m: map[string]kvvalue.LoginIntentValue{
+		intentID: {
+			ProviderID:   "github",
+			RedirectURI:  "http://127.0.0.1:21987/callback",
+			OAuthState:   intentID,
+			PKCEVerifier: "pkce",
+		},
+	}}
+	sessions := &memSessionRepo{}
+
+	uc := NewOIDCCallbackUseCase([]config.OIDCProviderConfig{{
+		ID:                   "github",
+		Kind:                 "github",
+		Issuer:               srv.URL,
+		ClientID:             "cid",
+		ClientSecret:         "sec",
+		RedirectURIAllowlist: []string{"http://127.0.0.1:21987/callback"},
+		GitHub:               &config.GitHubOIDCProviderConfig{},
+	}}, intents, sessions, kr, jwtUC, srv.Client(), time.Minute, nil, 0)
+
+	out, err := uc.Complete(t.Context(), "authcode", intentID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(out.AccessToken) == "" || strings.TrimSpace(out.RefreshToken) == "" {
+		t.Fatalf("unexpected output: %+v", out)
+	}
+	var snap map[string]any
+	if err := json.Unmarshal(sessions.last.ClaimsSnapshot, &snap); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := snap["preferred_username"].(string); got != "octocat" {
+		t.Fatalf("preferred_username=%v", snap["preferred_username"])
+	}
+	if got, _ := snap["sub"].(string); got != "github-id:42" {
+		t.Fatalf("sub=%v", snap["sub"])
 	}
 }

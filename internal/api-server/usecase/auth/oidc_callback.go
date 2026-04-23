@@ -129,17 +129,30 @@ func (u *OIDCCallbackUseCase) Complete(ctx context.Context, code, state string) 
 		return out, err
 	}
 
-	nonceOpt := ""
-	if strings.TrimSpace(intent.Nonce) != "" {
-		nonceOpt = intent.Nonce
-	}
-	idClaims, err := oidc.ValidateIDToken(ctx, u.hc, disc, tr.IDToken, oidc.ValidateIDTokenOptions{
-		ExpectedIssuer:   disc.Issuer,
-		ExpectedAudience: p.ClientID,
-		ExpectedNonce:    nonceOpt,
-	})
-	if err != nil {
-		return out, err
+	var idClaims jwt.MapClaims
+	if strings.TrimSpace(tr.IDToken) == "" {
+		if p.IsGitHubOIDCProvider() {
+			// GitHub OAuth Apps may return access_token-only responses in web flow.
+			idClaims, err = githubClaimsFromAccessToken(ctx, u.hc, p.GitHub, strings.TrimSpace(tr.AccessToken))
+			if err != nil {
+				return out, err
+			}
+		} else {
+			return out, fmt.Errorf("%w: %w", oidc.ErrTokenExchange, oidc.ErrMissingIDTokenInTokenResponse)
+		}
+	} else {
+		nonceOpt := ""
+		if strings.TrimSpace(intent.Nonce) != "" {
+			nonceOpt = intent.Nonce
+		}
+		idClaims, err = oidc.ValidateIDToken(ctx, u.hc, disc, tr.IDToken, oidc.ValidateIDTokenOptions{
+			ExpectedIssuer:   disc.Issuer,
+			ExpectedAudience: p.ClientID,
+			ExpectedNonce:    nonceOpt,
+		})
+		if err != nil {
+			return out, err
+		}
 	}
 
 	subject := interactiveSubject(idClaims)
@@ -210,6 +223,40 @@ func (u *OIDCCallbackUseCase) Complete(ctx context.Context, code, state string) 
 	return out, nil
 }
 
+func tokenExchangeProblemDetail(err error) string {
+	if errors.Is(err, oidc.ErrMissingIDTokenInTokenResponse) {
+		return "The IdP token response had no id_token (OIDC is required for this login flow). " +
+			"On GitHub use Developer settings → OAuth Apps (classic) as in docs/idp/github—not only a GitHub App whose user-token response omits id_token. " +
+			"Ensure the authorize request includes the openid scope and Accept: application/json on the token POST."
+	}
+	var te *oidc.OAuth2TokenError
+	if errors.As(err, &te) {
+		switch strings.ToLower(strings.TrimSpace(te.Code)) {
+		case "redirect_uri_mismatch":
+			return "The token request redirect_uri does not match the authorize step or the provider's registered callback rules."
+		case "incorrect_client_credentials":
+			return "The identity provider rejected client_id or client_secret for this OIDC provider entry."
+		case "bad_verification_code":
+			return "The identity provider rejected the authorization code (expired, already used, or PKCE / redirect_uri mismatch)."
+		case "unverified_user_email":
+			return "GitHub will not issue tokens until the user's primary email address is verified."
+		default:
+			c := strings.TrimSpace(te.Code)
+			d := strings.TrimSpace(te.Description)
+			if c != "" && d != "" {
+				return c + ": " + d
+			}
+			if d != "" {
+				return d
+			}
+			if c != "" {
+				return c
+			}
+		}
+	}
+	return "Authorization code could not be exchanged (invalid or reused code)."
+}
+
 func interactiveSubject(mc jwt.MapClaims) string {
 	if e, _ := mc["email"].(string); strings.TrimSpace(e) != "" {
 		return strings.TrimSpace(e)
@@ -239,7 +286,7 @@ func MapCallbackError(err error) (status int, code, detail string) {
 	case errors.Is(err, oidc.ErrDiscovery):
 		return 502, "OIDC_DISCOVERY_FAILED", "Could not load OpenID configuration from the issuer."
 	case errors.Is(err, oidc.ErrTokenExchange):
-		return 401, "OIDC_TOKEN_EXCHANGE_FAILED", "Authorization code could not be exchanged (invalid or reused code)."
+		return 401, "OIDC_TOKEN_EXCHANGE_FAILED", tokenExchangeProblemDetail(err)
 	case errors.Is(err, oidc.ErrIDTokenValidation):
 		return 401, "OIDC_ID_TOKEN_INVALID", "IdP id_token validation failed."
 	case errors.Is(err, apierrors.ErrGitHubLoginDenied):

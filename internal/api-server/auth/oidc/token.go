@@ -18,6 +18,9 @@ type TokenResponse struct {
 	RefreshToken string `json:"refresh_token,omitempty"`
 	IDToken      string `json:"id_token"`
 	Scope        string `json:"scope,omitempty"`
+	// OAuthErr / OAuthErrDescription are set when the IdP returns RFC 6749 error JSON (often with HTTP 200).
+	OAuthErr            string `json:"error,omitempty"`
+	OAuthErrDescription string `json:"error_description,omitempty"`
 }
 
 // ExchangeAuthorizationCode calls the token endpoint (grant_type=authorization_code, client_secret in body).
@@ -60,8 +63,8 @@ func ExchangeAuthorizationCode(ctx context.Context, hc *http.Client, tokenEndpoi
 	if err := json.Unmarshal(body, &tr); err != nil {
 		return nil, fmt.Errorf("%w: json: %w", ErrTokenExchange, err)
 	}
-	if tr.IDToken == "" {
-		return nil, fmt.Errorf("%w: missing id_token", ErrTokenExchange)
+	if strings.TrimSpace(tr.OAuthErr) != "" {
+		return nil, &OAuth2TokenError{Code: strings.TrimSpace(tr.OAuthErr), Description: strings.TrimSpace(tr.OAuthErrDescription)}
 	}
 	return &tr, nil
 }

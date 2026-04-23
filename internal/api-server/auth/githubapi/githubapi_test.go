@@ -69,3 +69,28 @@ func TestListUserTeams(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 }
+
+func TestGetAuthenticatedUser(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/user" {
+			http.NotFound(w, r)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(userWire{
+			ID:    12345,
+			Login: "octocat",
+			Name:  "Mona Octocat",
+			Email: "octo@example.com",
+		})
+	}))
+	t.Cleanup(srv.Close)
+
+	got, err := GetAuthenticatedUser(t.Context(), srv.Client(), "tok", srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != 12345 || got.Login != "octocat" || got.Name != "Mona Octocat" || got.Email != "octo@example.com" {
+		t.Fatalf("%+v", got)
+	}
+}

@@ -34,6 +34,21 @@ type teamWire struct {
 	} `json:"organization"`
 }
 
+// UserInfo is the subset of GitHub user profile used to build interactive claims without id_token.
+type UserInfo struct {
+	ID    int64
+	Login string
+	Name  string
+	Email string
+}
+
+type userWire struct {
+	ID    int64  `json:"id"`
+	Login string `json:"login"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
+
 func restBase(base string) string {
 	b := strings.TrimSuffix(strings.TrimSpace(base), "/")
 	if b == "" {
@@ -170,6 +185,50 @@ func ListUserTeams(ctx context.Context, hc *http.Client, oauthToken, restBaseURL
 		if page > 50 {
 			break
 		}
+	}
+	return out, nil
+}
+
+// GetAuthenticatedUser returns the OAuth user profile from GET /user.
+func GetAuthenticatedUser(ctx context.Context, hc *http.Client, oauthToken, restBaseURL string) (UserInfo, error) {
+	var out UserInfo
+	if hc == nil {
+		hc = http.DefaultClient
+	}
+	tok := strings.TrimSpace(oauthToken)
+	if tok == "" {
+		return out, fmt.Errorf("githubapi: empty oauth token")
+	}
+	base := restBase(restBaseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/user", nil)
+	if err != nil {
+		return out, err
+	}
+	req.Header.Set("Authorization", "Bearer "+tok)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("User-Agent", UserAgent)
+
+	resp, err := hc.Do(req)
+	if err != nil {
+		return out, err
+	}
+	body, rerr := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	_ = resp.Body.Close()
+	if rerr != nil {
+		return out, rerr
+	}
+	if resp.StatusCode != http.StatusOK {
+		return out, fmt.Errorf("githubapi: get user: status %d: %s", resp.StatusCode, truncate(body, 256))
+	}
+	var uw userWire
+	if err := json.Unmarshal(body, &uw); err != nil {
+		return out, fmt.Errorf("githubapi: get user json: %w", err)
+	}
+	out = UserInfo{
+		ID:    uw.ID,
+		Login: strings.TrimSpace(uw.Login),
+		Name:  strings.TrimSpace(uw.Name),
+		Email: strings.TrimSpace(uw.Email),
 	}
 	return out, nil
 }

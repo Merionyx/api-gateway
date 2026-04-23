@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/githubapi"
 	"github.com/merionyx/api-gateway/internal/api-server/config"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
@@ -21,6 +23,33 @@ func githubRESTBaseFor(gh *config.GitHubOIDCProviderConfig) string {
 		}
 	}
 	return githubRESTBaseURL
+}
+
+// githubClaimsFromAccessToken builds minimal identity claims for GitHub when token response has no id_token.
+func githubClaimsFromAccessToken(ctx context.Context, hc *http.Client, gh *config.GitHubOIDCProviderConfig, oauthAccess string) (jwt.MapClaims, error) {
+	user, err := githubapi.GetAuthenticatedUser(ctx, hc, oauthAccess, githubRESTBaseFor(gh))
+	if err != nil {
+		return nil, err
+	}
+	login := strings.TrimSpace(user.Login)
+	if login == "" {
+		return nil, fmt.Errorf("%w: github /user response missing login", apierrors.ErrInvalidInput)
+	}
+	sub := "github:" + login
+	if user.ID > 0 {
+		sub = "github-id:" + strconv.FormatInt(user.ID, 10)
+	}
+	claims := jwt.MapClaims{
+		"sub":                sub,
+		"preferred_username": login,
+	}
+	if s := strings.TrimSpace(user.Name); s != "" {
+		claims["name"] = s
+	}
+	if s := strings.TrimSpace(user.Email); s != "" {
+		claims["email"] = s
+	}
+	return claims, nil
 }
 
 func githubExtraRoles(ctx context.Context, hc *http.Client, gh *config.GitHubOIDCProviderConfig, oauthAccess, restBase string) ([]string, error) {
