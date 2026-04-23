@@ -203,8 +203,10 @@ func fiberAppFromContainer(t *testing.T, c *container.Container) *fiber.App {
 
 func TestE2E_ListOidcProviders(t *testing.T) {
 	t.Parallel()
-	etcdEndpoints := sharedetcd.IntegrationEndpoints(t)
-	authKeyPrefix := "/api-gateway/api-server/auth/v1/" + uuid.NewString() + "/"
+
+	etcdCli := NewEtcdClient(t)
+	defer etcdCli.Close()
+
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatal(err)
@@ -212,14 +214,21 @@ func TestE2E_ListOidcProviders(t *testing.T) {
 	idp := newMockOIDCProvider(t, priv)
 	t.Cleanup(idp.Close)
 
-	cfg := e2eAPIConfig(t, etcdEndpoints, idp.URL, authKeyPrefix)
-	c, err := container.NewContainer(cfg)
+	authPrefix := fmt.Sprintf("/api-gateway/integration-oidc-e2e/%s", strings.ReplaceAll(uuid.NewString(), "-", ""))
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		_, _ = etcdCli.Delete(ctx, authPrefix, clientv3.WithPrefix())
+	}()
+
+	cfg := e2eAPIConfig(t, EtcdEndpoints(), idp.URL, authPrefix)
+	cnt, err := container.NewContainer(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = c.Close() })
+	defer cnt.Close()
 
-	app := fiberAppFromContainer(t, c)
+	app := fiberAppFromContainer(t, cnt)
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/auth/oidc-providers", nil)
 	resp, err := app.Test(req)
 	if err != nil {
