@@ -246,6 +246,8 @@ func MapCallbackError(err error) (status int, code, detail string) {
 		return 403, "GITHUB_LOGIN_DENIED", "GitHub user does not satisfy allowed organization membership for this provider."
 	case errors.Is(err, apierrors.ErrGitLabLoginDenied):
 		return 403, "GITLAB_LOGIN_DENIED", "GitLab user does not satisfy allowed group membership for this provider."
+	case errors.Is(err, apierrors.ErrGoogleLoginDenied):
+		return 403, "GOOGLE_LOGIN_DENIED", "Google user does not satisfy hosted domain or email domain policy for this provider."
 	case errors.Is(err, apierrors.ErrNoActiveSigningKey), errors.Is(err, apierrors.ErrUnsupportedSigningAlgorithm), errors.Is(err, apierrors.ErrSigningOperationFailed):
 		return 503, "JWT_SIGNING_UNAVAILABLE", "Could not mint API access token."
 	case errors.Is(err, apierrors.ErrStoreAccess):

@@ -66,4 +66,8 @@ func TestBuildOIDCScope(t *testing.T) {
 	if s5 != "openid read_api" {
 		t.Fatalf("gitlab scopes got %q", s5)
 	}
+	s6 := buildOIDCScope(config.OIDCProviderConfig{Kind: "google"})
+	if s6 != "openid email profile" {
+		t.Fatalf("google scopes got %q", s6)
+	}
 }

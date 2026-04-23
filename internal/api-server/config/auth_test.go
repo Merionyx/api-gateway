@@ -119,6 +119,71 @@ func TestGitLabAPIV4BaseFromIssuer(t *testing.T) {
 	}
 }
 
+func TestValidateOIDCProviders_Google(t *testing.T) {
+	t.Parallel()
+	err := ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "g",
+		Issuer:               "https://accounts.google.com",
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		Kind:                 "google",
+		GitHub:               &GitHubOIDCProviderConfig{},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "must not set github block") {
+		t.Fatalf("got %v", err)
+	}
+
+	err = ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "g",
+		Issuer:               "https://evil.example",
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		Kind:                 "google",
+	}})
+	if err == nil || !strings.Contains(err.Error(), "kind=google requires issuer") {
+		t.Fatalf("got %v", err)
+	}
+
+	err = ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "g",
+		Issuer:               "https://accounts.google.com",
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		Kind:                 "google",
+		Google: &GoogleOIDCProviderConfig{
+			HostedDomainRoleBindings: []GoogleHostedDomainRoleBinding{{
+				HD:    "example.com",
+				Roles: []string{},
+			}},
+		},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "roles must be non-empty") {
+		t.Fatalf("got %v", err)
+	}
+
+	err = ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "g",
+		Issuer:               "https://accounts.google.com",
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		Kind:                 "google",
+		Google: &GoogleOIDCProviderConfig{
+			AllowedHostedDomains: []string{"example.com"},
+			EmailDomainRoleBindings: []GoogleEmailDomainRoleBinding{{
+				Domain: "example.com",
+				Roles:  []string{"api:admin"},
+			}},
+		},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestValidateOIDCProviders_GenericMustNotSetIdpBlocks(t *testing.T) {
 	t.Parallel()
 	err := ValidateOIDCProviders([]OIDCProviderConfig{{
@@ -130,6 +195,18 @@ func TestValidateOIDCProviders_GenericMustNotSetIdpBlocks(t *testing.T) {
 		GitLab:               &GitLabOIDCProviderConfig{},
 	}})
 	if err == nil || !strings.Contains(err.Error(), "set kind: gitlab") {
+		t.Fatalf("got %v", err)
+	}
+
+	err = ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "x",
+		Issuer:               "https://accounts.google.com",
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		Google:               &GoogleOIDCProviderConfig{},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "set kind: google") {
 		t.Fatalf("got %v", err)
 	}
 }

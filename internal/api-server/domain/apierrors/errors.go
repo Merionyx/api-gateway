@@ -63,4 +63,7 @@ var (
 
 	// ErrGitLabLoginDenied means the user failed GitLab group policy at callback (HTTP 403).
 	ErrGitLabLoginDenied = errors.New("gitlab login denied by group policy")
+
+	// ErrGoogleLoginDenied means the user failed Google hd/email domain policy at callback (HTTP 403).
+	ErrGoogleLoginDenied = errors.New("google login denied by hosted domain or email policy")
 )

@@ -47,7 +47,107 @@ func claimsSnapshotFromProvider(ctx context.Context, p config.OIDCProviderConfig
 		}
 		roles = mergeUniqueStrings(roles, extras)
 	}
+	if p.IsGoogleOIDCProvider() {
+		extras, err := googleExtraRoles(p.Google, idClaims)
+		if err != nil {
+			return nil, err
+		}
+		roles = mergeUniqueStrings(roles, extras)
+	}
 	return marshalClaimsSnapshot(idClaims, roles)
+}
+
+func googleExtraRoles(g *config.GoogleOIDCProviderConfig, mc jwt.MapClaims) ([]string, error) {
+	if g == nil {
+		g = &config.GoogleOIDCProviderConfig{}
+	}
+	allowedHD := stringSetLowerTrim(g.AllowedHostedDomains)
+	allowedEmailDom := stringSetLowerTrim(g.AllowedEmailDomains)
+	needHD := len(allowedHD) > 0
+	needEmail := len(allowedEmailDom) > 0
+	needBindHD := len(g.HostedDomainRoleBindings) > 0
+	needBindEmail := len(g.EmailDomainRoleBindings) > 0
+	if !needHD && !needEmail && !needBindHD && !needBindEmail {
+		return nil, nil
+	}
+
+	email := strings.TrimSpace(googleStringClaim(mc, "email"))
+	hd := strings.TrimSpace(googleStringClaim(mc, "hd"))
+
+	if needHD {
+		if hd == "" {
+			return nil, apierrors.ErrGoogleLoginDenied
+		}
+		if _, ok := allowedHD[strings.ToLower(hd)]; !ok {
+			return nil, apierrors.ErrGoogleLoginDenied
+		}
+	} else if needEmail {
+		d := emailDomainFromAddress(email)
+		if d == "" {
+			return nil, apierrors.ErrGoogleLoginDenied
+		}
+		if _, ok := allowedEmailDom[d]; !ok {
+			return nil, apierrors.ErrGoogleLoginDenied
+		}
+	}
+
+	var extras []string
+	for _, b := range g.HostedDomainRoleBindings {
+		bhd := strings.TrimSpace(b.HD)
+		if bhd == "" {
+			continue
+		}
+		if strings.EqualFold(hd, bhd) {
+			for _, r := range b.Roles {
+				if s := strings.TrimSpace(r); s != "" {
+					extras = append(extras, s)
+				}
+			}
+		}
+	}
+	dom := emailDomainFromAddress(email)
+	for _, b := range g.EmailDomainRoleBindings {
+		d := strings.TrimSpace(strings.ToLower(b.Domain))
+		if d == "" {
+			continue
+		}
+		if dom == d {
+			for _, r := range b.Roles {
+				if s := strings.TrimSpace(r); s != "" {
+					extras = append(extras, s)
+				}
+			}
+		}
+	}
+	return extras, nil
+}
+
+func googleStringClaim(mc jwt.MapClaims, k string) string {
+	v, ok := mc[k]
+	if !ok {
+		return ""
+	}
+	s, _ := v.(string)
+	return s
+}
+
+func stringSetLowerTrim(in []string) map[string]struct{} {
+	out := make(map[string]struct{})
+	for _, s := range in {
+		s = strings.ToLower(strings.TrimSpace(s))
+		if s != "" {
+			out[s] = struct{}{}
+		}
+	}
+	return out
+}
+
+func emailDomainFromAddress(email string) string {
+	at := strings.LastIndexByte(email, '@')
+	if at < 0 || at == len(email)-1 {
+		return ""
+	}
+	return strings.ToLower(strings.TrimSpace(email[at+1:]))
 }
 
 func gitlabRESTBaseFor(gl *config.GitLabOIDCProviderConfig, issuer string) (string, error) {
@@ -257,7 +357,7 @@ func marshalClaimsSnapshot(mc jwt.MapClaims, roles []string) (json.RawMessage, e
 	m := map[string]any{
 		"roles": roles,
 	}
-	for _, k := range []string{"sub", "email", "name", "preferred_username"} {
+	for _, k := range []string{"sub", "email", "name", "preferred_username", "hd"} {
 		if v, ok := mc[k]; ok {
 			m[k] = v
 		}

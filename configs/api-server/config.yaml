@@ -84,11 +84,22 @@ auth:
   #       allowed_group_paths: ["my-root-group"]
   #       group_role_bindings:
   #         - { group_full_path: "my-root-group/admins", roles: ["api:admin"] }
+  # Google (roadmap ш.37): docs/idp/google/README.md — issuer must be https://accounts.google.com ; kind: google
+  #   - id: "google"
+  #     kind: "google"
+  #     issuer: "https://accounts.google.com"
+  #     client_id: "….apps.googleusercontent.com"
+  #     client_secret: "…"
+  #     redirect_uri_allowlist: ["http://127.0.0.1:21987/callback"]
+  #     google:
+  #       allowed_hosted_domains: ["example.com"]
+  #       hosted_domain_role_bindings:
+  #         - { hd: "example.com", roles: ["api:admin"] }
 
-# OpenTelemetry: optional; can be overridden (e.g. TELEMETRY_ENABLED) via environment.
-# telemetry:
-#   enabled: false
-#   service_name: "api-server"
-#   otlp_endpoint: "http://jaeger:4317"
-#   otlp_insecure: true
-#   otlp_protocol: "grpc"
+  # OpenTelemetry: optional; can be overridden (e.g. TELEMETRY_ENABLED) via environment.
+  # telemetry:
+  #   enabled: false
+  #   service_name: "api-server"
+  #   otlp_endpoint: "http://jaeger:4317"
+  #   otlp_insecure: true
+  #   otlp_protocol: "grpc"

@@ -80,6 +80,58 @@ func TestClaimsSnapshotFromProvider_generic(t *testing.T) {
 	}
 }
 
+func TestGoogleExtraRoles_hdDenied(t *testing.T) {
+	t.Parallel()
+	mc := jwt.MapClaims{"hd": "other.com", "email": "u@other.com"}
+	_, err := googleExtraRoles(&config.GoogleOIDCProviderConfig{
+		AllowedHostedDomains: []string{"example.com"},
+	}, mc)
+	if !errors.Is(err, apierrors.ErrGoogleLoginDenied) {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestGoogleExtraRoles_hdBindings(t *testing.T) {
+	t.Parallel()
+	mc := jwt.MapClaims{"hd": "example.com", "email": "u@example.com"}
+	roles, err := googleExtraRoles(&config.GoogleOIDCProviderConfig{
+		HostedDomainRoleBindings: []config.GoogleHostedDomainRoleBinding{{
+			HD:    "example.com",
+			Roles: []string{"api:admin"},
+		}},
+	}, mc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(roles) != 1 || roles[0] != "api:admin" {
+		t.Fatalf("%v", roles)
+	}
+}
+
+func TestGoogleExtraRoles_emailDomainGate(t *testing.T) {
+	t.Parallel()
+	mc := jwt.MapClaims{"email": "u@example.com"}
+	_, err := googleExtraRoles(&config.GoogleOIDCProviderConfig{
+		AllowedEmailDomains: []string{"other.org"},
+	}, mc)
+	if !errors.Is(err, apierrors.ErrGoogleLoginDenied) {
+		t.Fatalf("got %v", err)
+	}
+	roles, err := googleExtraRoles(&config.GoogleOIDCProviderConfig{
+		AllowedEmailDomains: []string{"example.com"},
+		EmailDomainRoleBindings: []config.GoogleEmailDomainRoleBinding{{
+			Domain: "example.com",
+			Roles:  []string{"api:contracts:export"},
+		}},
+	}, mc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(roles) != 1 {
+		t.Fatalf("%v", roles)
+	}
+}
+
 func TestClaimsSnapshotFromProvider_githubNoExtraCalls(t *testing.T) {
 	t.Parallel()
 	mc := jwt.MapClaims{"sub": "1", "exp": float64(time.Now().Add(time.Hour).Unix())}

@@ -139,6 +139,14 @@ func buildOIDCScope(p config.OIDCProviderConfig) string {
 	if p.IsGitLabOIDCProvider() && !scopeInListCI(extra, "read_api") {
 		extra = append(extra, "read_api")
 	}
+	if p.IsGoogleOIDCProvider() {
+		if !scopeInListCI(extra, "email") {
+			extra = append(extra, "email")
+		}
+		if !scopeInListCI(extra, "profile") {
+			extra = append(extra, "profile")
+		}
+	}
 	for _, s := range extra {
 		s = strings.TrimSpace(s)
 		if s == "" || scopeInListCI(parts, s) {

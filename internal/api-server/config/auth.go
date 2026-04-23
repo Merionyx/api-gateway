@@ -21,12 +21,14 @@ type OIDCProviderConfig struct {
 	RedirectURIAllowlist []string `mapstructure:"redirect_uri_allowlist" json:"redirect_uri_allowlist"`
 	// ExtraScopes are appended after "openid" (e.g. "email", "profile").
 	ExtraScopes []string `mapstructure:"extra_scopes" json:"extra_scopes"`
-	// Kind selects IdP-specific behavior. Empty or "generic" keeps standard OIDC only. "github" enables org/team checks (roadmap ш. 35). "gitlab" enables group checks (ш. 36).
+	// Kind selects IdP-specific behavior. Empty or "generic" keeps standard OIDC only. "github" enables org/team checks (roadmap ш. 35). "gitlab" enables group checks (ш. 36). "google" uses id_token hd/email (ш. 37).
 	Kind string `mapstructure:"kind" json:"kind,omitempty"`
 	// GitHub is read when Kind is "github" (allowed orgs, team→role bindings). Optional; nil means no extra restrictions beyond GitHub OAuth.
 	GitHub *GitHubOIDCProviderConfig `mapstructure:"github" json:"github,omitempty"`
 	// GitLab is read when Kind is "gitlab" (allowed group paths, group→role bindings).
 	GitLab *GitLabOIDCProviderConfig `mapstructure:"gitlab" json:"gitlab,omitempty"`
+	// Google is read when Kind is "google" (Workspace hd / email domain allowlist and bindings from id_token claims).
+	Google *GoogleOIDCProviderConfig `mapstructure:"google" json:"google,omitempty"`
 }
 
 // GitHubOIDCProviderConfig restricts or enriches interactive login via GitHub REST (orgs, teams).
@@ -74,6 +76,38 @@ func (p OIDCProviderConfig) IsGitHubOIDCProvider() bool {
 // IsGitLabOIDCProvider reports whether this entry uses GitLab-specific group handling.
 func (p OIDCProviderConfig) IsGitLabOIDCProvider() bool {
 	return strings.EqualFold(strings.TrimSpace(p.Kind), "gitlab")
+}
+
+// GoogleOIDCProviderConfig restricts or enriches login using Google id_token claims (hd, email); no Admin SDK in MVP.
+type GoogleOIDCProviderConfig struct {
+	// AllowedHostedDomains, if non-empty, requires a non-empty id_token "hd" claim matching one entry (Google Workspace; case-insensitive).
+	AllowedHostedDomains []string `mapstructure:"allowed_hosted_domains" json:"allowed_hosted_domains,omitempty"`
+	// AllowedEmailDomains, if used without allowed_hosted_domains, requires email domain to match one entry (case-insensitive, no leading @ in config).
+	AllowedEmailDomains []string `mapstructure:"allowed_email_domains" json:"allowed_email_domains,omitempty"`
+	// HostedDomainRoleBindings grant roles when id_token "hd" matches (case-insensitive).
+	HostedDomainRoleBindings []GoogleHostedDomainRoleBinding `mapstructure:"hosted_domain_role_bindings" json:"hosted_domain_role_bindings,omitempty"`
+	// EmailDomainRoleBindings grant roles when the email address domain matches (case-insensitive).
+	EmailDomainRoleBindings []GoogleEmailDomainRoleBinding `mapstructure:"email_domain_role_bindings" json:"email_domain_role_bindings,omitempty"`
+}
+
+// GoogleHostedDomainRoleBinding maps a Workspace hosted domain (hd claim) to API roles.
+type GoogleHostedDomainRoleBinding struct {
+	HD    string   `mapstructure:"hd" json:"hd"`
+	Roles []string `mapstructure:"roles" json:"roles,omitempty"`
+}
+
+// GoogleEmailDomainRoleBinding maps an email domain suffix to API roles.
+type GoogleEmailDomainRoleBinding struct {
+	Domain string   `mapstructure:"domain" json:"domain"`
+	Roles  []string `mapstructure:"roles" json:"roles,omitempty"`
+}
+
+// GoogleOIDCDiscoveryIssuer is the issuer for Google accounts (browser OIDC).
+const GoogleOIDCDiscoveryIssuer = "https://accounts.google.com"
+
+// IsGoogleOIDCProvider reports whether this entry uses Google-specific claim handling.
+func (p OIDCProviderConfig) IsGoogleOIDCProvider() bool {
+	return strings.EqualFold(strings.TrimSpace(p.Kind), "google")
 }
 
 // GitLabAPIV4BaseFromIssuer returns {scheme}://{host}/api/v4 for a GitLab OIDC issuer (no path after host).
@@ -161,10 +195,16 @@ func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
 		if p.GitLab != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: set kind: gitlab when using gitlab block", id)
 		}
+		if p.Google != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: set kind: google when using google block", id)
+		}
 		return nil
 	case "github":
 		if p.GitLab != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=github must not set gitlab block", id)
+		}
+		if p.Google != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=github must not set google block", id)
 		}
 		if strings.TrimSuffix(strings.TrimSpace(p.Issuer), "/") != GitHubOIDCDiscoveryIssuer {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=github requires issuer %q (documented id_token iss is still https://github.com)", id, GitHubOIDCDiscoveryIssuer)
@@ -199,6 +239,9 @@ func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
 		if p.GitHub != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=gitlab must not set github block", id)
 		}
+		if p.Google != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=gitlab must not set google block", id)
+		}
 		if _, err := GitLabAPIV4BaseFromIssuer(p.Issuer); err != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=gitlab requires a valid issuer URL (e.g. https://gitlab.com or self-managed origin): %w", id, err)
 		}
@@ -230,8 +273,59 @@ func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
 			}
 		}
 		return nil
+	case "google":
+		if p.GitHub != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=google must not set github block", id)
+		}
+		if p.GitLab != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=google must not set gitlab block", id)
+		}
+		if strings.TrimSuffix(strings.TrimSpace(p.Issuer), "/") != GoogleOIDCDiscoveryIssuer {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=google requires issuer %q", id, GoogleOIDCDiscoveryIssuer)
+		}
+		g := p.Google
+		if g == nil {
+			return nil
+		}
+		for j, d := range g.AllowedHostedDomains {
+			if strings.TrimSpace(d) == "" {
+				return fmt.Errorf("auth.oidc_providers[%q].google.allowed_hosted_domains[%d]: empty entry", id, j)
+			}
+		}
+		for j, d := range g.AllowedEmailDomains {
+			if strings.TrimSpace(d) == "" {
+				return fmt.Errorf("auth.oidc_providers[%q].google.allowed_email_domains[%d]: empty entry", id, j)
+			}
+		}
+		for j, b := range g.HostedDomainRoleBindings {
+			if strings.TrimSpace(b.HD) == "" {
+				return fmt.Errorf("auth.oidc_providers[%q].google.hosted_domain_role_bindings[%d]: hd is required", id, j)
+			}
+			if len(b.Roles) == 0 {
+				return fmt.Errorf("auth.oidc_providers[%q].google.hosted_domain_role_bindings[%d]: roles must be non-empty", id, j)
+			}
+			for ri, role := range b.Roles {
+				if strings.TrimSpace(role) == "" {
+					return fmt.Errorf("auth.oidc_providers[%q].google.hosted_domain_role_bindings[%d].roles[%d]: empty role", id, j, ri)
+				}
+			}
+		}
+		for j, b := range g.EmailDomainRoleBindings {
+			if strings.TrimSpace(b.Domain) == "" {
+				return fmt.Errorf("auth.oidc_providers[%q].google.email_domain_role_bindings[%d]: domain is required", id, j)
+			}
+			if len(b.Roles) == 0 {
+				return fmt.Errorf("auth.oidc_providers[%q].google.email_domain_role_bindings[%d]: roles must be non-empty", id, j)
+			}
+			for ri, role := range b.Roles {
+				if strings.TrimSpace(role) == "" {
+					return fmt.Errorf("auth.oidc_providers[%q].google.email_domain_role_bindings[%d].roles[%d]: empty role", id, j, ri)
+				}
+			}
+		}
+		return nil
 	default:
-		return fmt.Errorf("auth.oidc_providers[%q]: unknown kind %q (supported: generic, github, gitlab)", id, strings.TrimSpace(p.Kind))
+		return fmt.Errorf("auth.oidc_providers[%q]: unknown kind %q (supported: generic, github, gitlab, google)", id, strings.TrimSpace(p.Kind))
 	}
 }
 
