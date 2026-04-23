@@ -1,3 +1,8 @@
+// Package handler implements the controller-registry gRPC API.
+//
+// MVP (roadmap п.8, ш.27): trust boundary for this surface is server TLS/mTLS (grpc_registry)
+// and network policy; Bearer JWT, X-API-Key, and OIDC apply only on HTTP. Do not add
+// per-RPC user auth here without an explicit ADR and operator contract.
 package handler
 
 import (

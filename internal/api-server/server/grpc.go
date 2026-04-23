@@ -1,3 +1,8 @@
+// Package server hosts API Server HTTP (Fiber) and gRPC (controller registry).
+//
+// MVP split (roadmap п.8, ш.27): interactive JWT, API keys, and OIDC callbacks are HTTP-only
+// (see RunHTTPServer). RunGRPCServer uses transport TLS/mTLS from grpc_registry plus grpcobs
+// metrics/logging only—no per-RPC Bearer or API-key middleware unless explicitly redesigned.
 package server
 
 import (
@@ -16,7 +21,7 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-// RunGRPCServer serves the registry until ctx is cancelled.
+// RunGRPCServer serves the controller-registry gRPC API until ctx is cancelled.
 func RunGRPCServer(ctx context.Context, cnt *container.Container) error {
 	address := fmt.Sprintf("%s:%s", cnt.Config.Server.Host, cnt.Config.Server.GRPCPort)
 	lis, err := net.Listen("tcp", address)
