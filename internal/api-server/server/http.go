@@ -40,7 +40,7 @@ func RunHTTPServer(ctx context.Context, c *container.Container) error {
 		AllowOrigins: []string{"*"},
 		AllowMethods: []string{"GET", "POST", "OPTIONS"},
 		AllowHeaders: []string{
-			"Origin", "Content-Type", "Accept", "Authorization",
+			"Origin", "Content-Type", "Accept", "Authorization", "X-API-Key",
 			"Traceparent", "Tracestate", // W3C TraceContext (CORS to browser/edge)
 		},
 	}))

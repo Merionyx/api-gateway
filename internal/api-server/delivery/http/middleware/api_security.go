@@ -1,16 +1,12 @@
 package middleware
 
 import (
-	"context"
-	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/merionyx/api-gateway/internal/api-server/adapter/etcd"
 	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/problem"
-	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
 )
 
@@ -18,8 +14,8 @@ import (
 const CtxKeyAPIJWTClaims = "merionyx.auth.api_jwt_claims"
 
 // APISecurity enforces OpenAPI security for routes that are not explicitly public (roadmap ш. 20).
-// Accepts either a valid API-profile Bearer JWT or a known X-API-Key (etcd lookup by SHA-256 digest).
-func APISecurity(jwtUC *auth.JWTUseCase, apiKeyRepo *etcd.APIKeyRepository) fiber.Handler {
+// Accepts either a valid API-profile Bearer JWT or a known X-API-Key (SHA-256 digest lookup; principal in Locals, roadmap ш. 21).
+func APISecurity(jwtUC *auth.JWTUseCase, apiKeys APIKeyRecordGetter) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		if c.Method() == http.MethodOptions {
 			return c.Next()
@@ -38,16 +34,12 @@ func APISecurity(jwtUC *auth.JWTUseCase, apiKeyRepo *etcd.APIKeyRepository) fibe
 			}
 		}
 
-		if apiKeyRepo != nil {
-			key := strings.TrimSpace(c.Get("X-API-Key"))
-			if key != "" {
-				ok, err := apiKeyKnown(c.Context(), apiKeyRepo, key)
-				if err != nil {
-					return problem.WriteInternal(c, err)
-				}
-				if ok {
-					return c.Next()
-				}
+		if apiKeys != nil {
+			if p, err := tryAPIKeyPrincipal(c.Context(), apiKeys, c.Get("X-API-Key")); err != nil {
+				return problem.WriteInternal(c, err)
+			} else if p != nil {
+				c.Locals(CtxKeyAPIKeyPrincipal, p)
+				return c.Next()
 			}
 		}
 
@@ -80,16 +72,4 @@ func parseBearer(h string) string {
 		return ""
 	}
 	return strings.TrimSpace(h[len(prefix):])
-}
-
-func apiKeyKnown(ctx context.Context, repo *etcd.APIKeyRepository, secret string) (bool, error) {
-	d := etcd.SHA256DigestHexFromSecret(secret)
-	_, _, err := repo.Get(ctx, d)
-	if errors.Is(err, apierrors.ErrNotFound) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return true, nil
 }
