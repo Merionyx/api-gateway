@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: API Gateway — API Server HTTP API
-  version: 1.5.0
+  version: 1.5.1
   description: |
     HTTP API for the **API Server** control plane: authentication material (JWT, JWKS), contract export,
     registry views backed by **etcd** (controllers, tenants, bundles), and operational endpoints.
@@ -10,6 +10,8 @@ info:
     lifecycle is owned by the **Gateway Controller**; this API does not expose CRUD for environments.
 
     **JSON naming:** request and response bodies use **snake_case** field names unless noted.
+
+    **v1.5.1 (roadmap step 13):** optional `nonce` query on **`GET /api/v1/auth/login`** (stored with the login-intent for callback **ш. 14**).
 
     **v1.5.0 (roadmap step 5):** removes deprecated `POST /api/v1/tokens`; **Edge** issuance is **`POST /api/v1/tokens/edge`**
     only. **API**-profile issuance remains **`POST /api/v1/tokens/api`** (contract stabilized for codegen; handler **ш. 22**).
@@ -856,6 +858,18 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
+    BadGateway:
+      description: Bad gateway — upstream IdP or dependency error.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ServiceUnavailable:
+      description: Service temporarily unavailable (e.g. persistence).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
 
 paths:
   /health:
@@ -1026,6 +1040,12 @@ paths:
         schema:
           type: string
           format: uri
+      - name: nonce
+        in: query
+        required: false
+        description: Optional OIDC `nonce` (replay protection); echoed into the authorization request when set.
+        schema:
+          type: string
       responses:
         '302':
           description: Redirect to the IdP authorization endpoint.
@@ -1037,6 +1057,10 @@ paths:
                 format: uri
         '400':
           $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
         '500':
           $ref: '#/components/responses/InternalError'
 

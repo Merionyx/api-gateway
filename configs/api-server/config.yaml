@@ -46,6 +46,14 @@ auth:
   etcd_key_prefix: "/api-gateway/api-server/auth/v1"
   environment: "production"
   allow_insecure_bootstrap: false
+  # login_intent_lease_ttl: "15m"   # default if omitted
+  # oidc_providers:                 # browser GET /api/v1/auth/login; see docs/etcd-auth-paths.md
+  #   - id: "dev-oidc"
+  #     issuer: "https://your-idp.example"
+  #     client_id: "your-client-id"
+  #     redirect_uri_allowlist:
+  #       - "http://127.0.0.1:8080/api/v1/auth/callback"
+  #     extra_scopes: ["email"]
 
 # OpenTelemetry: optional; can be overridden (e.g. TELEMETRY_ENABLED) via environment.
 # telemetry:

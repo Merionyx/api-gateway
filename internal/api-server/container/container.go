@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strings"
+	"time"
 
 	contractsyncergrpc "github.com/merionyx/api-gateway/internal/api-server/adapter/contractsyncer/grpc"
 	"github.com/merionyx/api-gateway/internal/api-server/adapter/etcd"
@@ -33,15 +35,19 @@ type Container struct {
 	ControllerRepository interfaces.ControllerRepository
 	APIKeyRepository       *etcd.APIKeyRepository
 	SessionRepository      *etcd.SessionRepository
+	LoginIntentRepository  *etcd.LoginIntentRepository
 
 	// ContractSyncerGRPC is the gRPC adapter for Contract Syncer (sync, export, ping).
 	ContractSyncerGRPC *contractsyncergrpc.Client
 
 	JWTUseCase                *auth.JWTUseCase
+	OIDCLoginUseCase          *auth.OIDCLoginUseCase
 	ControllerRegistryUseCase interfaces.ControllerRegistryUseCase
 	BundleSyncUseCase         interfaces.BundleSyncUseCase
 
 	JWTHandler *httphandler.JWTHandler
+
+	OIDCLoginHandler *httphandler.OIDCLoginHandler
 
 	ContractsExportHandler *httphandler.ContractsExportHandler
 
@@ -61,6 +67,10 @@ type Container struct {
 
 // NewContainer creates and initializes a new DI container
 func NewContainer(cfg *config.Config) (*Container, error) {
+	if err := config.ValidateOIDCProviders(cfg.Auth.OIDCProviders); err != nil {
+		return nil, err
+	}
+
 	c := &Container{
 		Config: cfg,
 	}
@@ -113,6 +123,7 @@ func (c *Container) initRepositories() {
 	c.ControllerRepository = etcd.NewControllerRepository(c.EtcdClient)
 	c.APIKeyRepository = etcd.NewAPIKeyRepository(c.EtcdClient, c.Config.Auth.EtcdKeyPrefix)
 	c.SessionRepository = etcd.NewSessionRepository(c.EtcdClient, c.Config.Auth.EtcdKeyPrefix)
+	c.LoginIntentRepository = etcd.NewLoginIntentRepository(c.EtcdClient, c.Config.Auth.EtcdKeyPrefix)
 
 	slog.Info("repositories initialized")
 }
@@ -126,6 +137,13 @@ func (c *Container) initUseCases() error {
 		return fmt.Errorf("initialize JWT use case: %w", err)
 	}
 	c.JWTUseCase = jwtUC
+
+	c.OIDCLoginUseCase = auth.NewOIDCLoginUseCase(
+		c.Config.Auth.OIDCProviders,
+		c.Config.Auth.LoginIntentLeaseTTL,
+		c.LoginIntentRepository,
+		&http.Client{Timeout: 12 * time.Second},
+	)
 
 	c.ControllerRegistryUseCase = registry.NewControllerRegistryUseCase(
 		c.ControllerRepository,
@@ -167,6 +185,7 @@ func (c *Container) initHandlers() {
 		slog.Info("idempotency backend=memory")
 	}
 	c.JWTHandler = httphandler.NewJWTHandler(c.JWTUseCase, c.Config.MetricsHTTP.Enabled)
+	c.OIDCLoginHandler = httphandler.NewOIDCLoginHandler(c.OIDCLoginUseCase)
 	exportUC := bundle.NewContractExportUseCase(c.ContractSyncerGRPC)
 	c.ContractsExportHandler = httphandler.NewContractsExportHandler(exportUC)
 	c.RegistryHandler = httphandler.NewRegistryHandler(

@@ -145,6 +145,30 @@ func TestLoginIntentMarshalRequiresFields(t *testing.T) {
 	}
 }
 
+func TestLoginIntentNonceRoundtrip(t *testing.T) {
+	t.Parallel()
+	v := LoginIntentValue{
+		SchemaVersion:   LoginIntentSchemaLatest,
+		ProviderID:      "p",
+		RedirectURI:     "https://a/cb",
+		OAuthState:      "st",
+		PKCEVerifier:    "pv",
+		IntentProtocol:  DefaultIntentProtocol,
+		Nonce:           "n-1",
+	}
+	raw, err := MarshalLoginIntentValueJSON(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := ParseLoginIntentValueJSON(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Nonce != "n-1" {
+		t.Fatalf("nonce %q", got.Nonce)
+	}
+}
+
 func TestAPIKeyMigrateV1(t *testing.T) {
 	t.Parallel()
 	raw := []byte(`{

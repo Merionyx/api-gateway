@@ -105,6 +105,7 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("auth.etcd_key_prefix", "/api-gateway/api-server/auth/v1")
 	v.SetDefault("auth.environment", "development")
 	v.SetDefault("auth.allow_insecure_bootstrap", false)
+	v.SetDefault("auth.login_intent_lease_ttl", 15*time.Minute)
 
 	v.AutomaticEnv()
 	v.SetEnvPrefix("API_SERVER_")

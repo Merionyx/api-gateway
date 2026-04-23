@@ -497,6 +497,16 @@ type Limit = int
 // Tenant defines model for Tenant.
 type Tenant = string
 
+// BadGateway RFC 7807 / RFC 9457 Problem Details.
+//
+// **Localization:** use `code` (stable `UPPER_SNAKE_CASE`) as the i18n message key, e.g. `problem.NOT_FOUND`
+// or `errors.api.NOT_FOUND`. `title` and `detail` are default English text for debugging and optional
+// display; do not rely on them as the only source for UI copy in translated apps.
+//
+// **Security:** low-level causes (stack traces, etcd/syncer diagnostics) must be logged server-side only;
+// the API returns `code` plus a neutral `detail` suitable for operators or an optional “technical details” panel.
+type BadGateway = Problem
+
 // BadRequest RFC 7807 / RFC 9457 Problem Details.
 //
 // **Localization:** use `code` (stable `UPPER_SNAKE_CASE`) as the i18n message key, e.g. `problem.NOT_FOUND`
@@ -536,6 +546,16 @@ type InternalError = Problem
 // **Security:** low-level causes (stack traces, etcd/syncer diagnostics) must be logged server-side only;
 // the API returns `code` plus a neutral `detail` suitable for operators or an optional “technical details” panel.
 type NotFound = Problem
+
+// ServiceUnavailable RFC 7807 / RFC 9457 Problem Details.
+//
+// **Localization:** use `code` (stable `UPPER_SNAKE_CASE`) as the i18n message key, e.g. `problem.NOT_FOUND`
+// or `errors.api.NOT_FOUND`. `title` and `detail` are default English text for debugging and optional
+// display; do not rely on them as the only source for UI copy in translated apps.
+//
+// **Security:** low-level causes (stack traces, etcd/syncer diagnostics) must be logged server-side only;
+// the API returns `code` plus a neutral `detail` suitable for operators or an optional “technical details” panel.
+type ServiceUnavailable = Problem
 
 // Unauthorized RFC 7807 / RFC 9457 Problem Details.
 //
@@ -580,6 +600,9 @@ type LoginOidcParams struct {
 
 	// RedirectUri Callback URL registered for this client (allowlisted server-side).
 	RedirectUri string `form:"redirect_uri" json:"redirect_uri"`
+
+	// Nonce Optional OIDC `nonce` (replay protection); echoed into the authorization request when set.
+	Nonce *string `form:"nonce,omitempty" json:"nonce,omitempty"`
 }
 
 // ListBundleKeysParams defines parameters for ListBundleKeys.
@@ -1450,6 +1473,18 @@ func NewLoginOidcRequest(server string, params *LoginOidcParams) (*http.Request,
 			for _, qp := range strings.Split(queryFrag, "&") {
 				rawQueryFragments = append(rawQueryFragments, qp)
 			}
+		}
+
+		if params.Nonce != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "nonce", *params.Nonce, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
 		}
 
 		if encoded := queryValues.Encode(); encoded != "" {
@@ -2896,6 +2931,8 @@ type LoginOidcResponse struct {
 	HTTPResponse              *http.Response
 	ApplicationproblemJSON400 *BadRequest
 	ApplicationproblemJSON500 *InternalError
+	ApplicationproblemJSON502 *BadGateway
+	ApplicationproblemJSON503 *ServiceUnavailable
 }
 
 // Status returns HTTPResponse.Status
@@ -3810,6 +3847,20 @@ func ParseLoginOidcResponse(rsp *http.Response) (*LoginOidcResponse, error) {
 			return nil, err
 		}
 		response.ApplicationproblemJSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 502:
+		var dest BadGateway
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON502 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON503 = &dest
 
 	}
 

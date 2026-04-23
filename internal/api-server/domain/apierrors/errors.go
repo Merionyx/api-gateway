@@ -40,3 +40,15 @@ var (
 	// ErrSigningOperationFailed wraps crypto/signing failures after key selection (HTTP 500, gRPC Internal).
 	ErrSigningOperationFailed = errors.New("signing operation failed")
 )
+
+// OIDC login (HTTP)
+var (
+	// ErrOIDCNotConfigured means no OIDC providers are configured (HTTP 400).
+	ErrOIDCNotConfigured = errors.New("oidc login not configured")
+
+	// ErrOIDCUnknownProvider means provider_id does not match a configured provider (HTTP 400).
+	ErrOIDCUnknownProvider = errors.New("unknown oidc provider_id")
+
+	// ErrOIDCRedirectNotAllowlisted means redirect_uri is not on the provider allowlist (HTTP 400).
+	ErrOIDCRedirectNotAllowlisted = errors.New("redirect_uri not allowlisted")
+)

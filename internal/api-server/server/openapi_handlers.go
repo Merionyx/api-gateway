@@ -30,8 +30,8 @@ func (s *OpenAPIServer) GetJwksEdge(c fiber.Ctx, _ apiserver.GetJwksEdgeParams) 
 	return s.c.JWTHandler.GetJWKS(c)
 }
 
-func (s *OpenAPIServer) LoginOidc(c fiber.Ctx, _ apiserver.LoginOidcParams) error {
-	return authFlowNotImplemented(c, "OIDC login is not implemented yet (roadmap steps 13–14).")
+func (s *OpenAPIServer) LoginOidc(c fiber.Ctx, params apiserver.LoginOidcParams) error {
+	return s.c.OIDCLoginHandler.Login(c, params)
 }
 
 func (s *OpenAPIServer) CallbackOidc(c fiber.Ctx, _ apiserver.CallbackOidcParams) error {

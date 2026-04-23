@@ -23,6 +23,9 @@ type LoginIntentValue struct {
 
 	// IntentProtocol is v2+ (e.g. "oidc_v1"); migrated v1 defaults to DefaultIntentProtocol.
 	IntentProtocol string `json:"intent_protocol"`
+
+	// Nonce is optional OIDC nonce for id_token validation at callback (roadmap ш. 13–14).
+	Nonce string `json:"nonce,omitempty"`
 }
 
 const DefaultIntentProtocol = "oidc_v1"
