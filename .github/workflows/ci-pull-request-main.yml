@@ -1,4 +1,4 @@
-name: CI - Pull request to main
+name: CI — Pull request to main
 
 on:
   pull_request:
