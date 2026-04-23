@@ -106,6 +106,18 @@ auth:
   #       allowed_id_token_groups: ["API Gateway Users"]
   #       group_role_bindings:
   #         - { group_name: "API Gateway Admins", roles: ["api:admin"] }
+  # Entra ID (roadmap ш.39): docs/idp/entra/README.md — issuer = v2.0 metadata URL (https); kind: entra
+  #   - id: "entra"
+  #     kind: "entra"
+  #     issuer: "https://login.microsoftonline.com/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/v2.0"
+  #     client_id: "…"
+  #     client_secret: "…"
+  #     redirect_uri_allowlist: ["http://127.0.0.1:21987/callback"]
+  #     entra:
+  #       allowed_tenant_ids: ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]
+  #       allowed_id_token_groups: ["<group object id as in id_token>"]
+  #       group_role_bindings:
+  #         - { group: "<same string as in id_token groups>", roles: ["api:admin"] }
 
   # OpenTelemetry: optional; can be overridden (e.g. TELEMETRY_ENABLED) via environment.
   # telemetry:

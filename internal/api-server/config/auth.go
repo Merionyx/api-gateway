@@ -21,7 +21,7 @@ type OIDCProviderConfig struct {
 	RedirectURIAllowlist []string `mapstructure:"redirect_uri_allowlist" json:"redirect_uri_allowlist"`
 	// ExtraScopes are appended after "openid" (e.g. "email", "profile").
 	ExtraScopes []string `mapstructure:"extra_scopes" json:"extra_scopes"`
-	// Kind selects IdP-specific behavior. Empty or "generic" keeps standard OIDC only. "github" enables org/team checks (roadmap ш. 35). "gitlab" enables group checks (ш. 36). "google" uses id_token hd/email (ш. 37). "okta" uses id_token groups (ш. 38).
+	// Kind selects IdP-specific behavior. Empty or "generic" keeps standard OIDC only. "github" enables org/team checks (roadmap ш. 35). "gitlab" enables group checks (ш. 36). "google" uses id_token hd/email (ш. 37). "okta" uses id_token groups (ш. 38). "entra" uses id_token tid/groups (ш. 39).
 	Kind string `mapstructure:"kind" json:"kind,omitempty"`
 	// GitHub is read when Kind is "github" (allowed orgs, team→role bindings). Optional; nil means no extra restrictions beyond GitHub OAuth.
 	GitHub *GitHubOIDCProviderConfig `mapstructure:"github" json:"github,omitempty"`
@@ -31,6 +31,8 @@ type OIDCProviderConfig struct {
 	Google *GoogleOIDCProviderConfig `mapstructure:"google" json:"google,omitempty"`
 	// Okta is read when Kind is "okta" (id_token "groups" claim allowlist and bindings; configure Okta to emit groups).
 	Okta *OktaOIDCProviderConfig `mapstructure:"okta" json:"okta,omitempty"`
+	// Entra is read when Kind is "entra" (Microsoft Entra ID: id_token tid + groups claim; configure app for group claims).
+	Entra *EntraOIDCProviderConfig `mapstructure:"entra" json:"entra,omitempty"`
 }
 
 // GitHubOIDCProviderConfig restricts or enriches interactive login via GitHub REST (orgs, teams).
@@ -131,16 +133,47 @@ func (p OIDCProviderConfig) IsOktaOIDCProvider() bool {
 	return strings.EqualFold(strings.TrimSpace(p.Kind), "okta")
 }
 
-// ValidateOktaIssuer returns an error if issuer is not a usable https URL for Okta OIDC (Authorization Server issuer).
-func ValidateOktaIssuer(issuer string) error {
+// EntraOIDCProviderConfig restricts or enriches login using Microsoft Entra id_token claims (tid, groups).
+type EntraOIDCProviderConfig struct {
+	// AllowedTenantIDs, if non-empty, requires id_token "tid" to match one entry (GUID string; comparison is case-insensitive).
+	AllowedTenantIDs []string `mapstructure:"allowed_tenant_ids" json:"allowed_tenant_ids,omitempty"`
+	// AllowedIDTokenGroups, if non-empty, requires id_token "groups" to intersect this list (exact string match after TrimSpace, as emitted in the token).
+	AllowedIDTokenGroups []string `mapstructure:"allowed_id_token_groups" json:"allowed_id_token_groups,omitempty"`
+	// GroupRoleBindings grant roles when an id_token "groups" entry matches Group (object ID or name, depending on Entra token configuration).
+	GroupRoleBindings []EntraGroupRoleBinding `mapstructure:"group_role_bindings" json:"group_role_bindings,omitempty"`
+}
+
+// EntraGroupRoleBinding maps a group entry from the id_token "groups" claim to API Server role strings.
+type EntraGroupRoleBinding struct {
+	Group string   `mapstructure:"group" json:"group"`
+	Roles []string `mapstructure:"roles" json:"roles,omitempty"`
+}
+
+// IsEntraOIDCProvider reports whether this entry uses Microsoft Entra-specific id_token handling.
+func (p OIDCProviderConfig) IsEntraOIDCProvider() bool {
+	return strings.EqualFold(strings.TrimSpace(p.Kind), "entra")
+}
+
+// ValidateHTTPSOIDCIssuer requires a parsed https URL with a host (Okta, Entra v2.0 issuer, etc.).
+func ValidateHTTPSOIDCIssuer(issuer string) error {
 	u, err := url.Parse(strings.TrimSpace(issuer))
 	if err != nil || u.Host == "" {
 		return fmt.Errorf("invalid issuer URL")
 	}
 	if strings.ToLower(u.Scheme) != "https" {
-		return fmt.Errorf("okta issuer must use https")
+		return fmt.Errorf("issuer must use https")
 	}
 	return nil
+}
+
+// ValidateOktaIssuer returns an error if issuer is not a usable https URL for Okta OIDC (Authorization Server issuer).
+func ValidateOktaIssuer(issuer string) error {
+	return ValidateHTTPSOIDCIssuer(issuer)
+}
+
+// ValidateEntraIssuer returns an error if issuer is not a usable https URL for Entra OIDC (v2.0 issuer).
+func ValidateEntraIssuer(issuer string) error {
+	return ValidateHTTPSOIDCIssuer(issuer)
 }
 
 // GitLabAPIV4BaseFromIssuer returns {scheme}://{host}/api/v4 for a GitLab OIDC issuer (no path after host).
@@ -234,6 +267,9 @@ func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
 		if p.Okta != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: set kind: okta when using okta block", id)
 		}
+		if p.Entra != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: set kind: entra when using entra block", id)
+		}
 		return nil
 	case "github":
 		if p.GitLab != nil {
@@ -244,6 +280,9 @@ func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
 		}
 		if p.Okta != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=github must not set okta block", id)
+		}
+		if p.Entra != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=github must not set entra block", id)
 		}
 		if strings.TrimSuffix(strings.TrimSpace(p.Issuer), "/") != GitHubOIDCDiscoveryIssuer {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=github requires issuer %q (documented id_token iss is still https://github.com)", id, GitHubOIDCDiscoveryIssuer)
@@ -283,6 +322,9 @@ func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
 		}
 		if p.Okta != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=gitlab must not set okta block", id)
+		}
+		if p.Entra != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=gitlab must not set entra block", id)
 		}
 		if _, err := GitLabAPIV4BaseFromIssuer(p.Issuer); err != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=gitlab requires a valid issuer URL (e.g. https://gitlab.com or self-managed origin): %w", id, err)
@@ -324,6 +366,9 @@ func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
 		}
 		if p.Okta != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=google must not set okta block", id)
+		}
+		if p.Entra != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=google must not set entra block", id)
 		}
 		if strings.TrimSuffix(strings.TrimSpace(p.Issuer), "/") != GoogleOIDCDiscoveryIssuer {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=google requires issuer %q", id, GoogleOIDCDiscoveryIssuer)
@@ -379,6 +424,9 @@ func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
 		if p.Google != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=okta must not set google block", id)
 		}
+		if p.Entra != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=okta must not set entra block", id)
+		}
 		if err := ValidateOktaIssuer(p.Issuer); err != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=okta: %w", id, err)
 		}
@@ -405,8 +453,52 @@ func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
 			}
 		}
 		return nil
+	case "entra":
+		if p.GitHub != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=entra must not set github block", id)
+		}
+		if p.GitLab != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=entra must not set gitlab block", id)
+		}
+		if p.Google != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=entra must not set google block", id)
+		}
+		if p.Okta != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=entra must not set okta block", id)
+		}
+		if err := ValidateEntraIssuer(p.Issuer); err != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=entra: %w", id, err)
+		}
+		e := p.Entra
+		if e == nil {
+			return nil
+		}
+		for j, t := range e.AllowedTenantIDs {
+			if strings.TrimSpace(t) == "" {
+				return fmt.Errorf("auth.oidc_providers[%q].entra.allowed_tenant_ids[%d]: empty entry", id, j)
+			}
+		}
+		for j, g := range e.AllowedIDTokenGroups {
+			if strings.TrimSpace(g) == "" {
+				return fmt.Errorf("auth.oidc_providers[%q].entra.allowed_id_token_groups[%d]: empty entry", id, j)
+			}
+		}
+		for j, b := range e.GroupRoleBindings {
+			if strings.TrimSpace(b.Group) == "" {
+				return fmt.Errorf("auth.oidc_providers[%q].entra.group_role_bindings[%d]: group is required", id, j)
+			}
+			if len(b.Roles) == 0 {
+				return fmt.Errorf("auth.oidc_providers[%q].entra.group_role_bindings[%d]: roles must be non-empty", id, j)
+			}
+			for ri, role := range b.Roles {
+				if strings.TrimSpace(role) == "" {
+					return fmt.Errorf("auth.oidc_providers[%q].entra.group_role_bindings[%d].roles[%d]: empty role", id, j, ri)
+				}
+			}
+		}
+		return nil
 	default:
-		return fmt.Errorf("auth.oidc_providers[%q]: unknown kind %q (supported: generic, github, gitlab, google, okta)", id, strings.TrimSpace(p.Kind))
+		return fmt.Errorf("auth.oidc_providers[%q]: unknown kind %q (supported: generic, github, gitlab, google, okta, entra)", id, strings.TrimSpace(p.Kind))
 	}
 }
 

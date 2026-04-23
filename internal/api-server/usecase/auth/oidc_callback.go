@@ -250,6 +250,8 @@ func MapCallbackError(err error) (status int, code, detail string) {
 		return 403, "GOOGLE_LOGIN_DENIED", "Google user does not satisfy hosted domain or email domain policy for this provider."
 	case errors.Is(err, apierrors.ErrOktaLoginDenied):
 		return 403, "OKTA_LOGIN_DENIED", "Okta user id_token groups do not satisfy policy for this provider."
+	case errors.Is(err, apierrors.ErrEntraLoginDenied):
+		return 403, "ENTRA_LOGIN_DENIED", "Microsoft Entra user id_token tid/groups do not satisfy policy for this provider."
 	case errors.Is(err, apierrors.ErrNoActiveSigningKey), errors.Is(err, apierrors.ErrUnsupportedSigningAlgorithm), errors.Is(err, apierrors.ErrSigningOperationFailed):
 		return 503, "JWT_SIGNING_UNAVAILABLE", "Could not mint API access token."
 	case errors.Is(err, apierrors.ErrStoreAccess):

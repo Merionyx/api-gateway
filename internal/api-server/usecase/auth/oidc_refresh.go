@@ -356,6 +356,8 @@ func MapRefreshError(err error) (status int, code, detail string) {
 		return http.StatusForbidden, "GOOGLE_LOGIN_DENIED", "Google user no longer satisfies hosted domain or email domain policy for this provider."
 	case errors.Is(err, apierrors.ErrOktaLoginDenied):
 		return http.StatusForbidden, "OKTA_LOGIN_DENIED", "Okta user id_token groups no longer satisfy policy for this provider."
+	case errors.Is(err, apierrors.ErrEntraLoginDenied):
+		return http.StatusForbidden, "ENTRA_LOGIN_DENIED", "Microsoft Entra user id_token tid/groups no longer satisfy policy for this provider."
 	case errors.Is(err, apierrors.ErrNoActiveSigningKey), errors.Is(err, apierrors.ErrUnsupportedSigningAlgorithm), errors.Is(err, apierrors.ErrSigningOperationFailed):
 		return http.StatusServiceUnavailable, "JWT_SIGNING_UNAVAILABLE", "Could not mint API access token."
 	case errors.Is(err, apierrors.ErrStoreAccess):

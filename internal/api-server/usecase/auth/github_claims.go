@@ -61,6 +61,13 @@ func claimsSnapshotFromProvider(ctx context.Context, p config.OIDCProviderConfig
 		}
 		roles = mergeUniqueStrings(roles, extras)
 	}
+	if p.IsEntraOIDCProvider() {
+		extras, err := entraExtraRoles(p.Entra, idClaims)
+		if err != nil {
+			return nil, err
+		}
+		roles = mergeUniqueStrings(roles, extras)
+	}
 	return marshalClaimsSnapshot(idClaims, roles)
 }
 
@@ -139,12 +146,12 @@ func oktaExtraRoles(o *config.OktaOIDCProviderConfig, mc jwt.MapClaims) ([]strin
 	if !needGate && !needBind {
 		return nil, nil
 	}
-	groups := oktaGroupsFromClaims(mc)
+	groups := idTokenStringArrayClaim(mc, "groups")
 	if needGate {
 		if len(groups) == 0 {
 			return nil, apierrors.ErrOktaLoginDenied
 		}
-		if !oktaIntersectsAllowed(groups, allowed) {
+		if !idTokenGroupsIntersectAllowed(groups, allowed) {
 			return nil, apierrors.ErrOktaLoginDenied
 		}
 	}
@@ -173,8 +180,74 @@ func oktaExtraRoles(o *config.OktaOIDCProviderConfig, mc jwt.MapClaims) ([]strin
 	return extras, nil
 }
 
-func oktaGroupsFromClaims(mc jwt.MapClaims) []string {
-	raw, ok := mc["groups"]
+func entraExtraRoles(e *config.EntraOIDCProviderConfig, mc jwt.MapClaims) ([]string, error) {
+	if e == nil {
+		e = &config.EntraOIDCProviderConfig{}
+	}
+	allowedTenants := trimStringSliceNonEmpty(e.AllowedTenantIDs)
+	allowedGroups := trimStringSliceNonEmpty(e.AllowedIDTokenGroups)
+	needTenant := len(allowedTenants) > 0
+	needGate := len(allowedGroups) > 0
+	needBind := len(e.GroupRoleBindings) > 0
+	if !needTenant && !needGate && !needBind {
+		return nil, nil
+	}
+
+	tid := strings.TrimSpace(googleStringClaim(mc, "tid"))
+	if needTenant {
+		if tid == "" {
+			return nil, apierrors.ErrEntraLoginDenied
+		}
+		tidLower := strings.ToLower(tid)
+		matched := false
+		for _, a := range allowedTenants {
+			if strings.ToLower(strings.TrimSpace(a)) == tidLower {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return nil, apierrors.ErrEntraLoginDenied
+		}
+	}
+
+	groups := idTokenStringArrayClaim(mc, "groups")
+	if needGate {
+		if len(groups) == 0 {
+			return nil, apierrors.ErrEntraLoginDenied
+		}
+		if !idTokenGroupsIntersectAllowed(groups, allowedGroups) {
+			return nil, apierrors.ErrEntraLoginDenied
+		}
+	}
+	if !needBind {
+		return nil, nil
+	}
+	set := make(map[string]struct{}, len(groups))
+	for _, g := range groups {
+		set[g] = struct{}{}
+	}
+	var extras []string
+	for _, b := range e.GroupRoleBindings {
+		gn := strings.TrimSpace(b.Group)
+		if gn == "" {
+			continue
+		}
+		if _, ok := set[gn]; !ok {
+			continue
+		}
+		for _, r := range b.Roles {
+			if s := strings.TrimSpace(r); s != "" {
+				extras = append(extras, s)
+			}
+		}
+	}
+	return extras, nil
+}
+
+// idTokenStringArrayClaim reads a string or JSON array-of-strings claim (e.g. Okta/Entra "groups").
+func idTokenStringArrayClaim(mc jwt.MapClaims, key string) []string {
+	raw, ok := mc[key]
 	if !ok {
 		return nil
 	}
@@ -221,7 +294,7 @@ func trimStringSliceNonEmpty(in []string) []string {
 	return out
 }
 
-func oktaIntersectsAllowed(userGroups, allowed []string) bool {
+func idTokenGroupsIntersectAllowed(userGroups, allowed []string) bool {
 	allowSet := make(map[string]struct{}, len(allowed))
 	for _, a := range allowed {
 		allowSet[a] = struct{}{}
@@ -469,7 +542,7 @@ func marshalClaimsSnapshot(mc jwt.MapClaims, roles []string) (json.RawMessage, e
 	m := map[string]any{
 		"roles": roles,
 	}
-	for _, k := range []string{"sub", "email", "name", "preferred_username", "hd"} {
+	for _, k := range []string{"sub", "email", "name", "preferred_username", "hd", "tid"} {
 		if v, ok := mc[k]; ok {
 			m[k] = v
 		}

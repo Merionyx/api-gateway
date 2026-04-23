@@ -249,6 +249,99 @@ func TestValidateOIDCProviders_Okta(t *testing.T) {
 	}
 }
 
+func TestValidateOIDCProviders_Entra(t *testing.T) {
+	t.Parallel()
+	err := ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "ent",
+		Issuer:               "https://login.microsoftonline.com/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/v2.0",
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		Kind:                 "entra",
+		GitHub:               &GitHubOIDCProviderConfig{},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "must not set github block") {
+		t.Fatalf("got %v", err)
+	}
+
+	err = ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "ent",
+		Issuer:               "http://login.microsoftonline.com/common/v2.0",
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		Kind:                 "entra",
+	}})
+	if err == nil || !strings.Contains(err.Error(), "https") {
+		t.Fatalf("got %v", err)
+	}
+
+	err = ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "ent",
+		Issuer:               "https://login.microsoftonline.com/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/v2.0",
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		Kind:                 "entra",
+		Entra: &EntraOIDCProviderConfig{
+			GroupRoleBindings: []EntraGroupRoleBinding{{
+				Group: "g",
+				Roles: []string{},
+			}},
+		},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "roles must be non-empty") {
+		t.Fatalf("got %v", err)
+	}
+
+	err = ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "ent",
+		Issuer:               "https://login.microsoftonline.com/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/v2.0",
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		Kind:                 "entra",
+		Entra: &EntraOIDCProviderConfig{
+			AllowedTenantIDs:     []string{"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"},
+			AllowedIDTokenGroups: []string{"admins"},
+			GroupRoleBindings: []EntraGroupRoleBinding{{
+				Group: "admins",
+				Roles: []string{"api:admin"},
+			}},
+		},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestValidateOIDCProviders_TwoGitHubKindDistinctIDs(t *testing.T) {
+	t.Parallel()
+	err := ValidateOIDCProviders([]OIDCProviderConfig{
+		{
+			ID:                   "github-corp-a",
+			Issuer:               GitHubOIDCDiscoveryIssuer,
+			ClientID:             "a",
+			ClientSecret:         "sa",
+			RedirectURIAllowlist: []string{"http://127.0.0.1:21987/callback"},
+			Kind:                 "github",
+			GitHub:               &GitHubOIDCProviderConfig{AllowedOrgLogins: []string{"corp-a"}},
+		},
+		{
+			ID:                   "github-corp-b",
+			Issuer:               GitHubOIDCDiscoveryIssuer,
+			ClientID:             "b",
+			ClientSecret:         "sb",
+			RedirectURIAllowlist: []string{"http://127.0.0.1:21988/callback"},
+			Kind:                 "github",
+			GitHub:               &GitHubOIDCProviderConfig{AllowedOrgLogins: []string{"corp-b"}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestValidateOIDCProviders_GenericMustNotSetIdpBlocks(t *testing.T) {
 	t.Parallel()
 	err := ValidateOIDCProviders([]OIDCProviderConfig{{
@@ -284,6 +377,18 @@ func TestValidateOIDCProviders_GenericMustNotSetIdpBlocks(t *testing.T) {
 		Okta:                 &OktaOIDCProviderConfig{},
 	}})
 	if err == nil || !strings.Contains(err.Error(), "set kind: okta") {
+		t.Fatalf("got %v", err)
+	}
+
+	err = ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "x",
+		Issuer:               "https://login.microsoftonline.com/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/v2.0",
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		Entra:                &EntraOIDCProviderConfig{},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "set kind: entra") {
 		t.Fatalf("got %v", err)
 	}
 }

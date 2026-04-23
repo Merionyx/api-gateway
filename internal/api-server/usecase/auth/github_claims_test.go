@@ -171,11 +171,65 @@ func TestOktaExtraRoles_bindings(t *testing.T) {
 	}
 }
 
-func TestOktaGroupsFromClaims_string(t *testing.T) {
+func TestIdTokenStringArrayClaim_string(t *testing.T) {
 	t.Parallel()
-	got := oktaGroupsFromClaims(jwt.MapClaims{"groups": " Solo "})
+	got := idTokenStringArrayClaim(jwt.MapClaims{"groups": " Solo "}, "groups")
 	if len(got) != 1 || got[0] != "Solo" {
 		t.Fatalf("%v", got)
+	}
+}
+
+func TestEntraExtraRoles_tenantDenied(t *testing.T) {
+	t.Parallel()
+	mc := jwt.MapClaims{"tid": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"}
+	_, err := entraExtraRoles(&config.EntraOIDCProviderConfig{
+		AllowedTenantIDs: []string{"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"},
+	}, mc)
+	if !errors.Is(err, apierrors.ErrEntraLoginDenied) {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestEntraExtraRoles_tenantCaseInsensitive(t *testing.T) {
+	t.Parallel()
+	mc := jwt.MapClaims{"tid": "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"}
+	_, err := entraExtraRoles(&config.EntraOIDCProviderConfig{
+		AllowedTenantIDs: []string{"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"},
+	}, mc)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEntraExtraRoles_groupsGate(t *testing.T) {
+	t.Parallel()
+	mc := jwt.MapClaims{"tid": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "groups": []any{"Other"}}
+	_, err := entraExtraRoles(&config.EntraOIDCProviderConfig{
+		AllowedTenantIDs:     []string{"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"},
+		AllowedIDTokenGroups: []string{"API-Admins"},
+	}, mc)
+	if !errors.Is(err, apierrors.ErrEntraLoginDenied) {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestEntraExtraRoles_groupBindings(t *testing.T) {
+	t.Parallel()
+	mc := jwt.MapClaims{
+		"tid":    "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+		"groups": []any{"everyone-uuid", "admins-uuid"},
+	}
+	roles, err := entraExtraRoles(&config.EntraOIDCProviderConfig{
+		GroupRoleBindings: []config.EntraGroupRoleBinding{{
+			Group: "admins-uuid",
+			Roles: []string{"api:admin"},
+		}},
+	}, mc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(roles) != 1 || roles[0] != "api:admin" {
+		t.Fatalf("%v", roles)
 	}
 }
 

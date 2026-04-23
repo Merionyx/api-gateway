@@ -69,4 +69,7 @@ var (
 
 	// ErrOktaLoginDenied means the user failed Okta id_token groups policy at callback (HTTP 403).
 	ErrOktaLoginDenied = errors.New("okta login denied by id_token groups policy")
+
+	// ErrEntraLoginDenied means the user failed Microsoft Entra id_token tid/groups policy at callback (HTTP 403).
+	ErrEntraLoginDenied = errors.New("entra login denied by tenant or id_token groups policy")
 )
