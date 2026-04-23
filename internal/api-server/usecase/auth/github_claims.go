@@ -54,6 +54,13 @@ func claimsSnapshotFromProvider(ctx context.Context, p config.OIDCProviderConfig
 		}
 		roles = mergeUniqueStrings(roles, extras)
 	}
+	if p.IsOktaOIDCProvider() {
+		extras, err := oktaExtraRoles(p.Okta, idClaims)
+		if err != nil {
+			return nil, err
+		}
+		roles = mergeUniqueStrings(roles, extras)
+	}
 	return marshalClaimsSnapshot(idClaims, roles)
 }
 
@@ -120,6 +127,111 @@ func googleExtraRoles(g *config.GoogleOIDCProviderConfig, mc jwt.MapClaims) ([]s
 		}
 	}
 	return extras, nil
+}
+
+func oktaExtraRoles(o *config.OktaOIDCProviderConfig, mc jwt.MapClaims) ([]string, error) {
+	if o == nil {
+		o = &config.OktaOIDCProviderConfig{}
+	}
+	allowed := trimStringSliceNonEmpty(o.AllowedIDTokenGroups)
+	needGate := len(allowed) > 0
+	needBind := len(o.GroupRoleBindings) > 0
+	if !needGate && !needBind {
+		return nil, nil
+	}
+	groups := oktaGroupsFromClaims(mc)
+	if needGate {
+		if len(groups) == 0 {
+			return nil, apierrors.ErrOktaLoginDenied
+		}
+		if !oktaIntersectsAllowed(groups, allowed) {
+			return nil, apierrors.ErrOktaLoginDenied
+		}
+	}
+	if !needBind {
+		return nil, nil
+	}
+	set := make(map[string]struct{}, len(groups))
+	for _, g := range groups {
+		set[g] = struct{}{}
+	}
+	var extras []string
+	for _, b := range o.GroupRoleBindings {
+		gn := strings.TrimSpace(b.GroupName)
+		if gn == "" {
+			continue
+		}
+		if _, ok := set[gn]; !ok {
+			continue
+		}
+		for _, r := range b.Roles {
+			if s := strings.TrimSpace(r); s != "" {
+				extras = append(extras, s)
+			}
+		}
+	}
+	return extras, nil
+}
+
+func oktaGroupsFromClaims(mc jwt.MapClaims) []string {
+	raw, ok := mc["groups"]
+	if !ok {
+		return nil
+	}
+	switch v := raw.(type) {
+	case string:
+		s := strings.TrimSpace(v)
+		if s == "" {
+			return nil
+		}
+		return []string{s}
+	case []string:
+		var out []string
+		for _, s := range v {
+			if t := strings.TrimSpace(s); t != "" {
+				out = append(out, t)
+			}
+		}
+		return out
+	case []any:
+		var out []string
+		for _, x := range v {
+			s, ok := x.(string)
+			if !ok {
+				continue
+			}
+			if t := strings.TrimSpace(s); t != "" {
+				out = append(out, t)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func trimStringSliceNonEmpty(in []string) []string {
+	var out []string
+	for _, s := range in {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func oktaIntersectsAllowed(userGroups, allowed []string) bool {
+	allowSet := make(map[string]struct{}, len(allowed))
+	for _, a := range allowed {
+		allowSet[a] = struct{}{}
+	}
+	for _, u := range userGroups {
+		if _, ok := allowSet[u]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func googleStringClaim(mc jwt.MapClaims, k string) string {

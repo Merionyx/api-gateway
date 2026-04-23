@@ -21,7 +21,7 @@ type OIDCProviderConfig struct {
 	RedirectURIAllowlist []string `mapstructure:"redirect_uri_allowlist" json:"redirect_uri_allowlist"`
 	// ExtraScopes are appended after "openid" (e.g. "email", "profile").
 	ExtraScopes []string `mapstructure:"extra_scopes" json:"extra_scopes"`
-	// Kind selects IdP-specific behavior. Empty or "generic" keeps standard OIDC only. "github" enables org/team checks (roadmap ш. 35). "gitlab" enables group checks (ш. 36). "google" uses id_token hd/email (ш. 37).
+	// Kind selects IdP-specific behavior. Empty or "generic" keeps standard OIDC only. "github" enables org/team checks (roadmap ш. 35). "gitlab" enables group checks (ш. 36). "google" uses id_token hd/email (ш. 37). "okta" uses id_token groups (ш. 38).
 	Kind string `mapstructure:"kind" json:"kind,omitempty"`
 	// GitHub is read when Kind is "github" (allowed orgs, team→role bindings). Optional; nil means no extra restrictions beyond GitHub OAuth.
 	GitHub *GitHubOIDCProviderConfig `mapstructure:"github" json:"github,omitempty"`
@@ -29,6 +29,8 @@ type OIDCProviderConfig struct {
 	GitLab *GitLabOIDCProviderConfig `mapstructure:"gitlab" json:"gitlab,omitempty"`
 	// Google is read when Kind is "google" (Workspace hd / email domain allowlist and bindings from id_token claims).
 	Google *GoogleOIDCProviderConfig `mapstructure:"google" json:"google,omitempty"`
+	// Okta is read when Kind is "okta" (id_token "groups" claim allowlist and bindings; configure Okta to emit groups).
+	Okta *OktaOIDCProviderConfig `mapstructure:"okta" json:"okta,omitempty"`
 }
 
 // GitHubOIDCProviderConfig restricts or enriches interactive login via GitHub REST (orgs, teams).
@@ -108,6 +110,37 @@ const GoogleOIDCDiscoveryIssuer = "https://accounts.google.com"
 // IsGoogleOIDCProvider reports whether this entry uses Google-specific claim handling.
 func (p OIDCProviderConfig) IsGoogleOIDCProvider() bool {
 	return strings.EqualFold(strings.TrimSpace(p.Kind), "google")
+}
+
+// OktaOIDCProviderConfig restricts or enriches login using the id_token "groups" claim (configure Okta Authorization Server + app).
+type OktaOIDCProviderConfig struct {
+	// AllowedIDTokenGroups, if non-empty, requires the id_token "groups" claim to contain at least one of these names (exact match after TrimSpace).
+	AllowedIDTokenGroups []string `mapstructure:"allowed_id_token_groups" json:"allowed_id_token_groups,omitempty"`
+	// GroupRoleBindings grant API roles when the user has the given group name in id_token "groups".
+	GroupRoleBindings []OktaGroupRoleBinding `mapstructure:"group_role_bindings" json:"group_role_bindings,omitempty"`
+}
+
+// OktaGroupRoleBinding maps an Okta group name (as in id_token) to API Server role strings.
+type OktaGroupRoleBinding struct {
+	GroupName string   `mapstructure:"group_name" json:"group_name"`
+	Roles     []string `mapstructure:"roles" json:"roles,omitempty"`
+}
+
+// IsOktaOIDCProvider reports whether this entry uses Okta-specific id_token groups handling.
+func (p OIDCProviderConfig) IsOktaOIDCProvider() bool {
+	return strings.EqualFold(strings.TrimSpace(p.Kind), "okta")
+}
+
+// ValidateOktaIssuer returns an error if issuer is not a usable https URL for Okta OIDC (Authorization Server issuer).
+func ValidateOktaIssuer(issuer string) error {
+	u, err := url.Parse(strings.TrimSpace(issuer))
+	if err != nil || u.Host == "" {
+		return fmt.Errorf("invalid issuer URL")
+	}
+	if strings.ToLower(u.Scheme) != "https" {
+		return fmt.Errorf("okta issuer must use https")
+	}
+	return nil
 }
 
 // GitLabAPIV4BaseFromIssuer returns {scheme}://{host}/api/v4 for a GitLab OIDC issuer (no path after host).
@@ -198,6 +231,9 @@ func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
 		if p.Google != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: set kind: google when using google block", id)
 		}
+		if p.Okta != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: set kind: okta when using okta block", id)
+		}
 		return nil
 	case "github":
 		if p.GitLab != nil {
@@ -205,6 +241,9 @@ func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
 		}
 		if p.Google != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=github must not set google block", id)
+		}
+		if p.Okta != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=github must not set okta block", id)
 		}
 		if strings.TrimSuffix(strings.TrimSpace(p.Issuer), "/") != GitHubOIDCDiscoveryIssuer {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=github requires issuer %q (documented id_token iss is still https://github.com)", id, GitHubOIDCDiscoveryIssuer)
@@ -241,6 +280,9 @@ func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
 		}
 		if p.Google != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=gitlab must not set google block", id)
+		}
+		if p.Okta != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=gitlab must not set okta block", id)
 		}
 		if _, err := GitLabAPIV4BaseFromIssuer(p.Issuer); err != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=gitlab requires a valid issuer URL (e.g. https://gitlab.com or self-managed origin): %w", id, err)
@@ -279,6 +321,9 @@ func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
 		}
 		if p.GitLab != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=google must not set gitlab block", id)
+		}
+		if p.Okta != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=google must not set okta block", id)
 		}
 		if strings.TrimSuffix(strings.TrimSpace(p.Issuer), "/") != GoogleOIDCDiscoveryIssuer {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=google requires issuer %q", id, GoogleOIDCDiscoveryIssuer)
@@ -324,8 +369,44 @@ func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
 			}
 		}
 		return nil
+	case "okta":
+		if p.GitHub != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=okta must not set github block", id)
+		}
+		if p.GitLab != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=okta must not set gitlab block", id)
+		}
+		if p.Google != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=okta must not set google block", id)
+		}
+		if err := ValidateOktaIssuer(p.Issuer); err != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=okta: %w", id, err)
+		}
+		o := p.Okta
+		if o == nil {
+			return nil
+		}
+		for j, g := range o.AllowedIDTokenGroups {
+			if strings.TrimSpace(g) == "" {
+				return fmt.Errorf("auth.oidc_providers[%q].okta.allowed_id_token_groups[%d]: empty entry", id, j)
+			}
+		}
+		for j, b := range o.GroupRoleBindings {
+			if strings.TrimSpace(b.GroupName) == "" {
+				return fmt.Errorf("auth.oidc_providers[%q].okta.group_role_bindings[%d]: group_name is required", id, j)
+			}
+			if len(b.Roles) == 0 {
+				return fmt.Errorf("auth.oidc_providers[%q].okta.group_role_bindings[%d]: roles must be non-empty", id, j)
+			}
+			for ri, role := range b.Roles {
+				if strings.TrimSpace(role) == "" {
+					return fmt.Errorf("auth.oidc_providers[%q].okta.group_role_bindings[%d].roles[%d]: empty role", id, j, ri)
+				}
+			}
+		}
+		return nil
 	default:
-		return fmt.Errorf("auth.oidc_providers[%q]: unknown kind %q (supported: generic, github, gitlab, google)", id, strings.TrimSpace(p.Kind))
+		return fmt.Errorf("auth.oidc_providers[%q]: unknown kind %q (supported: generic, github, gitlab, google, okta)", id, strings.TrimSpace(p.Kind))
 	}
 }
 

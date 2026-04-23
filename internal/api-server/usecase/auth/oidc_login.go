@@ -147,6 +147,9 @@ func buildOIDCScope(p config.OIDCProviderConfig) string {
 			extra = append(extra, "profile")
 		}
 	}
+	if p.IsOktaOIDCProvider() && !scopeInListCI(extra, "groups") {
+		extra = append(extra, "groups")
+	}
 	for _, s := range extra {
 		s = strings.TrimSpace(s)
 		if s == "" || scopeInListCI(parts, s) {

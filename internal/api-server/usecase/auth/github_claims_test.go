@@ -132,6 +132,53 @@ func TestGoogleExtraRoles_emailDomainGate(t *testing.T) {
 	}
 }
 
+func TestOktaExtraRoles_gateDenied(t *testing.T) {
+	t.Parallel()
+	mc := jwt.MapClaims{"groups": []any{"Other"}}
+	_, err := oktaExtraRoles(&config.OktaOIDCProviderConfig{
+		AllowedIDTokenGroups: []string{"API-Admins"},
+	}, mc)
+	if !errors.Is(err, apierrors.ErrOktaLoginDenied) {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestOktaExtraRoles_noGroupsClaimWhenRequired(t *testing.T) {
+	t.Parallel()
+	mc := jwt.MapClaims{"sub": "u1"}
+	_, err := oktaExtraRoles(&config.OktaOIDCProviderConfig{
+		AllowedIDTokenGroups: []string{"API-Admins"},
+	}, mc)
+	if !errors.Is(err, apierrors.ErrOktaLoginDenied) {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestOktaExtraRoles_bindings(t *testing.T) {
+	t.Parallel()
+	mc := jwt.MapClaims{"groups": []any{"API-Admins", "Everyone"}}
+	roles, err := oktaExtraRoles(&config.OktaOIDCProviderConfig{
+		GroupRoleBindings: []config.OktaGroupRoleBinding{{
+			GroupName: "API-Admins",
+			Roles:     []string{"api:admin"},
+		}},
+	}, mc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(roles) != 1 || roles[0] != "api:admin" {
+		t.Fatalf("%v", roles)
+	}
+}
+
+func TestOktaGroupsFromClaims_string(t *testing.T) {
+	t.Parallel()
+	got := oktaGroupsFromClaims(jwt.MapClaims{"groups": " Solo "})
+	if len(got) != 1 || got[0] != "Solo" {
+		t.Fatalf("%v", got)
+	}
+}
+
 func TestClaimsSnapshotFromProvider_githubNoExtraCalls(t *testing.T) {
 	t.Parallel()
 	mc := jwt.MapClaims{"sub": "1", "exp": float64(time.Now().Add(time.Hour).Unix())}

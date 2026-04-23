@@ -66,4 +66,7 @@ var (
 
 	// ErrGoogleLoginDenied means the user failed Google hd/email domain policy at callback (HTTP 403).
 	ErrGoogleLoginDenied = errors.New("google login denied by hosted domain or email policy")
+
+	// ErrOktaLoginDenied means the user failed Okta id_token groups policy at callback (HTTP 403).
+	ErrOktaLoginDenied = errors.New("okta login denied by id_token groups policy")
 )

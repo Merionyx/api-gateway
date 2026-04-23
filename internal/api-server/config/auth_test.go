@@ -184,6 +184,71 @@ func TestValidateOIDCProviders_Google(t *testing.T) {
 	}
 }
 
+func TestValidateOIDCProviders_Okta(t *testing.T) {
+	t.Parallel()
+	err := ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "ok",
+		Issuer:               "https://dev-123.okta.com/oauth2/default",
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		Kind:                 "okta",
+		GitHub:               &GitHubOIDCProviderConfig{},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "must not set github block") {
+		t.Fatalf("got %v", err)
+	}
+
+	err = ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "ok",
+		Issuer:               "http://dev-123.okta.com/oauth2/default",
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		Kind:                 "okta",
+	}})
+	if err == nil || !strings.Contains(err.Error(), "https") {
+		t.Fatalf("got %v", err)
+	}
+
+	err = ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "ok",
+		Issuer:               "https://dev-123.okta.com/oauth2/default",
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		Kind:                 "okta",
+		Okta: &OktaOIDCProviderConfig{
+			GroupRoleBindings: []OktaGroupRoleBinding{{
+				GroupName: "Everyone",
+				Roles:     []string{},
+			}},
+		},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "roles must be non-empty") {
+		t.Fatalf("got %v", err)
+	}
+
+	err = ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "ok",
+		Issuer:               "https://dev-123.okta.com/oauth2/default",
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		Kind:                 "okta",
+		Okta: &OktaOIDCProviderConfig{
+			AllowedIDTokenGroups: []string{"API-Admins"},
+			GroupRoleBindings: []OktaGroupRoleBinding{{
+				GroupName: "API-Admins",
+				Roles:     []string{"api:admin"},
+			}},
+		},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestValidateOIDCProviders_GenericMustNotSetIdpBlocks(t *testing.T) {
 	t.Parallel()
 	err := ValidateOIDCProviders([]OIDCProviderConfig{{
@@ -207,6 +272,18 @@ func TestValidateOIDCProviders_GenericMustNotSetIdpBlocks(t *testing.T) {
 		Google:               &GoogleOIDCProviderConfig{},
 	}})
 	if err == nil || !strings.Contains(err.Error(), "set kind: google") {
+		t.Fatalf("got %v", err)
+	}
+
+	err = ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "x",
+		Issuer:               "https://dev-1.okta.com/oauth2/default",
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		Okta:                 &OktaOIDCProviderConfig{},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "set kind: okta") {
 		t.Fatalf("got %v", err)
 	}
 }

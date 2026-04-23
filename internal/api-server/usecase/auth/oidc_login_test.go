@@ -70,4 +70,8 @@ func TestBuildOIDCScope(t *testing.T) {
 	if s6 != "openid email profile" {
 		t.Fatalf("google scopes got %q", s6)
 	}
+	s7 := buildOIDCScope(config.OIDCProviderConfig{Kind: "okta"})
+	if s7 != "openid groups" {
+		t.Fatalf("okta scopes got %q", s7)
+	}
 }

@@ -95,6 +95,17 @@ auth:
   #       allowed_hosted_domains: ["example.com"]
   #       hosted_domain_role_bindings:
   #         - { hd: "example.com", roles: ["api:admin"] }
+  # Okta (roadmap ш.38): docs/idp/okta/README.md — issuer = Authorization Server URL (https); kind: okta
+  #   - id: "okta"
+  #     kind: "okta"
+  #     issuer: "https://dev-12345.okta.com/oauth2/default"
+  #     client_id: "…"
+  #     client_secret: "…"
+  #     redirect_uri_allowlist: ["http://127.0.0.1:21987/callback"]
+  #     okta:
+  #       allowed_id_token_groups: ["API Gateway Users"]
+  #       group_role_bindings:
+  #         - { group_name: "API Gateway Admins", roles: ["api:admin"] }
 
   # OpenTelemetry: optional; can be overridden (e.g. TELEMETRY_ENABLED) via environment.
   # telemetry:
