@@ -11,6 +11,8 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
@@ -83,9 +85,18 @@ func readKeyPairFromFile(keyPath string) (*KeyPair, error) {
 }
 
 // loadKeyDirectory loads all *.key PEM files from dir and picks the newest as active.
+// It does not create the directory: on Kubernetes the mount is read-only and the default
+// edge path keys_dir/edge may not exist as a sub-mount (use jwt.edge_keys_dir or Helm projected volumes).
 func loadKeyDirectory(keysDir string) (map[string]*KeyPair, string, string, error) {
-	if err := os.MkdirAll(keysDir, 0700); err != nil {
+	fi, err := os.Stat(keysDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return make(map[string]*KeyPair), "", "", nil
+		}
 		return nil, "", "", err
+	}
+	if !fi.IsDir() {
+		return nil, "", "", fmt.Errorf("%w: jwt keys path %q is not a directory", apierrors.ErrInvalidInput, keysDir)
 	}
 
 	files, err := os.ReadDir(keysDir)
@@ -121,9 +132,32 @@ func loadKeyDirectory(keysDir string) (map[string]*KeyPair, string, string, erro
 	if newestKey != nil {
 		activeID = newestKey.Kid
 		activeAlg = newestKey.Algorithm
-		slog.Info("jwt: active signing key", "dir", keysDir, "kid", activeID, "alg", activeAlg)
+		slog.Info("jwt: newest key by mtime (default signing candidate)", "dir", keysDir, "kid", activeID, "alg", activeAlg)
 	}
 	return out, activeID, activeAlg, nil
+}
+
+func resolveSigningKeyID(profile string, keys map[string]*KeyPair, preferredKid, newestKid string) (string, error) {
+	if len(keys) == 0 {
+		return "", fmt.Errorf("%w: jwt %s: no signing keys loaded", apierrors.ErrInvalidInput, profile)
+	}
+	if kid := strings.TrimSpace(preferredKid); kid != "" {
+		if _, ok := keys[kid]; !ok {
+			list := make([]string, 0, len(keys))
+			for k := range keys {
+				list = append(list, k)
+			}
+			slices.Sort(list)
+			return "", fmt.Errorf("%w: jwt %s: signing kid %q not found (have: %s)", apierrors.ErrInvalidInput, profile, kid, strings.Join(list, ", "))
+		}
+		slog.Info("jwt: signing kid", "profile", profile, "kid", kid, "source", "config")
+		return kid, nil
+	}
+	if newestKid == "" {
+		return "", fmt.Errorf("%w: jwt %s: no signing key", apierrors.ErrInvalidInput, profile)
+	}
+	slog.Info("jwt: signing kid", "profile", profile, "kid", newestKid, "source", "newest_mtime")
+	return newestKid, nil
 }
 
 // generateDefaultEd25519InDir writes a new Ed25519 key under keysDir and returns the loaded KeyPair.

@@ -83,7 +83,7 @@ func NewJWTUseCase(cfg *config.JWTConfig) (*JWTUseCase, error) {
 		edgeSigningKeys: make(map[string]*KeyPair),
 	}
 
-	apiKeys, apiActive, _, err := loadKeyDirectory(uc.apiKeysDir)
+	apiKeys, apiNewest, _, err := loadKeyDirectory(uc.apiKeysDir)
 	if err != nil {
 		return nil, fmt.Errorf("jwt api keys: %w", err)
 	}
@@ -93,12 +93,16 @@ func NewJWTUseCase(cfg *config.JWTConfig) (*JWTUseCase, error) {
 			return nil, fmt.Errorf("jwt api default key: %w", gerr)
 		}
 		apiKeys[kp.Kid] = kp
-		apiActive = kp.Kid
+		apiNewest = kp.Kid
+	}
+	apiActive, err := resolveSigningKeyID("api", apiKeys, cfg.APISigningKid, apiNewest)
+	if err != nil {
+		return nil, fmt.Errorf("jwt api keys: %w", err)
 	}
 	uc.apiSigningKeys = apiKeys
 	uc.apiActiveKeyID = apiActive
 
-	edgeKeys, edgeActive, _, err := loadKeyDirectory(uc.edgeKeysDir)
+	edgeKeys, edgeNewest, _, err := loadKeyDirectory(uc.edgeKeysDir)
 	if err != nil {
 		return nil, fmt.Errorf("jwt edge keys: %w", err)
 	}
@@ -108,7 +112,11 @@ func NewJWTUseCase(cfg *config.JWTConfig) (*JWTUseCase, error) {
 			return nil, fmt.Errorf("jwt edge default key: %w", gerr)
 		}
 		edgeKeys[kp.Kid] = kp
-		edgeActive = kp.Kid
+		edgeNewest = kp.Kid
+	}
+	edgeActive, err := resolveSigningKeyID("edge", edgeKeys, cfg.EdgeSigningKid, edgeNewest)
+	if err != nil {
+		return nil, fmt.Errorf("jwt edge keys: %w", err)
 	}
 	uc.edgeSigningKeys = edgeKeys
 	uc.edgeActiveKeyID = edgeActive

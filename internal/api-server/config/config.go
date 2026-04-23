@@ -2,6 +2,7 @@ package config
 
 import (
 	"log/slog"
+	"strings"
 	"time"
 
 	sharedetcd "github.com/merionyx/api-gateway/internal/shared/etcd"
@@ -83,6 +84,10 @@ type JWTConfig struct {
 	APIAudience string `mapstructure:"api_audience" json:"api_audience"`
 	// EdgeKeysDir holds Edge-profile signing keys. Empty means keys_dir/edge (see auth.NewJWTUseCase).
 	EdgeKeysDir string `mapstructure:"edge_keys_dir" json:"edge_keys_dir"`
+	// APISigningKid / EdgeSigningKid pin which loaded key signs new tokens when multiple *.key files exist (rotation).
+	// Empty means "newest private key by file mtime" within each directory.
+	APISigningKid  string `mapstructure:"api_signing_kid" json:"api_signing_kid"`
+	EdgeSigningKid string `mapstructure:"edge_signing_kid" json:"edge_signing_kid"`
 	// EdgeIssuer / EdgeAudience are iss/aud for POST /api/v1/tokens/edge (data-plane / ExtAuthz profile).
 	EdgeIssuer   string `mapstructure:"edge_issuer" json:"edge_issuer"`
 	EdgeAudience string `mapstructure:"edge_audience" json:"edge_audience"`
@@ -125,6 +130,9 @@ func LoadConfig(configFile ...string) (*Config, error) {
 
 	v.AutomaticEnv()
 	v.SetEnvPrefix("API_SERVER_")
+	// Without this, nested keys map to env names containing dots (e.g. API_SERVER_AUTH.SESSION_KEK_BASE64),
+	// which Kubernetes cannot set — Helm uses API_SERVER_AUTH_SESSION_KEK_BASE64 instead.
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	if len(configFile) > 0 && configFile[0] != "" {
 		slog.Info("Loading config from explicit path", "path", configFile[0])
@@ -152,6 +160,9 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	if err := v.Unmarshal(&config); err != nil {
 		return nil, err
 	}
+
+	ApplySessionKekFromEnv(&config)
+	ApplyOIDCProviderSecretsFromEnv(&config)
 
 	ApplyCORSDevDefaults(&config)
 
