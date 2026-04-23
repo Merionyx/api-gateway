@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: API Gateway — API Server HTTP API
-  version: 1.5.2
+  version: 1.5.3
   description: |
     HTTP API for the **API Server** control plane: authentication material (JWT, JWKS), contract export,
     registry views backed by **etcd** (controllers, tenants, bundles), and operational endpoints.
@@ -10,6 +10,8 @@ info:
     lifecycle is owned by the **Gateway Controller**; this API does not expose CRUD for environments.
 
     **JSON naming:** request and response bodies use **snake_case** field names unless noted.
+
+    **v1.5.3:** RBAC on selected operations (roadmap step **23**): role constants (e.g. `api:contracts:export`, `api:access_tokens:issue`, baseline `api:member`, wildcard `api:admin`); **403** `INSUFFICIENT_ROLES` when authenticated but not authorized.
 
     **v1.5.2:** HTTP **APISecurity** middleware (roadmap step 20): deny-by-default on secured routes; API-profile Bearer JWT and/or `X-API-Key`.
 
@@ -854,6 +856,12 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: Authenticated but not authorized (e.g. missing required role for the operation).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
     Conflict:
       description: Request conflicts with current state (e.g. lost etcd CAS / concurrent refresh).
       content:
@@ -1169,6 +1177,7 @@ paths:
       summary: Issue API profile access JWT
       description: |
         Mints a short-lived **API profile** JWT for calling this HTTP API. Request **`IssueApiAccessTokenRequest`** and **201** body **`ApiAccessTokenIssued`** are stable for codegen; semantics/RBAC land in **roadmap step 22**.
+        **RBAC (step 23):** requires role **`api:access_tokens:issue`** or **`api:admin`** (JWT `roles` claim and/or API key `roles` in etcd).
       requestBody:
         required: true
         content:
@@ -1186,6 +1195,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -1199,6 +1210,7 @@ paths:
       summary: Export contract files from Git (via Contract Syncer)
       description: |
         Fetches contract YAML/JSON from a Git repository via the Contract Syncer service (not from etcd). Specify `repository` and `ref`; optionally narrow by `path` and/or a single `contract_name`. Response files carry base64-encoded content.
+        **RBAC (roadmap step 23):** requires **`api:contracts:export`** or **`api:admin`**.
       requestBody:
         required: true
         content:
@@ -1214,6 +1226,8 @@ paths:
                 $ref: '#/components/schemas/ContractsExportResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '502':
           description: Bad gateway (e.g. Contract Syncer unavailable)
           content:

@@ -12,6 +12,7 @@ const (
 	TokenResultValidationEnvironments = "validation_missing_environments"
 	TokenResultValidationEmptyEnv     = "validation_empty_environment"
 	TokenResultValidationExpiresAt    = "validation_expires_at"
+	TokenResultForbidden              = "forbidden"
 	TokenResultInternalError          = "internal_error"
 )
 

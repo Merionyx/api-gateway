@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/merionyx/api-gateway/internal/api-server/auth/roles"
+	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/middleware"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/bundle"
 
@@ -24,11 +27,22 @@ func (e *exportRemoteStub) ExportContractFiles(context.Context, string, string, 
 	return e.out, e.err
 }
 
+func contractsExportApp(h *ContractsExportHandler, injectRoles []string) *fiber.App {
+	app := fiber.New()
+	app.Use(func(c fiber.Ctx) error {
+		if len(injectRoles) > 0 {
+			c.Locals(middleware.CtxKeyAPIKeyPrincipal, &middleware.APIKeyPrincipal{Roles: injectRoles})
+		}
+		return c.Next()
+	})
+	app.Post("/", h.Export)
+	return app
+}
+
 func TestContractsExportHandler_invalidJSON(t *testing.T) {
 	t.Parallel()
 	h := NewContractsExportHandler(bundle.NewContractExportUseCase(&exportRemoteStub{}))
-	app := fiber.New()
-	app.Post("/", h.Export)
+	app := contractsExportApp(h, []string{roles.APIContractsExport})
 	req := httptest.NewRequest(fiber.MethodPost, "/", strings.NewReader(`{`))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	resp, err := app.Test(req)
@@ -44,8 +58,7 @@ func TestContractsExportHandler_invalidJSON(t *testing.T) {
 func TestContractsExportHandler_missingRepoRef(t *testing.T) {
 	t.Parallel()
 	h := NewContractsExportHandler(bundle.NewContractExportUseCase(&exportRemoteStub{}))
-	app := fiber.New()
-	app.Post("/", h.Export)
+	app := contractsExportApp(h, []string{roles.APIContractsExport})
 	req := httptest.NewRequest(fiber.MethodPost, "/", strings.NewReader(`{"repository":"","ref":""}`))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	resp, err := app.Test(req)
@@ -66,8 +79,7 @@ func TestContractsExportHandler_success(t *testing.T) {
 		},
 	}
 	h := NewContractsExportHandler(bundle.NewContractExportUseCase(remote))
-	app := fiber.New()
-	app.Post("/", h.Export)
+	app := contractsExportApp(h, []string{roles.APIContractsExport})
 	body := `{"repository":"r","ref":"main","path":"p","contract_name":"api"}`
 	req := httptest.NewRequest(fiber.MethodPost, "/", strings.NewReader(body))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
@@ -86,6 +98,40 @@ func TestContractsExportHandler_success(t *testing.T) {
 	}
 	if len(out.Files) != 1 || out.Files[0].ContractName != "api" || out.Files[0].ContentBase64 == "" {
 		t.Fatalf("got %#v", out.Files)
+	}
+}
+
+func TestContractsExportHandler_forbiddenWithoutPrincipal(t *testing.T) {
+	t.Parallel()
+	h := NewContractsExportHandler(bundle.NewContractExportUseCase(&exportRemoteStub{}))
+	app := contractsExportApp(h, nil)
+	body := `{"repository":"r","ref":"main"}`
+	req := httptest.NewRequest(fiber.MethodPost, "/", strings.NewReader(body))
+	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("status %d", resp.StatusCode)
+	}
+}
+
+func TestContractsExportHandler_forbiddenWrongRole(t *testing.T) {
+	t.Parallel()
+	h := NewContractsExportHandler(bundle.NewContractExportUseCase(&exportRemoteStub{}))
+	app := contractsExportApp(h, []string{roles.APIMember})
+	body := `{"repository":"r","ref":"main"}`
+	req := httptest.NewRequest(fiber.MethodPost, "/", strings.NewReader(body))
+	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("status %d", resp.StatusCode)
 	}
 }
 

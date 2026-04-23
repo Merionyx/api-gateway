@@ -13,6 +13,7 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/api-server/adapter/etcd"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/kvvalue"
+	"github.com/merionyx/api-gateway/internal/api-server/auth/roles"
 	"github.com/merionyx/api-gateway/internal/api-server/config"
 	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/middleware"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
@@ -33,7 +34,7 @@ func TestJWTHandler_IssueApiAccessToken_viaAPIKey(t *testing.T) {
 		rec: kvvalue.APIKeyValue{
 			SchemaVersion: kvvalue.APIKeySchemaV2,
 			Algorithm:     "sha256",
-			Roles:         []string{"ci"},
+			Roles:         []string{roles.APIAccessTokensIssue},
 			RecordFormat:  kvvalue.DefaultAPIKeyRecordFormat,
 		},
 	}
@@ -69,6 +70,109 @@ func TestJWTHandler_IssueApiAccessToken_viaAPIKey(t *testing.T) {
 	}
 }
 
+func TestJWTHandler_IssueApiAccessToken_forbiddenWrongAPIKeyRole(t *testing.T) {
+	t.Parallel()
+	uc := jwtHandlerTestUC(t)
+	h := NewJWTHandler(uc, false, 5*time.Minute)
+	secret := "issue-api-wrong-role"
+	d := etcd.SHA256DigestHexFromSecret(secret)
+	repo := &stubAPIKeyRepoForIssue{
+		wantDigest: d,
+		rec: kvvalue.APIKeyValue{
+			SchemaVersion: kvvalue.APIKeySchemaV2,
+			Algorithm:     "sha256",
+			Roles:         []string{roles.APIMember},
+			RecordFormat:  kvvalue.DefaultAPIKeyRecordFormat,
+		},
+	}
+	app := fiber.New()
+	app.Use(middleware.APISecurity(uc, repo))
+	app.Post("/api/v1/tokens/api", h.IssueApiAccessToken)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/tokens/api", strings.NewReader(`{}`))
+	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+	req.Header.Set("X-API-Key", secret)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusForbidden {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status %d body %s", resp.StatusCode, b)
+	}
+}
+
+func TestJWTHandler_IssueApiAccessToken_forbiddenBearerBaselineMember(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	uc, err := auth.NewJWTUseCase(&config.JWTConfig{
+		KeysDir:      dir,
+		EdgeKeysDir:  filepath.Join(dir, "edge"),
+		Issuer:       "iss",
+		APIAudience:  "api-aud",
+		EdgeIssuer:   "edge-iss",
+		EdgeAudience: "edge-aud",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tok, _, _, err := uc.MintInteractiveAPIAccessJWT(t.Context(), "user@example.com", time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := NewJWTHandler(uc, false, 2*time.Minute)
+	app := fiber.New()
+	app.Use(middleware.APISecurity(uc, nil))
+	app.Post("/api/v1/tokens/api", h.IssueApiAccessToken)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/tokens/api", strings.NewReader(`{}`))
+	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+	req.Header.Set(fiber.HeaderAuthorization, "Bearer "+tok)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusForbidden {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status %d body %s", resp.StatusCode, b)
+	}
+}
+
+func TestJWTHandler_IssueApiAccessToken_viaAPIKeyAdminBypass(t *testing.T) {
+	t.Parallel()
+	uc := jwtHandlerTestUC(t)
+	h := NewJWTHandler(uc, false, 5*time.Minute)
+	secret := "issue-api-admin-secret"
+	d := etcd.SHA256DigestHexFromSecret(secret)
+	repo := &stubAPIKeyRepoForIssue{
+		wantDigest: d,
+		rec: kvvalue.APIKeyValue{
+			SchemaVersion: kvvalue.APIKeySchemaV2,
+			Algorithm:     "sha256",
+			Roles:         []string{roles.APIAdmin},
+			RecordFormat:  kvvalue.DefaultAPIKeyRecordFormat,
+		},
+	}
+	app := fiber.New()
+	app.Use(middleware.APISecurity(uc, repo))
+	app.Post("/api/v1/tokens/api", h.IssueApiAccessToken)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/tokens/api", strings.NewReader(`{}`))
+	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+	req.Header.Set("X-API-Key", secret)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusCreated {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status %d body %s", resp.StatusCode, b)
+	}
+}
+
 type stubAPIKeyRepoForIssue struct {
 	wantDigest string
 	rec        kvvalue.APIKeyValue
@@ -95,7 +199,11 @@ func TestJWTHandler_IssueApiAccessToken_viaBearer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tok, _, _, err := uc.MintInteractiveAPIAccessJWT(t.Context(), "user@example.com", time.Minute)
+	snap, err := json.Marshal(map[string]any{"roles": []string{roles.APIAccessTokensIssue}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tok, _, _, err := uc.MintInteractiveAPIAccessJWTFromSnapshot(t.Context(), "user@example.com", snap, time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}

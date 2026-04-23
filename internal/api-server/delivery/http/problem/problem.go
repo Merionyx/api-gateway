@@ -43,6 +43,8 @@ func defaultHTTPtitle(st int) string {
 		return "Bad Request"
 	case http.StatusUnauthorized:
 		return "Unauthorized"
+	case http.StatusForbidden:
+		return "Forbidden"
 	case http.StatusNotFound:
 		return "Not Found"
 	case http.StatusBadGateway:
@@ -81,6 +83,11 @@ func BadGateway(code, title, detail string) apiserver.Problem {
 // Unauthorized builds a 401 Problem with stable code.
 func Unauthorized(code, title, detail string) apiserver.Problem {
 	return WithCode(http.StatusUnauthorized, code, title, detail)
+}
+
+// Forbidden builds a 403 Problem with stable code (authorization / RBAC).
+func Forbidden(code, title, detail string) apiserver.Problem {
+	return WithCode(http.StatusForbidden, code, title, detail)
 }
 
 // Conflict builds a 409 Problem with stable code.

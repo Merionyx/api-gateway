@@ -28,6 +28,13 @@ func TestParseAndValidateAPIProfileBearerToken_acceptsInteractiveMint(t *testing
 	if mc["sub"] != "user@example.com" {
 		t.Fatalf("sub %v", mc["sub"])
 	}
+	ra, _ := mc["roles"].([]any)
+	if len(ra) != 1 {
+		t.Fatalf("roles %v", mc["roles"])
+	}
+	if ra[0] != "api:member" {
+		t.Fatalf("role %v", ra[0])
+	}
 }
 
 func TestParseAndValidateAPIProfileBearerToken_rejectsEdgeToken(t *testing.T) {

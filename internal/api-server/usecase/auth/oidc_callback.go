@@ -18,6 +18,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/auth/idpcache"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/kvvalue"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/oidc"
+	apiroles "github.com/merionyx/api-gateway/internal/api-server/auth/roles"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/sessioncrypto"
 	"github.com/merionyx/api-gateway/internal/api-server/config"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
@@ -224,7 +225,9 @@ func interactiveSubject(mc jwt.MapClaims) string {
 }
 
 func initialClaimsSnapshotJSON(mc jwt.MapClaims) (json.RawMessage, error) {
-	m := map[string]any{}
+	m := map[string]any{
+		"roles": []string{apiroles.APIMember},
+	}
 	for _, k := range []string{"sub", "email", "name", "preferred_username"} {
 		if v, ok := mc[k]; ok {
 			m[k] = v

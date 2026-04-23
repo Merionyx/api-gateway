@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	apiroles "github.com/merionyx/api-gateway/internal/api-server/auth/roles"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 	"github.com/merionyx/api-gateway/internal/shared/telemetry"
@@ -74,19 +75,24 @@ func (uc *JWTUseCase) GenerateToken(ctx context.Context, req *models.GenerateTok
 
 func parseInteractiveSnapshotForJWT(snapshot json.RawMessage) (roles []any, idpIss, idpSub string) {
 	if len(snapshot) == 0 {
-		return []any{}, "", ""
+		return []any{apiroles.APIMember}, "", ""
 	}
 	var m map[string]any
 	if err := json.Unmarshal(snapshot, &m); err != nil {
-		return []any{}, "", ""
+		return []any{apiroles.APIMember}, "", ""
 	}
+	rolesKeyPresent := false
 	if v, ok := m["roles"]; ok {
+		rolesKeyPresent = true
 		if a, ok := v.([]any); ok {
 			roles = a
 		}
 	}
 	if roles == nil {
 		roles = []any{}
+	}
+	if !rolesKeyPresent {
+		roles = []any{apiroles.APIMember}
 	}
 	if s, _ := m["idp_iss"].(string); strings.TrimSpace(s) != "" {
 		idpIss = strings.TrimSpace(s)

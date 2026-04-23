@@ -527,6 +527,16 @@ type BadRequest = Problem
 // the API returns `code` plus a neutral `detail` suitable for operators or an optional “technical details” panel.
 type Conflict = Problem
 
+// Forbidden RFC 7807 / RFC 9457 Problem Details.
+//
+// **Localization:** use `code` (stable `UPPER_SNAKE_CASE`) as the i18n message key, e.g. `problem.NOT_FOUND`
+// or `errors.api.NOT_FOUND`. `title` and `detail` are default English text for debugging and optional
+// display; do not rely on them as the only source for UI copy in translated apps.
+//
+// **Security:** low-level causes (stack traces, etcd/syncer diagnostics) must be logged server-side only;
+// the API returns `code` plus a neutral `detail` suitable for operators or an optional “technical details” panel.
+type Forbidden = Problem
+
 // InternalError RFC 7807 / RFC 9457 Problem Details.
 //
 // **Localization:** use `code` (stable `UPPER_SNAKE_CASE`) as the i18n message key, e.g. `problem.NOT_FOUND`
@@ -3081,6 +3091,7 @@ type ExportContractsResponse struct {
 	HTTPResponse              *http.Response
 	JSON200                   *ContractsExportResponse
 	ApplicationproblemJSON400 *BadRequest
+	ApplicationproblemJSON403 *Forbidden
 	ApplicationproblemJSON500 *InternalError
 	ApplicationproblemJSON502 *Problem
 }
@@ -3323,6 +3334,7 @@ type IssueApiAccessTokenResponse struct {
 	JSON201                   *ApiAccessTokenIssued
 	ApplicationproblemJSON400 *BadRequest
 	ApplicationproblemJSON401 *Unauthorized
+	ApplicationproblemJSON403 *Forbidden
 	ApplicationproblemJSON500 *InternalError
 }
 
@@ -4130,6 +4142,13 @@ func ParseExportContractsResponse(rsp *http.Response) (*ExportContractsResponse,
 		}
 		response.ApplicationproblemJSON400 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -4543,6 +4562,13 @@ func ParseIssueApiAccessTokenResponse(rsp *http.Response) (*IssueApiAccessTokenR
 			return nil, err
 		}
 		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalError

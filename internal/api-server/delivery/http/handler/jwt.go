@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/merionyx/api-gateway/internal/api-server/auth/roles"
+	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/authz"
 	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/middleware"
 	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/problem"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
@@ -19,9 +21,9 @@ const defaultAPIAccessTokenTTL = 5 * time.Minute
 
 // JWTHandler serves JWT/JWKS HTTP endpoints (roadmap ш. 15, 22).
 type JWTHandler struct {
-	jwtUseCase      *auth.JWTUseCase
-	metricsEnabled  bool
-	apiAccessTTL    time.Duration
+	jwtUseCase     *auth.JWTUseCase
+	metricsEnabled bool
+	apiAccessTTL   time.Duration
 }
 
 // NewJWTHandler wires JWT HTTP handlers. apiAccessTTL<=0 defaults to 5m (POST /api/v1/tokens/api).
@@ -96,6 +98,11 @@ func (h *JWTHandler) IssueApiAccessToken(c fiber.Ctx) error {
 			"",
 			"Authenticated context is required to issue API access tokens.",
 		))
+	}
+
+	if denied, werr := authz.RequireAnyHTTPRole(c, roles.APIAccessTokensIssue); denied {
+		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultForbidden)
+		return werr
 	}
 
 	if len(c.Body()) > 0 {
