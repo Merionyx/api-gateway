@@ -1,4 +1,4 @@
-.PHONY: build build-cli test test-unit test-coverage test-coverage-ci test-integration clean tidy deps fmt lint docker-build docker-build-agwctl docker-push docker-up docker-down docker-up-dev docker-down-dev docker-up-dev-ha docker-down-dev-ha help proto-generate proto-install proto-lint proto-breaking generate-etcd-certs generate-ed25519-key generate-rsa-key controller-gen-bin generate-crds
+.PHONY: build build-cli test test-unit test-coverage test-coverage-ci test-integration test-integration-oidc clean tidy deps fmt lint docker-build docker-build-agwctl docker-push docker-up docker-down docker-up-dev docker-down-dev docker-up-dev-ha docker-down-dev-ha help proto-generate proto-install proto-lint proto-breaking generate-etcd-certs generate-ed25519-key generate-rsa-key controller-gen-bin generate-crds
 
 # Variables
 BUILD_DIR=./bin
@@ -50,6 +50,9 @@ test-coverage-ci: ## Unit tests + coverage gate (see .coverage-min; without meri
 
 test-integration: ## Run integration tests (starts etcd in Docker via scripts/dev/run-integration-tests.sh)
 	bash scripts/dev/run-integration-tests.sh
+
+test-integration-oidc: ## OIDC login+callback E2E only (Docker etcd; roadmap ш. 28)
+	bash scripts/dev/run-integration-tests.sh -run TestE2E_OIDCLoginCallback_HappyPath
 
 clean: ## Clean build artifacts
 	rm -rf $(BUILD_DIR)
