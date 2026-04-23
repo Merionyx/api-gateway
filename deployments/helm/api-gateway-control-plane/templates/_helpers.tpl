@@ -241,6 +241,8 @@ server:
   http_port: "8080"
   grpc_port: "19093"
   host: "0.0.0.0"
+  cors:
+    allow_origins: []
 etcd:
   endpoints:
 {{- range .Values.etcd.endpoints }}

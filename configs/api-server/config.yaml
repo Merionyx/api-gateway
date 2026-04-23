@@ -2,6 +2,10 @@ server:
   http_port: "8080"
   grpc_port: "19093"
   host: "0.0.0.0"
+  # Browser CORS (roadmap ш. 24): list every Origin (scheme+host+port) allowed to call this API from the browser.
+  # Production/staging must not use "*". Leave empty to disable CORS until UIs are known.
+  cors:
+    allow_origins: []
 
 etcd:
   endpoints:

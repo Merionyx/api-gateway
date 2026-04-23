@@ -44,6 +44,9 @@ func TestLoadConfig_FromRepoSample(t *testing.T) {
 	if cfg.Readiness.RequireContractSyncer {
 		t.Fatal("Readiness.RequireContractSyncer expected false from sample config")
 	}
+	if len(cfg.Server.CORS.AllowOrigins) != 0 {
+		t.Fatalf("sample prod config should keep server.cors.allow_origins empty (operator-filled), got %#v", cfg.Server.CORS.AllowOrigins)
+	}
 }
 
 func TestLoadConfig_NoFile_Defaults(t *testing.T) {
@@ -62,5 +65,8 @@ func TestLoadConfig_NoFile_Defaults(t *testing.T) {
 	}
 	if cfg.Readiness.RequireContractSyncer {
 		t.Fatal("readiness.require_contract_syncer should default to false")
+	}
+	if len(cfg.Server.CORS.AllowOrigins) == 0 {
+		t.Fatal("no config file: expected default server.cors.allow_origins for browser dev")
 	}
 }

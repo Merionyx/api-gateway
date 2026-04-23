@@ -70,9 +70,10 @@ type ReadinessConfig struct {
 }
 
 type ServerConfig struct {
-	HTTPPort string `mapstructure:"http_port" validate:"required" json:"http_port"`
-	GRPCPort string `mapstructure:"grpc_port" validate:"required" json:"grpc_port"`
-	Host     string `mapstructure:"host" json:"host"`
+	HTTPPort string     `mapstructure:"http_port" validate:"required" json:"http_port"`
+	GRPCPort string     `mapstructure:"grpc_port" validate:"required" json:"grpc_port"`
+	Host     string     `mapstructure:"host" json:"host"`
+	CORS     CORSConfig `mapstructure:"cors" json:"cors"`
 }
 
 type JWTConfig struct {
@@ -118,6 +119,9 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("auth.login_intent_lease_ttl", 15*time.Minute)
 	v.SetDefault("auth.interactive_access_token_ttl", 5*time.Minute)
 	v.SetDefault("auth.idp_access_cache_opaque_max_ttl", 2*time.Minute)
+	// Browser CORS (roadmap ш. 24): explicit dev defaults — no "*" (prod Helm must list real UI origins).
+	v.SetDefault("server.cors.allow_origins", DevCORSAllowOrigins())
+	v.SetDefault("server.cors.insecure_allow_wildcard", false)
 
 	v.AutomaticEnv()
 	v.SetEnvPrefix("API_SERVER_")
@@ -146,6 +150,12 @@ func LoadConfig(configFile ...string) (*Config, error) {
 
 	var config Config
 	if err := v.Unmarshal(&config); err != nil {
+		return nil, err
+	}
+
+	ApplyCORSDevDefaults(&config)
+
+	if err := ValidateServerCORS(config.Server.CORS, config.Auth.Environment); err != nil {
 		return nil, err
 	}
 

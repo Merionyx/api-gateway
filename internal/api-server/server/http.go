@@ -11,6 +11,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/recover"
 	oapimw "github.com/oapi-codegen/fiber-middleware/v2"
 
+	"github.com/merionyx/api-gateway/internal/api-server/config"
 	"github.com/merionyx/api-gateway/internal/api-server/container"
 	httpxmw "github.com/merionyx/api-gateway/internal/api-server/delivery/http/middleware"
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
@@ -36,14 +37,7 @@ func RunHTTPServer(ctx context.Context, c *container.Container) error {
 	app.Use(logger.New(logger.Config{
 		Format: "[${time}] ${status} - ${method} ${path} ${latency}\n",
 	}))
-	app.Use(cors.New(cors.Config{
-		AllowOrigins: []string{"*"},
-		AllowMethods: []string{"GET", "POST", "OPTIONS"},
-		AllowHeaders: []string{
-			"Origin", "Content-Type", "Accept", "Authorization", "X-API-Key",
-			"Traceparent", "Tracestate", // W3C TraceContext (CORS to browser/edge)
-		},
-	}))
+	installCORSMiddleware(app, c.Config)
 
 	app.Use(apimetrics.HTTPMiddleware(c.Config.MetricsHTTP.Enabled))
 	if err := setupRoutes(app, c); err != nil {
@@ -67,6 +61,32 @@ func RunHTTPServer(ctx context.Context, c *container.Container) error {
 	case err := <-errCh:
 		return err
 	}
+}
+
+func installCORSMiddleware(app *fiber.App, cfg *config.Config) {
+	cc := cfg.Server.CORS
+	origins := config.NormalizeCORSAllowOrigins(cc.AllowOrigins)
+	wildcard := cc.InsecureAllowWildcard && len(origins) == 1 && origins[0] == "*"
+
+	corsBase := cors.Config{
+		AllowMethods: []string{"GET", "POST", "OPTIONS"},
+		AllowHeaders: []string{
+			"Origin", "Content-Type", "Accept", "Authorization", "X-API-Key",
+			"Traceparent", "Tracestate", // W3C TraceContext (CORS to browser/edge)
+		},
+	}
+
+	if wildcard {
+		corsBase.AllowOrigins = []string{"*"}
+		app.Use(cors.New(corsBase))
+		return
+	}
+	if len(origins) == 0 {
+		slog.Info("http: CORS disabled (server.cors.allow_origins empty); set explicit Origins for browser OIDC/SPA (roadmap ш. 24)")
+		return
+	}
+	corsBase.AllowOrigins = origins
+	app.Use(cors.New(corsBase))
 }
 
 func setupRoutes(app *fiber.App, c *container.Container) error {
