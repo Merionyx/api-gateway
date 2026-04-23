@@ -28,7 +28,7 @@ From the repository root:
 | Coverage (local HTML report)                                              | `make test-coverage`                   |
 | Coverage (CI-style gate)                                                  | `make test-coverage-ci`                |
 | Integration tests only (Docker / etcd)                                    | `make test-integration`                |
-| OIDC HTTP E2E subset (mock IdP + etcd; roadmap ш. 28–29)                  | `make test-integration-oidc`           |
+| OIDC E2E subset (mock IdP + etcd; roadmap ш. 28–30)                       | `make test-integration-oidc`           |
 | Lint                                                                      | `make lint` (requires `golangci-lint`) |
 | Format                                                                    | `make fmt`                             |
 | Build binaries                                                            | `make build`                           |

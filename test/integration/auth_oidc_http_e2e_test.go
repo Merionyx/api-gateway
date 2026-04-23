@@ -9,6 +9,7 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -16,6 +17,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -30,6 +32,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/config"
 	"github.com/merionyx/api-gateway/internal/api-server/container"
 	httpxmw "github.com/merionyx/api-gateway/internal/api-server/delivery/http/middleware"
+	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
 	"github.com/merionyx/api-gateway/internal/api-server/server"
 	sharedetcd "github.com/merionyx/api-gateway/internal/shared/etcd"
@@ -37,8 +40,8 @@ import (
 	"github.com/merionyx/api-gateway/internal/shared/metricshttp"
 )
 
-// Roadmap ш. 28–29: OIDC E2E against real etcd (httptest mock IdP).
-// ш. 28 — login + callback; ш. 29 — POST refresh when IdP token endpoint returns 5xx (degraded refresh, roadmap ш. 18).
+// Roadmap ш. 28–30: OIDC E2E against real etcd (httptest mock IdP).
+// ш. 28 — login + callback; ш. 29 — refresh при 503 на token (degraded); ш. 30 — два параллельных refresh с одним our_refresh → CAS, один 409 (ADR 0001). Конкуренция через use case + etcd (Fiber app.Test не гоняем параллельно).
 
 const (
 	e2eOIDCProviderID = "mock-idp"
@@ -338,5 +341,72 @@ func TestE2E_OIDCRefresh_IdPUnavailable_Degraded(t *testing.T) {
 	}
 	if refresh2 == refresh1 {
 		t.Fatal("expected rotated refresh_token after degraded refresh")
+	}
+}
+
+func TestE2E_OIDCRefresh_ConcurrentSameRefreshToken_One409(t *testing.T) {
+	t.Parallel()
+
+	etcdCli := NewEtcdClient(t)
+	defer etcdCli.Close()
+
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	idp := newMockOIDCProvider(t, priv)
+	t.Cleanup(idp.Close)
+
+	authPrefix := fmt.Sprintf("/api-gateway/integration-oidc-e2e/%s", strings.ReplaceAll(uuid.NewString(), "-", ""))
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		_, _ = etcdCli.Delete(ctx, authPrefix, clientv3.WithPrefix())
+	}()
+
+	cfg := e2eAPIConfig(t, EtcdEndpoints(), idp.URL, authPrefix)
+	cnt, err := container.NewContainer(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cnt.Close()
+	if cnt.OIDCRefreshUseCase == nil {
+		t.Fatal("OIDCRefreshUseCase must be configured")
+	}
+
+	app := fiberAppFromContainer(t, cnt)
+	_, refresh1 := performOIDCLoginCallback(t, app)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	results := make([]error, 2)
+	for i := range 2 {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			<-start
+			_, err := cnt.OIDCRefreshUseCase.Refresh(ctx, refresh1)
+			results[idx] = err
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+
+	var nOK, nConflict int
+	for _, err := range results {
+		switch {
+		case err == nil:
+			nOK++
+		case errors.Is(err, apierrors.ErrSessionRefreshConflict):
+			nConflict++
+		default:
+			t.Fatalf("unexpected refresh error: %v", err)
+		}
+	}
+	if nOK != 1 || nConflict != 1 {
+		t.Fatalf("want exactly one success and one CAS conflict; got ok=%d conflict=%d errs=%v", nOK, nConflict, results)
 	}
 }
