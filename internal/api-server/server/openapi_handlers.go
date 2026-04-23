@@ -29,6 +29,10 @@ func (s *OpenAPIServer) GetJwksEdge(c fiber.Ctx, _ apiserver.GetJwksEdgeParams) 
 	return s.c.JWTHandler.GetJWKSEdge(c)
 }
 
+func (s *OpenAPIServer) ListOidcProviders(c fiber.Ctx) error {
+	return s.c.OIDCLoginHandler.ListOidcProviders(c)
+}
+
 func (s *OpenAPIServer) LoginOidc(c fiber.Ctx, params apiserver.LoginOidcParams) error {
 	return s.c.OIDCLoginHandler.Login(c, params)
 }

@@ -343,6 +343,18 @@ type Jwks struct {
 	Keys []Jwk `json:"keys"`
 }
 
+// OidcProviderDescriptor Public metadata for one configured `auth.oidc_providers[]` entry. Safe for browser UIs and CLI; excludes client secrets and redirect allowlists.
+type OidcProviderDescriptor struct {
+	// Id Same as `provider_id` for `GET /api/v1/auth/login`.
+	Id string `json:"id"`
+
+	// Issuer OIDC issuer URL configured for this provider.
+	Issuer string `json:"issuer"`
+
+	// Kind Normalized provider kind for labels/icons: `generic` when unset in config, otherwise `github`, `gitlab`, `google`, `okta`, or `entra` (lowercase).
+	Kind string `json:"kind"`
+}
+
 // Problem RFC 7807 / RFC 9457 Problem Details.
 //
 // **Localization:** use `code` (stable `UPPER_SNAKE_CASE`) as the i18n message key, e.g. `problem.NOT_FOUND`
@@ -880,6 +892,9 @@ type ClientInterface interface {
 	// LoginOidc request
 	LoginOidc(ctx context.Context, params *LoginOidcParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListOidcProviders request
+	ListOidcProviders(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// RefreshSessionWithBody request with any body
 	RefreshSessionWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -989,6 +1004,18 @@ func (c *Client) CallbackOidc(ctx context.Context, params *CallbackOidcParams, r
 
 func (c *Client) LoginOidc(ctx context.Context, params *LoginOidcParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewLoginOidcRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListOidcProviders(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListOidcProvidersRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -1501,6 +1528,33 @@ func NewLoginOidcRequest(server string, params *LoginOidcParams) (*http.Request,
 			rawQueryFragments = append(rawQueryFragments, encoded)
 		}
 		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListOidcProvidersRequest generates requests for ListOidcProviders
+func NewListOidcProvidersRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/auth/oidc-providers")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -2792,6 +2846,9 @@ type ClientWithResponsesInterface interface {
 	// LoginOidcWithResponse request
 	LoginOidcWithResponse(ctx context.Context, params *LoginOidcParams, reqEditors ...RequestEditorFn) (*LoginOidcResponse, error)
 
+	// ListOidcProvidersWithResponse request
+	ListOidcProvidersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListOidcProvidersResponse, error)
+
 	// RefreshSessionWithBodyWithResponse request with any body
 	RefreshSessionWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RefreshSessionResponse, error)
 
@@ -2955,6 +3012,29 @@ func (r LoginOidcResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r LoginOidcResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListOidcProvidersResponse struct {
+	Body                      []byte
+	HTTPResponse              *http.Response
+	JSON200                   *[]OidcProviderDescriptor
+	ApplicationproblemJSON500 *InternalError
+}
+
+// Status returns HTTPResponse.Status
+func (r ListOidcProvidersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListOidcProvidersResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -3485,6 +3565,15 @@ func (c *ClientWithResponses) LoginOidcWithResponse(ctx context.Context, params 
 	return ParseLoginOidcResponse(rsp)
 }
 
+// ListOidcProvidersWithResponse request returning *ListOidcProvidersResponse
+func (c *ClientWithResponses) ListOidcProvidersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListOidcProvidersResponse, error) {
+	rsp, err := c.ListOidcProviders(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListOidcProvidersResponse(rsp)
+}
+
 // RefreshSessionWithBodyWithResponse request with arbitrary body returning *RefreshSessionResponse
 func (c *ClientWithResponses) RefreshSessionWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RefreshSessionResponse, error) {
 	rsp, err := c.RefreshSessionWithBody(ctx, contentType, body, reqEditors...)
@@ -3873,6 +3962,39 @@ func ParseLoginOidcResponse(rsp *http.Response) (*LoginOidcResponse, error) {
 			return nil, err
 		}
 		response.ApplicationproblemJSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListOidcProvidersResponse parses an HTTP response from a ListOidcProvidersWithResponse call
+func ParseListOidcProvidersResponse(rsp *http.Response) (*ListOidcProvidersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListOidcProvidersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []OidcProviderDescriptor
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
 
 	}
 

@@ -7,6 +7,7 @@ replace github.com/oapi-codegen/fiber-middleware/v2 => github.com/kerak19/fiber-
 require (
 	github.com/getkin/kin-openapi v0.135.0
 	github.com/google/uuid v1.6.0
+	github.com/manifoldco/promptui v0.9.0
 	github.com/merionyx/go-diff v1.0.0
 	github.com/oapi-codegen/fiber-middleware/v2 v2.0.0-00010101000000-000000000000
 	github.com/oapi-codegen/runtime v1.2.0
@@ -33,6 +34,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect

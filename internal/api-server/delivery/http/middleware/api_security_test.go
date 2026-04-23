@@ -29,6 +29,9 @@ func Test_requiresAPISecurity(t *testing.T) {
 	if !requiresAPISecurity(http.MethodGet, "/api/v1/auth/refresh") {
 		t.Fatal("non-post refresh protected")
 	}
+	if requiresAPISecurity(http.MethodGet, "/api/v1/auth/oidc-providers") {
+		t.Fatal("oidc provider list public")
+	}
 }
 
 func TestAPISecurity_allowsHealthWithoutAuth(t *testing.T) {

@@ -39,6 +39,8 @@ func newAuthLoginCmd(resolveServer func() (string, error)) *cobra.Command {
 		Long: strings.TrimSpace(`
 Opens the system browser for API Server GET /api/v1/auth/login, then receives the IdP redirect on a local HTTP listener.
 
+Without --provider-id, agwctl calls GET /api/v1/auth/oidc-providers: if there is a single provider it is chosen automatically; if there are several, you pick one from an interactive list (arrow keys + Enter) when stdin/stdout are a TTY—otherwise pass --provider-id explicitly.
+
 You must add the exact redirect URI to auth.oidc_providers[].redirect_uri_allowlist for this provider (default:
   http://127.0.0.1:21987/callback
 ). Override host/port with --callback-host / --callback-port if that port is busy.
@@ -46,9 +48,6 @@ You must add the exact redirect URI to auth.oidc_providers[].redirect_uri_allowl
 Tokens are written to ~/.config/agwctl/credentials.yaml (or AGWCTL_CREDENTIALS), keyed by the current agwctl context; file mode 0600.
 `),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if strings.TrimSpace(providerID) == "" {
-				return fmt.Errorf("--provider-id is required")
-			}
 			ctxName, err := effectiveContextName(cmd)
 			if err != nil {
 				return err
@@ -64,6 +63,10 @@ Tokens are written to ~/.config/agwctl/credentials.yaml (or AGWCTL_CREDENTIALS),
 			execCtx := cmd.Context()
 			if execCtx == nil {
 				execCtx = context.Background()
+			}
+			chosenID, err := resolveAuthLoginProviderID(execCtx, server, baseHTTP, providerID, cmd.OutOrStdout())
+			if err != nil {
+				return err
 			}
 
 			redirectURI := fmt.Sprintf("http://%s:%d%s", strings.TrimSpace(callbackHost), callbackPort, callbackPath)
@@ -140,7 +143,7 @@ Tokens are written to ~/.config/agwctl/credentials.yaml (or AGWCTL_CREDENTIALS),
 				return err
 			}
 			loginResp, err := apiNoRedir.LoginOidc(execCtx, &apiserverclient.LoginOidcParams{
-				ProviderId:  providerID,
+				ProviderId:  chosenID,
 				RedirectUri: redirectURI,
 			})
 			if err != nil {
@@ -206,7 +209,7 @@ Tokens are written to ~/.config/agwctl/credentials.yaml (or AGWCTL_CREDENTIALS),
 				tt = strings.TrimSpace(*tok.TokenType)
 			}
 			if err := credentials.PutContext(ctxName, credentials.Entry{
-				ProviderID:   providerID,
+				ProviderID:   chosenID,
 				AccessToken:  tok.AccessToken,
 				RefreshToken: tok.RefreshToken,
 				TokenType:    tt,
@@ -221,11 +224,10 @@ Tokens are written to ~/.config/agwctl/credentials.yaml (or AGWCTL_CREDENTIALS),
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&providerID, "provider-id", "", "OIDC provider id (auth.oidc_providers[].id on the API Server)")
+	cmd.Flags().StringVar(&providerID, "provider-id", "", "OIDC provider id (auth.oidc_providers[].id); optional if the server exposes a single provider or you pick interactively")
 	cmd.Flags().StringVar(&callbackHost, "callback-host", defaultCallbackHost, "loopback host for redirect_uri (must match allowlist)")
 	cmd.Flags().IntVar(&callbackPort, "callback-port", defaultCallbackPort, "TCP port for loopback redirect_uri (must match allowlist)")
 	cmd.Flags().BoolVar(&noBrowser, "no-browser", false, "print IdP URL instead of opening a browser")
-	_ = cmd.MarkFlagRequired("provider-id")
 	return cmd
 }
 

@@ -56,7 +56,7 @@ func requiresAPISecurity(method, path string) bool {
 	case "/health", "/ready", "/api/v1/version",
 		"/.well-known/jwks.json", "/.well-known/jwks-edge.json",
 		"/api/v1/keys",
-		"/api/v1/auth/login", "/api/v1/auth/callback":
+		"/api/v1/auth/oidc-providers", "/api/v1/auth/login", "/api/v1/auth/callback":
 		return false
 	case "/api/v1/auth/refresh":
 		return method != http.MethodPost

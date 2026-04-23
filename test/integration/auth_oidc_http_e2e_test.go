@@ -201,6 +201,50 @@ func fiberAppFromContainer(t *testing.T, c *container.Container) *fiber.App {
 	return app
 }
 
+func TestE2E_ListOidcProviders(t *testing.T) {
+	t.Parallel()
+	etcdEndpoints := sharedetcd.IntegrationEndpoints(t)
+	authKeyPrefix := "/api-gateway/api-server/auth/v1/" + uuid.NewString() + "/"
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	idp := newMockOIDCProvider(t, priv)
+	t.Cleanup(idp.Close)
+
+	cfg := e2eAPIConfig(t, etcdEndpoints, idp.URL, authKeyPrefix)
+	c, err := container.NewContainer(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+
+	app := fiberAppFromContainer(t, c)
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/auth/oidc-providers", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status %d: %s", resp.StatusCode, string(b))
+	}
+	var got []map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("providers: %+v", got)
+	}
+	if got[0]["id"] != e2eOIDCProviderID {
+		t.Fatalf("id %v", got[0]["id"])
+	}
+	if got[0]["kind"] != "generic" {
+		t.Fatalf("kind %v", got[0]["kind"])
+	}
+}
+
 // performOIDCLoginCallback runs GET login → GET callback and returns access + refresh tokens (roadmap ш. 28).
 func performOIDCLoginCallback(t *testing.T, app *fiber.App) (accessToken, refreshToken string) {
 	t.Helper()

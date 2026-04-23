@@ -55,3 +55,13 @@ func (h *OIDCLoginHandler) Login(c fiber.Ctx, params apiserver.LoginOidcParams) 
 	c.Status(http.StatusFound)
 	return nil
 }
+
+// ListOidcProviders returns public metadata for configured browser OIDC providers (GET /api/v1/auth/oidc-providers).
+func (h *OIDCLoginHandler) ListOidcProviders(c fiber.Ctx) error {
+	rows := h.uc.ListPublicOIDCProviders()
+	out := make([]apiserver.OidcProviderDescriptor, len(rows))
+	for i, r := range rows {
+		out[i] = apiserver.OidcProviderDescriptor{Id: r.ID, Kind: r.Kind, Issuer: r.Issuer}
+	}
+	return c.JSON(out)
+}

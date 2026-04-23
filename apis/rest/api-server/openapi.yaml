@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: API Gateway — API Server HTTP API
-  version: 1.5.3
+  version: 1.5.4
   description: |
     HTTP API for the **API Server** control plane: authentication material (JWT, JWKS), contract export,
     registry views backed by **etcd** (controllers, tenants, bundles), and operational endpoints.
@@ -10,6 +10,8 @@ info:
     lifecycle is owned by the **Gateway Controller**; this API does not expose CRUD for environments.
 
     **JSON naming:** request and response bodies use **snake_case** field names unless noted.
+
+    **v1.5.4:** **`GET /api/v1/auth/oidc-providers`** — public list of configured browser OIDC providers (`id`, `kind`, `issuer`) for UIs and **`agwctl auth login`** (no secrets).
 
     **v1.5.3:** RBAC on selected operations (roadmap step **23**): role constants (e.g. `api:contracts:export`, `api:access_tokens:issue`, baseline `api:member`, wildcard `api:admin`); **403** `INSUFFICIENT_ROLES` when authenticated but not authorized.
 
@@ -390,6 +392,27 @@ components:
           type: string
           description: Token type for `access_token` (e.g. Bearer).
           default: Bearer
+
+    OidcProviderDescriptor:
+      type: object
+      description: |
+        Public metadata for one configured `auth.oidc_providers[]` entry. Safe for browser UIs and CLI; excludes client secrets and redirect allowlists.
+      required:
+      - id
+      - kind
+      - issuer
+      properties:
+        id:
+          type: string
+          description: Same as `provider_id` for `GET /api/v1/auth/login`.
+        kind:
+          type: string
+          description: |
+            Normalized provider kind for labels/icons: `generic` when unset in config, otherwise `github`, `gitlab`, `google`, `okta`, or `entra` (lowercase).
+        issuer:
+          type: string
+          format: uri
+          description: OIDC issuer URL configured for this provider.
 
     IssueApiAccessTokenRequest:
       type: object
@@ -1025,6 +1048,27 @@ paths:
           $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/auth/oidc-providers:
+    get:
+      tags: [ OIDC ]
+      operationId: listOidcProviders
+      security: []
+      summary: List configured OIDC login providers
+      description: |
+        Returns the set of `auth.oidc_providers` entries exposed for interactive login (`provider_id`, kind, issuer).
+        Does not include secrets. When OIDC is not configured, returns an empty array (**200**).
+      responses:
+        '200':
+          description: Providers available for `GET /api/v1/auth/login` (possibly empty).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OidcProviderDescriptor'
         '500':
           $ref: '#/components/responses/InternalError'
 
