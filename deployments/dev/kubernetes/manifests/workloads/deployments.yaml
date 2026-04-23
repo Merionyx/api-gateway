@@ -185,8 +185,12 @@ spec:
         - name: grpc-client-contract-syncer-tls
           mountPath: /etc/grpc-client-contract-syncer
           readOnly: true
-        - name: jwt-keys
+        - name: jwt-api-keys
           mountPath: /api-server/secrets/api-server/keys/jwt
+          readOnly: true
+        - name: jwt-edge-keys
+          mountPath: /api-server/secrets/api-server/keys/jwt-edge
+          readOnly: true
         readinessProbe:
           httpGet:
             path: /ready
@@ -220,9 +224,12 @@ spec:
       - name: grpc-client-contract-syncer-tls
         secret:
           secretName: grpc-client-api-server-tls
-      - name: jwt-keys
+      - name: jwt-api-keys
         secret:
-          secretName: api-gateway-jwt-keys
+          secretName: api-gateway-jwt-api-keys
+      - name: jwt-edge-keys
+        secret:
+          secretName: api-gateway-jwt-edge-keys
 ---
 apiVersion: apps/v1
 kind: Deployment

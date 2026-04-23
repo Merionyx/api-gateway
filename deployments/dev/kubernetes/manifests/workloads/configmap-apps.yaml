@@ -104,6 +104,7 @@ data:
 
     jwt:
       keys_dir: "/api-server/secrets/api-server/keys/jwt"
+      edge_keys_dir: "/api-server/secrets/api-server/keys/jwt-edge"
       issuer: "api-gateway-api-server"
 
     contract_syncer:
