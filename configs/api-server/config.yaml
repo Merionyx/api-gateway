@@ -21,7 +21,8 @@ etcd:
 
 jwt:
   keys_dir: "./secrets/api-server/keys/jwt"
-  # edge_keys_dir: ""  # omit = <keys_dir>/edge
+  # edge_keys_dir: ""  # omit = <keys_dir>/edge (on K8s read-only mounts use a second path; see Helm README)
+  # api_signing_kid / edge_signing_kid: optional fixed kid when multiple *.key files exist (else newest by mtime)
   issuer: "api-gateway-api-server"
   # api_audience, edge_issuer, edge_audience: see config defaults (API_SERVER_JWT_*)
 
