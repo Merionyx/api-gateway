@@ -4,8 +4,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/middleware"
 	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/problem"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
+	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
 	apimetrics "github.com/merionyx/api-gateway/internal/api-server/metrics"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
 	"github.com/merionyx/api-gateway/internal/shared/telemetry"
@@ -13,13 +15,25 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
+const defaultAPIAccessTokenTTL = 5 * time.Minute
+
+// JWTHandler serves JWT/JWKS HTTP endpoints (roadmap ш. 15, 22).
 type JWTHandler struct {
-	jwtUseCase     *auth.JWTUseCase
-	metricsEnabled bool
+	jwtUseCase      *auth.JWTUseCase
+	metricsEnabled  bool
+	apiAccessTTL    time.Duration
 }
 
-func NewJWTHandler(jwtUseCase *auth.JWTUseCase, metricsEnabled bool) *JWTHandler {
-	return &JWTHandler{jwtUseCase: jwtUseCase, metricsEnabled: metricsEnabled}
+// NewJWTHandler wires JWT HTTP handlers. apiAccessTTL<=0 defaults to 5m (POST /api/v1/tokens/api).
+func NewJWTHandler(jwtUseCase *auth.JWTUseCase, metricsEnabled bool, apiAccessTTL time.Duration) *JWTHandler {
+	if apiAccessTTL <= 0 {
+		apiAccessTTL = defaultAPIAccessTokenTTL
+	}
+	return &JWTHandler{
+		jwtUseCase:     jwtUseCase,
+		metricsEnabled: metricsEnabled,
+		apiAccessTTL:   apiAccessTTL,
+	}
 }
 
 // GenerateToken generates a JWT token
@@ -65,6 +79,68 @@ func (h *JWTHandler) GenerateToken(c fiber.Ctx) error {
 
 	apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultCreated)
 	return c.Status(fiber.StatusCreated).JSON(token)
+}
+
+// IssueApiAccessToken mints a short-lived API-profile JWT (POST /api/v1/tokens/api; roadmap ш. 22).
+// Caller must already be authenticated (API-profile Bearer and/or X-API-Key via APISecurity).
+func (h *JWTHandler) IssueApiAccessToken(c fiber.Ctx) error {
+	span := beginHandlerSpan(c, "IssueApiAccessToken")
+	defer span.End()
+
+	p, pOK := middleware.APIKeyPrincipalFromCtx(c)
+	mc, jOK := middleware.APIJWTClaimsFromCtx(c)
+	if !pOK && !jOK {
+		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultInternalError)
+		return problem.Write(c, http.StatusUnauthorized, problem.Unauthorized(
+			"AUTH_CONTEXT_MISSING",
+			"",
+			"Authenticated context is required to issue API access tokens.",
+		))
+	}
+
+	if len(c.Body()) > 0 {
+		var body apiserver.IssueApiAccessTokenRequest
+		if err := c.Bind().Body(&body); err != nil {
+			telemetry.MarkError(span, err)
+			apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationBind)
+			return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidJSONBody, "", problem.DetailInvalidJSONBody))
+		}
+		_ = body.RequestedScopes
+	}
+
+	var subject string
+	var snap []byte
+	var err error
+	if pOK {
+		subject = "m2m:" + p.DigestHex
+		snap, err = snapshotForAPIAccess(rolesStringsToAny(p.Roles), nil)
+	} else {
+		subject = subjectFromAPIJWTClaims(mc)
+		if subject == "" {
+			apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationAppID)
+			return problem.Write(c, http.StatusBadRequest, problem.BadRequest("API_TOKEN_SUBJECT_MISSING", "", "Bearer token has no usable sub/email for API access issuance."))
+		}
+		snap, err = snapshotForAPIAccess(rolesFromAPIJWTClaims(mc), mc)
+	}
+	if err != nil {
+		telemetry.MarkError(span, err)
+		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultInternalError)
+		return problem.WriteInternal(c, err)
+	}
+
+	token, _, exp, err := h.jwtUseCase.MintInteractiveAPIAccessJWTFromSnapshot(c.Context(), subject, snap, h.apiAccessTTL)
+	if err != nil {
+		telemetry.MarkError(span, err)
+		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultInternalError)
+		return problem.RespondError(c, err)
+	}
+
+	apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultCreated)
+	out := apiserver.ApiAccessTokenIssued{
+		AccessToken: token,
+		ExpiresAt:   exp,
+	}
+	return c.Status(fiber.StatusCreated).JSON(out)
 }
 
 // GetJWKS returns a JSON Web Key Set

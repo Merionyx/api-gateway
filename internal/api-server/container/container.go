@@ -240,7 +240,11 @@ func (c *Container) initHandlers() {
 		c.BundleSyncIdempotency = idempotency.NewStore(c.Config.Idempotency.BundleSyncTTL)
 		slog.Info("idempotency backend=memory")
 	}
-	c.JWTHandler = httphandler.NewJWTHandler(c.JWTUseCase, c.Config.MetricsHTTP.Enabled)
+	c.JWTHandler = httphandler.NewJWTHandler(
+		c.JWTUseCase,
+		c.Config.MetricsHTTP.Enabled,
+		c.Config.Auth.InteractiveAccessTokenTTL,
+	)
 	c.OIDCLoginHandler = httphandler.NewOIDCLoginHandler(c.OIDCLoginUseCase)
 	c.OIDCCallbackHandler = httphandler.NewOIDCCallbackHandler(c.OIDCCallbackUseCase)
 	if c.OIDCRefreshUseCase != nil {

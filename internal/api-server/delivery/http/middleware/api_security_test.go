@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/merionyx/api-gateway/internal/api-server/config"
+	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
 
 	"github.com/gofiber/fiber/v3"
@@ -56,6 +57,38 @@ func TestAPISecurity_blocksProtectedWithoutAuth(t *testing.T) {
 	app.Get("/api/v1/status", func(c fiber.Ctx) error { return c.SendString("no") })
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/status", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusUnauthorized {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status %d body %s", resp.StatusCode, b)
+	}
+}
+
+func TestAPISecurity_rejectsEdgeProfileBearer(t *testing.T) {
+	t.Parallel()
+	uc := testJWTUC(t)
+	edgeResp, err := uc.GenerateToken(t.Context(), &models.GenerateTokenRequest{
+		AppID:          "edge-app",
+		Environments:   []string{"dev"},
+		ExpiresAt:      time.Now().Add(time.Hour),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := uc.ParseAndValidateAPIProfileBearerToken(edgeResp.Token); err == nil {
+		t.Fatal("edge token must not validate as API profile")
+	}
+
+	app := fiber.New()
+	app.Use(APISecurity(uc, nil))
+	app.Get("/api/v1/status", func(c fiber.Ctx) error { return c.SendString("no") })
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/status", nil)
+	req.Header.Set(fiber.HeaderAuthorization, "Bearer "+edgeResp.Token)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)

@@ -33,7 +33,7 @@ func jwtHandlerTestUC(t *testing.T) *auth.JWTUseCase {
 
 func TestJWTHandler_GenerateToken_ValidationAppID(t *testing.T) {
 	uc := jwtHandlerTestUC(t)
-	h := NewJWTHandler(uc, false)
+	h := NewJWTHandler(uc, false, 5*time.Minute)
 	app := fiber.New()
 	app.Post("/tokens", h.GenerateToken)
 
@@ -51,7 +51,7 @@ func TestJWTHandler_GenerateToken_ValidationAppID(t *testing.T) {
 
 func TestJWTHandler_GenerateToken_Created(t *testing.T) {
 	uc := jwtHandlerTestUC(t)
-	h := NewJWTHandler(uc, false)
+	h := NewJWTHandler(uc, false, 5*time.Minute)
 	app := fiber.New()
 	app.Post("/tokens", h.GenerateToken)
 

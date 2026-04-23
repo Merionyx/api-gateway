@@ -49,7 +49,7 @@ func (s *OpenAPIServer) IssueEdgeToken(c fiber.Ctx) error {
 }
 
 func (s *OpenAPIServer) IssueApiAccessToken(c fiber.Ctx) error {
-	return authFlowNotImplemented(c, "API-profile token issuance via this endpoint is not implemented yet (roadmap step 22).")
+	return s.c.JWTHandler.IssueApiAccessToken(c)
 }
 
 func authFlowNotImplemented(c fiber.Ctx, detail string) error {
