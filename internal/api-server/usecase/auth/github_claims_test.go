@@ -88,3 +88,49 @@ func TestClaimsSnapshotFromProvider_githubNoExtraCalls(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestGitlabExtraRoles_groupDenied(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v4/groups" {
+			_ = json.NewEncoder(w).Encode([]map[string]string{{"full_path": "other/top"}})
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(srv.Close)
+
+	_, err := gitlabExtraRoles(t.Context(), srv.Client(), &config.GitLabOIDCProviderConfig{
+		APIV4Base:         srv.URL + "/api/v4",
+		AllowedGroupPaths: []string{"acme"},
+	}, "https://gitlab.com", "oauth-token")
+	if !errors.Is(err, apierrors.ErrGitLabLoginDenied) {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestGitlabExtraRoles_groupBindings(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v4/groups" {
+			_ = json.NewEncoder(w).Encode([]map[string]string{{"full_path": "acme/platform"}})
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(srv.Close)
+
+	roles, err := gitlabExtraRoles(t.Context(), srv.Client(), &config.GitLabOIDCProviderConfig{
+		APIV4Base: srv.URL + "/api/v4",
+		GroupRoleBindings: []config.GitLabGroupRoleBinding{{
+			GroupFullPath: "acme/platform",
+			Roles:         []string{"api:admin"},
+		}},
+	}, "https://gitlab.com", "oauth-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(roles) != 1 || roles[0] != "api:admin" {
+		t.Fatalf("%v", roles)
+	}
+}

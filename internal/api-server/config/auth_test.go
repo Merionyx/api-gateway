@@ -55,6 +55,85 @@ func TestValidateOIDCProviders_GitHub(t *testing.T) {
 	}
 }
 
+func TestValidateOIDCProviders_GitLab(t *testing.T) {
+	t.Parallel()
+	err := ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "gl",
+		Issuer:               "https://gitlab.example.com",
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		Kind:                 "gitlab",
+		GitHub:               &GitHubOIDCProviderConfig{},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "must not set github block") {
+		t.Fatalf("got %v", err)
+	}
+
+	err = ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "gl",
+		Issuer:               "https://gitlab.com",
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		Kind:                 "gitlab",
+		GitLab: &GitLabOIDCProviderConfig{
+			GroupRoleBindings: []GitLabGroupRoleBinding{{
+				GroupFullPath: "a/b",
+				Roles:         []string{},
+			}},
+		},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "roles must be non-empty") {
+		t.Fatalf("got %v", err)
+	}
+
+	err = ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "gl",
+		Issuer:               "https://gitlab.com",
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		Kind:                 "gitlab",
+		GitLab: &GitLabOIDCProviderConfig{
+			AllowedGroupPaths: []string{"acme"},
+			GroupRoleBindings: []GitLabGroupRoleBinding{{
+				GroupFullPath: "acme/devops",
+				Roles:         []string{"api:contracts:export"},
+			}},
+		},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGitLabAPIV4BaseFromIssuer(t *testing.T) {
+	t.Parallel()
+	got, err := GitLabAPIV4BaseFromIssuer("https://gitlab.com/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "https://gitlab.com/api/v4" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestValidateOIDCProviders_GenericMustNotSetIdpBlocks(t *testing.T) {
+	t.Parallel()
+	err := ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "x",
+		Issuer:               "https://idp.example",
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		GitLab:               &GitLabOIDCProviderConfig{},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "set kind: gitlab") {
+		t.Fatalf("got %v", err)
+	}
+}
+
 func TestAuthConfig_BootstrapAPIKeyAllowed(t *testing.T) {
 	t.Parallel()
 	cases := []struct {

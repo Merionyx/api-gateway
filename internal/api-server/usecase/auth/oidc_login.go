@@ -136,6 +136,9 @@ func buildOIDCScope(p config.OIDCProviderConfig) string {
 	if p.IsGitHubOIDCProvider() && !scopeInListCI(extra, "read:org") {
 		extra = append(extra, "read:org")
 	}
+	if p.IsGitLabOIDCProvider() && !scopeInListCI(extra, "read_api") {
+		extra = append(extra, "read_api")
+	}
 	for _, s := range extra {
 		s = strings.TrimSpace(s)
 		if s == "" || scopeInListCI(parts, s) {

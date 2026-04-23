@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -20,10 +21,12 @@ type OIDCProviderConfig struct {
 	RedirectURIAllowlist []string `mapstructure:"redirect_uri_allowlist" json:"redirect_uri_allowlist"`
 	// ExtraScopes are appended after "openid" (e.g. "email", "profile").
 	ExtraScopes []string `mapstructure:"extra_scopes" json:"extra_scopes"`
-	// Kind selects IdP-specific behavior. Empty or "generic" keeps standard OIDC only. "github" enables org/team checks (roadmap ш. 35).
+	// Kind selects IdP-specific behavior. Empty or "generic" keeps standard OIDC only. "github" enables org/team checks (roadmap ш. 35). "gitlab" enables group checks (ш. 36).
 	Kind string `mapstructure:"kind" json:"kind,omitempty"`
 	// GitHub is read when Kind is "github" (allowed orgs, team→role bindings). Optional; nil means no extra restrictions beyond GitHub OAuth.
 	GitHub *GitHubOIDCProviderConfig `mapstructure:"github" json:"github,omitempty"`
+	// GitLab is read when Kind is "gitlab" (allowed group paths, group→role bindings).
+	GitLab *GitLabOIDCProviderConfig `mapstructure:"gitlab" json:"gitlab,omitempty"`
 }
 
 // GitHubOIDCProviderConfig restricts or enriches interactive login via GitHub REST (orgs, teams).
@@ -46,9 +49,46 @@ type GitHubTeamRoleBinding struct {
 // GitHubOIDCDiscoveryIssuer is the issuer URL used in FetchDiscovery for GitHub browser OAuth (openid-configuration lives under this path).
 const GitHubOIDCDiscoveryIssuer = "https://github.com/login/oauth"
 
+// GitLabOIDCProviderConfig restricts or enriches interactive login via GitLab REST API v4 (groups).
+type GitLabOIDCProviderConfig struct {
+	// APIV4Base overrides the default {issuer origin}/api/v4 (e.g. https://gitlab.com/api/v4 or self-managed).
+	APIV4Base string `mapstructure:"api_v4_base" json:"api_v4_base,omitempty"`
+	// AllowedGroupPaths, if non-empty, requires the user to belong to at least one group whose full_path equals a path
+	// or starts with path+"/" (GitLab group path, case-sensitive as on GitLab).
+	AllowedGroupPaths []string `mapstructure:"allowed_group_paths" json:"allowed_group_paths,omitempty"`
+	// GroupRoleBindings grant API roles when the user is a direct member of the given group full_path.
+	GroupRoleBindings []GitLabGroupRoleBinding `mapstructure:"group_role_bindings" json:"group_role_bindings,omitempty"`
+}
+
+// GitLabGroupRoleBinding maps membership in a GitLab group (full_path) to API Server role strings.
+type GitLabGroupRoleBinding struct {
+	GroupFullPath string   `mapstructure:"group_full_path" json:"group_full_path"`
+	Roles           []string `mapstructure:"roles" json:"roles,omitempty"`
+}
+
 // IsGitHubOIDCProvider reports whether this entry uses GitHub-specific org/team handling.
 func (p OIDCProviderConfig) IsGitHubOIDCProvider() bool {
 	return strings.EqualFold(strings.TrimSpace(p.Kind), "github")
+}
+
+// IsGitLabOIDCProvider reports whether this entry uses GitLab-specific group handling.
+func (p OIDCProviderConfig) IsGitLabOIDCProvider() bool {
+	return strings.EqualFold(strings.TrimSpace(p.Kind), "gitlab")
+}
+
+// GitLabAPIV4BaseFromIssuer returns {scheme}://{host}/api/v4 for a GitLab OIDC issuer (no path after host).
+func GitLabAPIV4BaseFromIssuer(issuer string) (string, error) {
+	u, err := url.Parse(strings.TrimSpace(issuer))
+	if err != nil || u.Host == "" || u.Scheme == "" {
+		return "", fmt.Errorf("invalid gitlab issuer URL")
+	}
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return "", fmt.Errorf("gitlab issuer must use http or https")
+	}
+	u.Path = ""
+	u.RawQuery = ""
+	u.Fragment = ""
+	return strings.TrimSuffix(u.String(), "/") + "/api/v4", nil
 }
 
 // AuthConfig controls auth-related etcd keys and dev-only bootstrap (roadmap п. 20).
@@ -115,8 +155,17 @@ func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
 	k := strings.ToLower(strings.TrimSpace(p.Kind))
 	switch k {
 	case "", "generic":
+		if p.GitHub != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: set kind: github when using github block", id)
+		}
+		if p.GitLab != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: set kind: gitlab when using gitlab block", id)
+		}
 		return nil
 	case "github":
+		if p.GitLab != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=github must not set gitlab block", id)
+		}
 		if strings.TrimSuffix(strings.TrimSpace(p.Issuer), "/") != GitHubOIDCDiscoveryIssuer {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=github requires issuer %q (documented id_token iss is still https://github.com)", id, GitHubOIDCDiscoveryIssuer)
 		}
@@ -146,8 +195,43 @@ func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
 			}
 		}
 		return nil
+	case "gitlab":
+		if p.GitHub != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=gitlab must not set github block", id)
+		}
+		if _, err := GitLabAPIV4BaseFromIssuer(p.Issuer); err != nil {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=gitlab requires a valid issuer URL (e.g. https://gitlab.com or self-managed origin): %w", id, err)
+		}
+		gl := p.GitLab
+		if gl == nil {
+			return nil
+		}
+		if b := strings.TrimSpace(gl.APIV4Base); b != "" {
+			if _, err := url.Parse(b); err != nil || !strings.HasPrefix(strings.ToLower(b), "http") {
+				return fmt.Errorf("auth.oidc_providers[%q].gitlab.api_v4_base: invalid URL", id)
+			}
+		}
+		for j, path := range gl.AllowedGroupPaths {
+			if strings.TrimSpace(path) == "" {
+				return fmt.Errorf("auth.oidc_providers[%q].gitlab.allowed_group_paths[%d]: empty entry", id, j)
+			}
+		}
+		for j, b := range gl.GroupRoleBindings {
+			if strings.TrimSpace(b.GroupFullPath) == "" {
+				return fmt.Errorf("auth.oidc_providers[%q].gitlab.group_role_bindings[%d]: group_full_path is required", id, j)
+			}
+			if len(b.Roles) == 0 {
+				return fmt.Errorf("auth.oidc_providers[%q].gitlab.group_role_bindings[%d]: roles must be non-empty", id, j)
+			}
+			for ri, role := range b.Roles {
+				if strings.TrimSpace(role) == "" {
+					return fmt.Errorf("auth.oidc_providers[%q].gitlab.group_role_bindings[%d].roles[%d]: empty role", id, j, ri)
+				}
+			}
+		}
+		return nil
 	default:
-		return fmt.Errorf("auth.oidc_providers[%q]: unknown kind %q (supported: generic, github)", id, strings.TrimSpace(p.Kind))
+		return fmt.Errorf("auth.oidc_providers[%q]: unknown kind %q (supported: generic, github, gitlab)", id, strings.TrimSpace(p.Kind))
 	}
 }
 

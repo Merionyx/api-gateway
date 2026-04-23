@@ -60,4 +60,7 @@ var (
 
 	// ErrGitHubLoginDenied means the user failed GitHub org/team policy at callback (HTTP 403).
 	ErrGitHubLoginDenied = errors.New("github login denied by org or team policy")
+
+	// ErrGitLabLoginDenied means the user failed GitLab group policy at callback (HTTP 403).
+	ErrGitLabLoginDenied = errors.New("gitlab login denied by group policy")
 )

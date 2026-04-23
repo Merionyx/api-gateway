@@ -73,6 +73,17 @@ auth:
   #       allowed_org_logins: ["my-org"]
   #       team_role_bindings:
   #         - { org: "my-org", team_slug: "admins", roles: ["api:admin"] }
+  # GitLab (roadmap ш.36): docs/idp/gitlab/README.md — issuer = https://gitlab.com or self-managed origin; kind: gitlab
+  #   - id: "gitlab"
+  #     kind: "gitlab"
+  #     issuer: "https://gitlab.com"
+  #     client_id: "…"
+  #     client_secret: "…"
+  #     redirect_uri_allowlist: ["http://127.0.0.1:21987/callback"]
+  #     gitlab:
+  #       allowed_group_paths: ["my-root-group"]
+  #       group_role_bindings:
+  #         - { group_full_path: "my-root-group/admins", roles: ["api:admin"] }
 
 # OpenTelemetry: optional; can be overridden (e.g. TELEMETRY_ENABLED) via environment.
 # telemetry:

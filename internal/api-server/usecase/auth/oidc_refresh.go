@@ -350,6 +350,8 @@ func MapRefreshError(err error) (status int, code, detail string) {
 		return http.StatusUnauthorized, "OIDC_ID_TOKEN_INVALID", "IdP id_token validation failed after refresh."
 	case errors.Is(err, apierrors.ErrGitHubLoginDenied):
 		return http.StatusForbidden, "GITHUB_LOGIN_DENIED", "GitHub user no longer satisfies organization policy for this provider."
+	case errors.Is(err, apierrors.ErrGitLabLoginDenied):
+		return http.StatusForbidden, "GITLAB_LOGIN_DENIED", "GitLab user no longer satisfies group policy for this provider."
 	case errors.Is(err, apierrors.ErrNoActiveSigningKey), errors.Is(err, apierrors.ErrUnsupportedSigningAlgorithm), errors.Is(err, apierrors.ErrSigningOperationFailed):
 		return http.StatusServiceUnavailable, "JWT_SIGNING_UNAVAILABLE", "Could not mint API access token."
 	case errors.Is(err, apierrors.ErrStoreAccess):
