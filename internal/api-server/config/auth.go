@@ -20,6 +20,35 @@ type OIDCProviderConfig struct {
 	RedirectURIAllowlist []string `mapstructure:"redirect_uri_allowlist" json:"redirect_uri_allowlist"`
 	// ExtraScopes are appended after "openid" (e.g. "email", "profile").
 	ExtraScopes []string `mapstructure:"extra_scopes" json:"extra_scopes"`
+	// Kind selects IdP-specific behavior. Empty or "generic" keeps standard OIDC only. "github" enables org/team checks (roadmap ш. 35).
+	Kind string `mapstructure:"kind" json:"kind,omitempty"`
+	// GitHub is read when Kind is "github" (allowed orgs, team→role bindings). Optional; nil means no extra restrictions beyond GitHub OAuth.
+	GitHub *GitHubOIDCProviderConfig `mapstructure:"github" json:"github,omitempty"`
+}
+
+// GitHubOIDCProviderConfig restricts or enriches interactive login via GitHub REST (orgs, teams).
+type GitHubOIDCProviderConfig struct {
+	// RESTAPIBase overrides https://api.github.com (GitHub Enterprise Server: https://HOST/api/v3).
+	RESTAPIBase string `mapstructure:"rest_api_base" json:"rest_api_base,omitempty"`
+	// AllowedOrgLogins, if non-empty, requires the user to be a member of at least one listed organization (login names, case-insensitive).
+	AllowedOrgLogins []string `mapstructure:"allowed_org_logins" json:"allowed_org_logins,omitempty"`
+	// TeamRoleBindings grant API roles when the user belongs to org/team_slug on GitHub (requires read:org; added automatically for kind=github).
+	TeamRoleBindings []GitHubTeamRoleBinding `mapstructure:"team_role_bindings" json:"team_role_bindings,omitempty"`
+}
+
+// GitHubTeamRoleBinding maps GitHub org membership in a team to API Server role strings.
+type GitHubTeamRoleBinding struct {
+	Org      string   `mapstructure:"org" json:"org"`
+	TeamSlug string   `mapstructure:"team_slug" json:"team_slug"`
+	Roles    []string `mapstructure:"roles" json:"roles,omitempty"`
+}
+
+// GitHubOIDCDiscoveryIssuer is the issuer URL used in FetchDiscovery for GitHub browser OAuth (openid-configuration lives under this path).
+const GitHubOIDCDiscoveryIssuer = "https://github.com/login/oauth"
+
+// IsGitHubOIDCProvider reports whether this entry uses GitHub-specific org/team handling.
+func (p OIDCProviderConfig) IsGitHubOIDCProvider() bool {
+	return strings.EqualFold(strings.TrimSpace(p.Kind), "github")
 }
 
 // AuthConfig controls auth-related etcd keys and dev-only bootstrap (roadmap п. 20).
@@ -75,8 +104,51 @@ func ValidateOIDCProviders(providers []OIDCProviderConfig) error {
 		if len(p.RedirectURIAllowlist) == 0 {
 			return fmt.Errorf("auth.oidc_providers[%q]: redirect_uri_allowlist must be non-empty", id)
 		}
+		if err := validateOIDCProviderKind(id, p); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
+	k := strings.ToLower(strings.TrimSpace(p.Kind))
+	switch k {
+	case "", "generic":
+		return nil
+	case "github":
+		if strings.TrimSuffix(strings.TrimSpace(p.Issuer), "/") != GitHubOIDCDiscoveryIssuer {
+			return fmt.Errorf("auth.oidc_providers[%q]: kind=github requires issuer %q (documented id_token iss is still https://github.com)", id, GitHubOIDCDiscoveryIssuer)
+		}
+		g := p.GitHub
+		if g == nil {
+			return nil
+		}
+		for j, org := range g.AllowedOrgLogins {
+			if strings.TrimSpace(org) == "" {
+				return fmt.Errorf("auth.oidc_providers[%q].github.allowed_org_logins[%d]: empty entry", id, j)
+			}
+		}
+		for j, b := range g.TeamRoleBindings {
+			if strings.TrimSpace(b.Org) == "" {
+				return fmt.Errorf("auth.oidc_providers[%q].github.team_role_bindings[%d]: org is required", id, j)
+			}
+			if strings.TrimSpace(b.TeamSlug) == "" {
+				return fmt.Errorf("auth.oidc_providers[%q].github.team_role_bindings[%d]: team_slug is required", id, j)
+			}
+			if len(b.Roles) == 0 {
+				return fmt.Errorf("auth.oidc_providers[%q].github.team_role_bindings[%d]: roles must be non-empty", id, j)
+			}
+			for ri, role := range b.Roles {
+				if strings.TrimSpace(role) == "" {
+					return fmt.Errorf("auth.oidc_providers[%q].github.team_role_bindings[%d].roles[%d]: empty role", id, j, ri)
+				}
+			}
+		}
+		return nil
+	default:
+		return fmt.Errorf("auth.oidc_providers[%q]: unknown kind %q (supported: generic, github)", id, strings.TrimSpace(p.Kind))
+	}
 }
 
 // BootstrapAPIKeyAllowed reports whether the insecure bootstrap path may run (roadmap step 10).

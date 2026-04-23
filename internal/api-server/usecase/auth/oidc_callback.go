@@ -18,7 +18,6 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/auth/idpcache"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/kvvalue"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/oidc"
-	apiroles "github.com/merionyx/api-gateway/internal/api-server/auth/roles"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/sessioncrypto"
 	"github.com/merionyx/api-gateway/internal/api-server/config"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
@@ -171,7 +170,7 @@ func (u *OIDCCallbackUseCase) Complete(ctx context.Context, code, state string) 
 		return out, err
 	}
 
-	snap, err := initialClaimsSnapshotJSON(idClaims)
+	snap, err := claimsSnapshotFromProvider(ctx, p, idClaims, strings.TrimSpace(tr.AccessToken), u.hc)
 	if err != nil {
 		return out, err
 	}
@@ -224,22 +223,6 @@ func interactiveSubject(mc jwt.MapClaims) string {
 	return ""
 }
 
-func initialClaimsSnapshotJSON(mc jwt.MapClaims) (json.RawMessage, error) {
-	m := map[string]any{
-		"roles": []string{apiroles.APIMember},
-	}
-	for _, k := range []string{"sub", "email", "name", "preferred_username"} {
-		if v, ok := mc[k]; ok {
-			m[k] = v
-		}
-	}
-	b, err := json.Marshal(m)
-	if err != nil {
-		return nil, err
-	}
-	return b, nil
-}
-
 // MapCallbackError maps Complete errors to HTTP status and stable problem codes.
 func MapCallbackError(err error) (status int, code, detail string) {
 	switch {
@@ -259,6 +242,8 @@ func MapCallbackError(err error) (status int, code, detail string) {
 		return 401, "OIDC_TOKEN_EXCHANGE_FAILED", "Authorization code could not be exchanged (invalid or reused code)."
 	case errors.Is(err, oidc.ErrIDTokenValidation):
 		return 401, "OIDC_ID_TOKEN_INVALID", "IdP id_token validation failed."
+	case errors.Is(err, apierrors.ErrGitHubLoginDenied):
+		return 403, "GITHUB_LOGIN_DENIED", "GitHub user does not satisfy allowed organization membership for this provider."
 	case errors.Is(err, apierrors.ErrNoActiveSigningKey), errors.Is(err, apierrors.ErrUnsupportedSigningAlgorithm), errors.Is(err, apierrors.ErrSigningOperationFailed):
 		return 503, "JWT_SIGNING_UNAVAILABLE", "Could not mint API access token."
 	case errors.Is(err, apierrors.ErrStoreAccess):

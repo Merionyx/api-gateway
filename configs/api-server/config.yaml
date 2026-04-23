@@ -62,6 +62,17 @@ auth:
   #     redirect_uri_allowlist:
   #       - "http://127.0.0.1:8080/api/v1/auth/callback"
   #     extra_scopes: ["email"]
+  # GitHub (roadmap ш.35): docs/idp/github/README.md — issuer must be https://github.com/login/oauth ; kind: github
+  #   - id: "github"
+  #     kind: "github"
+  #     issuer: "https://github.com/login/oauth"
+  #     client_id: "…"
+  #     client_secret: "…"
+  #     redirect_uri_allowlist: ["http://127.0.0.1:21987/callback"]
+  #     github:
+  #       allowed_org_logins: ["my-org"]
+  #       team_role_bindings:
+  #         - { org: "my-org", team_slug: "admins", roles: ["api:admin"] }
 
 # OpenTelemetry: optional; can be overridden (e.g. TELEMETRY_ENABLED) via environment.
 # telemetry:

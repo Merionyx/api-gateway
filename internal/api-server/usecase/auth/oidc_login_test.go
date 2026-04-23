@@ -54,4 +54,12 @@ func TestBuildOIDCScope(t *testing.T) {
 	if s2 != "openid" {
 		t.Fatalf("got %q", s2)
 	}
+	s3 := buildOIDCScope(config.OIDCProviderConfig{Kind: "github"})
+	if s3 != "openid read:org" {
+		t.Fatalf("github scopes got %q", s3)
+	}
+	s4 := buildOIDCScope(config.OIDCProviderConfig{Kind: "GitHub", ExtraScopes: []string{"read:org", "read:user"}})
+	if s4 != "openid read:org read:user" {
+		t.Fatalf("github scopes with extras got %q", s4)
+	}
 }

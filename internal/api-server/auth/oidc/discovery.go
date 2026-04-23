@@ -50,8 +50,27 @@ func FetchDiscovery(ctx context.Context, hc *http.Client, issuerBase string) (*D
 	if err := json.Unmarshal(body, &d); err != nil {
 		return nil, fmt.Errorf("%w: json: %w", ErrDiscovery, err)
 	}
+	patchWellKnownIncomplete(&d)
 	if d.Issuer == "" || d.TokenEndpoint == "" || d.JWKSURI == "" {
 		return nil, fmt.Errorf("%w: missing required fields", ErrDiscovery)
 	}
 	return &d, nil
+}
+
+// patchWellKnownIncomplete fills endpoints some providers omit from openid-configuration.
+// GitHub documents issuer "https://github.com" but serves metadata under /login/oauth and
+// does not include authorization_endpoint / token_endpoint in that JSON.
+func patchWellKnownIncomplete(d *Discovery) {
+	if d == nil {
+		return
+	}
+	if d.Issuer != "https://github.com" || d.JWKSURI == "" {
+		return
+	}
+	if d.AuthorizationEndpoint == "" {
+		d.AuthorizationEndpoint = "https://github.com/login/oauth/authorize"
+	}
+	if d.TokenEndpoint == "" {
+		d.TokenEndpoint = "https://github.com/login/oauth/access_token"
+	}
 }

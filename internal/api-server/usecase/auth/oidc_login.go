@@ -132,13 +132,28 @@ func (u *OIDCLoginUseCase) Start(ctx context.Context, providerID, redirectURI, n
 
 func buildOIDCScope(p config.OIDCProviderConfig) string {
 	parts := []string{"openid"}
-	for _, s := range p.ExtraScopes {
+	extra := append([]string(nil), p.ExtraScopes...)
+	if p.IsGitHubOIDCProvider() && !scopeInListCI(extra, "read:org") {
+		extra = append(extra, "read:org")
+	}
+	for _, s := range extra {
 		s = strings.TrimSpace(s)
-		if s != "" {
-			parts = append(parts, s)
+		if s == "" || scopeInListCI(parts, s) {
+			continue
 		}
+		parts = append(parts, s)
 	}
 	return strings.Join(parts, " ")
+}
+
+func scopeInListCI(list []string, s string) bool {
+	want := strings.TrimSpace(strings.ToLower(s))
+	for _, x := range list {
+		if strings.TrimSpace(strings.ToLower(x)) == want {
+			return true
+		}
+	}
+	return false
 }
 
 func mergeAuthorizeQuery(authEndpoint string, add url.Values) (string, error) {

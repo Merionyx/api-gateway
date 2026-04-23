@@ -41,6 +41,8 @@ func ExchangeAuthorizationCode(ctx context.Context, hc *http.Client, tokenEndpoi
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	// GitHub returns x-www-form-urlencoded unless JSON is requested.
+	req.Header.Set("Accept", "application/json")
 
 	resp, err := hc.Do(req)
 	if err != nil {
@@ -85,6 +87,7 @@ func ExchangeRefreshToken(ctx context.Context, hc *http.Client, tokenEndpoint, c
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
 
 	resp, err := hc.Do(req)
 	if err != nil {

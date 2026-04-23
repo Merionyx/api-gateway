@@ -57,4 +57,7 @@ var (
 
 	// ErrSessionAuthFailed means invalid or unknown refresh / session (HTTP 401).
 	ErrSessionAuthFailed = errors.New("session authentication failed")
+
+	// ErrGitHubLoginDenied means the user failed GitHub org/team policy at callback (HTTP 403).
+	ErrGitHubLoginDenied = errors.New("github login denied by org or team policy")
 )
