@@ -1,0 +1,240 @@
+# Publishes merionyx/api-gateway-ctl in two flavors:
+#   (default)  :latest, :v1.2.3, …  — target slim  (distroless)
+#   (suffix)   :latest-ci, :v1.2.3-ci — target ci  (Alpine + git, openssh, jq, …)
+# Also mirrors to ghcr.io/merionyx/api-gateway-ctl
+name: Publish agwctl Docker image (multi-arch)
+
+permissions:
+  contents: read
+  packages: write
+  attestations: write
+  id-token: write
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Docker image tag (latest, v1.0.0, …)
+        required: false
+        type: string
+        default: latest
+      checkout_ref:
+        description: Git ref to build (e.g. SHA or tag)
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Image tag
+        required: false
+        default: latest
+        type: string
+      checkout_ref:
+        description: Git ref to build (empty = SHA of default branch for manual run)
+        required: false
+        type: string
+        default: ''
+
+env:
+  IMAGE: merionyx/api-gateway-ctl
+  GHCR_IMAGE: ghcr.io/merionyx/api-gateway-ctl
+
+jobs:
+  build:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: slim
+          platform: linux/amd64
+          arch: amd64
+          runner: ubuntu-latest
+        - target: slim
+          platform: linux/arm64
+          arch: arm64
+          runner: ubuntu-24.04-arm
+        - target: ci
+          platform: linux/amd64
+          arch: amd64
+          runner: ubuntu-latest
+        - target: ci
+          platform: linux/arm64
+          arch: arm64
+          runner: ubuntu-24.04-arm
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        # Caller passes ref; local dispatch with empty field falls back to the triggering ref / SHA
+        ref: ${{ inputs.checkout_ref != '' && inputs.checkout_ref || github.sha }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
+
+    - name: Metadata
+      id: vmeta
+      run: |
+        if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
+          R="${{ github.event.inputs.version }}"
+        else
+          R="${{ inputs.version }}"
+        fi
+        if [ -z "$R" ]; then R=latest; fi
+        echo "version=${R}" >> "$GITHUB_OUTPUT"
+        S=$(echo "${{ github.sha }}" | cut -c1-7)
+        echo "commit=${S}" >> "$GITHUB_OUTPUT"
+        echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+      env:
+        GITHUB_EVENT_NAME: ${{ github.event_name }}
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v4
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Build and push (by digest)
+      id: build
+      uses: docker/build-push-action@v7
+      with:
+        context: .
+        file: build/release/Dockerfile.agwctl
+        target: ${{ matrix.target }}
+        build-args: |
+          GIT_REVISION=${{ steps.vmeta.outputs.commit }}
+          BUILD_TIME=${{ steps.vmeta.outputs.build_time }}
+          RELEASE_VERSION=${{ steps.vmeta.outputs.version }}
+        platforms: ${{ matrix.platform }}
+        provenance: mode=max
+        sbom: true
+        outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,push=true
+        cache-from: type=gha,scope=agwctl-${{ matrix.target }}-${{ matrix.arch }}
+        cache-to: type=gha,scope=agwctl-${{ matrix.target }}-${{ matrix.arch }},mode=max
+
+    - name: Write digest file
+      run: echo "${{ steps.build.outputs.digest }}" > "${{ matrix.target }}-${{ matrix.arch }}.txt"
+
+    - name: Upload digest
+      uses: actions/upload-artifact@v7
+      with:
+        name: digest-agwctl-${{ matrix.target }}-${{ matrix.arch }}
+        path: ${{ matrix.target }}-${{ matrix.arch }}.txt
+        if-no-files-found: error
+
+  merge:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download digests
+      uses: actions/download-artifact@v7
+      with:
+        pattern: digest-agwctl-*
+        path: digests
+        merge-multiple: true
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v4
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Resolve version tag
+      id: tag
+      run: |
+        if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
+          V="${{ github.event.inputs.version }}"
+        else
+          V="${{ inputs.version }}"
+        fi
+        if [ -z "$V" ]; then V=latest; fi
+        echo "version=${V}" >> "$GITHUB_OUTPUT"
+        echo "ci_tag=${V}-ci" >> "$GITHUB_OUTPUT"
+      env:
+        GITHUB_EVENT_NAME: ${{ github.event_name }}
+
+    - name: Create multi-arch manifest (slim)
+      run: |
+        set -euo pipefail
+        amd_file=$(find digests -name 'slim-amd64.txt' -print -quit)
+        arm_file=$(find digests -name 'slim-arm64.txt' -print -quit)
+        AMD=$(tr -d '\n' < "${amd_file}")
+        ARM=$(tr -d '\n' < "${arm_file}")
+        docker buildx imagetools create \
+          -t "docker.io/${{ env.IMAGE }}:${{ steps.tag.outputs.version }}" \
+          "docker.io/${{ env.IMAGE }}@${AMD}" \
+          "docker.io/${{ env.IMAGE }}@${ARM}"
+
+    - name: Create multi-arch manifest (ci)
+      run: |
+        set -euo pipefail
+        amd_file=$(find digests -name 'ci-amd64.txt' -print -quit)
+        arm_file=$(find digests -name 'ci-arm64.txt' -print -quit)
+        AMD=$(tr -d '\n' < "${amd_file}")
+        ARM=$(tr -d '\n' < "${arm_file}")
+        docker buildx imagetools create \
+          -t "docker.io/${{ env.IMAGE }}:${{ steps.tag.outputs.ci_tag }}" \
+          "docker.io/${{ env.IMAGE }}@${AMD}" \
+          "docker.io/${{ env.IMAGE }}@${ARM}"
+
+    - name: Install crane
+      env:
+        CRANE_VERSION: v0.20.3
+      run: |
+        curl -fsSL "https://github.com/google/go-containerregistry/releases/download/${CRANE_VERSION}/go-containerregistry_Linux_x86_64.tar.gz" -o /tmp/crane.tgz
+        tar -xzf /tmp/crane.tgz -C /tmp
+        sudo mv /tmp/crane /usr/local/bin/
+
+    - name: Mirror to GHCR
+      run: |
+        V="${{ steps.tag.outputs.version }}"
+        CIT="${{ steps.tag.outputs.ci_tag }}"
+        crane copy "docker.io/${{ env.IMAGE }}:${V}" "${{ env.GHCR_IMAGE }}:${V}"
+        crane copy "docker.io/${{ env.IMAGE }}:${CIT}" "${{ env.GHCR_IMAGE }}:${CIT}"
+
+    - name: Resolve digest (slim) for attestation
+      id: d-slim
+      run: echo "digest=$(crane digest "docker.io/${{ env.IMAGE }}:${{ steps.tag.outputs.version }}")" >> "$GITHUB_OUTPUT"
+
+    - name: Resolve digest (ci) for attestation
+      id: d-ci
+      run: echo "digest=$(crane digest "docker.io/${{ env.IMAGE }}:${{ steps.tag.outputs.ci_tag }}")" >> "$GITHUB_OUTPUT"
+
+    - name: Attest (Docker Hub — slim)
+      uses: actions/attest-build-provenance@v2
+      with:
+        subject-name: index.docker.io/${{ env.IMAGE }}
+        subject-digest: ${{ steps.d-slim.outputs.digest }}
+        push-to-registry: true
+
+    - name: Attest (GHCR — slim)
+      uses: actions/attest-build-provenance@v2
+      with:
+        subject-name: ghcr.io/merionyx/api-gateway-ctl
+        subject-digest: ${{ steps.d-slim.outputs.digest }}
+        push-to-registry: true
+
+    - name: Attest (Docker Hub — ci)
+      uses: actions/attest-build-provenance@v2
+      with:
+        subject-name: index.docker.io/${{ env.IMAGE }}
+        subject-digest: ${{ steps.d-ci.outputs.digest }}
+        push-to-registry: true
+
+    - name: Attest (GHCR — ci)
+      uses: actions/attest-build-provenance@v2
+      with:
+        subject-name: ghcr.io/merionyx/api-gateway-ctl
+        subject-digest: ${{ steps.d-ci.outputs.digest }}
+        push-to-registry: true

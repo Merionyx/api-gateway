@@ -1,4 +1,4 @@
-.PHONY: build build-cli test test-unit test-coverage test-coverage-ci test-integration clean tidy deps fmt lint docker-build docker-push docker-up docker-down docker-up-dev docker-down-dev docker-up-dev-ha docker-down-dev-ha help proto-generate proto-install proto-lint proto-breaking generate-etcd-certs generate-ed25519-key generate-rsa-key controller-gen-bin generate-crds
+.PHONY: build build-cli test test-unit test-coverage test-coverage-ci test-integration clean tidy deps fmt lint docker-build docker-build-agwctl docker-push docker-up docker-down docker-up-dev docker-down-dev docker-up-dev-ha docker-down-dev-ha help proto-generate proto-install proto-lint proto-breaking generate-etcd-certs generate-ed25519-key generate-rsa-key controller-gen-bin generate-crds
 
 # Variables
 BUILD_DIR=./bin
@@ -21,6 +21,10 @@ build: ## Build binary
 	CGO_ENABLED=0 go build -a -installsuffix cgo -o $(BUILD_DIR)/controller cmd/controller/main.go
 	CGO_ENABLED=0 go build -a -installsuffix cgo -o $(BUILD_DIR)/contract-syncer cmd/contract-syncer/main.go
 	CGO_ENABLED=0 go build -a -installsuffix cgo -o $(BUILD_DIR)/mock-service cmd/mock-service/main.go
+
+docker-build-agwctl: ## Build agwctl images locally (set DOCKER_TAG, default latest)
+	@DOCKER_BUILDKIT=1 docker build --target slim -f build/release/Dockerfile.agwctl -t $(DOCKER_REPO)/api-gateway-ctl:$(DOCKER_TAG) --build-arg RELEASE_VERSION=$(RELEASE_VERSION) --build-arg GIT_REVISION=$(shell git rev-parse --short HEAD 2>/dev/null) --build-arg BUILD_TIME=$(BUILD_TIME) .
+	@DOCKER_BUILDKIT=1 docker build --target ci  -f build/release/Dockerfile.agwctl -t $(DOCKER_REPO)/api-gateway-ctl:$(DOCKER_TAG)-ci --build-arg RELEASE_VERSION=$(RELEASE_VERSION) --build-arg GIT_REVISION=$(shell git rev-parse --short HEAD 2>/dev/null) --build-arg BUILD_TIME=$(BUILD_TIME) .
 
 build-cli: ## Build agwctl CLI (embeds git tag/rev/time via -ldflags when git available)
 	mkdir -p $(BUILD_DIR)

@@ -82,3 +82,10 @@ jobs:
       checkout_ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || inputs.checkout_ref }}
       version: ${{ inputs.version || 'latest' }}
     secrets: inherit
+
+  agwctl:
+    uses: ./.github/workflows/docker-publish-agwctl.yml
+    with:
+      checkout_ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || inputs.checkout_ref }}
+      version: ${{ inputs.version || 'latest' }}
+    secrets: inherit
