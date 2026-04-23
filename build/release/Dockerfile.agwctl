@@ -1,0 +1,79 @@
+# agwctl (CLI) — two runtime targets:
+#   slim  — [gcr.io/distroless/static] static binary only (~min attack surface, default)
+#   ci    — [Alpine + toolkit] for pipelines that need git, ssh, etc.
+#
+# Build:
+#   docker build -f build/release/Dockerfile.agwctl --target slim -t merionyx/api-gateway-ctl:local .
+#   docker build -f build/release/Dockerfile.agwctl --target ci  -t merionyx/api-gateway-ctl:local-ci .
+
+FROM golang:1.26.2-alpine AS builder
+
+RUN apk add --no-cache git ca-certificates
+
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
+
+COPY cmd/agwctl/ cmd/agwctl/
+COPY internal/cli/ internal/cli/
+COPY internal/shared/ internal/shared/
+
+ARG TARGETOS=linux
+ARG TARGETARCH
+ARG GIT_REVISION=unknown
+ARG BUILD_TIME=unknown
+ARG RELEASE_VERSION=dev
+
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+  CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -o /out/agwctl -ldflags "-s -w \
+  -X 'github.com/merionyx/api-gateway/internal/cli/version.Version=${RELEASE_VERSION}' \
+  -X 'github.com/merionyx/api-gateway/internal/cli/version.Commit=${GIT_REVISION}' \
+  -X 'github.com/merionyx/api-gateway/internal/cli/version.BuildTime=${BUILD_TIME}'" \
+  ./cmd/agwctl
+
+FROM gcr.io/distroless/static-debian12:nonroot AS slim
+
+COPY --from=builder --chown=nonroot:nonroot /out/agwctl /agwctl
+
+USER nonroot:nonroot
+
+LABEL org.opencontainers.image.title="Merionyx API Gateway — agwctl (Alpine)" \
+      org.opencontainers.image.source="https://github.com/merionyx/api-gateway" \
+      org.opencontainers.image.url="https://github.com/merionyx/api-gateway" \
+      org.opencontainers.image.documentation="https://github.com/merionyx/api-gateway-control-plane#readme" \
+      org.opencontainers.image.vendor="Merionyx" \
+      org.opencontainers.image.logo="https://avatars.githubusercontent.com/u/208366109?s=512" \
+      com.docker.extension.icon="https://avatars.githubusercontent.com/u/208366109?s=512" \
+      dev.orbstack.icon="https://avatars.githubusercontent.com/u/208366109?s=512"
+
+ENTRYPOINT ["/agwctl"]
+
+FROM merionyx/alpine:3.23 AS ci
+
+USER root
+
+RUN apk add --no-cache \
+  bash \
+  ca-certificates \
+  coreutils \
+  curl \
+  findutils \
+  git \
+  jq \
+  openssh-client \
+  tini
+
+COPY --from=builder --chown=1001:1001 /out/agwctl /usr/local/bin/agwctl
+
+USER 1001:1001
+
+LABEL org.opencontainers.image.title="Merionyx API Gateway — agwctl (Alpine)" \
+      org.opencontainers.image.source="https://github.com/merionyx/api-gateway" \
+      org.opencontainers.image.url="https://github.com/merionyx/api-gateway" \
+      org.opencontainers.image.documentation="https://github.com/merionyx/api-gateway-control-plane#readme" \
+      org.opencontainers.image.vendor="Merionyx" \
+      org.opencontainers.image.logo="https://avatars.githubusercontent.com/u/208366109?s=512" \
+      com.docker.extension.icon="https://avatars.githubusercontent.com/u/208366109?s=512" \
+      dev.orbstack.icon="https://avatars.githubusercontent.com/u/208366109?s=512"
+
+ENTRYPOINT ["/sbin/tini", "-s", "--", "/usr/local/bin/agwctl"]
