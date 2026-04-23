@@ -12,6 +12,7 @@ import (
 	oapimw "github.com/oapi-codegen/fiber-middleware/v2"
 
 	"github.com/merionyx/api-gateway/internal/api-server/container"
+	httpxmw "github.com/merionyx/api-gateway/internal/api-server/delivery/http/middleware"
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
 	apimetrics "github.com/merionyx/api-gateway/internal/api-server/metrics"
 )
@@ -78,6 +79,7 @@ func setupRoutes(app *fiber.App, c *container.Container) error {
 
 	app.Use(httpTraceMiddleware())
 	app.Use(oapimw.OapiRequestValidator(swagger))
+	app.Use(httpxmw.APISecurity(c.JWTUseCase, c.APIKeyRepository))
 	apiserver.RegisterHandlers(app, NewOpenAPIServer(c))
 	return nil
 }

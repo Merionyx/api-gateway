@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: API Gateway — API Server HTTP API
-  version: 1.5.1
+  version: 1.5.2
   description: |
     HTTP API for the **API Server** control plane: authentication material (JWT, JWKS), contract export,
     registry views backed by **etcd** (controllers, tenants, bundles), and operational endpoints.
@@ -11,6 +11,8 @@ info:
 
     **JSON naming:** request and response bodies use **snake_case** field names unless noted.
 
+    **v1.5.2:** HTTP **APISecurity** middleware (roadmap step 20): deny-by-default on secured routes; API-profile Bearer JWT and/or `X-API-Key`.
+
     **v1.5.1 (roadmap step 13):** optional `nonce` query on **`GET /api/v1/auth/login`** (stored with the login-intent for callback **ш. 14**).
 
     **v1.5.0 (roadmap step 5):** removes deprecated `POST /api/v1/tokens`; **Edge** issuance is **`POST /api/v1/tokens/edge`**
@@ -18,8 +20,8 @@ info:
 
     **v1.4.0 (roadmap step 4 — OpenAPI draft):** per-operation `security` (public vs `bearerAuth` **or** `apiKey`);
     split **Edge** vs **API** JWKS and token issuance paths; OIDC **login** / **callback** / **refresh** (draft contracts —
-    handlers land in roadmap steps 13–14, 17–18). Existing HTTP handlers may still ignore `Authorization` until the
-    deny-by-default middleware (**roadmap step 20**); the spec documents the target contract.
+    handlers land in roadmap steps 13–14, 17–18). **Step 20 (implemented):** Fiber middleware `APISecurity` enforces
+    API-profile `Authorization: Bearer` and/or `X-API-Key` on all routes except those marked public in the spec.
 
     **v1.1.0** added optional `config_source` on static bundles, `sources_fingerprint` and `effective_generation` on
     environments. **v1.2.0** added `environment_config_source`, `services` (static upstreams with per-line
