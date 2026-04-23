@@ -180,6 +180,8 @@ data:
 
     jwt:
       jwks_url: "http://gateway-api-server:8080/.well-known/jwks-edge.json"
+      expected_issuer: "api-gateway-edge"
+      expected_audience: "api-gateway-edge-http"
 
     # ext_authz remains plaintext: cluster to sidecar is set via xDS without TLS in this repository.
     grpc_ext_authz:

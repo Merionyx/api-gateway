@@ -8,3 +8,4 @@ controller:
 
 jwt:
   jwks_url: "http://gateway-ha-lb:8080/.well-known/jwks-edge.json"
+  # expected_issuer / expected_audience: defaults api-gateway-edge / api-gateway-edge-http (API Server jwt.edge_*).

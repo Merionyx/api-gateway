@@ -82,6 +82,9 @@ connectivity:
   controllerGrpcAddress: ""
   controllerServerName: ""
   jwksUrl: ""
+  # Must match API Server jwt.edge_issuer / jwt.edge_audience when validating Edge JWT at ext_authz.
+  edgeExpectedIssuer: ""
+  edgeExpectedAudience: ""
   environment: ""
   tenant: cluster-default
   xdsHost: ""

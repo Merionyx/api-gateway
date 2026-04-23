@@ -102,6 +102,8 @@ controller:
   environment: {{ .Values.connectivity.environment | quote }}
 jwt:
   jwks_url: {{ .Values.connectivity.jwksUrl | quote }}
+  expected_issuer: {{ .Values.connectivity.edgeExpectedIssuer | default "api-gateway-edge" | quote }}
+  expected_audience: {{ .Values.connectivity.edgeExpectedAudience | default "api-gateway-edge-http" | quote }}
 grpc_ext_authz:
   tls:
     enabled: false
