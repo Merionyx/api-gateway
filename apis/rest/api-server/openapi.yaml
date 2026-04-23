@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: API Gateway — API Server HTTP API
-  version: 1.3.0
+  version: 1.4.0
   description: |
     HTTP API for the **API Server** control plane: authentication material (JWT, JWKS), contract export,
     registry views backed by **etcd** (controllers, tenants, bundles), and operational endpoints.
@@ -10,6 +10,11 @@ info:
     lifecycle is owned by the **Gateway Controller**; this API does not expose CRUD for environments.
 
     **JSON naming:** request and response bodies use **snake_case** field names unless noted.
+
+    **v1.4.0 (roadmap step 4 — OpenAPI draft):** per-operation `security` (public vs `bearerAuth` **or** `apiKey`);
+    split **Edge** vs **API** JWKS and token issuance paths; OIDC **login** / **callback** / **refresh** (draft contracts —
+    handlers land in roadmap steps 13–14, 17–18). Existing HTTP handlers may still ignore `Authorization` until the
+    deny-by-default middleware (**roadmap step 20**); the spec documents the target contract.
 
     **v1.1.0** added optional `config_source` on static bundles, `sources_fingerprint` and `effective_generation` on
     environments. **v1.2.0** added `environment_config_source`, `services` (static upstreams with per-line
@@ -37,6 +42,8 @@ tags:
   description: Liveness (`/health`), readiness (`/ready`), build metadata (`/api/v1/version`), and aggregate status (`/api/v1/status`)
 - name: Authentication
   description: JWT issuance, JWKS, signing keys
+- name: OIDC
+  description: Interactive OAuth2/OIDC login, callback, and refresh (draft)
 - name: Contracts
   description: Contract export from Git via Contract Syncer
 - name: Registry
@@ -46,8 +53,6 @@ tags:
 - name: Operations
   description: Sync and maintenance actions
 
-security: []
-
 components:
   securitySchemes:
     bearerAuth:
@@ -55,7 +60,13 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: |
-        Reserved for future use. The current API Server revision does not validate Bearer tokens on these routes.
+        **API profile** access JWT (`iss` / `aud` / `kid` for API Server HTTP routes). Not interchangeable with Edge tokens.
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        Opaque M2M / CI API key (never logged or returned after creation). Constant-time lookup server-side.
 
   parameters:
     Limit:
@@ -344,6 +355,59 @@ components:
         created_at:
           type: string
           format: date-time
+
+    AuthRefreshRequest:
+      type: object
+      required:
+      - refresh_token
+      properties:
+        refresh_token:
+          type: string
+          description: Our refresh token from the last login or refresh response (server must not log this value).
+
+    AuthSessionTokensResponse:
+      type: object
+      required:
+      - access_token
+      - refresh_token
+      properties:
+        access_token:
+          type: string
+          description: New **API profile** access JWT.
+        refresh_token:
+          type: string
+          description: Rotated our refresh token; clients must discard the previous pair.
+        token_type:
+          type: string
+          description: Token type for `access_token` (e.g. Bearer).
+          default: Bearer
+
+    IssueApiAccessTokenRequest:
+      type: object
+      description: |
+        Draft body for `POST /api/v1/tokens/api`. Final fields follow RBAC/CEL and M2M policy (**roadmap steps 22–23**).
+      properties:
+        requested_scopes:
+          type: array
+          items:
+            type: string
+          description: Optional hints; the server may ignore or narrow scopes.
+
+    IssueApiAccessTokenResponse:
+      type: object
+      required:
+      - access_token
+      - expires_at
+      properties:
+        access_token:
+          type: string
+          description: Short-lived **API profile** JWT for calling this HTTP API.
+        expires_at:
+          type: string
+          format: date-time
+        refresh_token:
+          type: string
+          description: Issued for interactive-style sessions when applicable (draft).
 
     ContractsExportRequest:
       type: object
@@ -775,12 +839,25 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
+    Unauthorized:
+      description: Authentication failed or credentials are missing.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Conflict:
+      description: Request conflicts with current state (e.g. lost etcd CAS / concurrent refresh).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
 
 paths:
   /health:
     get:
       tags: [ System ]
       operationId: getHealth
+      security: []
       summary: Liveness
       description: |
         **Liveness only:** returns `{ "status": "ok" }` when the process accepts HTTP — does **not** verify etcd or Contract Syncer.
@@ -799,6 +876,7 @@ paths:
     get:
       tags: [ System ]
       operationId: getReady
+      security: []
       summary: Readiness
       description: |
         **Readiness probe:** verifies **etcd** (required). **Contract Syncer** is included only when the server is configured
@@ -824,6 +902,7 @@ paths:
     get:
       tags: [ System ]
       operationId: getVersion
+      security: []
       summary: Build and API schema version
       description: |
         Returns git revision, build time, embedded OpenAPI `info.version`, and optional release tag — useful to see **which binary** answers in multi-replica setups.
@@ -841,9 +920,10 @@ paths:
     get:
       tags: [ Authentication ]
       operationId: getJwks
-      summary: JSON Web Key Set (JWKS)
+      security: []
+      summary: JSON Web Key Set (JWKS) — API profile
       description: |
-        Public keys for verifying JWTs issued by this API Server (`/.well-known/jwks.json`). Supports conditional requests via `ETag` / `If-None-Match` to avoid re-downloading when keys are unchanged.
+        Public keys for verifying **API profile** JWTs minted for HTTP calls to this API Server (`iss` / `aud` / `kid` for the API surface). Supports conditional requests via `ETag` / `If-None-Match`. **Not** for Edge / data-plane tokens — use `/.well-known/jwks-edge.json`.
       parameters:
       - $ref: '#/components/parameters/IfNoneMatch'
       responses:
@@ -863,10 +943,38 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /.well-known/jwks-edge.json:
+    get:
+      tags: [ Authentication ]
+      operationId: getJwksEdge
+      security: []
+      summary: JSON Web Key Set (JWKS) — Edge profile
+      description: |
+        Public keys for verifying **Edge profile** JWTs consumed by Envoy / ExtAuthz and data plane (**not** valid as `Authorization` on this HTTP API). Same caching semantics as the API JWKS.
+      parameters:
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: JWKS document (Edge signing keys)
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Jwks'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /api/v1/keys:
     get:
       tags: [ Authentication ]
       operationId: listSigningKeys
+      security: []
       summary: List JWT signing keys (metadata)
       description: |
         Returns metadata about configured signing keys (`kid`, algorithm, active flag, creation time). Does not expose private key material. Cache-friendly with `ETag` / `If-None-Match`.
@@ -891,13 +999,176 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /api/v1/auth/login:
+    get:
+      tags: [ OIDC ]
+      operationId: loginOidc
+      security: []
+      summary: Start OIDC login (redirect)
+      description: |
+        Draft: starts the browser OIDC authorization code + PKCE flow for a configured `provider_id`. The server responds with **302** to the IdP `authorization_endpoint` (Location), or returns **400** when parameters are invalid. `redirect_uri` must match operator allowlists (**roadmap / threat model**).
+      parameters:
+      - name: provider_id
+        in: query
+        required: true
+        description: Registered IdP configuration identifier.
+        schema:
+          type: string
+      - name: redirect_uri
+        in: query
+        required: true
+        description: Callback URL registered for this client (allowlisted server-side).
+        schema:
+          type: string
+          format: uri
+      responses:
+        '302':
+          description: Redirect to the IdP authorization endpoint.
+          headers:
+            Location:
+              description: IdP authorization URL including `state` and PKCE challenge.
+              schema:
+                type: string
+                format: uri
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/auth/callback:
+    get:
+      tags: [ OIDC ]
+      operationId: callbackOidc
+      security: []
+      summary: OIDC callback (authorization code exchange)
+      description: |
+        Draft: browser redirect target after IdP login. Exchanges `code` for tokens, runs first CEL mapping, establishes a server session, returns **200 JSON** with our `access_token` / `refresh_token` (**API profile only** in MVP).
+      parameters:
+      - name: code
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: state
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Session established; API-profile tokens returned as JSON (not Set-Cookie).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSessionTokensResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [ OIDC ]
+      operationId: refreshSession
+      security: []
+      summary: Refresh API session tokens
+      description: |
+        Draft: exchanges a valid our `refresh_token` for a new `access_token` / `refresh_token` pair. Implements **IdP up** (full CEL) and **IdP down / degraded** branches (see repo doc `docs/degraded-refresh-api-server.md`). Concurrent refresh conflicts return **409** (`application/problem+json`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRefreshRequest'
+      responses:
+        '200':
+          description: New token pair (normal or degraded refresh).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSessionTokensResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/tokens/edge:
+    post:
+      tags: [ Authentication ]
+      operationId: issueEdgeToken
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      summary: Issue Edge profile JWT (data plane / ExtAuthz)
+      description: |
+        Mints an **Edge profile** JWT (distinct `iss` / `aud` / JWKS from API tokens). Request/response mirror the legacy application token shape until DTOs are narrowed in **roadmap step 5**.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateTokenRequest'
+      responses:
+        '201':
+          description: Edge token created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateTokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/tokens/api:
+    post:
+      tags: [ Authentication ]
+      operationId: issueApiAccessToken
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      summary: Issue API profile access JWT
+      description: |
+        Mints a short-lived **API profile** JWT for calling this HTTP API. Draft body/response — stabilize in **roadmap step 5** together with codegen.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IssueApiAccessTokenRequest'
+      responses:
+        '201':
+          description: API access token created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssueApiAccessTokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /api/v1/tokens:
     post:
       tags: [ Authentication ]
       operationId: createToken
-      summary: Issue application JWT
+      security:
+        - bearerAuth: []
+        - apiKey: []
+      deprecated: true
+      summary: Issue application JWT (deprecated)
       description: |
-        Mints an application JWT bound to `app_id` and allowed `environments`. The raw token string is returned only in this response (`201`); store it securely. `expires_at` must be in the future.
+        **Deprecated in v1.4.0:** use `POST /api/v1/tokens/edge` for the same **Edge profile** issuance (or `POST /api/v1/tokens/api` for API-profile tokens). This path remains in the spec temporarily so generated clients can migrate (**roadmap step 5** removes it).
       requestBody:
         required: true
         content:
@@ -916,10 +1187,14 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+
   /api/v1/contracts/export:
     post:
       tags: [ Contracts ]
       operationId: exportContracts
+      security:
+        - bearerAuth: []
+        - apiKey: []
       summary: Export contract files from Git (via Contract Syncer)
       description: |
         Fetches contract YAML/JSON from a Git repository via the Contract Syncer service (not from etcd). Specify `repository` and `ref`; optionally narrow by `path` and/or a single `contract_name`. Response files carry base64-encoded content.
@@ -951,6 +1226,9 @@ paths:
     get:
       tags: [ Registry ]
       operationId: listControllers
+      security:
+        - bearerAuth: []
+        - apiKey: []
       summary: List registered controllers
       description: |
         Lists Gateway Controllers registered in etcd (`controller_id`, `tenant`, declared environments and static bundles). Paginated with `limit` / `cursor`. Use `If-None-Match` with the previous `ETag` to obtain `304` when nothing changed.
@@ -979,6 +1257,9 @@ paths:
     get:
       tags: [ Registry ]
       operationId: getController
+      security:
+        - bearerAuth: []
+        - apiKey: []
       summary: Get controller by ID
       description: |
         Returns one controller record by `controller_id`. Supports conditional GET via `If-None-Match` / `ETag`. `404` if the controller is unknown.
@@ -1006,6 +1287,9 @@ paths:
     get:
       tags: [ Registry ]
       operationId: getControllerHeartbeat
+      security:
+        - bearerAuth: []
+        - apiKey: []
       summary: Get last heartbeat for a controller
       description: |
         Returns the last heartbeat timestamp stored for the controller (operator visibility). Not the same payload as full controller registration; use when you only need freshness. `404` if the controller does not exist.
@@ -1033,6 +1317,9 @@ paths:
     get:
       tags: [ Registry ]
       operationId: listTenants
+      security:
+        - bearerAuth: []
+        - apiKey: []
       summary: List distinct tenants
       description: |
         Returns distinct `tenant` values observed across registered controllers. Cursor-paginated; combine with registry list endpoints to drill down.
@@ -1061,6 +1348,9 @@ paths:
     get:
       tags: [ Registry ]
       operationId: listControllersByTenant
+      security:
+        - bearerAuth: []
+        - apiKey: []
       summary: List controllers for a tenant
       description: |
         Lists controllers whose `tenant` path parameter matches. Same response shape as `GET /api/v1/controllers` but scoped to one tenant.
@@ -1090,6 +1380,9 @@ paths:
     get:
       tags: [ Registry ]
       operationId: listEnvironmentsByTenant
+      security:
+        - bearerAuth: []
+        - apiKey: []
       summary: Aggregated environments observed for a tenant (read-only snapshot)
       description: |
         Read-only aggregated view of environments (and their static bundles) as reported for this tenant. Environment lifecycle is owned by the Gateway Controller; this endpoint does not mutate configuration.
@@ -1119,6 +1412,9 @@ paths:
     get:
       tags: [ Registry ]
       operationId: listBundlesByTenant
+      security:
+        - bearerAuth: []
+        - apiKey: []
       summary: Static bundles aggregated across environments for a tenant
       description: |
         Flattens static bundle descriptors (`name`, `repository`, `ref`, `path`) across environments for the tenant. Useful for overview UIs; not a substitute for etcd bundle-key APIs.
@@ -1148,6 +1444,9 @@ paths:
     get:
       tags: [ Bundles ]
       operationId: listBundleKeys
+      security:
+        - bearerAuth: []
+        - apiKey: []
       summary: List bundles present in etcd
       description: |
         Lists bundles that exist under the API Server’s contract snapshot prefix in etcd (`repository`, `ref`, `path`, canonical `key`). Paginated; the `key` may require percent-encoding when used as path segments elsewhere.
@@ -1176,6 +1475,9 @@ paths:
     get:
       tags: [ Bundles ]
       operationId: listContractsInBundle
+      security:
+        - bearerAuth: []
+        - apiKey: []
       summary: List contract names for a bundle key
       description: |
         Returns logical contract names stored for the bundle in etcd. Identify the bundle either with
@@ -1213,6 +1515,9 @@ paths:
     get:
       tags: [ Bundles ]
       operationId: getContractInBundle
+      security:
+        - bearerAuth: []
+        - apiKey: []
       summary: Get a single contract document for a bundle
       description: |
         Returns one contract document from etcd-backed storage for the bundle (JSON object; YAML sources may be normalized to JSON). Identify the bundle with `bundle_key` **or** `repo` + `ref` (+ optional `path`) query parameters, same as `listContractsInBundle`. Supports `If-None-Match` for caching. `404` if the bundle or contract is missing.
@@ -1244,6 +1549,9 @@ paths:
     post:
       tags: [ Operations ]
       operationId: syncBundle
+      security:
+        - bearerAuth: []
+        - apiKey: []
       summary: Trigger contract bundle synchronization (Schemas / bundle sync pipeline)
       description: |
         Triggers synchronization of a contract bundle from Git into etcd (same conceptual fields as `SyncContractBundle`: `repository`, `ref`, `bundle`, optional `force`). Idempotent retries may send the same `Idempotency-Key`. `502` indicates upstream/sync pipeline failure.
@@ -1283,6 +1591,9 @@ paths:
     get:
       tags: [ System ]
       operationId: getStatus
+      security:
+        - bearerAuth: []
+        - apiKey: []
       summary: Dependency status for operators
       description: |
         Rich snapshot for dashboards and alerting (API Server self-check, etcd, Contract Syncer). **Not** a Kubernetes probe — use `GET /ready` for orchestrator readiness. Exact fields may evolve. Conditional GET via `ETag` / `If-None-Match`.
