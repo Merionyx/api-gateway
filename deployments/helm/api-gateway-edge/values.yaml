@@ -10,7 +10,7 @@ global:
 
 replicaCount: 1
 
-# OpenTelemetry; merged as top-level `telemetry` into the auth sidecar app config
+# OpenTelemetry; merged as top-level `telemetry` into the sidecar app config
 # (same keys as internal/shared/telemetry FileBlock). Overridden by `sidecar.telemetry`.
 telemetry:
   enabled: false
@@ -39,7 +39,7 @@ envoy:
   # OpenTelemetry (Envoy → OTLP gRPC). Independent sampling vs application `telemetry` — most knobs
   # live in the bootstrap (ConfigMap) so you can tune tracers, cluster, and optional `appendBootstrap`.
   # Set `enabled: true` and a collector (or `inheritCollectorFromTelemetry: true` with a parseable
-  # `telemetry.otlp_endpoint`). The auth sidecar can still use the same `telemetry` block to send
+  # `telemetry.otlp_endpoint`). The sidecar can still use the same `telemetry` block to send
   # to the same backend.
   tracing:
     enabled: false
@@ -74,7 +74,7 @@ sidecar:
   topologySpreadConstraints: []
   hostAliases: []
   config: {}
-  # Merged over global .telemetry for the auth sidecar only.
+  # Merged over global .telemetry for the sidecar only.
   telemetry: {}
 
 # Explicit connectivity (set to your control-plane Services / cross-cluster DNS)

@@ -102,7 +102,7 @@ func buildExtAuthzFilter() (*hcmv3.HttpFilter, error) {
 			GrpcService: &corev3.GrpcService{
 				TargetSpecifier: &corev3.GrpcService_EnvoyGrpc_{
 					EnvoyGrpc: &corev3.GrpcService_EnvoyGrpc{
-						ClusterName: "auth_sidecar",
+						ClusterName: "sidecar",
 					},
 				},
 				Timeout: durationpb.New(1 * time.Second),

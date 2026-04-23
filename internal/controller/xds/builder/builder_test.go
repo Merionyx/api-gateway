@@ -53,7 +53,7 @@ func TestXDSBuilder_BuildAll_RealisticEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(clusters) < 2 {
-		t.Fatalf("expected auth_sidecar + service clusters, got %d", len(clusters))
+		t.Fatalf("expected sidecar + service clusters, got %d", len(clusters))
 	}
 
 	routes, err := b.BuildRoutes(env)

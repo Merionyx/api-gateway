@@ -9,7 +9,7 @@ import (
 
 func main() {
 	if err := app.Run(); err != nil {
-		slog.Error("failed to run auth sidecar", "error", err)
+		slog.Error("failed to run sidecar", "error", err)
 		os.Exit(1)
 	}
 }

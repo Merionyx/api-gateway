@@ -65,7 +65,7 @@ func (c *SyncClient) Start(ctx context.Context) error {
 	c.conn = conn
 	c.client = authv1.NewAuthServiceClient(conn)
 
-	slog.Info("auth sidecar sync connected to controller", "address", c.config.Controller.Address)
+	slog.Info("sidecar sync connected to controller", "address", c.config.Controller.Address)
 
 	const (
 		initialBackoff = 5 * time.Second
@@ -81,7 +81,7 @@ func (c *SyncClient) Start(ctx context.Context) error {
 		}
 
 		if backoff > 0 {
-			slog.Info("auth sidecar sync reconnecting after backoff", "backoff", backoff)
+			slog.Info("sidecar sync reconnecting after backoff", "backoff", backoff)
 			if err := grpcutil.SleepOrDone(ctx, backoff); err != nil {
 				return err
 			}
@@ -91,7 +91,7 @@ func (c *SyncClient) Start(ctx context.Context) error {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
-			slog.Warn("auth sidecar sync error", "error", err)
+			slog.Warn("sidecar sync error", "error", err)
 			authmetrics.RecordControllerReconnect(c.config.MetricsHTTP.Enabled)
 			backoff = grpcutil.NextReconnectBackoff(backoff, initialBackoff, maxBackoff)
 		}
@@ -123,7 +123,7 @@ func (c *SyncClient) syncLoop(ctx context.Context) (err error) {
 
 	authmetrics.RecordControllerStreamOpen(en)
 	c.setConnected(true)
-	slog.Info("auth sidecar sync stream started", "environment", c.config.Controller.Environment)
+	slog.Info("sidecar sync stream started", "environment", c.config.Controller.Environment)
 
 	// Listen for updates from the Controller
 	for {
@@ -141,14 +141,14 @@ func (c *SyncClient) syncLoop(ctx context.Context) (err error) {
 		switch msg := resp.Message.(type) {
 		case *authv1.SyncAccessResponse_InitialConfig:
 			// Initial configuration
-			slog.Info("auth sidecar sync received initial config", "contracts", len(msg.InitialConfig.Contracts))
+			slog.Info("sidecar sync received initial config", "contracts", len(msg.InitialConfig.Contracts))
 			c.storage.SetAccessConfig(msg.InitialConfig)
 			authmetrics.RecordControllerSyncMessage(en, authmetrics.SyncMsgInitial)
 			authmetrics.SetAccessContractsCount(en, c.storage.GetContractsCount())
 
 		case *authv1.SyncAccessResponse_Update:
 			// Incremental update
-			slog.Info("auth sidecar sync received update",
+			slog.Info("sidecar sync received update",
 				"added", len(msg.Update.AddedContracts),
 				"updated", len(msg.Update.UpdatedContracts),
 				"removed", len(msg.Update.RemovedContracts))

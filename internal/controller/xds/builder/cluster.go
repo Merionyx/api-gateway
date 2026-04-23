@@ -55,10 +55,10 @@ func buildsidecarCluster() (*clusterv3.Cluster, error) {
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("marshal auth sidecar HttpProtocolOptions: %w", err)
+		return nil, fmt.Errorf("marshal sidecar HttpProtocolOptions: %w", err)
 	}
 	return &clusterv3.Cluster{
-		Name:           "auth_sidecar",
+		Name:           "sidecar",
 		ConnectTimeout: durationpb.New(1 * time.Second),
 
 		// Envoy and sidecar run in the same pod (edge chart): gRPC ext_authz to loopback, not a K8s Service name.
@@ -67,7 +67,7 @@ func buildsidecarCluster() (*clusterv3.Cluster, error) {
 		},
 
 		LoadAssignment: &endpointv3.ClusterLoadAssignment{
-			ClusterName: "auth_sidecar",
+			ClusterName: "sidecar",
 			Endpoints: []*endpointv3.LocalityLbEndpoints{{
 				LbEndpoints: []*endpointv3.LbEndpoint{{
 					HostIdentifier: &endpointv3.LbEndpoint_Endpoint{

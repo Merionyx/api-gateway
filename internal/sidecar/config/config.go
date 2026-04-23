@@ -57,7 +57,7 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("metrics_http.path", "/metrics")
 
 	v.AutomaticEnv()
-	v.SetEnvPrefix("AUTH_SIDECAR_")
+	v.SetEnvPrefix("SIDECAR_")
 
 	if len(configFile) > 0 && configFile[0] != "" {
 		slog.Info("Loading config from explicit path", "path", configFile[0])
