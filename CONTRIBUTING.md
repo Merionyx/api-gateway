@@ -4,10 +4,10 @@ Thanks for your interest in this API Gateway project. This document explains how
 
 ## Prerequisites
 
-- **Go** — see `go.mod` for the required toolchain version (currently **Go 1.26.x**). Use the same or newer patch release.
-- **Git**
-- Optional: **Docker** — for integration tests and local stacks described in the Makefile
-- Optional: **golangci-lint**, **buf**, **protoc** — only if you change code paths that use them (see Makefile targets)
+* **Go** — see `go.mod` for the required toolchain version (currently **Go 1.26.x**). Use the same or newer patch release.
+* **Git**
+* Optional: **Docker** — for integration tests and local stacks described in the Makefile
+* Optional: **golangci-lint**, **buf**, **protoc** — only if you change code paths that use them (see Makefile targets)
 
 ## Getting started
 
@@ -28,7 +28,7 @@ From the repository root:
 | Coverage (local HTML report)                                              | `make test-coverage`                   |
 | Coverage (CI-style gate)                                                  | `make test-coverage-ci`                |
 | Integration tests only (Docker / etcd)                                    | `make test-integration`                |
-| OIDC E2E subset (mock IdP + etcd; roadmap ш. 28–30)                       | `make test-integration-oidc`           |
+| OIDC E2E subset (mock IdP + etcd)                                         | `make test-integration-oidc`           |
 | Lint                                                                      | `make lint` (requires `golangci-lint`) |
 | Format                                                                    | `make fmt`                             |
 | Build binaries                                                            | `make build`                           |

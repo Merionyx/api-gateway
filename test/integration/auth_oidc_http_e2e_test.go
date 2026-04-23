@@ -40,8 +40,8 @@ import (
 	"github.com/merionyx/api-gateway/internal/shared/metricshttp"
 )
 
-// Roadmap ш. 28–30: OIDC E2E against real etcd (httptest mock IdP).
-// ш. 28 — login + callback; ш. 29 — refresh при 503 на token (degraded); ш. 30 — два параллельных refresh с одним our_refresh → CAS, один 409 (ADR 0001). Конкуренция через use case + etcd (Fiber app.Test не гоняем параллельно).
+// Roadmap ш. 28–31: OIDC E2E against real etcd (httptest mock IdP).
+// ш. 28 — login + callback; ш. 29 — refresh при 503 (degraded); ш. 30 — конкурентный refresh → 409 (CAS); ш. 31 — reuse старого our refresh после ротации → 401.
 
 const (
 	e2eOIDCProviderID = "mock-idp"
@@ -408,5 +408,84 @@ func TestE2E_OIDCRefresh_ConcurrentSameRefreshToken_One409(t *testing.T) {
 	}
 	if nOK != 1 || nConflict != 1 {
 		t.Fatalf("want exactly one success and one CAS conflict; got ok=%d conflict=%d errs=%v", nOK, nConflict, results)
+	}
+}
+
+func TestE2E_OIDCRefresh_ReuseOldRefreshTokenAfterRotate_401(t *testing.T) {
+	t.Parallel()
+
+	etcdCli := NewEtcdClient(t)
+	defer etcdCli.Close()
+
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	idp := newMockOIDCProvider(t, priv)
+	t.Cleanup(idp.Close)
+
+	authPrefix := fmt.Sprintf("/api-gateway/integration-oidc-e2e/%s", strings.ReplaceAll(uuid.NewString(), "-", ""))
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		_, _ = etcdCli.Delete(ctx, authPrefix, clientv3.WithPrefix())
+	}()
+
+	cfg := e2eAPIConfig(t, EtcdEndpoints(), idp.URL, authPrefix)
+	cnt, err := container.NewContainer(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cnt.Close()
+
+	app := fiberAppFromContainer(t, cnt)
+	_, refresh1 := performOIDCLoginCallback(t, app)
+
+	doRefresh := func(refreshHex string) *http.Response {
+		t.Helper()
+		body := fmt.Sprintf(`{"refresh_token":%q}`, refreshHex)
+		req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/auth/refresh", bytes.NewReader([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resp
+	}
+
+	r1 := doRefresh(refresh1)
+	defer func() { _ = r1.Body.Close() }()
+	if r1.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(r1.Body)
+		t.Fatalf("first refresh status %d body %s", r1.StatusCode, string(b))
+	}
+	var first map[string]any
+	if err := json.NewDecoder(r1.Body).Decode(&first); err != nil {
+		t.Fatal(err)
+	}
+	refresh2, _ := first["refresh_token"].(string)
+	if refresh2 == "" || refresh2 == refresh1 {
+		t.Fatalf("expected new refresh_token, got %+v", first)
+	}
+
+	rReuse := doRefresh(refresh1)
+	defer func() { _ = rReuse.Body.Close() }()
+	if rReuse.StatusCode != http.StatusUnauthorized {
+		b, _ := io.ReadAll(rReuse.Body)
+		t.Fatalf("reuse old refresh: status %d want 401 body %s", rReuse.StatusCode, string(b))
+	}
+	var prob map[string]any
+	if err := json.NewDecoder(rReuse.Body).Decode(&prob); err != nil {
+		t.Fatal(err)
+	}
+	if prob["code"] != "SESSION_AUTH_FAILED" {
+		t.Fatalf("problem code: want SESSION_AUTH_FAILED got %v", prob["code"])
+	}
+
+	r2 := doRefresh(refresh2)
+	defer func() { _ = r2.Body.Close() }()
+	if r2.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(r2.Body)
+		t.Fatalf("second refresh with new token status %d body %s", r2.StatusCode, string(b))
 	}
 }
