@@ -32,6 +32,28 @@ func TestSessionMigrateV1ToV2OnRead(t *testing.T) {
 	}
 }
 
+func TestSessionV2OptionalFieldsRoundTrip(t *testing.T) {
+	t.Parallel()
+	s := SessionValue{
+		SchemaVersion:        SessionSchemaV2,
+		EncryptedIDPRefresh: json.RawMessage(`{"k":1}`),
+		RotationGeneration:   1,
+		LoginIntentID:        "6ba7b810-9dad-41d4-a716-446655440001",
+		OurRefreshVerifier:   "opaque-verifier-handle",
+	}
+	b, err := MarshalSessionValueJSON(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := ParseSessionValueJSON(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.LoginIntentID != s.LoginIntentID || got.OurRefreshVerifier != s.OurRefreshVerifier {
+		t.Fatalf("optional fields lost: %+v", got)
+	}
+}
+
 func TestSessionV2RoundTrip(t *testing.T) {
 	t.Parallel()
 	s := SessionValue{

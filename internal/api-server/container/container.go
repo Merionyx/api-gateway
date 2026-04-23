@@ -32,6 +32,7 @@ type Container struct {
 	SnapshotRepository   interfaces.SnapshotRepository
 	ControllerRepository interfaces.ControllerRepository
 	APIKeyRepository       *etcd.APIKeyRepository
+	SessionRepository      *etcd.SessionRepository
 
 	// ContractSyncerGRPC is the gRPC adapter for Contract Syncer (sync, export, ping).
 	ContractSyncerGRPC *contractsyncergrpc.Client
@@ -111,6 +112,7 @@ func (c *Container) initRepositories() {
 	c.SnapshotRepository = etcd.NewSnapshotRepository(c.EtcdClient)
 	c.ControllerRepository = etcd.NewControllerRepository(c.EtcdClient)
 	c.APIKeyRepository = etcd.NewAPIKeyRepository(c.EtcdClient, c.Config.Auth.EtcdKeyPrefix)
+	c.SessionRepository = etcd.NewSessionRepository(c.EtcdClient, c.Config.Auth.EtcdKeyPrefix)
 
 	slog.Info("repositories initialized")
 }

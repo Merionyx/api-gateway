@@ -26,6 +26,13 @@ type SessionValue struct {
 
 	// RotationGeneration is introduced in v2; v1 migrations set it to 0.
 	RotationGeneration int64 `json:"rotation_generation"`
+
+	// LoginIntentID links to login-intents/{intent_id} established this session (roadmap ш. 13–14).
+	LoginIntentID string `json:"login_intent_id,omitempty"`
+
+	// OurRefreshVerifier is an opaque verifier for the current our-refresh chain (hash/HMAC handle);
+	// plaintext our refresh must not appear in etcd (roadmap п. 13).
+	OurRefreshVerifier string `json:"our_refresh_verifier,omitempty"`
 }
 
 type sessionValueV1Wire struct {
