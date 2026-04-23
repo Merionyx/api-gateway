@@ -2,8 +2,10 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
@@ -70,14 +72,45 @@ func (uc *JWTUseCase) GenerateToken(ctx context.Context, req *models.GenerateTok
 	}, nil
 }
 
+func parseInteractiveSnapshotForJWT(snapshot json.RawMessage) (roles []any, idpIss, idpSub string) {
+	if len(snapshot) == 0 {
+		return []any{}, "", ""
+	}
+	var m map[string]any
+	if err := json.Unmarshal(snapshot, &m); err != nil {
+		return []any{}, "", ""
+	}
+	if v, ok := m["roles"]; ok {
+		if a, ok := v.([]any); ok {
+			roles = a
+		}
+	}
+	if roles == nil {
+		roles = []any{}
+	}
+	if s, _ := m["idp_iss"].(string); strings.TrimSpace(s) != "" {
+		idpIss = strings.TrimSpace(s)
+	}
+	if s, _ := m["idp_sub"].(string); strings.TrimSpace(s) != "" {
+		idpSub = strings.TrimSpace(s)
+	}
+	return roles, idpIss, idpSub
+}
+
 // MintInteractiveAPIAccessJWT issues a short-lived API-profile access JWT after browser OIDC (roadmap ш. 14–15).
 func (uc *JWTUseCase) MintInteractiveAPIAccessJWT(ctx context.Context, subject string, ttl time.Duration) (tokenStr, jti string, exp time.Time, err error) {
-	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseAuthPkg, "MintInteractiveAPIAccessJWT"))
+	return uc.MintInteractiveAPIAccessJWTFromSnapshot(ctx, subject, nil, ttl)
+}
+
+// MintInteractiveAPIAccessJWTFromSnapshot mints an API access JWT using session claims_snapshot for roles / idp_* (degraded refresh, roadmap ш. 18).
+func (uc *JWTUseCase) MintInteractiveAPIAccessJWTFromSnapshot(ctx context.Context, subject string, snapshot json.RawMessage, ttl time.Duration) (tokenStr, jti string, exp time.Time, err error) {
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseAuthPkg, "MintInteractiveAPIAccessJWTFromSnapshot"))
 	defer span.End()
 	now := time.Now()
 	exp = now.Add(ttl)
 	jti = uuid.New().String()
 
+	roles, idpIss, idpSub := parseInteractiveSnapshotForJWT(snapshot)
 	claims := jwt.MapClaims{
 		"iss":   uc.apiIssuer,
 		"sub":   subject,
@@ -85,7 +118,13 @@ func (uc *JWTUseCase) MintInteractiveAPIAccessJWT(ctx context.Context, subject s
 		"iat":   now.Unix(),
 		"exp":   exp.Unix(),
 		"jti":   jti,
-		"roles": []any{},
+		"roles": roles,
+	}
+	if idpIss != "" {
+		claims["idp_iss"] = idpIss
+	}
+	if idpSub != "" {
+		claims["idp_sub"] = idpSub
 	}
 
 	keyPair := uc.apiSigningKeys[uc.apiActiveKeyID]

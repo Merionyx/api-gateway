@@ -22,6 +22,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/config"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
+	"github.com/merionyx/api-gateway/internal/api-server/metrics"
 )
 
 // refreshSessionStore is implemented by etcd.SessionRepository (sessions + refresh-verifier index).
@@ -31,14 +32,15 @@ type refreshSessionStore interface {
 	ReplaceCASWithRefreshIndex(ctx context.Context, sessionID, oldVerifier, newVerifier string, v kvvalue.SessionValue, expectedModRevision int64) error
 }
 
-// OIDCRefreshUseCase handles POST /api/v1/auth/refresh when IdP is reachable (roadmap ш. 17).
+// OIDCRefreshUseCase handles POST /api/v1/auth/refresh (IdP up + degraded, roadmap ш. 17–18).
 type OIDCRefreshUseCase struct {
-	byID      map[string]config.OIDCProviderConfig
-	sessions  refreshSessionStore
-	sealer    *sessioncrypto.Keyring
-	jwt       *JWTUseCase
-	hc        *http.Client
-	accessTTL time.Duration
+	byID            map[string]config.OIDCProviderConfig
+	sessions        refreshSessionStore
+	sealer          *sessioncrypto.Keyring
+	jwt             *JWTUseCase
+	hc              *http.Client
+	accessTTL       time.Duration
+	metricsEnabled  bool
 }
 
 // NewOIDCRefreshUseCase wires refresh; accessTTL<=0 defaults to 5m; hc nil uses http.DefaultClient.
@@ -49,6 +51,7 @@ func NewOIDCRefreshUseCase(
 	jwtUC *JWTUseCase,
 	hc *http.Client,
 	accessTTL time.Duration,
+	metricsEnabled bool,
 ) *OIDCRefreshUseCase {
 	by := make(map[string]config.OIDCProviderConfig, len(providers))
 	for _, p := range providers {
@@ -61,12 +64,13 @@ func NewOIDCRefreshUseCase(
 		hc = http.DefaultClient
 	}
 	return &OIDCRefreshUseCase{
-		byID:      by,
-		sessions:  sessions,
-		sealer:    sealer,
-		jwt:       jwtUC,
-		hc:        hc,
-		accessTTL: accessTTL,
+		byID:           by,
+		sessions:       sessions,
+		sealer:         sealer,
+		jwt:            jwtUC,
+		hc:             hc,
+		accessTTL:      accessTTL,
+		metricsEnabled: metricsEnabled,
 	}
 }
 
@@ -99,6 +103,70 @@ func subjectFromClaimsSnapshot(raw json.RawMessage) (string, error) {
 	return s, nil
 }
 
+func cloneJSONRaw(b json.RawMessage) json.RawMessage {
+	if len(b) == 0 {
+		return nil
+	}
+	return append(json.RawMessage(nil), b...)
+}
+
+// completeSessionRefresh mints access JWT, rotates our refresh, CAS-persists session, records refresh metric.
+func (u *OIDCRefreshUseCase) completeSessionRefresh(
+	ctx context.Context,
+	sessionID, oldVerifier string,
+	sess kvvalue.SessionValue,
+	modRev int64,
+	nextEncryptedIDP, nextClaims json.RawMessage,
+	subject string,
+	metricResult string,
+) (apiserver.AuthSessionTokensResponse, error) {
+	var out apiserver.AuthSessionTokensResponse
+	accessJWT, _, _, err := u.jwt.MintInteractiveAPIAccessJWTFromSnapshot(ctx, subject, nextClaims, u.accessTTL)
+	if err != nil {
+		return out, err
+	}
+
+	newOur := make([]byte, 32)
+	if _, err := rand.Read(newOur); err != nil {
+		return out, fmt.Errorf("our refresh: %w", err)
+	}
+	newOurStr := hex.EncodeToString(newOur)
+	newSum := sha256.Sum256([]byte(newOurStr))
+	newVerifier := hex.EncodeToString(newSum[:])
+
+	newSess := kvvalue.SessionValue{
+		EncryptedIDPRefresh: cloneJSONRaw(nextEncryptedIDP),
+		ClaimsSnapshot:      cloneJSONRaw(nextClaims),
+		RotationGeneration:  sess.RotationGeneration + 1,
+		LoginIntentID:       sess.LoginIntentID,
+		ProviderID:          strings.TrimSpace(sess.ProviderID),
+		OurRefreshVerifier:  newVerifier,
+	}
+	if newSess.ProviderID == "" && len(u.byID) == 1 {
+		for id := range u.byID {
+			newSess.ProviderID = id
+			break
+		}
+	}
+
+	if err := u.sessions.ReplaceCASWithRefreshIndex(ctx, sessionID, oldVerifier, newVerifier, newSess, modRev); err != nil {
+		if errors.Is(err, etcd.ErrSessionCASConflict) {
+			return out, apierrors.ErrSessionRefreshConflict
+		}
+		return out, err
+	}
+
+	metrics.RecordAuthRefresh(u.metricsEnabled, metricResult)
+
+	bt := "Bearer"
+	out = apiserver.AuthSessionTokensResponse{
+		AccessToken:  accessJWT,
+		RefreshToken: newOurStr,
+		TokenType:    &bt,
+	}
+	return out, nil
+}
+
 func (u *OIDCRefreshUseCase) resolveProvider(sess kvvalue.SessionValue) (config.OIDCProviderConfig, error) {
 	pid := strings.TrimSpace(sess.ProviderID)
 	if pid != "" {
@@ -116,7 +184,7 @@ func (u *OIDCRefreshUseCase) resolveProvider(sess kvvalue.SessionValue) (config.
 	return config.OIDCProviderConfig{}, fmt.Errorf("%w: session missing provider_id", apierrors.ErrInvalidInput)
 }
 
-// Refresh rotates our refresh + IdP material when the IdP accepts refresh_token (IdP up branch).
+// Refresh rotates our refresh; updates IdP material when the IdP is reachable, otherwise degraded refresh (roadmap ш. 17–18).
 func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, ourRefreshHex string) (apiserver.AuthSessionTokensResponse, error) {
 	var out apiserver.AuthSessionTokensResponse
 	if len(u.byID) == 0 {
@@ -167,14 +235,32 @@ func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, ourRefreshHex string) 
 	idpRT := strings.TrimSpace(string(idpRefreshBytes))
 
 	issuer := oidc.NormalizeIssuer(p.Issuer)
-	disc, err := oidc.FetchDiscovery(ctx, u.hc, issuer)
-	if err != nil {
-		return out, fmt.Errorf("%w: %w", oidc.ErrDiscovery, err)
+	disc, dErr := oidc.FetchDiscovery(ctx, u.hc, issuer)
+	if dErr != nil && oidc.ShouldDegradeRefresh(dErr) {
+		claimsSnap := sess.ClaimsSnapshot
+		subj, snapErr := subjectFromClaimsSnapshot(claimsSnap)
+		if snapErr != nil {
+			return out, apierrors.ErrSessionAuthFailed
+		}
+		return u.completeSessionRefresh(ctx, sessionID, verifier, sess, modRev,
+			sess.EncryptedIDPRefresh, claimsSnap, subj, metrics.AuthRefreshDegraded)
+	}
+	if dErr != nil {
+		return out, dErr
 	}
 
-	tr, err := oidc.ExchangeRefreshToken(ctx, u.hc, disc.TokenEndpoint, p.ClientID, p.ClientSecret, idpRT)
-	if err != nil {
-		return out, err
+	tr, tErr := oidc.ExchangeRefreshToken(ctx, u.hc, disc.TokenEndpoint, p.ClientID, p.ClientSecret, idpRT)
+	if tErr != nil && oidc.ShouldDegradeRefresh(tErr) {
+		claimsSnap := sess.ClaimsSnapshot
+		subj, snapErr := subjectFromClaimsSnapshot(claimsSnap)
+		if snapErr != nil {
+			return out, apierrors.ErrSessionAuthFailed
+		}
+		return u.completeSessionRefresh(ctx, sessionID, verifier, sess, modRev,
+			sess.EncryptedIDPRefresh, claimsSnap, subj, metrics.AuthRefreshDegraded)
+	}
+	if tErr != nil {
+		return out, tErr
 	}
 
 	claimsSnap := sess.ClaimsSnapshot
@@ -203,23 +289,10 @@ func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, ourRefreshHex string) 
 		subject = subj
 	}
 
-	accessJWT, _, _, err := u.jwt.MintInteractiveAPIAccessJWT(ctx, subject, u.accessTTL)
-	if err != nil {
-		return out, err
-	}
-
 	newIDPRT := strings.TrimSpace(tr.RefreshToken)
 	if newIDPRT == "" {
 		newIDPRT = idpRT
 	}
-
-	newOur := make([]byte, 32)
-	if _, err := rand.Read(newOur); err != nil {
-		return out, fmt.Errorf("our refresh: %w", err)
-	}
-	newOurStr := hex.EncodeToString(newOur)
-	newSum := sha256.Sum256([]byte(newOurStr))
-	newVerifier := hex.EncodeToString(newSum[:])
 
 	sealed, err := u.sealer.Seal([]byte(newIDPRT))
 	if err != nil {
@@ -230,35 +303,8 @@ func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, ourRefreshHex string) 
 		return out, err
 	}
 
-	newSess := kvvalue.SessionValue{
-		EncryptedIDPRefresh: json.RawMessage(envBytes),
-		ClaimsSnapshot:      claimsSnap,
-		RotationGeneration:  sess.RotationGeneration + 1,
-		LoginIntentID:       sess.LoginIntentID,
-		ProviderID:          strings.TrimSpace(sess.ProviderID),
-		OurRefreshVerifier:  newVerifier,
-	}
-	if newSess.ProviderID == "" && len(u.byID) == 1 {
-		for id := range u.byID {
-			newSess.ProviderID = id
-			break
-		}
-	}
-
-	if err := u.sessions.ReplaceCASWithRefreshIndex(ctx, sessionID, verifier, newVerifier, newSess, modRev); err != nil {
-		if errors.Is(err, etcd.ErrSessionCASConflict) {
-			return out, apierrors.ErrSessionRefreshConflict
-		}
-		return out, err
-	}
-
-	bt := "Bearer"
-	out = apiserver.AuthSessionTokensResponse{
-		AccessToken:  accessJWT,
-		RefreshToken: newOurStr,
-		TokenType:    &bt,
-	}
-	return out, nil
+	return u.completeSessionRefresh(ctx, sessionID, verifier, sess, modRev,
+		json.RawMessage(envBytes), claimsSnap, subject, metrics.AuthRefreshIDPUp)
 }
 
 // MapRefreshError maps Refresh errors to HTTP status and stable problem codes.

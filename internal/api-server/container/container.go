@@ -185,6 +185,7 @@ func (c *Container) initUseCases() error {
 			c.JWTUseCase,
 			&http.Client{Timeout: 25 * time.Second},
 			c.Config.Auth.InteractiveAccessTokenTTL,
+			c.Config.MetricsHTTP.Enabled,
 		)
 	}
 

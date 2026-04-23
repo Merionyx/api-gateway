@@ -88,15 +88,15 @@ func ExchangeRefreshToken(ctx context.Context, hc *http.Client, tokenEndpoint, c
 
 	resp, err := hc.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrTokenExchange, err)
+		return nil, &TokenExchangeFailure{HTTPStatus: 0, Cause: err}
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
-		return nil, fmt.Errorf("%w: read: %w", ErrTokenExchange, err)
+		return nil, &TokenExchangeFailure{HTTPStatus: 0, Cause: err}
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%w: status %d body=%s", ErrTokenExchange, resp.StatusCode, truncateForErr(body, 512))
+		return nil, &TokenExchangeFailure{HTTPStatus: resp.StatusCode, Cause: nil}
 	}
 	var tr TokenResponse
 	if err := json.Unmarshal(body, &tr); err != nil {

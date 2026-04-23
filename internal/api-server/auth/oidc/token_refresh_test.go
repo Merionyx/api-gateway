@@ -2,6 +2,7 @@ package oidc
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -31,5 +32,25 @@ func TestExchangeRefreshToken_ok(t *testing.T) {
 	}
 	if tr.AccessToken != "at" {
 		t.Fatalf("got %+v", tr)
+	}
+}
+
+func TestExchangeRefreshToken_503_degradable(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "unavailable", http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+
+	_, err := ExchangeRefreshToken(context.Background(), srv.Client(), srv.URL, "cid", "sec", "rt")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	var te *TokenExchangeFailure
+	if !errors.As(err, &te) || te.HTTPStatus != http.StatusServiceUnavailable || !te.Degradable() {
+		t.Fatalf("got %#v", err)
+	}
+	if !ShouldDegradeRefresh(err) {
+		t.Fatal("expected ShouldDegradeRefresh")
 	}
 }
