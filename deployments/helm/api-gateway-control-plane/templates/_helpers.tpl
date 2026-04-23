@@ -289,6 +289,10 @@ idempotency:
   bundle_sync_ttl: "24h"
   etcd_key_prefix: "/api-gateway/api-server/idempotency/v1"
   cluster: ""
+auth:
+  etcd_key_prefix: "/api-gateway/api-server/auth/v1"
+  environment: "production"
+  allow_insecure_bootstrap: false
 {{- end }}
 
 {{- define "agwcp.contractSyncer.config.defaults" -}}

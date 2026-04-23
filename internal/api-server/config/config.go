@@ -29,6 +29,8 @@ type Config struct {
 	Idempotency IdempotencyConfig `mapstructure:"idempotency" json:"idempotency"`
 	// Telemetry: OpenTelemetry trace export (optional). Merged with env; see FileBlock in the telemetry package.
 	Telemetry telemetry.FileBlock `mapstructure:"telemetry" json:"telemetry"`
+	// Auth: etcd key layout for API keys (and future session material); insecure bootstrap is dev-only.
+	Auth AuthConfig `mapstructure:"auth" json:"auth"`
 }
 
 // IdempotencyConfig controls POST /bundles/sync idempotency (memory or etcd).
@@ -100,6 +102,9 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("idempotency.bundle_sync_ttl", 24*time.Hour)
 	v.SetDefault("idempotency.etcd_key_prefix", "/api-gateway/api-server/idempotency/v1")
 	v.SetDefault("idempotency.cluster", "")
+	v.SetDefault("auth.etcd_key_prefix", "/api-gateway/api-server/auth/v1")
+	v.SetDefault("auth.environment", "development")
+	v.SetDefault("auth.allow_insecure_bootstrap", false)
 
 	v.AutomaticEnv()
 	v.SetEnvPrefix("API_SERVER_")

@@ -41,6 +41,12 @@ idempotency:
   etcd_key_prefix: "/api-gateway/api-server/idempotency/v1"
   cluster: ""
 
+# Auth etcd layout (API keys, future sessions). Bootstrap is dev-only — see docs/operator-api-server-auth.md
+auth:
+  etcd_key_prefix: "/api-gateway/api-server/auth/v1"
+  environment: "production"
+  allow_insecure_bootstrap: false
+
 # OpenTelemetry: optional; can be overridden (e.g. TELEMETRY_ENABLED) via environment.
 # telemetry:
 #   enabled: false
