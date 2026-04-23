@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -49,8 +50,8 @@ func (m *memIntentRepo) Delete(_ context.Context, id string) error {
 }
 
 type memSessionRepo struct {
-	mu    sync.Mutex
-	last  kvvalue.SessionValue
+	mu     sync.Mutex
+	last   kvvalue.SessionValue
 	lastID string
 }
 
@@ -94,10 +95,10 @@ func TestOIDCCallbackUseCase_Complete_HappyPath(t *testing.T) {
 	intentID := uuid.NewString()
 	intents := &memIntentRepo{m: map[string]kvvalue.LoginIntentValue{
 		intentID: {
-			ProviderID:   "p1",
-			RedirectURI:  redirectURI,
-			OAuthState:   intentID,
-			PKCEVerifier: pkceVerifier,
+			ProviderID:     "p1",
+			RedirectURI:    redirectURI,
+			OAuthState:     intentID,
+			PKCEVerifier:   pkceVerifier,
 			IntentProtocol: kvvalue.DefaultIntentProtocol,
 		},
 	}}
@@ -154,7 +155,14 @@ func TestOIDCCallbackUseCase_Complete_HappyPath(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	dir := t.TempDir()
-	jwtUC, err := NewJWTUseCase(dir, "test-issuer", "test-aud")
+	jwtUC, err := NewJWTUseCase(&config.JWTConfig{
+		KeysDir:      dir,
+		EdgeKeysDir:  filepath.Join(dir, "edge"),
+		Issuer:       "test-issuer",
+		APIAudience:  "test-aud",
+		EdgeIssuer:   "edge-iss",
+		EdgeAudience: "edge-aud",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +208,7 @@ func TestOIDCCallbackUseCase_Complete_HappyPath(t *testing.T) {
 func TestOIDCCallbackUseCase_Complete_UnknownIntent(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	jwtUC, err := NewJWTUseCase(dir, "iss", "")
+	jwtUC, err := NewJWTUseCase(jwtTestCfg(t, dir))
 	if err != nil {
 		t.Fatal(err)
 	}

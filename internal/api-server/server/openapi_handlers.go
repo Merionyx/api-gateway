@@ -26,8 +26,7 @@ func (s *OpenAPIServer) GetJwks(c fiber.Ctx, _ apiserver.GetJwksParams) error {
 }
 
 func (s *OpenAPIServer) GetJwksEdge(c fiber.Ctx, _ apiserver.GetJwksEdgeParams) error {
-	// TODO(roadmap): separate Edge signing JWKS; until then reuse the same material as the API JWKS endpoint.
-	return s.c.JWTHandler.GetJWKS(c)
+	return s.c.JWTHandler.GetJWKSEdge(c)
 }
 
 func (s *OpenAPIServer) LoginOidc(c fiber.Ctx, params apiserver.LoginOidcParams) error {

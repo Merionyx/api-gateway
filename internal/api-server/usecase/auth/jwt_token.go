@@ -22,7 +22,8 @@ func (uc *JWTUseCase) GenerateToken(ctx context.Context, req *models.GenerateTok
 	tokenID := uuid.New().String()
 
 	claims := jwt.MapClaims{
-		"iss":          uc.issuer,
+		"iss":          uc.edgeIssuer,
+		"aud":          uc.edgeAudience,
 		"sub":          req.AppID,
 		"app_id":       req.AppID,
 		"environments": req.Environments,
@@ -31,7 +32,7 @@ func (uc *JWTUseCase) GenerateToken(ctx context.Context, req *models.GenerateTok
 		"jti":          tokenID,
 	}
 
-	keyPair := uc.signingKeys[uc.activeKeyID]
+	keyPair := uc.edgeSigningKeys[uc.edgeActiveKeyID]
 	if keyPair == nil {
 		err := fmt.Errorf("%w", apierrors.ErrNoActiveSigningKey)
 		telemetry.MarkError(span, err)
@@ -78,7 +79,7 @@ func (uc *JWTUseCase) MintInteractiveAPIAccessJWT(ctx context.Context, subject s
 	jti = uuid.New().String()
 
 	claims := jwt.MapClaims{
-		"iss":   uc.issuer,
+		"iss":   uc.apiIssuer,
 		"sub":   subject,
 		"aud":   uc.apiAudience,
 		"iat":   now.Unix(),
@@ -87,7 +88,7 @@ func (uc *JWTUseCase) MintInteractiveAPIAccessJWT(ctx context.Context, subject s
 		"roles": []any{},
 	}
 
-	keyPair := uc.signingKeys[uc.activeKeyID]
+	keyPair := uc.apiSigningKeys[uc.apiActiveKeyID]
 	if keyPair == nil {
 		err = fmt.Errorf("%w", apierrors.ErrNoActiveSigningKey)
 		telemetry.MarkError(span, err)

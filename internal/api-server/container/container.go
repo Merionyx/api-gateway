@@ -139,11 +139,7 @@ func (c *Container) initRepositories() {
 }
 
 func (c *Container) initUseCases() error {
-	jwtUC, err := auth.NewJWTUseCase(
-		c.Config.JWT.KeysDir,
-		c.Config.JWT.Issuer,
-		c.Config.JWT.APIAudience,
-	)
+	jwtUC, err := auth.NewJWTUseCase(&c.Config.JWT)
 	if err != nil {
 		return fmt.Errorf("initialize JWT use case: %w", err)
 	}

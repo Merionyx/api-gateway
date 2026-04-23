@@ -15,7 +15,7 @@ Helm chart for **Envoy** and **Sidecar** (single Deployment, two containers). In
 helm install edge ./deployments/helm/api-gateway-edge -n api-gateway \
   --set connectivity.controllerGrpcAddress=my-controller:19090 \
   --set connectivity.controllerServerName=my-controller.api-gateway.svc.cluster.local \
-  --set connectivity.jwksUrl=http://my-api-server:8080/.well-known/jwks.json \
+  --set connectivity.jwksUrl=http://my-api-server:8080/.well-known/jwks-edge.json \
   --set connectivity.environment=prod \
   --set connectivity.xdsHost=my-controller \
   --set connectivity.xdsSni=my-controller.api-gateway.svc.cluster.local

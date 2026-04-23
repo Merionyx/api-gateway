@@ -78,8 +78,13 @@ type ServerConfig struct {
 type JWTConfig struct {
 	KeysDir string `mapstructure:"keys_dir" validate:"required" json:"keys_dir"`
 	Issuer  string `mapstructure:"issuer" validate:"required" json:"issuer"`
-	// APIAudience is the JWT aud claim for interactive API access tokens (Edge≠API refined in roadmap ш. 15).
+	// APIAudience is the JWT aud claim for interactive API access tokens (Edge≠API; roadmap ш. 15).
 	APIAudience string `mapstructure:"api_audience" json:"api_audience"`
+	// EdgeKeysDir holds Edge-profile signing keys. Empty means keys_dir/edge (see auth.NewJWTUseCase).
+	EdgeKeysDir string `mapstructure:"edge_keys_dir" json:"edge_keys_dir"`
+	// EdgeIssuer / EdgeAudience are iss/aud for POST /api/v1/tokens/edge (data-plane / ExtAuthz profile).
+	EdgeIssuer   string `mapstructure:"edge_issuer" json:"edge_issuer"`
+	EdgeAudience string `mapstructure:"edge_audience" json:"edge_audience"`
 }
 
 func LoadConfig(configFile ...string) (*Config, error) {
@@ -91,6 +96,8 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("jwt.keys_dir", "./secrets/keys/jwt")
 	v.SetDefault("jwt.issuer", "api-gateway-api-server")
 	v.SetDefault("jwt.api_audience", "api-gateway-api-http")
+	v.SetDefault("jwt.edge_issuer", "api-gateway-edge")
+	v.SetDefault("jwt.edge_audience", "api-gateway-edge-http")
 	v.SetDefault("leader_election.enabled", true)
 	v.SetDefault("leader_election.key_prefix", "/api-gateway/api-server/election/leader")
 	v.SetDefault("leader_election.session_ttl_seconds", 5)

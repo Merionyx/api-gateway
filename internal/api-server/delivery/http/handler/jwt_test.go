@@ -3,20 +3,36 @@ package handler
 import (
 	"io"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/merionyx/api-gateway/internal/api-server/config"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
 
 	"github.com/gofiber/fiber/v3"
 )
 
-func TestJWTHandler_GenerateToken_ValidationAppID(t *testing.T) {
-	uc, err := auth.NewJWTUseCase(t.TempDir(), "iss", "")
+func jwtHandlerTestUC(t *testing.T) *auth.JWTUseCase {
+	t.Helper()
+	root := t.TempDir()
+	uc, err := auth.NewJWTUseCase(&config.JWTConfig{
+		KeysDir:      root,
+		EdgeKeysDir:  filepath.Join(root, "edge"),
+		Issuer:       "iss",
+		APIAudience:  "api-aud",
+		EdgeIssuer:   "edge-iss",
+		EdgeAudience: "edge-aud",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	return uc
+}
+
+func TestJWTHandler_GenerateToken_ValidationAppID(t *testing.T) {
+	uc := jwtHandlerTestUC(t)
 	h := NewJWTHandler(uc, false)
 	app := fiber.New()
 	app.Post("/tokens", h.GenerateToken)
@@ -34,10 +50,7 @@ func TestJWTHandler_GenerateToken_ValidationAppID(t *testing.T) {
 }
 
 func TestJWTHandler_GenerateToken_Created(t *testing.T) {
-	uc, err := auth.NewJWTUseCase(t.TempDir(), "iss", "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	uc := jwtHandlerTestUC(t)
 	h := NewJWTHandler(uc, false)
 	app := fiber.New()
 	app.Post("/tokens", h.GenerateToken)

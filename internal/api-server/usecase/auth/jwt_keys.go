@@ -16,52 +16,8 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 )
 
-func (uc *JWTUseCase) loadKeys() error {
-	if err := os.MkdirAll(uc.keysDir, 0700); err != nil {
-		return err
-	}
-
-	files, err := os.ReadDir(uc.keysDir)
-	if err != nil {
-		return err
-	}
-
-	var newestKey *KeyPair
-	var newestTime time.Time
-
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		}
-
-		if filepath.Ext(file.Name()) == ".key" {
-			keyPath := filepath.Join(uc.keysDir, file.Name())
-
-			keyPair, err := uc.loadKeyPair(keyPath)
-			if err != nil {
-				slog.Warn("jwt: skip key file", "file", file.Name(), "error", err)
-				continue
-			}
-
-			uc.signingKeys[keyPair.Kid] = keyPair
-
-			if keyPair.CreatedAt.After(newestTime) {
-				newestTime = keyPair.CreatedAt
-				newestKey = keyPair
-			}
-		}
-	}
-
-	if newestKey != nil {
-		uc.activeKeyID = newestKey.Kid
-		uc.activeKeyAlg = newestKey.Algorithm
-		slog.Info("jwt: active signing key", "kid", uc.activeKeyID, "alg", uc.activeKeyAlg)
-	}
-
-	return nil
-}
-
-func (uc *JWTUseCase) loadKeyPair(keyPath string) (*KeyPair, error) {
+// readKeyPairFromFile loads a single PEM private key and builds a KeyPair (kid from basename without .key).
+func readKeyPairFromFile(keyPath string) (*KeyPair, error) {
 	keyData, err := os.ReadFile(keyPath)
 	if err != nil {
 		return nil, fmt.Errorf("%w: read key file: %w", apierrors.ErrInvalidInput, err)
@@ -126,18 +82,66 @@ func (uc *JWTUseCase) loadKeyPair(keyPath string) (*KeyPair, error) {
 	}, nil
 }
 
-func (uc *JWTUseCase) generateDefaultKey() error {
-	kid := fmt.Sprintf("api-server-key-%s", time.Now().Format("2006-01-02"))
-	keyPath := filepath.Join(uc.keysDir, kid+".key")
+// loadKeyDirectory loads all *.key PEM files from dir and picks the newest as active.
+func loadKeyDirectory(keysDir string) (map[string]*KeyPair, string, string, error) {
+	if err := os.MkdirAll(keysDir, 0700); err != nil {
+		return nil, "", "", err
+	}
+
+	files, err := os.ReadDir(keysDir)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	out := make(map[string]*KeyPair)
+	var newestKey *KeyPair
+	var newestTime time.Time
+
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		if filepath.Ext(file.Name()) != ".key" {
+			continue
+		}
+		keyPath := filepath.Join(keysDir, file.Name())
+		keyPair, err := readKeyPairFromFile(keyPath)
+		if err != nil {
+			slog.Warn("jwt: skip key file", "dir", keysDir, "file", file.Name(), "error", err)
+			continue
+		}
+		out[keyPair.Kid] = keyPair
+		if keyPair.CreatedAt.After(newestTime) {
+			newestTime = keyPair.CreatedAt
+			newestKey = keyPair
+		}
+	}
+
+	activeID, activeAlg := "", ""
+	if newestKey != nil {
+		activeID = newestKey.Kid
+		activeAlg = newestKey.Algorithm
+		slog.Info("jwt: active signing key", "dir", keysDir, "kid", activeID, "alg", activeAlg)
+	}
+	return out, activeID, activeAlg, nil
+}
+
+// generateDefaultEd25519InDir writes a new Ed25519 key under keysDir and returns the loaded KeyPair.
+func generateDefaultEd25519InDir(keysDir, kidPrefix string) (*KeyPair, error) {
+	if err := os.MkdirAll(keysDir, 0700); err != nil {
+		return nil, err
+	}
+	kid := fmt.Sprintf("%s-%s", kidPrefix, time.Now().Format("2006-01-02-150405"))
+	keyPath := filepath.Join(keysDir, kid+".key")
 
 	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
-		return fmt.Errorf("%w: generate Ed25519 key: %w", apierrors.ErrSigningOperationFailed, err)
+		return nil, fmt.Errorf("%w: generate Ed25519 key: %w", apierrors.ErrSigningOperationFailed, err)
 	}
 
 	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
 	if err != nil {
-		return fmt.Errorf("%w: marshal PKCS#8 private key: %w", apierrors.ErrSigningOperationFailed, err)
+		return nil, fmt.Errorf("%w: marshal PKCS#8 private key: %w", apierrors.ErrSigningOperationFailed, err)
 	}
 
 	privateKeyPEM := pem.EncodeToMemory(&pem.Block{
@@ -146,21 +150,16 @@ func (uc *JWTUseCase) generateDefaultKey() error {
 	})
 
 	if err := os.WriteFile(keyPath, privateKeyPEM, 0600); err != nil {
-		return fmt.Errorf("%w: write generated key file: %w", apierrors.ErrSigningOperationFailed, err)
+		return nil, fmt.Errorf("%w: write generated key file: %w", apierrors.ErrSigningOperationFailed, err)
 	}
 
-	uc.signingKeys[kid] = &KeyPair{
+	kp := &KeyPair{
 		Kid:        kid,
 		Algorithm:  AlgorithmEdDSA,
 		PrivateKey: privateKey,
 		PublicKey:  publicKey,
 		CreatedAt:  time.Now(),
 	}
-
-	uc.activeKeyID = kid
-	uc.activeKeyAlg = AlgorithmEdDSA
-
-	slog.Info("jwt: generated default EdDSA key", "kid", kid)
-
-	return nil
+	slog.Info("jwt: generated default EdDSA key", "dir", keysDir, "kid", kid)
+	return kp, nil
 }

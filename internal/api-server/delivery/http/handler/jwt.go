@@ -81,6 +81,18 @@ func (h *JWTHandler) GetJWKS(c fiber.Ctx) error {
 	return c.JSON(jwks)
 }
 
+// GetJWKSEdge returns the Edge-profile JSON Web Key Set (GET /.well-known/jwks-edge.json).
+func (h *JWTHandler) GetJWKSEdge(c fiber.Ctx) error {
+	span := beginHandlerSpan(c, "GetJWKSEdge")
+	defer span.End()
+	jwks, err := h.jwtUseCase.GetJWKSEdge(c.Context())
+	if err != nil {
+		telemetry.MarkError(span, err)
+		return problem.RespondError(c, err)
+	}
+	return c.JSON(jwks)
+}
+
 // GetSigningKeys returns a list of signing keys
 // GET /api/v1/keys
 func (h *JWTHandler) GetSigningKeys(c fiber.Ctx) error {

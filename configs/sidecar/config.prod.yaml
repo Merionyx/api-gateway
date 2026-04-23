@@ -7,4 +7,4 @@ controller:
   environment: "prod"
 
 jwt:
-  jwks_url: "http://gateway-ha-lb:8080/.well-known/jwks.json"
+  jwks_url: "http://gateway-ha-lb:8080/.well-known/jwks-edge.json"

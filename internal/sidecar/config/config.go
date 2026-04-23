@@ -48,7 +48,7 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v := viper.New()
 	v.SetDefault("server.http_port", "8080")
 	v.SetDefault("server.host", "localhost")
-	v.SetDefault("jwt.jwks_url", "http://api-server:8080/.well-known/jwks.json")
+	v.SetDefault("jwt.jwks_url", "http://api-server:8080/.well-known/jwks-edge.json")
 	v.SetDefault("grpc_ext_authz.observability.reflection_enabled", true)
 	v.SetDefault("grpc_ext_authz.observability.log_requests", false)
 	v.SetDefault("metrics_http.enabled", false)
