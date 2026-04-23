@@ -1,6 +1,6 @@
 # Dev-only internal CA and gRPC TLS certificates (cert-manager).
 # Workloads expect these Secrets (optional: false): apply etcd issuer + this file before Deployments.
-# Client certs: controller → API Server, API Server → contract-syncer, auth sidecar → controller, Envoy → xDS.
+# Client certs: controller → API Server, API Server → contract-syncer, sidecar → controller, Envoy → xDS.
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:

@@ -11,7 +11,7 @@ const (
 	AlgorithmRS256 = "RS256"
 )
 
-// JWTUseCase issues app tokens and exposes JWKS for verification (e.g. auth sidecar).
+// JWTUseCase issues app tokens and exposes JWKS for verification (e.g. sidecar).
 type JWTUseCase struct {
 	keysDir      string
 	issuer       string

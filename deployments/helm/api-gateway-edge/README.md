@@ -1,6 +1,6 @@
 # api-gateway-edge
 
-Helm chart for **Envoy** and **Auth Sidecar** (single Deployment, two containers). Install once per edge pool; use a separate release from `api-gateway-control-plane`.
+Helm chart for **Envoy** and **Sidecar** (single Deployment, two containers). Install once per edge pool; use a separate release from `api-gateway-control-plane`.
 
 ## Prerequisites
 
@@ -25,7 +25,7 @@ helm install edge ./deployments/helm/api-gateway-edge -n api-gateway \
 
 Set `replicaCount` &gt; 1 and keep `envoy.pdb.enabled` (PDB is created only when replicas &gt; 1).
 
-## Tracing (Envoy + auth sidecar)
+## Tracing (Envoy + sidecar)
 
 - **Auth sidecar** uses the top-level `telemetry` block in `values.yaml` (same key names as application configs: `enabled`, `service_name`, `otlp_endpoint`, …) with optional `sidecar.telemetry` overrides. This becomes `telemetry:` in the auth `ConfigMap`.
 - **Envoy** uses `envoy.tracing`. When `envoy.tracing.enabled` is true, the chart injects a bootstrap [OpenTelemetry](https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/trace/v3/opentelemetry.proto.html) tracer (OTLP gRPC) and a static `clusters` entry for the collector. Defaults:

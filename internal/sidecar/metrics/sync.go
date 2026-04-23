@@ -18,39 +18,39 @@ const (
 var (
 	controllerStreamOpens = promauto.NewCounter(
 		prometheus.CounterOpts{
-			Name: "auth_sidecar_controller_sync_stream_opens_total",
+			Name: "sidecar_controller_sync_stream_opens_total",
 			Help: "Successful SyncAccess stream handshakes (after initial Send).",
 		},
 	)
 	controllerStreamCloses = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "auth_sidecar_controller_sync_stream_closes_total",
+			Name: "sidecar_controller_sync_stream_closes_total",
 			Help: "Sync stream ends by reason.",
 		},
 		[]string{"reason"},
 	)
 	controllerReconnects = promauto.NewCounter(
 		prometheus.CounterOpts{
-			Name: "auth_sidecar_controller_sync_reconnects_total",
+			Name: "sidecar_controller_sync_reconnects_total",
 			Help: "Backoff reconnects after controller sync stream failure.",
 		},
 	)
 	controllerSyncMessages = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "auth_sidecar_controller_sync_messages_total",
+			Name: "sidecar_controller_sync_messages_total",
 			Help: "Messages received on SyncAccess stream.",
 		},
 		[]string{"kind"},
 	)
 	controllerConnected = promauto.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "auth_sidecar_controller_connected",
+			Name: "sidecar_controller_connected",
 			Help: "1 if SyncAccess stream is active, else 0.",
 		},
 	)
 	accessContractsCount = promauto.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "auth_sidecar_access_contracts_count",
+			Name: "sidecar_access_contracts_count",
 			Help: "Number of contracts in in-memory access storage.",
 		},
 	)

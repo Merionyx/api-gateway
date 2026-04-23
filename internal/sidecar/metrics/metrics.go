@@ -7,7 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-// Fixed reason labels for auth_sidecar_authorization_decisions_total (low cardinality).
+// Fixed reason labels for sidecar_authorization_decisions_total (low cardinality).
 const (
 	ReasonContractNotFound      = "contract_not_found"
 	ReasonInsecureAllow         = "insecure_allow"
@@ -30,14 +30,14 @@ const (
 var (
 	authorizationDecisions = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "auth_sidecar_authorization_decisions_total",
+			Name: "sidecar_authorization_decisions_total",
 			Help: "Authorization check outcomes from ext_authz.",
 		},
 		[]string{"result", "reason"},
 	)
 	checkDuration = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "auth_sidecar_authorization_check_duration_seconds",
+			Name:    "sidecar_authorization_check_duration_seconds",
 			Help:    "Duration of ext_authz Check handler.",
 			Buckets: prometheus.DefBuckets,
 		},

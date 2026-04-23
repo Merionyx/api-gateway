@@ -12,15 +12,15 @@ services:
       dockerfile: build/release/Dockerfile
       args:
         SERVICE: sidecar
-        OCI_NAME: "Auth Sidecar"
+        OCI_NAME: "Sidecar"
     container_name: sidecar-dev
     ports:
       - "9101:9001"
     environment:
       - CONFIG_PATH=./configs/sidecar/config.dev.yaml
-      - AUTH_SIDECAR_CONTROLLER_ADDRESS=gateway-controller-dev:19090
-      - AUTH_SIDECAR_CONTROLLER_ENVIRONMENT=dev
-      - AUTH_SIDECAR_JWT_JWKS_URL=http://api-server:8080/.well-known/jwks.json
+      - SIDECAR_CONTROLLER_ADDRESS=gateway-controller-dev:19090
+      - SIDECAR_CONTROLLER_ENVIRONMENT=dev
+      - SIDECAR_JWT_JWKS_URL=http://api-server:8080/.well-known/jwks.json
     networks:
       default:
       dev-network:
@@ -36,15 +36,15 @@ services:
       dockerfile: build/release/Dockerfile
       args:
         SERVICE: sidecar
-        OCI_NAME: "Auth Sidecar"
+        OCI_NAME: "Sidecar"
     container_name: sidecar-prod
     ports:
       - "9102:9001"
     environment:
       - CONFIG_PATH=./configs/sidecar/config.prod.yaml
-      - AUTH_SIDECAR_CONTROLLER_ADDRESS=gateway-controller-prod:19090
-      - AUTH_SIDECAR_CONTROLLER_ENVIRONMENT=dev
-      - AUTH_SIDECAR_JWT_JWKS_URL=http://api-server:8080/.well-known/jwks.json
+      - SIDECAR_CONTROLLER_ADDRESS=gateway-controller-prod:19090
+      - SIDECAR_CONTROLLER_ENVIRONMENT=dev
+      - SIDECAR_JWT_JWKS_URL=http://api-server:8080/.well-known/jwks.json
     networks:
       default:
       prod-network:
