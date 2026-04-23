@@ -16,11 +16,12 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
 	"github.com/merionyx/api-gateway/internal/api-server/idempotency"
 	apimetrics "github.com/merionyx/api-gateway/internal/api-server/metrics"
+	"github.com/merionyx/api-gateway/internal/api-server/safelog"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/bundle"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/registry"
 	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
-	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
+	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
 
 // RegistryHandler implements registry / bundle / tenant HTTP operations from the OpenAPI spec.
@@ -67,7 +68,7 @@ func (h *RegistryHandler) ListBundleKeys(c fiber.Ctx, params apiserver.ListBundl
 	for _, key := range items {
 		b, err := bundleFromCanonicalKey(key)
 		if err != nil {
-			slog.Warn("skip invalid bundle key from etcd", "key", key, "err", err)
+			slog.Warn("skip invalid bundle key from etcd", "key", key, "err", safelog.Redact(err.Error()))
 			continue
 		}
 		apiItems = append(apiItems, b)
@@ -163,7 +164,11 @@ func logHTTPProblem(st int, p *apiserver.Problem, cause error) {
 	if p != nil && p.Code != nil {
 		code = *p.Code
 	}
-	slog.Error("http problem response", "status", st, "code", code, "err", cause)
+	msg := ""
+	if cause != nil {
+		msg = safelog.Redact(cause.Error())
+	}
+	slog.Error("http problem response", "status", st, "code", code, "err", msg)
 }
 
 func (h *RegistryHandler) ListContractsInBundle(c fiber.Ctx, params apiserver.ListContractsInBundleParams) error {

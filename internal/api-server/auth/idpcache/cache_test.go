@@ -121,3 +121,40 @@ func TestCache_closeClears(t *testing.T) {
 		t.Fatal("expected miss after close")
 	}
 }
+
+func TestCache_metricsHooks(t *testing.T) {
+	t.Parallel()
+	var hits, misses, puts, invs int
+	c := New(nil)
+	c.SetMetricsHooks(
+		func(hit bool) {
+			if hit {
+				hits++
+			} else {
+				misses++
+			}
+		},
+		func() { puts++ },
+		func() { invs++ },
+	)
+	if _, ok := c.Get("nope"); ok {
+		t.Fatal("expected miss")
+	}
+	if misses != 1 || hits != 0 {
+		t.Fatalf("lookup miss: hits=%d misses=%d", hits, misses)
+	}
+	c.Put("s", "t", time.Minute)
+	if puts != 1 {
+		t.Fatalf("puts %d", puts)
+	}
+	if _, ok := c.Get("s"); !ok {
+		t.Fatal("expected hit")
+	}
+	if hits != 1 {
+		t.Fatalf("hits %d", hits)
+	}
+	c.Invalidate("s")
+	if invs != 1 {
+		t.Fatalf("invs %d", invs)
+	}
+}

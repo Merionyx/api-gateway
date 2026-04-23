@@ -10,6 +10,7 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/problem"
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
+	"github.com/merionyx/api-gateway/internal/api-server/safelog"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
 )
 
@@ -47,10 +48,10 @@ func (h *OIDCRefreshHandler) Refresh(c fiber.Ctx) error {
 		case http.StatusConflict:
 			return problem.Write(c, st, problem.Conflict(code, "", detail))
 		case http.StatusBadGateway:
-			slog.Error("oidc refresh discovery", "err", err)
+			slog.Error("oidc refresh discovery", "err", safelog.Redact(err.Error()))
 			return problem.Write(c, st, problem.BadGateway(code, "", detail))
 		case http.StatusServiceUnavailable:
-			slog.Error("oidc refresh dependency", "err", err)
+			slog.Error("oidc refresh dependency", "err", safelog.Redact(err.Error()))
 			return problem.Write(c, st, problem.ServiceUnavailable(code, "", detail))
 		default:
 			return problem.WriteInternal(c, err)

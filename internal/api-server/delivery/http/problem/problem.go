@@ -9,6 +9,7 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
 	apimetrics "github.com/merionyx/api-gateway/internal/api-server/metrics"
+	"github.com/merionyx/api-gateway/internal/api-server/safelog"
 )
 
 // ContentType is the media type for Problem Details (RFC 7807).
@@ -119,12 +120,20 @@ func logProblemResponse(st int, p *apiserver.Problem, err error) {
 	if p != nil && p.Code != nil {
 		code = *p.Code
 	}
-	slog.Error("http problem response", "status", st, "code", code, "err", err)
+	msg := ""
+	if err != nil {
+		msg = safelog.Redact(err.Error())
+	}
+	slog.Error("http problem response", "status", st, "code", code, "err", msg)
 }
 
 // WriteInternal writes 500 with a stable code; logs the full error server-side only.
 func WriteInternal(c fiber.Ctx, err error) error {
-	slog.Error("http internal error", "err", err)
+	msg := ""
+	if err != nil {
+		msg = safelog.Redact(err.Error())
+	}
+	slog.Error("http internal error", "err", msg)
 	p := WithCode(http.StatusInternalServerError, CodeInternalError, "", DetailInternalError)
 	return Write(c, http.StatusInternalServerError, p)
 }

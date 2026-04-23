@@ -25,6 +25,11 @@ type Cache struct {
 	mu  sync.RWMutex
 	m   map[string]entry
 	now func() time.Time
+
+	// Optional hooks (set once at startup; roadmap ш. 25). Must not log token material.
+	onGet        func(hit bool)
+	onPut        func()
+	onInvalidate func()
 }
 
 // New returns an empty cache. If now is nil, time.Now is used.
@@ -36,6 +41,13 @@ func New(now func() time.Time) *Cache {
 		m:   make(map[string]entry),
 		now: now,
 	}
+}
+
+// SetMetricsHooks registers low-cardinality callbacks for Prometheus (optional). Call before serving traffic.
+func (c *Cache) SetMetricsHooks(onGet func(hit bool), onPut, onInvalidate func()) {
+	c.onGet = onGet
+	c.onPut = onPut
+	c.onInvalidate = onInvalidate
 }
 
 // Now is the cache clock (for tests).
@@ -52,7 +64,11 @@ func (c *Cache) Get(sessionID string) (token string, ok bool) {
 	c.mu.RLock()
 	e, found := c.m[sessionID]
 	c.mu.RUnlock()
-	if !found || !now.Before(e.deadline) {
+	hit := found && now.Before(e.deadline)
+	if c.onGet != nil {
+		c.onGet(hit)
+	}
+	if !hit {
 		return "", false
 	}
 	return string(e.token), true
@@ -71,6 +87,9 @@ func (c *Cache) Put(sessionID, token string, ttl time.Duration) {
 		zeroBytes(old.token)
 	}
 	c.m[sessionID] = entry{token: buf, deadline: deadline}
+	if c.onPut != nil {
+		c.onPut()
+	}
 }
 
 // Invalidate removes the session entry and zeroes the previous token buffer.
@@ -83,6 +102,9 @@ func (c *Cache) Invalidate(sessionID string) {
 	if old, ok := c.m[sessionID]; ok {
 		zeroBytes(old.token)
 		delete(c.m, sessionID)
+		if c.onInvalidate != nil {
+			c.onInvalidate()
+		}
 	}
 }
 

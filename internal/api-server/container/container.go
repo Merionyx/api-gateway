@@ -18,6 +18,7 @@ import (
 	httphandler "github.com/merionyx/api-gateway/internal/api-server/delivery/http/handler"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/api-server/idempotency"
+	"github.com/merionyx/api-gateway/internal/api-server/metrics"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/bundle"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/registry"
@@ -166,6 +167,19 @@ func (c *Container) initUseCases() error {
 	if c.SessionSealer != nil && len(c.Config.Auth.OIDCProviders) > 0 {
 		idpAccessCache = idpcache.New(nil)
 		c.IdpAccessCache = idpAccessCache
+		if c.Config.MetricsHTTP.Enabled {
+			idpAccessCache.SetMetricsHooks(
+				func(hit bool) {
+					if hit {
+						metrics.RecordIdpAccessCacheEvent(true, metrics.IdpAccessCacheHit)
+					} else {
+						metrics.RecordIdpAccessCacheEvent(true, metrics.IdpAccessCacheMiss)
+					}
+				},
+				func() { metrics.RecordIdpAccessCacheEvent(true, metrics.IdpAccessCachePut) },
+				func() { metrics.RecordIdpAccessCacheEvent(true, metrics.IdpAccessCacheInvalidate) },
+			)
+		}
 	}
 
 	c.OIDCLoginUseCase = auth.NewOIDCLoginUseCase(

@@ -10,6 +10,7 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/problem"
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
+	"github.com/merionyx/api-gateway/internal/api-server/safelog"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
 )
 
@@ -40,10 +41,10 @@ func (h *OIDCLoginHandler) Login(c fiber.Ctx, params apiserver.LoginOidcParams) 
 		case http.StatusBadRequest:
 			return problem.Write(c, st, problem.WithCode(st, code, "", detail))
 		case http.StatusBadGateway:
-			slog.Error("oidc login discovery", "err", err)
+			slog.Error("oidc login discovery", "err", safelog.Redact(err.Error()))
 			return problem.Write(c, st, problem.BadGateway(code, "", detail))
 		case http.StatusServiceUnavailable:
-			slog.Error("oidc login store", "err", err)
+			slog.Error("oidc login store", "err", safelog.Redact(err.Error()))
 			return problem.Write(c, st, problem.ServiceUnavailable(code, "", detail))
 		default:
 			return problem.WriteInternal(c, err)
