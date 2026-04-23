@@ -32,6 +32,14 @@ spec:
         env:
         - name: CONFIG_PATH
           value: /api-server/config/k8s.yaml
+        {{- $sessionKekSecret := trim (.Values.components.apiServer.sessionKek.existingSecret | default "") }}
+        {{- if ne $sessionKekSecret "" }}
+        - name: API_SERVER_AUTH_SESSION_KEK_BASE64
+          valueFrom:
+            secretKeyRef:
+              name: {{ $sessionKekSecret | quote }}
+              key: {{ (.Values.components.apiServer.sessionKek.secretKey | default "kek") | quote }}
+        {{- end }}
         ports:
         - name: http
           containerPort: 8080

@@ -102,6 +102,12 @@ components:
       minAvailable: 1
     jwt:
       existingSecret: ""
+    # Session KEK for encrypting IdP refresh tokens at rest (auth.session_kek_base64).
+    # Set existingSecret to a Secret name in the release namespace; never commit raw key material in values.
+    # Injects API_SERVER_AUTH_SESSION_KEK_BASE64 from secretKeyRef (see docs/operator-api-server-auth.md).
+    sessionKek:
+      existingSecret: ""
+      secretKey: "kek"
     # Merged over chart defaults (e.g. readiness.require_contract_syncer for GET /ready).
     config: {}
     # Merged over global .telemetry; use to override tracing for this component only.
