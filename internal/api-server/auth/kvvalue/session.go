@@ -30,6 +30,9 @@ type SessionValue struct {
 	// LoginIntentID links to login-intents/{intent_id} established this session (roadmap ш. 13–14).
 	LoginIntentID string `json:"login_intent_id,omitempty"`
 
+	// ProviderID is the configured OIDC provider used for this session (IdP token refresh; roadmap ш. 17).
+	ProviderID string `json:"provider_id,omitempty"`
+
 	// OurRefreshVerifier is an opaque verifier for the current our-refresh chain (hash/HMAC handle);
 	// plaintext our refresh must not appear in etcd (roadmap п. 13).
 	OurRefreshVerifier string `json:"our_refresh_verifier,omitempty"`

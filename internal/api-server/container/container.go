@@ -33,20 +33,21 @@ type Container struct {
 	EtcdClient *clientv3.Client
 	LeaderGate election.LeaderGate
 
-	SnapshotRepository   interfaces.SnapshotRepository
-	ControllerRepository interfaces.ControllerRepository
-	APIKeyRepository       *etcd.APIKeyRepository
-	SessionRepository      *etcd.SessionRepository
-	LoginIntentRepository  *etcd.LoginIntentRepository
+	SnapshotRepository    interfaces.SnapshotRepository
+	ControllerRepository  interfaces.ControllerRepository
+	APIKeyRepository      *etcd.APIKeyRepository
+	SessionRepository     *etcd.SessionRepository
+	LoginIntentRepository *etcd.LoginIntentRepository
 
 	// ContractSyncerGRPC is the gRPC adapter for Contract Syncer (sync, export, ping).
 	ContractSyncerGRPC *contractsyncergrpc.Client
 
-	JWTUseCase                *auth.JWTUseCase
-	OIDCLoginUseCase          *auth.OIDCLoginUseCase
-	OIDCCallbackUseCase       *auth.OIDCCallbackUseCase
+	JWTUseCase          *auth.JWTUseCase
+	OIDCLoginUseCase    *auth.OIDCLoginUseCase
+	OIDCCallbackUseCase *auth.OIDCCallbackUseCase
+	OIDCRefreshUseCase  *auth.OIDCRefreshUseCase
 
-	SessionSealer *sessioncrypto.Keyring
+	SessionSealer             *sessioncrypto.Keyring
 	ControllerRegistryUseCase interfaces.ControllerRegistryUseCase
 	BundleSyncUseCase         interfaces.BundleSyncUseCase
 
@@ -55,6 +56,7 @@ type Container struct {
 	OIDCLoginHandler *httphandler.OIDCLoginHandler
 
 	OIDCCallbackHandler *httphandler.OIDCCallbackHandler
+	OIDCRefreshHandler  *httphandler.OIDCRefreshHandler
 
 	ContractsExportHandler *httphandler.ContractsExportHandler
 
@@ -175,6 +177,17 @@ func (c *Container) initUseCases() error {
 		c.Config.Auth.InteractiveAccessTokenTTL,
 	)
 
+	if len(c.Config.Auth.OIDCProviders) > 0 && c.SessionSealer != nil {
+		c.OIDCRefreshUseCase = auth.NewOIDCRefreshUseCase(
+			c.Config.Auth.OIDCProviders,
+			c.SessionRepository,
+			c.SessionSealer,
+			c.JWTUseCase,
+			&http.Client{Timeout: 25 * time.Second},
+			c.Config.Auth.InteractiveAccessTokenTTL,
+		)
+	}
+
 	c.ControllerRegistryUseCase = registry.NewControllerRegistryUseCase(
 		c.ControllerRepository,
 		c.SnapshotRepository,
@@ -217,6 +230,9 @@ func (c *Container) initHandlers() {
 	c.JWTHandler = httphandler.NewJWTHandler(c.JWTUseCase, c.Config.MetricsHTTP.Enabled)
 	c.OIDCLoginHandler = httphandler.NewOIDCLoginHandler(c.OIDCLoginUseCase)
 	c.OIDCCallbackHandler = httphandler.NewOIDCCallbackHandler(c.OIDCCallbackUseCase)
+	if c.OIDCRefreshUseCase != nil {
+		c.OIDCRefreshHandler = httphandler.NewOIDCRefreshHandler(c.OIDCRefreshUseCase)
+	}
 	exportUC := bundle.NewContractExportUseCase(c.ContractSyncerGRPC)
 	c.ContractsExportHandler = httphandler.NewContractsExportHandler(exportUC)
 	c.RegistryHandler = httphandler.NewRegistryHandler(

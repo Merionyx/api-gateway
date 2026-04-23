@@ -11,6 +11,8 @@ const (
 	CodeSigningOperationFailed      = "SIGNING_OPERATION_FAILED"
 	CodeStoreUnavailable            = "STORE_UNAVAILABLE"
 	CodeContractSyncerUnavailable   = "CONTRACT_SYNCER_UNAVAILABLE"
+	CodeSessionRefreshConflict      = "REFRESH_STATE_CONFLICT"
+	CodeSessionAuthFailed           = "SESSION_AUTH_FAILED"
 	CodeInternalError               = "INTERNAL_ERROR"
 
 	CodeContractSyncPipelineFailed = "CONTRACT_SYNC_PIPELINE_FAILED"
@@ -26,6 +28,8 @@ const (
 	DetailSigningOperationFailed      = "Signing the token failed."
 	DetailStoreUnavailable            = "Required storage is temporarily unavailable."
 	DetailContractSyncerUnavailable   = "The contract sync service is temporarily unavailable."
+	DetailSessionRefreshConflict        = "Session state changed concurrently; retry with backoff or use the latest token pair from a successful refresh."
+	DetailSessionAuthFailed             = "Refresh token is invalid, expired, or revoked."
 	DetailInternalError               = "An unexpected error occurred."
 	DetailContractSyncPipelineFailed  = "The contract sync request could not be completed."
 )

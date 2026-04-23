@@ -120,7 +120,29 @@ func (r *SessionRepository) Put(ctx context.Context, sessionID string, v kvvalue
 	return nil
 }
 
-// Create writes the session only if the key does not exist (post-callback first write).
+func validateRefreshVerifierHex(v string) error {
+	s := strings.TrimSpace(v)
+	if len(s) != 64 {
+		return errors.New("etcd: refresh verifier must be 64 lowercase hex chars")
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') {
+			continue
+		}
+		return errors.New("etcd: refresh verifier must be lowercase hex")
+	}
+	return nil
+}
+
+func (r *SessionRepository) refreshVerifierIndexKey(verifier string) (string, error) {
+	if err := validateRefreshVerifierHex(verifier); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s/session-refresh-verifiers/%s", r.prefix, strings.TrimSpace(verifier)), nil
+}
+
+// Create writes the session and refresh-verifier index atomically (post-callback first write).
 func (r *SessionRepository) Create(ctx context.Context, sessionID string, v kvvalue.SessionValue) error {
 	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanSessionRepo, "Create"))
 	var err error
@@ -129,7 +151,18 @@ func (r *SessionRepository) Create(ctx context.Context, sessionID string, v kvva
 		span.End()
 	}()
 
+	if strings.TrimSpace(v.OurRefreshVerifier) == "" {
+		return errors.New("etcd: session OurRefreshVerifier is required")
+	}
+	canonID, err := validateCanonicalSessionUUIDv4(sessionID)
+	if err != nil {
+		return err
+	}
 	key, err := r.sessionKey(sessionID)
+	if err != nil {
+		return err
+	}
+	idxKey, err := r.refreshVerifierIndexKey(v.OurRefreshVerifier)
 	if err != nil {
 		return err
 	}
@@ -137,8 +170,12 @@ func (r *SessionRepository) Create(ctx context.Context, sessionID string, v kvva
 	if err != nil {
 		return err
 	}
-	cond := clientv3.Compare(clientv3.CreateRevision(key), "=", 0)
-	txn := r.client.Txn(ctx).If(cond).Then(clientv3.OpPut(key, string(raw)))
+	condS := clientv3.Compare(clientv3.CreateRevision(key), "=", 0)
+	condI := clientv3.Compare(clientv3.CreateRevision(idxKey), "=", 0)
+	txn := r.client.Txn(ctx).If(condS, condI).Then(
+		clientv3.OpPut(key, string(raw)),
+		clientv3.OpPut(idxKey, canonID),
+	)
 	resp, err := txn.Commit()
 	if err != nil {
 		return apierrors.JoinStore("etcd txn create session", err)
@@ -147,6 +184,36 @@ func (r *SessionRepository) Create(ctx context.Context, sessionID string, v kvva
 		return ErrSessionAlreadyExists
 	}
 	return nil
+}
+
+// GetSessionIDByRefreshVerifier resolves sessions/{id} via session-refresh-verifiers/{sha256_hex}.
+func (r *SessionRepository) GetSessionIDByRefreshVerifier(ctx context.Context, verifier string) (string, error) {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanSessionRepo, "GetSessionIDByRefreshVerifier"))
+	var err error
+	defer func() {
+		if err != nil && !errors.Is(err, apierrors.ErrNotFound) {
+			telemetry.MarkError(span, err)
+		}
+		span.End()
+	}()
+
+	idxKey, err := r.refreshVerifierIndexKey(verifier)
+	if err != nil {
+		return "", err
+	}
+	resp, err := r.client.Get(ctx, idxKey)
+	if err != nil {
+		return "", apierrors.JoinStore("etcd get refresh index", err)
+	}
+	if len(resp.Kvs) == 0 {
+		err = apierrors.ErrNotFound
+		return "", err
+	}
+	sid := strings.TrimSpace(string(resp.Kvs[0].Value))
+	if _, err := validateCanonicalSessionUUIDv4(sid); err != nil {
+		return "", fmt.Errorf("etcd: corrupt refresh index value: %w", err)
+	}
+	return sid, nil
 }
 
 // ReplaceCAS updates the session only if mod_revision matches (refresh winner path).
@@ -174,6 +241,60 @@ func (r *SessionRepository) ReplaceCAS(ctx context.Context, sessionID string, v 
 	resp, err := txn.Commit()
 	if err != nil {
 		return apierrors.JoinStore("etcd txn replace session", err)
+	}
+	if !resp.Succeeded {
+		return ErrSessionCASConflict
+	}
+	return nil
+}
+
+// ReplaceCASWithRefreshIndex updates the session and rotates the refresh-verifier index in one txn (ADR 0001).
+func (r *SessionRepository) ReplaceCASWithRefreshIndex(ctx context.Context, sessionID, oldVerifier, newVerifier string, v kvvalue.SessionValue, expectedModRevision int64) error {
+	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanSessionRepo, "ReplaceCASWithRefreshIndex"))
+	var err error
+	defer func() {
+		telemetry.MarkError(span, err)
+		span.End()
+	}()
+
+	if expectedModRevision <= 0 {
+		return errors.New("etcd: ReplaceCASWithRefreshIndex expected_mod_revision must be > 0")
+	}
+	if strings.TrimSpace(oldVerifier) == "" || strings.TrimSpace(newVerifier) == "" {
+		return errors.New("etcd: old and new refresh verifiers are required")
+	}
+	if oldVerifier == newVerifier {
+		return errors.New("etcd: refresh verifiers must differ on rotation")
+	}
+	canonID, err := validateCanonicalSessionUUIDv4(sessionID)
+	if err != nil {
+		return err
+	}
+	key, err := r.sessionKey(sessionID)
+	if err != nil {
+		return err
+	}
+	oldIdx, err := r.refreshVerifierIndexKey(oldVerifier)
+	if err != nil {
+		return err
+	}
+	newIdx, err := r.refreshVerifierIndexKey(newVerifier)
+	if err != nil {
+		return err
+	}
+	raw, err := kvvalue.MarshalSessionValueJSON(v)
+	if err != nil {
+		return err
+	}
+	cmp := clientv3.Compare(clientv3.ModRevision(key), "=", expectedModRevision)
+	ops := []clientv3.Op{
+		clientv3.OpPut(key, string(raw)),
+		clientv3.OpDelete(oldIdx),
+		clientv3.OpPut(newIdx, canonID),
+	}
+	resp, err := r.client.Txn(ctx).If(cmp).Then(ops...).Commit()
+	if err != nil {
+		return apierrors.JoinStore("etcd txn replace session+refresh index", err)
 	}
 	if !resp.Succeeded {
 		return ErrSessionCASConflict

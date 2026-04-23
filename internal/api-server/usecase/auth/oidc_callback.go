@@ -174,6 +174,7 @@ func (u *OIDCCallbackUseCase) Complete(ctx context.Context, code, state string) 
 		ClaimsSnapshot:      snap,
 		RotationGeneration:  0,
 		LoginIntentID:       state,
+		ProviderID:          strings.TrimSpace(intent.ProviderID),
 		OurRefreshVerifier:  verifier,
 	}
 	if err := u.sessions.Create(ctx, sessionID, sess); err != nil {

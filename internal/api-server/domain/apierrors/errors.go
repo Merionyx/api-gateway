@@ -51,4 +51,10 @@ var (
 
 	// ErrOIDCRedirectNotAllowlisted means redirect_uri is not on the provider allowlist (HTTP 400).
 	ErrOIDCRedirectNotAllowlisted = errors.New("redirect_uri not allowlisted")
+
+	// ErrSessionRefreshConflict means etcd CAS lost during refresh (HTTP 409, ADR 0001).
+	ErrSessionRefreshConflict = errors.New("session refresh state conflict")
+
+	// ErrSessionAuthFailed means invalid or unknown refresh / session (HTTP 401).
+	ErrSessionAuthFailed = errors.New("session authentication failed")
 )

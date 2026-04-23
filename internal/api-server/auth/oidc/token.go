@@ -64,6 +64,50 @@ func ExchangeAuthorizationCode(ctx context.Context, hc *http.Client, tokenEndpoi
 	return &tr, nil
 }
 
+// ExchangeRefreshToken calls the token endpoint with grant_type=refresh_token (RFC 6749).
+// id_token in the response is optional; access_token is required.
+func ExchangeRefreshToken(ctx context.Context, hc *http.Client, tokenEndpoint, clientID, clientSecret, refreshToken string) (*TokenResponse, error) {
+	if hc == nil {
+		hc = http.DefaultClient
+	}
+	rt := strings.TrimSpace(refreshToken)
+	if rt == "" {
+		return nil, fmt.Errorf("%w: empty refresh_token", ErrTokenExchange)
+	}
+	form := url.Values{}
+	form.Set("grant_type", "refresh_token")
+	form.Set("refresh_token", rt)
+	form.Set("client_id", clientID)
+	form.Set("client_secret", clientSecret)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenEndpoint, strings.NewReader(form.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := hc.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrTokenExchange, err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return nil, fmt.Errorf("%w: read: %w", ErrTokenExchange, err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%w: status %d body=%s", ErrTokenExchange, resp.StatusCode, truncateForErr(body, 512))
+	}
+	var tr TokenResponse
+	if err := json.Unmarshal(body, &tr); err != nil {
+		return nil, fmt.Errorf("%w: json: %w", ErrTokenExchange, err)
+	}
+	if strings.TrimSpace(tr.AccessToken) == "" {
+		return nil, fmt.Errorf("%w: missing access_token", ErrTokenExchange)
+	}
+	return &tr, nil
+}
+
 func truncateForErr(b []byte, max int) string {
 	s := string(b)
 	if len(s) > max {

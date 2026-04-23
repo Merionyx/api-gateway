@@ -38,7 +38,10 @@ func (s *OpenAPIServer) CallbackOidc(c fiber.Ctx, params apiserver.CallbackOidcP
 }
 
 func (s *OpenAPIServer) RefreshSession(c fiber.Ctx) error {
-	return authFlowNotImplemented(c, "Session refresh is not implemented yet (roadmap steps 17–18).")
+	if s.c.OIDCRefreshHandler == nil {
+		return authFlowNotImplemented(c, "Session refresh requires auth.oidc_providers and auth.session_kek_base64 (roadmap step 18: IdP down branch not implemented yet).")
+	}
+	return s.c.OIDCRefreshHandler.Refresh(c)
 }
 
 func (s *OpenAPIServer) IssueEdgeToken(c fiber.Ctx) error {
