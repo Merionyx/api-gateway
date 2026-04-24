@@ -37,6 +37,10 @@ type OIDCProviderConfig struct {
 
 // GitHubOIDCProviderConfig restricts or enriches interactive login via GitHub REST (orgs, teams).
 type GitHubOIDCProviderConfig struct {
+	// AuthFlow selects how browser authorization is initiated.
+	// "oauth_app" (default) keeps OAuth App style scopes like read:org.
+	// "github_app" uses GitHub App user authorization flow, which does not send OAuth scopes.
+	AuthFlow string `mapstructure:"auth_flow" json:"auth_flow,omitempty"`
 	// RESTAPIBase overrides https://api.github.com (GitHub Enterprise Server: https://HOST/api/v3).
 	RESTAPIBase string `mapstructure:"rest_api_base" json:"rest_api_base,omitempty"`
 	// AllowedOrgLogins, if non-empty, requires the user to be a member of at least one listed organization (login names, case-insensitive).
@@ -69,12 +73,27 @@ type GitLabOIDCProviderConfig struct {
 // GitLabGroupRoleBinding maps membership in a GitLab group (full_path) to API Server role strings.
 type GitLabGroupRoleBinding struct {
 	GroupFullPath string   `mapstructure:"group_full_path" json:"group_full_path"`
-	Roles           []string `mapstructure:"roles" json:"roles,omitempty"`
+	Roles         []string `mapstructure:"roles" json:"roles,omitempty"`
 }
 
 // IsGitHubOIDCProvider reports whether this entry uses GitHub-specific org/team handling.
 func (p OIDCProviderConfig) IsGitHubOIDCProvider() bool {
 	return strings.EqualFold(strings.TrimSpace(p.Kind), "github")
+}
+
+// GitHubAuthFlow returns the normalized GitHub browser auth flow mode.
+func (p OIDCProviderConfig) GitHubAuthFlow() string {
+	if p.GitHub == nil {
+		return "oauth_app"
+	}
+	switch strings.ToLower(strings.TrimSpace(p.GitHub.AuthFlow)) {
+	case "", "oauth_app":
+		return "oauth_app"
+	case "github_app":
+		return "github_app"
+	default:
+		return strings.ToLower(strings.TrimSpace(p.GitHub.AuthFlow))
+	}
 }
 
 // IsGitLabOIDCProvider reports whether this entry uses GitLab-specific group handling.
@@ -288,6 +307,9 @@ func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=github requires issuer %q (documented id_token iss is still https://github.com)", id, GitHubOIDCDiscoveryIssuer)
 		}
 		g := p.GitHub
+		if flow := p.GitHubAuthFlow(); flow != "oauth_app" && flow != "github_app" {
+			return fmt.Errorf("auth.oidc_providers[%q].github.auth_flow: want oauth_app or github_app", id)
+		}
 		if g == nil {
 			return nil
 		}

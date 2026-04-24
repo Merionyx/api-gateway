@@ -71,6 +71,7 @@ auth:
   #     client_secret: "…"
   #     redirect_uri_allowlist: ["http://127.0.0.1:21987/callback"]
   #     github:
+  #       auth_flow: "oauth_app"   # or "github_app" for GitHub App user-to-server tokens (no OAuth scopes in authorize URL)
   #       allowed_org_logins: ["my-org"]
   #       team_role_bindings:
   #         - { org: "my-org", team_slug: "admins", roles: ["api:admin"] }

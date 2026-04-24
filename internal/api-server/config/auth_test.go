@@ -53,6 +53,32 @@ func TestValidateOIDCProviders_GitHub(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	err = ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "gh",
+		Issuer:               GitHubOIDCDiscoveryIssuer,
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		Kind:                 "github",
+		GitHub:               &GitHubOIDCProviderConfig{AuthFlow: "bad"},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "auth_flow") {
+		t.Fatalf("expected auth_flow validation error, got %v", err)
+	}
+
+	err = ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "gh",
+		Issuer:               GitHubOIDCDiscoveryIssuer,
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		Kind:                 "github",
+		GitHub:               &GitHubOIDCProviderConfig{AuthFlow: "github_app"},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestValidateOIDCProviders_GitLab(t *testing.T) {
@@ -396,9 +422,9 @@ func TestValidateOIDCProviders_GenericMustNotSetIdpBlocks(t *testing.T) {
 func TestAuthConfig_BootstrapAPIKeyAllowed(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name   string
-		cfg    AuthConfig
-		allow  bool
+		name  string
+		cfg   AuthConfig
+		allow bool
 	}{
 		{"off", AuthConfig{AllowInsecureBootstrap: false, Environment: "development"}, false},
 		{"prod flag on still blocked", AuthConfig{AllowInsecureBootstrap: true, Environment: "production"}, false},

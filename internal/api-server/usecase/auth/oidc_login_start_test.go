@@ -99,3 +99,22 @@ func TestOIDCLoginUseCase_Start_HappyPath(t *testing.T) {
 		t.Fatalf("intent: %+v", stub.last)
 	}
 }
+
+func TestApplyProviderAuthorizeParams_googleAddsOfflineRefreshParams(t *testing.T) {
+	t.Parallel()
+
+	q := url.Values{}
+	applyProviderAuthorizeParams(q, config.OIDCProviderConfig{
+		ID:   "google",
+		Kind: "google",
+	})
+	if q.Get("access_type") != "offline" {
+		t.Fatalf("access_type=%q", q.Get("access_type"))
+	}
+	if q.Get("include_granted_scopes") != "true" {
+		t.Fatalf("include_granted_scopes=%q", q.Get("include_granted_scopes"))
+	}
+	if q.Get("prompt") != "consent" {
+		t.Fatalf("prompt=%q", q.Get("prompt"))
+	}
+}

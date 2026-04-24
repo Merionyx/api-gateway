@@ -204,6 +204,21 @@ func (u *OIDCRefreshUseCase) resolveProvider(sess kvvalue.SessionValue) (config.
 	return config.OIDCProviderConfig{}, fmt.Errorf("%w: session missing provider_id", apierrors.ErrInvalidInput)
 }
 
+func missingIDPRefreshTokenDetail(p config.OIDCProviderConfig) string {
+	switch {
+	case p.IsGoogleOIDCProvider():
+		return "Google did not issue a refresh token for this session. Re-login and ensure the authorization request asks for offline access; this server now sends access_type=offline and prompt=consent."
+	case p.IsGitHubOIDCProvider():
+		return "GitHub did not issue a refresh token for this session. If you use an OAuth App, refresh tokens may be unavailable; use a GitHub App with expiring user-to-server tokens if you need refresh."
+	default:
+		pid := strings.TrimSpace(p.ID)
+		if pid == "" {
+			pid = "configured provider"
+		}
+		return fmt.Sprintf("%s did not issue a refresh token for this session; start login again and verify the provider supports offline refresh.", pid)
+	}
+}
+
 // Refresh rotates our refresh; updates IdP material when the IdP is reachable, otherwise degraded refresh (roadmap ш. 17–18).
 func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, ourRefreshHex string) (apiserver.AuthSessionTokensResponse, error) {
 	var out apiserver.AuthSessionTokensResponse
@@ -253,6 +268,9 @@ func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, ourRefreshHex string) 
 		return out, fmt.Errorf("%w: cannot open session secrets", apierrors.ErrSessionAuthFailed)
 	}
 	idpRT := strings.TrimSpace(string(idpRefreshBytes))
+	if idpRT == "" {
+		return out, fmt.Errorf("%w: %s", oidc.ErrMissingRefreshTokenInTokenResponse, missingIDPRefreshTokenDetail(p))
+	}
 
 	issuer := oidc.NormalizeIssuer(p.Issuer)
 	disc, dErr := oidc.FetchDiscovery(ctx, u.hc, issuer)
@@ -342,6 +360,8 @@ func MapRefreshError(err error) (status int, code, detail string) {
 		return http.StatusUnauthorized, "SESSION_AUTH_FAILED", "Refresh token is invalid, expired, or revoked."
 	case errors.Is(err, apierrors.ErrSessionRefreshConflict):
 		return http.StatusConflict, "REFRESH_STATE_CONFLICT", "Session state changed concurrently; retry with backoff or use the latest token pair from a successful refresh."
+	case errors.Is(err, oidc.ErrMissingRefreshTokenInTokenResponse):
+		return http.StatusUnauthorized, "OIDC_REFRESH_TOKEN_UNAVAILABLE", strings.TrimSpace(strings.TrimPrefix(err.Error(), oidc.ErrMissingRefreshTokenInTokenResponse.Error()+":"))
 	case errors.Is(err, oidc.ErrDiscovery):
 		return http.StatusBadGateway, "OIDC_DISCOVERY_FAILED", "Could not load OpenID configuration from the issuer."
 	case errors.Is(err, oidc.ErrTokenExchange):

@@ -115,13 +115,16 @@ func (u *OIDCLoginUseCase) Start(ctx context.Context, providerID, redirectURI, n
 	q.Set("response_type", "code")
 	q.Set("client_id", p.ClientID)
 	q.Set("redirect_uri", val.RedirectURI)
-	q.Set("scope", buildOIDCScope(p))
+	if scope := buildOIDCScope(p); strings.TrimSpace(scope) != "" {
+		q.Set("scope", scope)
+	}
 	q.Set("state", state)
 	q.Set("code_challenge", chal)
 	q.Set("code_challenge_method", "S256")
 	if val.Nonce != "" {
 		q.Set("nonce", val.Nonce)
 	}
+	applyProviderAuthorizeParams(q, p)
 
 	authURL, err := mergeAuthorizeQuery(disc.AuthorizationEndpoint, q)
 	if err != nil {
@@ -131,9 +134,12 @@ func (u *OIDCLoginUseCase) Start(ctx context.Context, providerID, redirectURI, n
 }
 
 func buildOIDCScope(p config.OIDCProviderConfig) string {
+	if p.IsGitHubOIDCProvider() && p.GitHubAuthFlow() == "github_app" {
+		return ""
+	}
 	parts := []string{"openid"}
 	extra := append([]string(nil), p.ExtraScopes...)
-	if p.IsGitHubOIDCProvider() && !scopeInListCI(extra, "read:org") {
+	if p.IsGitHubOIDCProvider() && p.GitHubAuthFlow() == "oauth_app" && !scopeInListCI(extra, "read:org") {
 		extra = append(extra, "read:org")
 	}
 	if p.IsGitLabOIDCProvider() {
@@ -185,6 +191,19 @@ func scopeInListCI(list []string, s string) bool {
 		}
 	}
 	return false
+}
+
+func applyProviderAuthorizeParams(q url.Values, p config.OIDCProviderConfig) {
+	if q == nil {
+		return
+	}
+	if p.IsGoogleOIDCProvider() {
+		// Google returns refresh_token for web-server OAuth when offline access is requested.
+		// prompt=consent forces a fresh consent screen so re-logins can recover a missing refresh token.
+		q.Set("access_type", "offline")
+		q.Set("include_granted_scopes", "true")
+		q.Set("prompt", "consent")
+	}
 }
 
 func mergeAuthorizeQuery(authEndpoint string, add url.Values) (string, error) {

@@ -19,6 +19,7 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/api-server/auth/idpcache"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/kvvalue"
+	"github.com/merionyx/api-gateway/internal/api-server/auth/oidc"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/sessioncrypto"
 	"github.com/merionyx/api-gateway/internal/api-server/config"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
@@ -51,6 +52,10 @@ func TestMapRefreshError(t *testing.T) {
 	st, code, _ := MapRefreshError(apierrors.ErrSessionRefreshConflict)
 	if st != http.StatusConflict || code != "REFRESH_STATE_CONFLICT" {
 		t.Fatalf("got %d %s", st, code)
+	}
+	st, code, detail := MapRefreshError(fmt.Errorf("%w: provider detail", oidc.ErrMissingRefreshTokenInTokenResponse))
+	if st != http.StatusUnauthorized || code != "OIDC_REFRESH_TOKEN_UNAVAILABLE" || detail != "provider detail" {
+		t.Fatalf("got %d %s %q", st, code, detail)
 	}
 	st, _, _ = MapRefreshError(errors.New("opaque"))
 	if st != http.StatusInternalServerError {
@@ -238,5 +243,81 @@ func TestSessionValue_providerID_roundTrip(t *testing.T) {
 	got, err := kvvalue.ParseSessionValueJSON(b)
 	if err != nil || got.ProviderID != "p1" {
 		t.Fatalf("%+v err %v", got, err)
+	}
+}
+
+func TestOIDCRefresh_missingStoredIDPRefreshToken(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	jwtUC, err := NewJWTUseCase(jwtTestCfg(t, dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	k := make([]byte, 32)
+	for i := range k {
+		k[i] = byte(i + 1)
+	}
+	kr, err := sessioncrypto.NewKeyring(sessioncrypto.KEK{ID: "k", Key: k})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { kr.Close() })
+
+	sealed, err := kr.Seal([]byte(""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	envBytes, err := sessioncrypto.MarshalEnvelope(sealed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	claims, err := json.Marshal(map[string]any{
+		"email": "user@gmail.com",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ourBytes := make([]byte, 32)
+	if _, err := rand.Read(ourBytes); err != nil {
+		t.Fatal(err)
+	}
+	ourHex := hex.EncodeToString(ourBytes)
+	verifier := ourOpaqueRefreshVerifier(ourHex)
+
+	st := &memRefreshSessionStore{
+		sessionID: "sid-1",
+		sess: kvvalue.SessionValue{
+			SchemaVersion:       kvvalue.SessionSchemaV2,
+			EncryptedIDPRefresh: json.RawMessage(envBytes),
+			ClaimsSnapshot:      claims,
+			ProviderID:          "google",
+			OurRefreshVerifier:  verifier,
+		},
+		modRev:   7,
+		verifier: verifier,
+	}
+
+	uc := NewOIDCRefreshUseCase([]config.OIDCProviderConfig{{
+		ID:       "google",
+		Kind:     "google",
+		Issuer:   "https://accounts.google.com",
+		ClientID: "cid",
+	}}, st, kr, jwtUC, http.DefaultClient, 5*time.Minute, false, nil, 0)
+
+	_, err = uc.Refresh(context.Background(), ourHex)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !errors.Is(err, oidc.ErrMissingRefreshTokenInTokenResponse) {
+		t.Fatalf("got %v", err)
+	}
+	stCode, code, detail := MapRefreshError(err)
+	if stCode != http.StatusUnauthorized || code != "OIDC_REFRESH_TOKEN_UNAVAILABLE" {
+		t.Fatalf("got %d %s %q", stCode, code, detail)
+	}
+	if !strings.Contains(detail, "Google did not issue a refresh token") {
+		t.Fatalf("detail %q", detail)
 	}
 }

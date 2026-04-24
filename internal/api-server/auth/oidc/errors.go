@@ -17,6 +17,10 @@ var (
 	// (authorization code flow). Some GitHub App user-token responses only include access_token.
 	ErrMissingIDTokenInTokenResponse = errors.New("oidc: token response missing id_token")
 
+	// ErrMissingRefreshTokenInTokenResponse is returned when the login flow completed without an IdP refresh token,
+	// so the API Server cannot perform IdP-up refresh later.
+	ErrMissingRefreshTokenInTokenResponse = errors.New("oidc: token response missing refresh_token")
+
 	// ErrIDTokenValidation is returned when id_token cannot be cryptographically verified or claims are invalid.
 	ErrIDTokenValidation = errors.New("oidc: id_token validation failed")
 )
