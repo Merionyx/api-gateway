@@ -160,7 +160,12 @@ func (u *OIDCCallbackUseCase) Complete(ctx context.Context, code, state string) 
 		return out, fmt.Errorf("%w: cannot derive subject from id_token (need email or sub)", apierrors.ErrInvalidInput)
 	}
 
-	accessJWT, _, ourAccessExp, err := u.jwt.MintInteractiveAPIAccessJWT(ctx, subject, u.accessTTL)
+	snap, err := claimsSnapshotFromProvider(ctx, p, idClaims, strings.TrimSpace(tr.AccessToken), u.hc)
+	if err != nil {
+		return out, err
+	}
+
+	accessJWT, _, ourAccessExp, err := u.jwt.MintInteractiveAPIAccessJWTFromSnapshot(ctx, subject, snap, u.accessTTL)
 	if err != nil {
 		return out, err
 	}
@@ -179,11 +184,6 @@ func (u *OIDCCallbackUseCase) Complete(ctx context.Context, code, state string) 
 		return out, err
 	}
 	envBytes, err := sessioncrypto.MarshalEnvelope(env)
-	if err != nil {
-		return out, err
-	}
-
-	snap, err := claimsSnapshotFromProvider(ctx, p, idClaims, strings.TrimSpace(tr.AccessToken), u.hc)
 	if err != nil {
 		return out, err
 	}

@@ -73,34 +73,58 @@ func (uc *JWTUseCase) GenerateToken(ctx context.Context, req *models.GenerateTok
 	}, nil
 }
 
-func parseInteractiveSnapshotForJWT(snapshot json.RawMessage) (roles []any, idpIss, idpSub string) {
+// interactiveSnapshotJWTInputs is the subset of claims_snapshot copied into API-profile access JWTs.
+type interactiveSnapshotJWTInputs struct {
+	Roles             []any
+	IDPIss            string
+	IDPSub            string
+	Email             string
+	PreferredUsername string
+	Name              string
+}
+
+func snapshotStringClaim(m map[string]any, key string) string {
+	v, ok := m[key]
+	if !ok || v == nil {
+		return ""
+	}
+	switch t := v.(type) {
+	case string:
+		return strings.TrimSpace(t)
+	default:
+		return strings.TrimSpace(fmt.Sprint(t))
+	}
+}
+
+func parseInteractiveSnapshotForJWT(snapshot json.RawMessage) interactiveSnapshotJWTInputs {
+	var out interactiveSnapshotJWTInputs
+	out.Roles = []any{apiroles.APIMember}
 	if len(snapshot) == 0 {
-		return []any{apiroles.APIMember}, "", ""
+		return out
 	}
 	var m map[string]any
 	if err := json.Unmarshal(snapshot, &m); err != nil {
-		return []any{apiroles.APIMember}, "", ""
+		return out
 	}
 	rolesKeyPresent := false
 	if v, ok := m["roles"]; ok {
 		rolesKeyPresent = true
 		if a, ok := v.([]any); ok {
-			roles = a
+			out.Roles = a
 		}
 	}
-	if roles == nil {
-		roles = []any{}
+	if out.Roles == nil {
+		out.Roles = []any{}
 	}
 	if !rolesKeyPresent {
-		roles = []any{apiroles.APIMember}
+		out.Roles = []any{apiroles.APIMember}
 	}
-	if s, _ := m["idp_iss"].(string); strings.TrimSpace(s) != "" {
-		idpIss = strings.TrimSpace(s)
-	}
-	if s, _ := m["idp_sub"].(string); strings.TrimSpace(s) != "" {
-		idpSub = strings.TrimSpace(s)
-	}
-	return roles, idpIss, idpSub
+	out.IDPIss = snapshotStringClaim(m, "idp_iss")
+	out.IDPSub = snapshotStringClaim(m, "idp_sub")
+	out.Email = snapshotStringClaim(m, "email")
+	out.PreferredUsername = snapshotStringClaim(m, "preferred_username")
+	out.Name = snapshotStringClaim(m, "name")
+	return out
 }
 
 // MintInteractiveAPIAccessJWT issues a short-lived API-profile access JWT after browser OIDC (roadmap ш. 14–15).
@@ -116,7 +140,7 @@ func (uc *JWTUseCase) MintInteractiveAPIAccessJWTFromSnapshot(ctx context.Contex
 	exp = now.Add(ttl)
 	jti = uuid.New().String()
 
-	roles, idpIss, idpSub := parseInteractiveSnapshotForJWT(snapshot)
+	parts := parseInteractiveSnapshotForJWT(snapshot)
 	claims := jwt.MapClaims{
 		"iss":   uc.apiIssuer,
 		"sub":   subject,
@@ -124,13 +148,22 @@ func (uc *JWTUseCase) MintInteractiveAPIAccessJWTFromSnapshot(ctx context.Contex
 		"iat":   now.Unix(),
 		"exp":   exp.Unix(),
 		"jti":   jti,
-		"roles": roles,
+		"roles": parts.Roles,
 	}
-	if idpIss != "" {
-		claims["idp_iss"] = idpIss
+	if parts.IDPIss != "" {
+		claims["idp_iss"] = parts.IDPIss
 	}
-	if idpSub != "" {
-		claims["idp_sub"] = idpSub
+	if parts.IDPSub != "" {
+		claims["idp_sub"] = parts.IDPSub
+	}
+	if parts.Email != "" {
+		claims["email"] = parts.Email
+	}
+	if parts.PreferredUsername != "" {
+		claims["preferred_username"] = parts.PreferredUsername
+	}
+	if parts.Name != "" {
+		claims["name"] = parts.Name
 	}
 
 	keyPair := uc.apiSigningKeys[uc.apiActiveKeyID]

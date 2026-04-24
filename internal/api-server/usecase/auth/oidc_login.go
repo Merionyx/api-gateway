@@ -136,8 +136,17 @@ func buildOIDCScope(p config.OIDCProviderConfig) string {
 	if p.IsGitHubOIDCProvider() && !scopeInListCI(extra, "read:org") {
 		extra = append(extra, "read:org")
 	}
-	if p.IsGitLabOIDCProvider() && !scopeInListCI(extra, "read_api") {
-		extra = append(extra, "read_api")
+	if p.IsGitLabOIDCProvider() {
+		if !scopeInListCI(extra, "read_api") {
+			extra = append(extra, "read_api")
+		}
+		// Match typical GitLab OIDC userinfo: id_token often omits email without these scopes.
+		if !scopeInListCI(extra, "email") {
+			extra = append(extra, "email")
+		}
+		if !scopeInListCI(extra, "profile") {
+			extra = append(extra, "profile")
+		}
 	}
 	if p.IsGoogleOIDCProvider() {
 		if !scopeInListCI(extra, "email") {
