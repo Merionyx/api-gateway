@@ -182,6 +182,7 @@ func TestOIDCCallbackUseCase_Complete_HappyPath(t *testing.T) {
 	cache := idpcache.New(nil)
 	uc := NewOIDCCallbackUseCase([]config.OIDCProviderConfig{{
 		ID:                   "p1",
+		Name:                 "Test Provider",
 		Issuer:               srv.URL,
 		ClientID:             clientID,
 		ClientSecret:         clientSecret,
@@ -233,6 +234,7 @@ func TestOIDCCallbackUseCase_Complete_UnknownIntent(t *testing.T) {
 	t.Cleanup(func() { kr.Close() })
 	uc := NewOIDCCallbackUseCase([]config.OIDCProviderConfig{{
 		ID:                   "p1",
+		Name:                 "Test Provider",
 		Issuer:               "https://unused.example",
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -322,6 +324,7 @@ func TestOIDCCallbackUseCase_Complete_GitHubFallbackWithoutIDToken(t *testing.T)
 
 	uc := NewOIDCCallbackUseCase([]config.OIDCProviderConfig{{
 		ID:                   "github",
+		Name:                 "GitHub",
 		Kind:                 "github",
 		Issuer:               srv.URL,
 		ClientID:             "cid",

@@ -181,6 +181,7 @@ func TestOIDCRefresh_degraded_discovery503(t *testing.T) {
 
 	uc := NewOIDCRefreshUseCase([]config.OIDCProviderConfig{{
 		ID:           "p1",
+		Name:         "Test Provider",
 		Issuer:       srv.URL,
 		ClientID:     "cid",
 		ClientSecret: "sec",
@@ -301,6 +302,7 @@ func TestOIDCRefresh_missingStoredIDPRefreshToken(t *testing.T) {
 
 	uc := NewOIDCRefreshUseCase([]config.OIDCProviderConfig{{
 		ID:       "google",
+		Name:     "Google",
 		Kind:     "google",
 		Issuer:   "https://accounts.google.com",
 		ClientID: "cid",

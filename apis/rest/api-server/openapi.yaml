@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: API Gateway — API Server HTTP API
-  version: 1.5.4
+  version: 1.5.5
   description: |
     HTTP API for the **API Server** control plane: authentication material (JWT, JWKS), contract export,
     registry views backed by **etcd** (controllers, tenants, bundles), and operational endpoints.
@@ -10,6 +10,8 @@ info:
     lifecycle is owned by the **Gateway Controller**; this API does not expose CRUD for environments.
 
     **JSON naming:** request and response bodies use **snake_case** field names unless noted.
+
+    **v1.5.5:** OIDC providers now include mandatory user-facing `name` in config and in **`GET /api/v1/auth/oidc-providers`** for UIs and **`agwctl auth login`**.
 
     **v1.5.4:** **`GET /api/v1/auth/oidc-providers`** — public list of configured browser OIDC providers (`id`, `kind`, `issuer`) for UIs and **`agwctl auth login`** (no secrets).
 
@@ -399,12 +401,16 @@ components:
         Public metadata for one configured `auth.oidc_providers[]` entry. Safe for browser UIs and CLI; excludes client secrets and redirect allowlists.
       required:
       - id
+      - name
       - kind
       - issuer
       properties:
         id:
           type: string
           description: Same as `provider_id` for `GET /api/v1/auth/login`.
+        name:
+          type: string
+          description: User-facing provider label configured in `auth.oidc_providers[].name`.
         kind:
           type: string
           description: |
@@ -1058,7 +1064,7 @@ paths:
       security: []
       summary: List configured OIDC login providers
       description: |
-        Returns the set of `auth.oidc_providers` entries exposed for interactive login (`provider_id`, kind, issuer).
+        Returns the set of `auth.oidc_providers` entries exposed for interactive login (`provider_id`, name, kind, issuer).
         Does not include secrets. When OIDC is not configured, returns an empty array (**200**).
       responses:
         '200':

@@ -10,8 +10,19 @@ import (
 
 	"github.com/manifoldco/promptui"
 	apiserverclient "github.com/merionyx/api-gateway/internal/cli/apiserver/client"
+	"github.com/merionyx/api-gateway/internal/cli/style"
 	"golang.org/x/term"
 )
+
+func providerDisplayName(p apiserverclient.OidcProviderDescriptor) string {
+	return strings.TrimSpace(p.Name)
+}
+
+func providerSelectLabel(p apiserverclient.OidcProviderDescriptor) string {
+	name := providerDisplayName(p)
+	kind := strings.TrimSpace(p.Kind)
+	return fmt.Sprintf("%s  %s", name, style.S(true, style.Dim, fmt.Sprintf("(%s)", kind)))
+}
 
 // resolveAuthLoginProviderID returns explicit non-empty id, or fetches GET /api/v1/auth/oidc-providers
 // and picks one (single provider auto-selected; multiple + TTY → arrow-key prompt; multiple + non-TTY → error).
@@ -39,7 +50,7 @@ func resolveAuthLoginProviderID(ctx context.Context, server string, httpClient *
 	}
 	if len(providers) == 1 {
 		id := strings.TrimSpace(providers[0].Id)
-		_, _ = fmt.Fprintf(out, "Using the only configured provider %q (%s).\n", id, providers[0].Kind)
+		_, _ = fmt.Fprintf(out, "Using the only configured provider %q [%s] (%s).\n", providerDisplayName(providers[0]), id, providers[0].Kind)
 		return id, nil
 	}
 	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
@@ -47,8 +58,9 @@ func resolveAuthLoginProviderID(ctx context.Context, server string, httpClient *
 	}
 	labels := make([]string, len(providers))
 	for i, p := range providers {
-		labels[i] = fmt.Sprintf("%s  (%s)", strings.TrimSpace(p.Id), strings.TrimSpace(p.Kind))
+		labels[i] = providerSelectLabel(p)
 	}
+	fmt.Fprintln(out, "")
 	prompt := promptui.Select{
 		Label: "Select login provider",
 		Items: labels,

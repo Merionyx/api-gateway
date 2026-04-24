@@ -8,6 +8,7 @@ import (
 // OIDCProviderPublic is non-sensitive metadata for discovery (GET /api/v1/auth/oidc-providers).
 type OIDCProviderPublic struct {
 	ID     string
+	Name   string
 	Kind   string
 	Issuer string
 }
@@ -27,6 +28,7 @@ func (u *OIDCLoginUseCase) ListPublicOIDCProviders() []OIDCProviderPublic {
 		}
 		out = append(out, OIDCProviderPublic{
 			ID:     strings.TrimSpace(p.ID),
+			Name:   strings.TrimSpace(p.Name),
 			Kind:   k,
 			Issuer: strings.TrimSpace(p.Issuer),
 		})

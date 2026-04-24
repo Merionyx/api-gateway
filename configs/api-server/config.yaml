@@ -57,6 +57,7 @@ auth:
   # session_kek_base64: "<openssl rand -base64 32>"  # required when oidc_providers is set (32 bytes after decode)
   # oidc_providers:                 # browser GET /api/v1/auth/login; see docs/etcd-auth-paths.md
   #   - id: "dev-oidc"
+  #     name: "Development OIDC"
   #     issuer: "https://your-idp.example"
   #     client_id: "your-client-id"
   #     client_secret: "from-secret-manager"
@@ -65,6 +66,7 @@ auth:
   #     extra_scopes: ["email"]
   # GitHub (roadmap ш.35): docs/idp/github/README.md — issuer must be https://github.com/login/oauth ; kind: github
   #   - id: "github"
+  #     name: "GitHub"
   #     kind: "github"
   #     issuer: "https://github.com/login/oauth"
   #     client_id: "…"
@@ -77,6 +79,7 @@ auth:
   #         - { org: "my-org", team_slug: "admins", roles: ["api:admin"] }
   # GitLab (roadmap ш.36): docs/idp/gitlab/README.md — issuer = https://gitlab.com or self-managed origin; kind: gitlab
   #   - id: "gitlab"
+  #     name: "GitLab"
   #     kind: "gitlab"
   #     issuer: "https://gitlab.com"
   #     client_id: "…"
@@ -88,6 +91,7 @@ auth:
   #         - { group_full_path: "my-root-group/admins", roles: ["api:admin"] }
   # Google (roadmap ш.37): docs/idp/google/README.md — issuer must be https://accounts.google.com ; kind: google
   #   - id: "google"
+  #     name: "Google"
   #     kind: "google"
   #     issuer: "https://accounts.google.com"
   #     client_id: "….apps.googleusercontent.com"
@@ -99,6 +103,7 @@ auth:
   #         - { hd: "example.com", roles: ["api:admin"] }
   # Okta (roadmap ш.38): docs/idp/okta/README.md — issuer = Authorization Server URL (https); kind: okta
   #   - id: "okta"
+  #     name: "Okta"
   #     kind: "okta"
   #     issuer: "https://dev-12345.okta.com/oauth2/default"
   #     client_id: "…"
@@ -110,6 +115,7 @@ auth:
   #         - { group_name: "API Gateway Admins", roles: ["api:admin"] }
   # Entra ID (roadmap ш.39): docs/idp/entra/README.md — issuer = v2.0 metadata URL (https); kind: entra
   #   - id: "entra"
+  #     name: "Microsoft Entra ID"
   #     kind: "entra"
   #     issuer: "https://login.microsoftonline.com/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/v2.0"
   #     client_id: "…"

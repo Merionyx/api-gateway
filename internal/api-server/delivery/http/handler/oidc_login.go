@@ -61,7 +61,7 @@ func (h *OIDCLoginHandler) ListOidcProviders(c fiber.Ctx) error {
 	rows := h.uc.ListPublicOIDCProviders()
 	out := make([]apiserver.OidcProviderDescriptor, len(rows))
 	for i, r := range rows {
-		out[i] = apiserver.OidcProviderDescriptor{Id: r.ID, Kind: r.Kind, Issuer: r.Issuer}
+		out[i] = apiserver.OidcProviderDescriptor{Id: r.ID, Name: r.Name, Kind: r.Kind, Issuer: r.Issuer}
 	}
 	return c.JSON(out)
 }

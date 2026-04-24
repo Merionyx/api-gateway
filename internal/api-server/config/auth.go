@@ -11,6 +11,8 @@ import (
 type OIDCProviderConfig struct {
 	// ID matches the login query parameter provider_id (opaque string, not a path segment).
 	ID string `mapstructure:"id" json:"id"`
+	// Name is the user-facing provider label shown in APIs and CLI (e.g. "GitHub", "GitHub Enterprise").
+	Name string `mapstructure:"name" json:"name"`
 	// Issuer is the OIDC issuer base URL (no trailing slash); used for discovery.
 	Issuer string `mapstructure:"issuer" json:"issuer"`
 	// ClientID is the OAuth client_id sent to the authorization server.
@@ -249,6 +251,9 @@ func ValidateOIDCProviders(providers []OIDCProviderConfig) error {
 		id := strings.TrimSpace(p.ID)
 		if id == "" {
 			return fmt.Errorf("auth.oidc_providers[%d]: id is required", i)
+		}
+		if strings.TrimSpace(p.Name) == "" {
+			return fmt.Errorf("auth.oidc_providers[%q]: name is required", id)
 		}
 		if _, dup := seen[id]; dup {
 			return fmt.Errorf("auth: duplicate oidc provider id %q", id)

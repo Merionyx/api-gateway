@@ -22,12 +22,13 @@ func TestApplyOIDCProviderSecretsFromEnv(t *testing.T) {
 	cfg := &Config{
 		Auth: AuthConfig{
 			OIDCProviders: []OIDCProviderConfig{{
-				ID:           "github",
-				Issuer:       "https://github.com/login/oauth",
-				ClientID:     "was-file",
-				ClientSecret: "was-secret",
+				ID:                   "github",
+				Name:                 "GitHub",
+				Issuer:               "https://github.com/login/oauth",
+				ClientID:             "was-file",
+				ClientSecret:         "was-secret",
 				RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
-				Kind:         "github",
+				Kind:                 "github",
 			}},
 		},
 	}

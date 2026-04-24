@@ -9,6 +9,7 @@ func TestValidateOIDCProviders_GitHub(t *testing.T) {
 	t.Parallel()
 	err := ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "gh",
+		Name:                 "GitHub",
 		Issuer:               "https://example.com",
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -21,6 +22,7 @@ func TestValidateOIDCProviders_GitHub(t *testing.T) {
 
 	err = ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "gh",
+		Name:                 "GitHub",
 		Issuer:               GitHubOIDCDiscoveryIssuer,
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -38,6 +40,7 @@ func TestValidateOIDCProviders_GitHub(t *testing.T) {
 
 	err = ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "gh",
+		Name:                 "GitHub",
 		Issuer:               GitHubOIDCDiscoveryIssuer,
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -56,6 +59,7 @@ func TestValidateOIDCProviders_GitHub(t *testing.T) {
 
 	err = ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "gh",
+		Name:                 "GitHub",
 		Issuer:               GitHubOIDCDiscoveryIssuer,
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -69,6 +73,7 @@ func TestValidateOIDCProviders_GitHub(t *testing.T) {
 
 	err = ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "gh",
+		Name:                 "GitHub",
 		Issuer:               GitHubOIDCDiscoveryIssuer,
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -85,6 +90,7 @@ func TestValidateOIDCProviders_GitLab(t *testing.T) {
 	t.Parallel()
 	err := ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "gl",
+		Name:                 "GitLab",
 		Issuer:               "https://gitlab.example.com",
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -98,6 +104,7 @@ func TestValidateOIDCProviders_GitLab(t *testing.T) {
 
 	err = ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "gl",
+		Name:                 "GitLab",
 		Issuer:               "https://gitlab.com",
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -116,6 +123,7 @@ func TestValidateOIDCProviders_GitLab(t *testing.T) {
 
 	err = ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "gl",
+		Name:                 "GitLab",
 		Issuer:               "https://gitlab.com",
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -134,6 +142,22 @@ func TestValidateOIDCProviders_GitLab(t *testing.T) {
 	}
 }
 
+func TestValidateOIDCProviders_NameRequired(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "github",
+		Issuer:               GitHubOIDCDiscoveryIssuer,
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		Kind:                 "github",
+	}})
+	if err == nil || !strings.Contains(err.Error(), "name is required") {
+		t.Fatalf("got %v", err)
+	}
+}
+
 func TestGitLabAPIV4BaseFromIssuer(t *testing.T) {
 	t.Parallel()
 	got, err := GitLabAPIV4BaseFromIssuer("https://gitlab.com/")
@@ -149,6 +173,7 @@ func TestValidateOIDCProviders_Google(t *testing.T) {
 	t.Parallel()
 	err := ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "g",
+		Name:                 "Google",
 		Issuer:               "https://accounts.google.com",
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -162,6 +187,7 @@ func TestValidateOIDCProviders_Google(t *testing.T) {
 
 	err = ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "g",
+		Name:                 "Google",
 		Issuer:               "https://evil.example",
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -174,6 +200,7 @@ func TestValidateOIDCProviders_Google(t *testing.T) {
 
 	err = ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "g",
+		Name:                 "Google",
 		Issuer:               "https://accounts.google.com",
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -192,6 +219,7 @@ func TestValidateOIDCProviders_Google(t *testing.T) {
 
 	err = ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "g",
+		Name:                 "Google",
 		Issuer:               "https://accounts.google.com",
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -214,6 +242,7 @@ func TestValidateOIDCProviders_Okta(t *testing.T) {
 	t.Parallel()
 	err := ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "ok",
+		Name:                 "Okta",
 		Issuer:               "https://dev-123.okta.com/oauth2/default",
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -227,6 +256,7 @@ func TestValidateOIDCProviders_Okta(t *testing.T) {
 
 	err = ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "ok",
+		Name:                 "Okta",
 		Issuer:               "http://dev-123.okta.com/oauth2/default",
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -239,6 +269,7 @@ func TestValidateOIDCProviders_Okta(t *testing.T) {
 
 	err = ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "ok",
+		Name:                 "Okta",
 		Issuer:               "https://dev-123.okta.com/oauth2/default",
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -257,6 +288,7 @@ func TestValidateOIDCProviders_Okta(t *testing.T) {
 
 	err = ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "ok",
+		Name:                 "Okta",
 		Issuer:               "https://dev-123.okta.com/oauth2/default",
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -279,6 +311,7 @@ func TestValidateOIDCProviders_Entra(t *testing.T) {
 	t.Parallel()
 	err := ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "ent",
+		Name:                 "Microsoft Entra ID",
 		Issuer:               "https://login.microsoftonline.com/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/v2.0",
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -292,6 +325,7 @@ func TestValidateOIDCProviders_Entra(t *testing.T) {
 
 	err = ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "ent",
+		Name:                 "Microsoft Entra ID",
 		Issuer:               "http://login.microsoftonline.com/common/v2.0",
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -304,6 +338,7 @@ func TestValidateOIDCProviders_Entra(t *testing.T) {
 
 	err = ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "ent",
+		Name:                 "Microsoft Entra ID",
 		Issuer:               "https://login.microsoftonline.com/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/v2.0",
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -322,6 +357,7 @@ func TestValidateOIDCProviders_Entra(t *testing.T) {
 
 	err = ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "ent",
+		Name:                 "Microsoft Entra ID",
 		Issuer:               "https://login.microsoftonline.com/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/v2.0",
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -346,6 +382,7 @@ func TestValidateOIDCProviders_TwoGitHubKindDistinctIDs(t *testing.T) {
 	err := ValidateOIDCProviders([]OIDCProviderConfig{
 		{
 			ID:                   "github-corp-a",
+			Name:                 "GitHub Corp A",
 			Issuer:               GitHubOIDCDiscoveryIssuer,
 			ClientID:             "a",
 			ClientSecret:         "sa",
@@ -355,6 +392,7 @@ func TestValidateOIDCProviders_TwoGitHubKindDistinctIDs(t *testing.T) {
 		},
 		{
 			ID:                   "github-corp-b",
+			Name:                 "GitHub Corp B",
 			Issuer:               GitHubOIDCDiscoveryIssuer,
 			ClientID:             "b",
 			ClientSecret:         "sb",
@@ -372,6 +410,7 @@ func TestValidateOIDCProviders_GenericMustNotSetIdpBlocks(t *testing.T) {
 	t.Parallel()
 	err := ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "x",
+		Name:                 "Generic OIDC",
 		Issuer:               "https://idp.example",
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -384,6 +423,7 @@ func TestValidateOIDCProviders_GenericMustNotSetIdpBlocks(t *testing.T) {
 
 	err = ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "x",
+		Name:                 "Generic OIDC",
 		Issuer:               "https://accounts.google.com",
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -396,6 +436,7 @@ func TestValidateOIDCProviders_GenericMustNotSetIdpBlocks(t *testing.T) {
 
 	err = ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "x",
+		Name:                 "Generic OIDC",
 		Issuer:               "https://dev-1.okta.com/oauth2/default",
 		ClientID:             "c",
 		ClientSecret:         "s",
@@ -408,6 +449,7 @@ func TestValidateOIDCProviders_GenericMustNotSetIdpBlocks(t *testing.T) {
 
 	err = ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "x",
+		Name:                 "Generic OIDC",
 		Issuer:               "https://login.microsoftonline.com/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/v2.0",
 		ClientID:             "c",
 		ClientSecret:         "s",

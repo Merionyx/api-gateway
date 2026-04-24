@@ -89,6 +89,7 @@ components:
         environment: development
         oidc_providers:
         - id: github
+          name: GitHub
           kind: github
           issuer: https://github.com/login/oauth
           client_id: ""
@@ -110,6 +111,7 @@ components:
               roles:
               - "api:admin"
         - id: gitlab
+          name: GitLab
           kind: gitlab
           # Self-managed: set issuer to https://gitlab.example.com (no path after host)
           issuer: https://gitlab.com
@@ -121,6 +123,7 @@ components:
           - "http://elg.mikhailminaev.com:30100/api/v1/auth/callback"
           - "https://oauth.pstmn.io/v1/callback"
         - id: google
+          name: Google
           kind: google
           issuer: https://accounts.google.com
           client_id: ""

@@ -356,6 +356,9 @@ type OidcProviderDescriptor struct {
 
 	// Kind Normalized provider kind for labels/icons: `generic` when unset in config, otherwise `github`, `gitlab`, `google`, `okta`, or `entra` (lowercase).
 	Kind string `json:"kind"`
+
+	// Name User-facing provider label configured in `auth.oidc_providers[].name`.
+	Name string `json:"name"`
 }
 
 // Problem RFC 7807 / RFC 9457 Problem Details.

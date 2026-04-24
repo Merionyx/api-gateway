@@ -176,6 +176,7 @@ func e2eAPIConfig(t *testing.T, etcdEndpoints []string, idpIssuerURL, authKeyPre
 			SessionKEKBase64:          base64.StdEncoding.EncodeToString(kek),
 			OIDCProviders: []config.OIDCProviderConfig{{
 				ID:                   e2eOIDCProviderID,
+				Name:                 "Mock IdP",
 				Issuer:               idpIssuerURL,
 				ClientID:             e2eClientID,
 				ClientSecret:         e2eClientSecret,
@@ -248,6 +249,9 @@ func TestE2E_ListOidcProviders(t *testing.T) {
 	}
 	if got[0]["id"] != e2eOIDCProviderID {
 		t.Fatalf("id %v", got[0]["id"])
+	}
+	if got[0]["name"] != "Mock IdP" {
+		t.Fatalf("name %v", got[0]["name"])
 	}
 	if got[0]["kind"] != "generic" {
 		t.Fatalf("kind %v", got[0]["kind"])
