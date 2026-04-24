@@ -2,9 +2,11 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
+	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/gofiber/fiber/v3/middleware/logger"
@@ -98,8 +100,42 @@ func setupRoutes(app *fiber.App, c *container.Container) error {
 	swagger.Servers = nil
 
 	app.Use(httpTraceMiddleware())
-	app.Use(oapimw.OapiRequestValidator(swagger))
 	app.Use(httpxmw.APISecurity(c.JWTUseCase, c.APIKeyRepository))
+	app.Use(oapimw.OapiRequestValidatorWithOptions(swagger, &oapimw.Options{
+		Options: openapi3filter.Options{
+			AuthenticationFunc: AuthenticationFunc,
+		},
+	}))
 	apiserver.RegisterHandlers(app, NewOpenAPIServer(c))
 	return nil
+}
+
+func AuthenticationFunc(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
+	if input == nil {
+		return errors.New("missing authentication input")
+	}
+	c := oapimw.GetFiberContext(ctx)
+	if c == nil {
+		return input.NewError(errors.New("missing fiber context"))
+	}
+	return openAPISecuritySatisfied(c, input)
+}
+
+func openAPISecuritySatisfied(c fiber.Ctx, input *openapi3filter.AuthenticationInput) error {
+	if input == nil {
+		return errors.New("missing authentication input")
+	}
+	switch input.SecuritySchemeName {
+	case "bearerAuth":
+		if c.Locals(httpxmw.CtxKeyAPIJWTClaims) != nil {
+			return nil
+		}
+	case "apiKey":
+		if _, ok := httpxmw.APIKeyPrincipalFromCtx(c); ok {
+			return nil
+		}
+	default:
+		return input.NewError(fmt.Errorf("unsupported security scheme %q", input.SecuritySchemeName))
+	}
+	return input.NewError(errors.New("authentication required"))
 }
