@@ -101,6 +101,14 @@ components:
           - "http://elg.mikhailminaev.com:30100/api/v1/auth/callback"
           # Postman OAuth 2.0 (Get New Access Token) helper
           - "https://oauth.pstmn.io/v1/callback"
+          github:
+            allowed_org_logins:
+            - "merionyx"
+            team_role_bindings:
+            - org: "merionyx"
+              team_slug: "maintainers"
+              roles:
+              - "api:admin"
         - id: gitlab
           kind: gitlab
           # Self-managed: set issuer to https://gitlab.example.com (no path after host)
