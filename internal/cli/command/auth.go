@@ -11,5 +11,6 @@ func NewAuthCommand(resolveServer func() (string, error)) *cobra.Command {
 		Short: "Interactive authentication (OIDC browser login)",
 	}
 	cmd.AddCommand(newAuthLoginCmd(resolveServer))
+	cmd.AddCommand(newAuthRefreshCmd(resolveServer))
 	return cmd
 }

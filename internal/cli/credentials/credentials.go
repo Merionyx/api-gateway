@@ -62,6 +62,26 @@ func Load() (*File, error) {
 	return &f, nil
 }
 
+// GetContext returns saved credentials for one agwctl context.
+func GetContext(contextName string) (Entry, error) {
+	if err := validateContextName(contextName); err != nil {
+		return Entry{}, err
+	}
+	f, err := Load()
+	if err != nil {
+		return Entry{}, err
+	}
+	key := strings.TrimSpace(contextName)
+	e, ok := f.Contexts[key]
+	if !ok {
+		return Entry{}, fmt.Errorf("credentials: no tokens saved for context %q; run `agwctl auth login`", key)
+	}
+	if strings.TrimSpace(e.RefreshToken) == "" {
+		return Entry{}, fmt.Errorf("credentials: no refresh token saved for context %q; run `agwctl auth login`", key)
+	}
+	return e, nil
+}
+
 // PutContext merges entry for contextName and writes the file atomically with mode 0600.
 func PutContext(contextName string, e Entry) error {
 	if err := validateContextName(contextName); err != nil {
