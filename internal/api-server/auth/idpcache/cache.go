@@ -170,6 +170,6 @@ func idpAccessRemaining(clock time.Time, idpAccess string, expiresInSec int) (ti
 	if err != nil || exp == nil {
 		return 0, false
 	}
-	d := exp.Time.Sub(clock) - clockSkew
+	d := exp.Sub(clock) - clockSkew
 	return d, d > 0
 }

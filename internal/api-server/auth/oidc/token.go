@@ -53,7 +53,7 @@ func ExchangeAuthorizationCode(ctx context.Context, hc *http.Client, tokenEndpoi
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrTokenExchange, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return nil, fmt.Errorf("%w: read: %w", ErrTokenExchange, err)
@@ -98,7 +98,7 @@ func ExchangeRefreshToken(ctx context.Context, hc *http.Client, tokenEndpoint, c
 	if err != nil {
 		return nil, &TokenExchangeFailure{HTTPStatus: 0, Cause: err}
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return nil, &TokenExchangeFailure{HTTPStatus: 0, Cause: err}

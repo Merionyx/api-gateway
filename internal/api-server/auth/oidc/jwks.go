@@ -36,7 +36,7 @@ func fetchRSAPublicKeys(ctx context.Context, hc *http.Client, jwksURI string) (m
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return nil, err

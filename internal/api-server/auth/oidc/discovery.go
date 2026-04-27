@@ -11,11 +11,11 @@ import (
 
 // Discovery is a subset of OpenID Provider Metadata (RFC 8414 / OIDC Discovery).
 type Discovery struct {
-	Issuer                            string `json:"issuer"`
-	AuthorizationEndpoint             string `json:"authorization_endpoint"`
-	TokenEndpoint                     string `json:"token_endpoint"`
-	JWKSURI                           string `json:"jwks_uri"`
-	UserinfoEndpoint                  string `json:"userinfo_endpoint,omitempty"`
+	Issuer                            string   `json:"issuer"`
+	AuthorizationEndpoint             string   `json:"authorization_endpoint"`
+	TokenEndpoint                     string   `json:"token_endpoint"`
+	JWKSURI                           string   `json:"jwks_uri"`
+	UserinfoEndpoint                  string   `json:"userinfo_endpoint,omitempty"`
 	ResponseTypesSupported            []string `json:"response_types_supported,omitempty"`
 	TokenEndpointAuthMethodsSupported []string `json:"token_endpoint_auth_methods_supported,omitempty"`
 }
@@ -38,7 +38,7 @@ func FetchDiscovery(ctx context.Context, hc *http.Client, issuerBase string) (*D
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrDiscovery, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return nil, fmt.Errorf("%w: read: %w", ErrDiscovery, err)

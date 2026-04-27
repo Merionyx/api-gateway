@@ -60,7 +60,7 @@ func resolveAuthLoginProviderID(ctx context.Context, server string, httpClient *
 	for i, p := range providers {
 		labels[i] = providerSelectLabel(p)
 	}
-	fmt.Fprintln(out, "")
+	_, _ = fmt.Fprintln(out, "")
 	prompt := promptui.Select{
 		Label: "Select login provider",
 		Items: labels,
