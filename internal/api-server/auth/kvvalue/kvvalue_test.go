@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestSessionMigrateV1ToV2OnRead(t *testing.T) {
+func TestSessionMigrateV1ToLatestOnRead(t *testing.T) {
 	t.Parallel()
 	raw := []byte(`{
 		"schema_version": 1,
@@ -32,14 +32,40 @@ func TestSessionMigrateV1ToV2OnRead(t *testing.T) {
 	}
 }
 
-func TestSessionV2OptionalFieldsRoundTrip(t *testing.T) {
+func TestSessionMigrateV2ToLatestOnRead(t *testing.T) {
+	t.Parallel()
+	raw := []byte(`{
+		"schema_version": 2,
+		"encrypted_idp_refresh": {"k":1},
+		"claims_snapshot": {"roles":["x"]},
+		"rotation_generation": 5,
+		"login_intent_id": "6ba7b810-9dad-41d4-a716-446655440001",
+		"provider_id": "p1",
+		"our_refresh_verifier": "opaque-verifier-handle"
+	}`)
+	got, err := ParseSessionValueJSON(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.SchemaVersion != SessionSchemaLatest {
+		t.Fatalf("schema: want %d got %d", SessionSchemaLatest, got.SchemaVersion)
+	}
+	if got.RotationGeneration != 5 || got.ProviderID != "p1" || got.OurRefreshVerifier != "opaque-verifier-handle" {
+		t.Fatalf("migrated session: %+v", got)
+	}
+	if !got.RefreshExpiresAt.IsZero() {
+		t.Fatalf("legacy v2 must not invent refresh expiry: %s", got.RefreshExpiresAt)
+	}
+}
+
+func TestSessionLatestOptionalFieldsRoundTrip(t *testing.T) {
 	t.Parallel()
 	s := SessionValue{
-		SchemaVersion:        SessionSchemaV2,
+		SchemaVersion:       SessionSchemaLatest,
 		EncryptedIDPRefresh: json.RawMessage(`{"k":1}`),
-		RotationGeneration:   1,
-		LoginIntentID:        "6ba7b810-9dad-41d4-a716-446655440001",
-		OurRefreshVerifier:   "opaque-verifier-handle",
+		RotationGeneration:  1,
+		LoginIntentID:       "6ba7b810-9dad-41d4-a716-446655440001",
+		OurRefreshVerifier:  "opaque-verifier-handle",
 	}
 	b, err := MarshalSessionValueJSON(s)
 	if err != nil {
@@ -54,10 +80,10 @@ func TestSessionV2OptionalFieldsRoundTrip(t *testing.T) {
 	}
 }
 
-func TestSessionV2RoundTrip(t *testing.T) {
+func TestSessionLatestRoundTrip(t *testing.T) {
 	t.Parallel()
 	s := SessionValue{
-		SchemaVersion:       SessionSchemaV2,
+		SchemaVersion:       SessionSchemaLatest,
 		EncryptedIDPRefresh: json.RawMessage(`{}`),
 		ClaimsSnapshot:      json.RawMessage(`[]`),
 		RotationGeneration:  3,
@@ -148,13 +174,13 @@ func TestLoginIntentMarshalRequiresFields(t *testing.T) {
 func TestLoginIntentNonceRoundtrip(t *testing.T) {
 	t.Parallel()
 	v := LoginIntentValue{
-		SchemaVersion:   LoginIntentSchemaLatest,
-		ProviderID:      "p",
-		RedirectURI:     "https://a/cb",
-		OAuthState:      "st",
-		PKCEVerifier:    "pv",
-		IntentProtocol:  DefaultIntentProtocol,
-		Nonce:           "n-1",
+		SchemaVersion:  LoginIntentSchemaLatest,
+		ProviderID:     "p",
+		RedirectURI:    "https://a/cb",
+		OAuthState:     "st",
+		PKCEVerifier:   "pv",
+		IntentProtocol: DefaultIntentProtocol,
+		Nonce:          "n-1",
 	}
 	raw, err := MarshalLoginIntentValueJSON(v)
 	if err != nil {

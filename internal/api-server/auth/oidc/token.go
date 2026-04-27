@@ -12,12 +12,14 @@ import (
 
 // TokenResponse is the subset of OAuth2 token response used by OIDC authorization code flow.
 type TokenResponse struct {
-	AccessToken  string `json:"access_token"`
-	TokenType    string `json:"token_type"`
-	ExpiresIn    int    `json:"expires_in"`
-	RefreshToken string `json:"refresh_token,omitempty"`
-	IDToken      string `json:"id_token"`
-	Scope        string `json:"scope,omitempty"`
+	AccessToken           string `json:"access_token"`
+	TokenType             string `json:"token_type"`
+	ExpiresIn             int    `json:"expires_in"`
+	RefreshToken          string `json:"refresh_token,omitempty"`
+	RefreshTokenExpiresIn int    `json:"refresh_token_expires_in,omitempty"`
+	RefreshExpiresIn      int    `json:"refresh_expires_in,omitempty"`
+	IDToken               string `json:"id_token"`
+	Scope                 string `json:"scope,omitempty"`
 	// OAuthErr / OAuthErrDescription are set when the IdP returns RFC 6749 error JSON (often with HTTP 200).
 	OAuthErr            string `json:"error,omitempty"`
 	OAuthErrDescription string `json:"error_description,omitempty"`

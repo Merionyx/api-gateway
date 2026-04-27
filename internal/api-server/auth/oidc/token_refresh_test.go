@@ -2,6 +2,7 @@ package oidc
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -31,6 +32,18 @@ func TestExchangeRefreshToken_ok(t *testing.T) {
 		t.Fatal(err)
 	}
 	if tr.AccessToken != "at" {
+		t.Fatalf("got %+v", tr)
+	}
+}
+
+func TestExchangeRefreshToken_readsProviderRefreshLifetime(t *testing.T) {
+	t.Parallel()
+	var tr TokenResponse
+	err := json.Unmarshal([]byte(`{"access_token":"at","token_type":"Bearer","expires_in":3600,"refresh_token_expires_in":86400,"refresh_expires_in":43200}`), &tr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tr.RefreshTokenExpiresIn != 86400 || tr.RefreshExpiresIn != 43200 {
 		t.Fatalf("got %+v", tr)
 	}
 }

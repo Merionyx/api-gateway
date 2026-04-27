@@ -82,6 +82,9 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 	if err := config.ValidateOIDCProviders(cfg.Auth.OIDCProviders); err != nil {
 		return nil, err
 	}
+	if err := config.ValidateInteractiveTokenTTLs(cfg.Auth.InteractiveAccessTokenTTL, cfg.Auth.InteractiveRefreshTokenTTL); err != nil {
+		return nil, err
+	}
 	if len(cfg.Auth.OIDCProviders) > 0 && strings.TrimSpace(cfg.Auth.SessionKEKBase64) == "" {
 		return nil, fmt.Errorf("auth.session_kek_base64 is required when auth.oidc_providers is configured")
 	}
@@ -197,6 +200,7 @@ func (c *Container) initUseCases() error {
 		c.JWTUseCase,
 		&http.Client{Timeout: 20 * time.Second},
 		c.Config.Auth.InteractiveAccessTokenTTL,
+		c.Config.Auth.InteractiveRefreshTokenTTL,
 		idpAccessCache,
 		c.Config.Auth.IdpAccessCacheOpaqueMaxTTL,
 	)
@@ -209,6 +213,7 @@ func (c *Container) initUseCases() error {
 			c.JWTUseCase,
 			&http.Client{Timeout: 25 * time.Second},
 			c.Config.Auth.InteractiveAccessTokenTTL,
+			c.Config.Auth.InteractiveRefreshTokenTTL,
 			c.Config.MetricsHTTP.Enabled,
 			idpAccessCache,
 			c.Config.Auth.IdpAccessCacheOpaqueMaxTTL,

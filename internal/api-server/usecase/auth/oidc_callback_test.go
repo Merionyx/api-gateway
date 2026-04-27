@@ -187,7 +187,7 @@ func TestOIDCCallbackUseCase_Complete_HappyPath(t *testing.T) {
 		ClientID:             clientID,
 		ClientSecret:         clientSecret,
 		RedirectURIAllowlist: []string{redirectURI},
-	}}, intents, sessions, kr, jwtUC, srv.Client(), 5*time.Minute, cache, 2*time.Minute)
+	}}, intents, sessions, kr, jwtUC, srv.Client(), 5*time.Minute, 7*24*time.Hour, cache, 2*time.Minute)
 
 	out, err := uc.Complete(t.Context(), authCode, intentID)
 	if err != nil {
@@ -201,6 +201,9 @@ func TestOIDCCallbackUseCase_Complete_HappyPath(t *testing.T) {
 	}
 	if sessions.last.LoginIntentID != intentID {
 		t.Fatalf("login_intent_id %q", sessions.last.LoginIntentID)
+	}
+	if sessions.last.RefreshExpiresAt.IsZero() {
+		t.Fatal("refresh_expires_at must be set")
 	}
 	sessions.mu.Lock()
 	sid := sessions.lastID
@@ -239,7 +242,7 @@ func TestOIDCCallbackUseCase_Complete_UnknownIntent(t *testing.T) {
 		ClientID:             "c",
 		ClientSecret:         "s",
 		RedirectURIAllowlist: []string{"http://x"},
-	}}, &memIntentRepo{m: map[string]kvvalue.LoginIntentValue{}}, &memSessionRepo{}, kr, jwtUC, http.DefaultClient, time.Minute, nil, 0)
+	}}, &memIntentRepo{m: map[string]kvvalue.LoginIntentValue{}}, &memSessionRepo{}, kr, jwtUC, http.DefaultClient, time.Minute, 7*24*time.Hour, nil, 0)
 	_, err = uc.Complete(t.Context(), "code", uuid.NewString())
 	if err == nil {
 		t.Fatal("expected error")
@@ -331,7 +334,7 @@ func TestOIDCCallbackUseCase_Complete_GitHubFallbackWithoutIDToken(t *testing.T)
 		ClientSecret:         "sec",
 		RedirectURIAllowlist: []string{"http://127.0.0.1:21987/callback"},
 		GitHub:               &config.GitHubOIDCProviderConfig{},
-	}}, intents, sessions, kr, jwtUC, srv.Client(), time.Minute, nil, 0)
+	}}, intents, sessions, kr, jwtUC, srv.Client(), time.Minute, 7*24*time.Hour, nil, 0)
 
 	out, err := uc.Complete(t.Context(), "authcode", intentID)
 	if err != nil {

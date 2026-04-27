@@ -40,8 +40,6 @@ type envelopeSealer interface {
 	Seal(plaintext []byte) (sessioncrypto.Envelope, error)
 }
 
-const defaultInteractiveAccessTTL = 5 * time.Minute
-
 // OIDCCallbackUseCase completes GET /api/v1/auth/callback (roadmap ш. 14).
 type OIDCCallbackUseCase struct {
 	byID            map[string]config.OIDCProviderConfig
@@ -51,6 +49,7 @@ type OIDCCallbackUseCase struct {
 	jwt             *JWTUseCase
 	hc              *http.Client
 	accessTTL       time.Duration
+	refreshTTL      time.Duration
 	idpCache        *idpcache.Cache
 	idpOpaqueMaxTTL time.Duration
 }
@@ -64,6 +63,7 @@ func NewOIDCCallbackUseCase(
 	jwtUC *JWTUseCase,
 	hc *http.Client,
 	accessTTL time.Duration,
+	refreshTTL time.Duration,
 	idpCache *idpcache.Cache,
 	idpOpaqueMaxTTL time.Duration,
 ) *OIDCCallbackUseCase {
@@ -71,9 +71,8 @@ func NewOIDCCallbackUseCase(
 	for _, p := range providers {
 		by[strings.TrimSpace(p.ID)] = p
 	}
-	if accessTTL <= 0 {
-		accessTTL = defaultInteractiveAccessTTL
-	}
+	accessTTL = config.EffectiveInteractiveAccessTokenTTL(accessTTL)
+	refreshTTL = config.EffectiveInteractiveRefreshTokenTTL(refreshTTL)
 	if hc == nil {
 		hc = http.DefaultClient
 	}
@@ -85,6 +84,7 @@ func NewOIDCCallbackUseCase(
 		jwt:             jwtUC,
 		hc:              hc,
 		accessTTL:       accessTTL,
+		refreshTTL:      refreshTTL,
 		idpCache:        idpCache,
 		idpOpaqueMaxTTL: idpOpaqueMaxTTL,
 	}
@@ -189,6 +189,7 @@ func (u *OIDCCallbackUseCase) Complete(ctx context.Context, code, state string) 
 	}
 
 	sessionID := uuid.NewString()
+	refreshExpiresAt := initialRefreshExpiry(time.Now().UTC(), u.refreshTTL, tr)
 	sess := kvvalue.SessionValue{
 		EncryptedIDPRefresh: json.RawMessage(envBytes),
 		ClaimsSnapshot:      snap,
@@ -196,6 +197,7 @@ func (u *OIDCCallbackUseCase) Complete(ctx context.Context, code, state string) 
 		LoginIntentID:       state,
 		ProviderID:          strings.TrimSpace(intent.ProviderID),
 		OurRefreshVerifier:  verifier,
+		RefreshExpiresAt:    refreshExpiresAt,
 	}
 	if err := u.sessions.Create(ctx, sessionID, sess); err != nil {
 		return out, err

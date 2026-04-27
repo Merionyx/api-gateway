@@ -54,6 +54,8 @@ auth:
   environment: "production"
   allow_insecure_bootstrap: false
   # login_intent_lease_ttl: "15m"   # default if omitted
+  # interactive_access_token_ttl: "5m"   # our API access JWT after browser OIDC login; may be increased deliberately
+  # interactive_refresh_token_ttl: "168h" # our max refresh-chain lifetime; clamped to provider refresh TTL when the IdP discloses one
   # session_kek_base64: "<openssl rand -base64 32>"  # required when oidc_providers is set (32 bytes after decode)
   # oidc_providers:                 # browser GET /api/v1/auth/login; see docs/etcd-auth-paths.md
   #   - id: "dev-oidc"

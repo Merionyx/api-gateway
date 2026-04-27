@@ -161,13 +161,14 @@ func TestOIDCRefresh_degraded_discovery503(t *testing.T) {
 	verifier := ourOpaqueRefreshVerifier(ourHex)
 
 	sess := kvvalue.SessionValue{
-		SchemaVersion:       kvvalue.SessionSchemaV2,
+		SchemaVersion:       kvvalue.SessionSchemaLatest,
 		EncryptedIDPRefresh: json.RawMessage(envBytes),
 		ClaimsSnapshot:      claims,
 		RotationGeneration:  2,
 		LoginIntentID:       "intent-1",
 		ProviderID:          "p1",
 		OurRefreshVerifier:  verifier,
+		RefreshExpiresAt:    time.Now().Add(7 * 24 * time.Hour),
 	}
 	st := &memRefreshSessionStore{
 		sessionID: "sid-1",
@@ -185,7 +186,7 @@ func TestOIDCRefresh_degraded_discovery503(t *testing.T) {
 		Issuer:       srv.URL,
 		ClientID:     "cid",
 		ClientSecret: "sec",
-	}}, st, kr, jwtUC, srv.Client(), 5*time.Minute, false, cache, 0)
+	}}, st, kr, jwtUC, srv.Client(), 5*time.Minute, 7*24*time.Hour, false, cache, 0)
 
 	out, err := uc.Refresh(context.Background(), ourHex)
 	if err != nil {
@@ -232,10 +233,11 @@ func TestOIDCRefresh_degraded_discovery503(t *testing.T) {
 func TestSessionValue_providerID_roundTrip(t *testing.T) {
 	t.Parallel()
 	s := kvvalue.SessionValue{
-		SchemaVersion:       kvvalue.SessionSchemaV2,
+		SchemaVersion:       kvvalue.SessionSchemaLatest,
 		EncryptedIDPRefresh: json.RawMessage(`{"v":1}`),
 		ProviderID:          "p1",
 		OurRefreshVerifier:  strings.Repeat("a", 64),
+		RefreshExpiresAt:    time.Now().Add(time.Hour),
 	}
 	b, err := kvvalue.MarshalSessionValueJSON(s)
 	if err != nil {
@@ -290,11 +292,12 @@ func TestOIDCRefresh_missingStoredIDPRefreshToken(t *testing.T) {
 	st := &memRefreshSessionStore{
 		sessionID: "sid-1",
 		sess: kvvalue.SessionValue{
-			SchemaVersion:       kvvalue.SessionSchemaV2,
+			SchemaVersion:       kvvalue.SessionSchemaLatest,
 			EncryptedIDPRefresh: json.RawMessage(envBytes),
 			ClaimsSnapshot:      claims,
 			ProviderID:          "google",
 			OurRefreshVerifier:  verifier,
+			RefreshExpiresAt:    time.Now().Add(time.Hour),
 		},
 		modRev:   7,
 		verifier: verifier,
@@ -306,7 +309,7 @@ func TestOIDCRefresh_missingStoredIDPRefreshToken(t *testing.T) {
 		Kind:     "google",
 		Issuer:   "https://accounts.google.com",
 		ClientID: "cid",
-	}}, st, kr, jwtUC, http.DefaultClient, 5*time.Minute, false, nil, 0)
+	}}, st, kr, jwtUC, http.DefaultClient, 5*time.Minute, 7*24*time.Hour, false, nil, 0)
 
 	_, err = uc.Refresh(context.Background(), ourHex)
 	if err == nil {
@@ -321,5 +324,70 @@ func TestOIDCRefresh_missingStoredIDPRefreshToken(t *testing.T) {
 	}
 	if !strings.Contains(detail, "Google did not issue a refresh token") {
 		t.Fatalf("detail %q", detail)
+	}
+}
+
+func TestOIDCRefresh_expiredRefreshSession(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	jwtUC, err := NewJWTUseCase(jwtTestCfg(t, dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	k := make([]byte, 32)
+	for i := range k {
+		k[i] = byte(i + 1)
+	}
+	kr, err := sessioncrypto.NewKeyring(sessioncrypto.KEK{ID: "k", Key: k})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { kr.Close() })
+
+	sealed, err := kr.Seal([]byte("idp-rt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	envBytes, err := sessioncrypto.MarshalEnvelope(sealed)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ourBytes := make([]byte, 32)
+	if _, err := rand.Read(ourBytes); err != nil {
+		t.Fatal(err)
+	}
+	ourHex := hex.EncodeToString(ourBytes)
+	verifier := ourOpaqueRefreshVerifier(ourHex)
+
+	st := &memRefreshSessionStore{
+		sessionID: "sid-1",
+		sess: kvvalue.SessionValue{
+			SchemaVersion:       kvvalue.SessionSchemaLatest,
+			EncryptedIDPRefresh: json.RawMessage(envBytes),
+			ClaimsSnapshot:      json.RawMessage(`{"email":"user@example.com"}`),
+			ProviderID:          "p1",
+			OurRefreshVerifier:  verifier,
+			RefreshExpiresAt:    time.Now().Add(-time.Minute),
+		},
+		modRev:   7,
+		verifier: verifier,
+	}
+
+	uc := NewOIDCRefreshUseCase([]config.OIDCProviderConfig{{
+		ID:       "p1",
+		Name:     "Test Provider",
+		Issuer:   "https://issuer.example",
+		ClientID: "cid",
+	}}, st, kr, jwtUC, http.DefaultClient, 5*time.Minute, 7*24*time.Hour, false, nil, 0)
+
+	_, err = uc.Refresh(context.Background(), ourHex)
+	if !errors.Is(err, apierrors.ErrSessionRefreshExpired) {
+		t.Fatalf("got %v", err)
+	}
+	stCode, code, _ := MapRefreshError(err)
+	if stCode != http.StatusUnauthorized || code != "SESSION_REFRESH_EXPIRED" {
+		t.Fatalf("got %d %s", stCode, code)
 	}
 }

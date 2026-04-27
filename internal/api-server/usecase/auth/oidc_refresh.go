@@ -41,6 +41,7 @@ type OIDCRefreshUseCase struct {
 	jwt             *JWTUseCase
 	hc              *http.Client
 	accessTTL       time.Duration
+	refreshTTL      time.Duration
 	metricsEnabled  bool
 	idpCache        *idpcache.Cache
 	idpOpaqueMaxTTL time.Duration
@@ -54,6 +55,7 @@ func NewOIDCRefreshUseCase(
 	jwtUC *JWTUseCase,
 	hc *http.Client,
 	accessTTL time.Duration,
+	refreshTTL time.Duration,
 	metricsEnabled bool,
 	idpCache *idpcache.Cache,
 	idpOpaqueMaxTTL time.Duration,
@@ -62,9 +64,8 @@ func NewOIDCRefreshUseCase(
 	for _, p := range providers {
 		by[strings.TrimSpace(p.ID)] = p
 	}
-	if accessTTL <= 0 {
-		accessTTL = defaultInteractiveAccessTTL
-	}
+	accessTTL = config.EffectiveInteractiveAccessTokenTTL(accessTTL)
+	refreshTTL = config.EffectiveInteractiveRefreshTokenTTL(refreshTTL)
 	if hc == nil {
 		hc = http.DefaultClient
 	}
@@ -75,6 +76,7 @@ func NewOIDCRefreshUseCase(
 		jwt:             jwtUC,
 		hc:              hc,
 		accessTTL:       accessTTL,
+		refreshTTL:      refreshTTL,
 		metricsEnabled:  metricsEnabled,
 		idpCache:        idpCache,
 		idpOpaqueMaxTTL: idpOpaqueMaxTTL,
@@ -125,6 +127,7 @@ func (u *OIDCRefreshUseCase) completeSessionRefresh(
 	modRev int64,
 	nextEncryptedIDP, nextClaims json.RawMessage,
 	subject string,
+	refreshExpiresAt time.Time,
 	idpAccessForCache string,
 	idpExpiresInSec int,
 	metricResult string,
@@ -150,6 +153,7 @@ func (u *OIDCRefreshUseCase) completeSessionRefresh(
 		LoginIntentID:       sess.LoginIntentID,
 		ProviderID:          strings.TrimSpace(sess.ProviderID),
 		OurRefreshVerifier:  newVerifier,
+		RefreshExpiresAt:    refreshExpiresAt,
 	}
 	if newSess.ProviderID == "" && len(u.byID) == 1 {
 		for id := range u.byID {
@@ -253,6 +257,10 @@ func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, ourRefreshHex string) 
 	if subtle.ConstantTimeCompare([]byte(sess.OurRefreshVerifier), []byte(verifier)) != 1 {
 		return out, apierrors.ErrSessionAuthFailed
 	}
+	now := time.Now().UTC()
+	if refreshSessionExpired(now, sess.RefreshExpiresAt) {
+		return out, apierrors.ErrSessionRefreshExpired
+	}
 
 	p, err := u.resolveProvider(sess)
 	if err != nil {
@@ -281,7 +289,7 @@ func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, ourRefreshHex string) 
 			return out, apierrors.ErrSessionAuthFailed
 		}
 		return u.completeSessionRefresh(ctx, sessionID, verifier, sess, modRev,
-			sess.EncryptedIDPRefresh, claimsSnap, subj, "", 0, metrics.AuthRefreshDegraded)
+			sess.EncryptedIDPRefresh, claimsSnap, subj, sess.RefreshExpiresAt, "", 0, metrics.AuthRefreshDegraded)
 	}
 	if dErr != nil {
 		return out, dErr
@@ -295,7 +303,7 @@ func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, ourRefreshHex string) 
 			return out, apierrors.ErrSessionAuthFailed
 		}
 		return u.completeSessionRefresh(ctx, sessionID, verifier, sess, modRev,
-			sess.EncryptedIDPRefresh, claimsSnap, subj, "", 0, metrics.AuthRefreshDegraded)
+			sess.EncryptedIDPRefresh, claimsSnap, subj, sess.RefreshExpiresAt, "", 0, metrics.AuthRefreshDegraded)
 	}
 	if tErr != nil {
 		return out, tErr
@@ -340,9 +348,10 @@ func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, ourRefreshHex string) 
 	if err != nil {
 		return out, err
 	}
+	refreshExpiresAt := rotatedRefreshExpiry(now, u.refreshTTL, sess.RefreshExpiresAt, tr)
 
 	return u.completeSessionRefresh(ctx, sessionID, verifier, sess, modRev,
-		json.RawMessage(envBytes), claimsSnap, subject, strings.TrimSpace(tr.AccessToken), tr.ExpiresIn, metrics.AuthRefreshIDPUp)
+		json.RawMessage(envBytes), claimsSnap, subject, refreshExpiresAt, strings.TrimSpace(tr.AccessToken), tr.ExpiresIn, metrics.AuthRefreshIDPUp)
 }
 
 // MapRefreshError maps Refresh errors to HTTP status and stable problem codes.
@@ -356,6 +365,8 @@ func MapRefreshError(err error) (status int, code, detail string) {
 		return http.StatusBadRequest, "REFRESH_INVALID", err.Error()
 	case errors.Is(err, apierrors.ErrOIDCUnknownProvider):
 		return http.StatusBadRequest, "OIDC_UNKNOWN_PROVIDER", "Session refers to an unknown provider_id."
+	case errors.Is(err, apierrors.ErrSessionRefreshExpired):
+		return http.StatusUnauthorized, "SESSION_REFRESH_EXPIRED", "Interactive refresh session expired; start login again."
 	case errors.Is(err, apierrors.ErrSessionAuthFailed):
 		return http.StatusUnauthorized, "SESSION_AUTH_FAILED", "Refresh token is invalid, expired, or revoked."
 	case errors.Is(err, apierrors.ErrSessionRefreshConflict):

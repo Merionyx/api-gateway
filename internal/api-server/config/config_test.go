@@ -44,6 +44,12 @@ func TestLoadConfig_FromRepoSample(t *testing.T) {
 	if cfg.Readiness.RequireContractSyncer {
 		t.Fatal("Readiness.RequireContractSyncer expected false from sample config")
 	}
+	if cfg.Auth.InteractiveAccessTokenTTL != DefaultInteractiveAccessTokenTTL {
+		t.Fatalf("InteractiveAccessTokenTTL: got %s", cfg.Auth.InteractiveAccessTokenTTL)
+	}
+	if cfg.Auth.InteractiveRefreshTokenTTL != DefaultInteractiveRefreshTokenTTL {
+		t.Fatalf("InteractiveRefreshTokenTTL: got %s", cfg.Auth.InteractiveRefreshTokenTTL)
+	}
 	if len(cfg.Server.CORS.AllowOrigins) != 0 {
 		t.Fatalf("sample prod config should keep server.cors.allow_origins empty (operator-filled), got %#v", cfg.Server.CORS.AllowOrigins)
 	}
@@ -59,6 +65,9 @@ func TestLoadConfig_NoFile_Defaults(t *testing.T) {
 	}
 	if cfg.JWT.Issuer != "api-gateway-api-server" {
 		t.Fatalf("JWT default issuer: %q", cfg.JWT.Issuer)
+	}
+	if cfg.Auth.InteractiveRefreshTokenTTL != DefaultInteractiveRefreshTokenTTL {
+		t.Fatalf("refresh ttl default: %s", cfg.Auth.InteractiveRefreshTokenTTL)
 	}
 	if !cfg.LeaderElection.Enabled {
 		t.Fatal("leader election should default to enabled")

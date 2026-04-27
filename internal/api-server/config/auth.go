@@ -7,6 +7,13 @@ import (
 	"time"
 )
 
+const (
+	// DefaultInteractiveAccessTokenTTL is the default API-profile access JWT lifetime after OIDC login.
+	DefaultInteractiveAccessTokenTTL = 5 * time.Minute
+	// DefaultInteractiveRefreshTokenTTL is the default maximum lifetime of our interactive refresh chain.
+	DefaultInteractiveRefreshTokenTTL = 7 * 24 * time.Hour
+)
+
 // OIDCProviderConfig describes one generic OIDC IdP for browser login (roadmap ш. 12–13).
 type OIDCProviderConfig struct {
 	// ID matches the login query parameter provider_id (opaque string, not a path segment).
@@ -240,8 +247,42 @@ type AuthConfig struct {
 	// InteractiveAccessTokenTTL is our API-profile access JWT lifetime after OIDC login (default 5m; roadmap).
 	InteractiveAccessTokenTTL time.Duration `mapstructure:"interactive_access_token_ttl" json:"interactive_access_token_ttl"`
 
+	// InteractiveRefreshTokenTTL is the maximum lifetime of our interactive refresh chain (default 7d).
+	// When the IdP discloses a shorter refresh lifetime, our session is clamped to that shorter deadline.
+	InteractiveRefreshTokenTTL time.Duration `mapstructure:"interactive_refresh_token_ttl" json:"interactive_refresh_token_ttl"`
+
 	// IdpAccessCacheOpaqueMaxTTL caps inferred IdP access lifetime for opaque tokens without expires_in/JWT exp (ADR 0002, roadmap ш. 19). Zero uses idpcache.DefaultOpaqueMaxTTL for that branch only.
 	IdpAccessCacheOpaqueMaxTTL time.Duration `mapstructure:"idp_access_cache_opaque_max_ttl" json:"idp_access_cache_opaque_max_ttl"`
+}
+
+func EffectiveInteractiveAccessTokenTTL(ttl time.Duration) time.Duration {
+	if ttl <= 0 {
+		return DefaultInteractiveAccessTokenTTL
+	}
+	return ttl
+}
+
+func EffectiveInteractiveRefreshTokenTTL(ttl time.Duration) time.Duration {
+	if ttl <= 0 {
+		return DefaultInteractiveRefreshTokenTTL
+	}
+	return ttl
+}
+
+// ValidateInteractiveTokenTTLs validates interactive token lifetimes after applying defaults for zero values.
+func ValidateInteractiveTokenTTLs(accessTTL, refreshTTL time.Duration) error {
+	accessTTL = EffectiveInteractiveAccessTokenTTL(accessTTL)
+	refreshTTL = EffectiveInteractiveRefreshTokenTTL(refreshTTL)
+	if accessTTL <= 0 {
+		return fmt.Errorf("auth.interactive_access_token_ttl must be > 0")
+	}
+	if refreshTTL <= 0 {
+		return fmt.Errorf("auth.interactive_refresh_token_ttl must be > 0")
+	}
+	if refreshTTL < accessTTL {
+		return fmt.Errorf("auth.interactive_refresh_token_ttl (%s) must be >= auth.interactive_access_token_ttl (%s)", refreshTTL, accessTTL)
+	}
+	return nil
 }
 
 // ValidateOIDCProviders returns an error if the slice is inconsistent (duplicate id, missing fields, empty allowlist).

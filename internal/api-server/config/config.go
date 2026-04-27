@@ -122,7 +122,8 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("auth.environment", "development")
 	v.SetDefault("auth.allow_insecure_bootstrap", false)
 	v.SetDefault("auth.login_intent_lease_ttl", 15*time.Minute)
-	v.SetDefault("auth.interactive_access_token_ttl", 5*time.Minute)
+	v.SetDefault("auth.interactive_access_token_ttl", DefaultInteractiveAccessTokenTTL)
+	v.SetDefault("auth.interactive_refresh_token_ttl", DefaultInteractiveRefreshTokenTTL)
 	v.SetDefault("auth.idp_access_cache_opaque_max_ttl", 2*time.Minute)
 	// Browser CORS (roadmap ш. 24): explicit dev defaults — no "*" (prod Helm must list real UI origins).
 	v.SetDefault("server.cors.allow_origins", DevCORSAllowOrigins())
@@ -167,6 +168,9 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	ApplyCORSDevDefaults(&config)
 
 	if err := ValidateServerCORS(config.Server.CORS, config.Auth.Environment); err != nil {
+		return nil, err
+	}
+	if err := ValidateInteractiveTokenTTLs(config.Auth.InteractiveAccessTokenTTL, config.Auth.InteractiveRefreshTokenTTL); err != nil {
 		return nil, err
 	}
 

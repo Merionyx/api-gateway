@@ -3,6 +3,7 @@ package config
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestValidateOIDCProviders_GitHub(t *testing.T) {
@@ -155,6 +156,20 @@ func TestValidateOIDCProviders_NameRequired(t *testing.T) {
 	}})
 	if err == nil || !strings.Contains(err.Error(), "name is required") {
 		t.Fatalf("got %v", err)
+	}
+}
+
+func TestValidateInteractiveTokenTTLs(t *testing.T) {
+	t.Parallel()
+
+	if err := ValidateInteractiveTokenTTLs(7*24*time.Hour, 30*24*time.Hour); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := ValidateInteractiveTokenTTLs(24*time.Hour, time.Hour); err == nil || !strings.Contains(err.Error(), "interactive_refresh_token_ttl") {
+		t.Fatalf("expected ttl validation error, got %v", err)
+	}
+	if err := ValidateInteractiveTokenTTLs(0, 0); err != nil {
+		t.Fatalf("zero values should resolve to defaults, got %v", err)
 	}
 }
 
