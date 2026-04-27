@@ -11,17 +11,17 @@ func TestAccessStorage_FindContractByPath_longestPrefixWins(t *testing.T) {
 	s.SetAccessConfig(&authv1.AccessConfig{
 		Version: 1,
 		Contracts: []*authv1.ContractAccess{
-			{ContractName: "short", Prefix: "/api"},
-			{ContractName: "long", Prefix: "/api/v1"},
+			{ContractName: "short", Prefix: "/"},
+			{ContractName: "long", Prefix: "/v1"},
 		},
 	})
 
-	got := s.FindContractByPath("/api/v1/users")
+	got := s.FindContractByPath("/v1/users")
 	if got == nil || got.ContractName != "long" {
 		t.Fatalf("want long contract, got %v", got)
 	}
 
-	got2 := s.FindContractByPath("/api/other")
+	got2 := s.FindContractByPath("/other")
 	if got2 == nil || got2.ContractName != "short" {
 		t.Fatalf("want short contract, got %v", got2)
 	}

@@ -6,7 +6,7 @@ import (
 	apiserverclient "github.com/merionyx/api-gateway/internal/cli/apiserver/client"
 )
 
-// ExportRequest is the JSON body for POST /api/v1/contracts/export (OpenAPI ContractsExportRequest).
+// ExportRequest is the JSON body for POST /v1/contracts/export (OpenAPI ContractsExportRequest).
 type ExportRequest = apiserverclient.ContractsExportRequest
 
 // ExportFile is one contract file in a successful export response.

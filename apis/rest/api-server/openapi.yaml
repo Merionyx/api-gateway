@@ -13,18 +13,18 @@ info:
 
     **v1.5.6:** interactive OIDC login / refresh may request longer token lifetimes per client (`requested_*_token_ttl_seconds`), while the server clamps them to configured maxima and provider refresh limits; session responses now include actual `access_expires_at` / `refresh_expires_at`.
 
-    **v1.5.5:** OIDC providers now include mandatory user-facing `name` in config and in **`GET /api/v1/auth/oidc-providers`** for UIs and **`agwctl auth login`**.
+    **v1.5.5:** OIDC providers now include mandatory user-facing `name` in config and in **`GET /v1/auth/oidc-providers`** for UIs and **`agwctl auth login`**.
 
-    **v1.5.4:** **`GET /api/v1/auth/oidc-providers`** — public list of configured browser OIDC providers (`id`, `kind`, `issuer`) for UIs and **`agwctl auth login`** (no secrets).
+    **v1.5.4:** **`GET /v1/auth/oidc-providers`** — public list of configured browser OIDC providers (`id`, `kind`, `issuer`) for UIs and **`agwctl auth login`** (no secrets).
 
     **v1.5.3:** RBAC on selected operations (roadmap step **23**): role constants (e.g. `api:contracts:export`, `api:access_tokens:issue`, baseline `api:role:viewer`, wildcard `api:role:admin`); **403** `INSUFFICIENT_ROLES` when authenticated but not authorized.
 
     **v1.5.2:** HTTP **APISecurity** middleware (roadmap step 20): deny-by-default on secured routes; API-profile Bearer JWT and/or `X-API-Key`.
 
-    **v1.5.1 (roadmap step 13):** optional `nonce` query on **`GET /api/v1/auth/authorize`** (stored with the login-intent for callback **ш. 14**).
+    **v1.5.1 (roadmap step 13):** optional `nonce` query on **`GET /v1/auth/authorize`** (stored with the login-intent for callback **ш. 14**).
 
-    **v1.5.0 (roadmap step 5):** removes deprecated `POST /api/v1/tokens`; **Edge** issuance is **`POST /api/v1/tokens/edge`**
-    only. **API**-profile issuance remains **`POST /api/v1/tokens/api`** (contract stabilized for codegen; handler **ш. 22**).
+    **v1.5.0 (roadmap step 5):** removes deprecated `POST /v1/tokens`; **Edge** issuance is **`POST /v1/tokens/edge`**
+    only. **API**-profile issuance remains **`POST /v1/tokens/api`** (contract stabilized for codegen; handler **ш. 22**).
 
     **v1.4.0 (roadmap step 4 — OpenAPI draft):** per-operation `security` (public vs `bearerAuth` **or** `apiKey`);
     split **Edge** vs **API** JWKS and token issuance paths; OIDC **login** / **callback** / **refresh** (draft contracts —
@@ -54,7 +54,7 @@ servers:
 
 tags:
 - name: System
-  description: Liveness (`/health`), readiness (`/ready`), build metadata (`/api/v1/version`), and aggregate status (`/api/v1/status`)
+  description: Liveness (`/health`), readiness (`/ready`), build metadata (`/v1/version`), and aggregate status (`/v1/status`)
 - name: Authentication
   description: JWT issuance, JWKS, signing keys
 - name: OIDC
@@ -505,7 +505,7 @@ components:
       properties:
         id:
           type: string
-          description: Same as `provider_id` for `GET /api/v1/auth/authorize`.
+          description: Same as `provider_id` for `GET /v1/auth/authorize`.
         name:
           type: string
           description: User-facing provider label configured in `auth.oidc_providers[].name`.
@@ -521,7 +521,7 @@ components:
     IssueApiAccessTokenRequest:
       type: object
       description: |
-        Draft body for `POST /api/v1/tokens/api`. Final fields follow RBAC/CEL and M2M policy (**roadmap steps 22–23**).
+        Draft body for `POST /v1/tokens/api`. Final fields follow RBAC/CEL and M2M policy (**roadmap steps 22–23**).
       properties:
         permissions:
           type: array
@@ -532,7 +532,7 @@ components:
     ApiAccessTokenIssued:
       type: object
       description: |
-        JSON body for **201** from `POST /api/v1/tokens/api` (name avoids clashing with client codegen type `IssueApiAccessTokenResponse`).
+        JSON body for **201** from `POST /v1/tokens/api` (name avoids clashing with client codegen type `IssueApiAccessTokenResponse`).
       required:
       - access_token
       - expires_at
@@ -1054,7 +1054,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/version:
+  /v1/version:
     get:
       tags: [ System ]
       operationId: getVersion
@@ -1126,7 +1126,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/keys:
+  /v1/keys:
     get:
       tags: [ Authentication ]
       operationId: listSigningKeys
@@ -1155,7 +1155,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/auth/oidc-providers:
+  /v1/auth/oidc-providers:
     get:
       tags: [ OIDC ]
       operationId: listOidcProviders
@@ -1166,7 +1166,7 @@ paths:
         Does not include secrets. When OIDC is not configured, returns an empty array (**200**).
       responses:
         '200':
-          description: Providers available for `GET /api/v1/auth/authorize` (possibly empty).
+          description: Providers available for `GET /v1/auth/authorize` (possibly empty).
           content:
             application/json:
               schema:
@@ -1176,7 +1176,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/auth/authorize:
+  /v1/auth/authorize:
     get:
       tags: [ OIDC ]
       operationId: authorizeOidc
@@ -1269,7 +1269,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/auth/callback:
+  /v1/auth/callback:
     get:
       tags: [ OIDC ]
       operationId: callbackOidc
@@ -1304,7 +1304,7 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/InternalError'
-  /api/v1/auth/token:
+  /v1/auth/token:
     post:
       tags: [ OIDC ]
       operationId: tokenOidc
@@ -1345,7 +1345,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/OAuthTokenError'
 
-  /api/v1/tokens/edge:
+  /v1/tokens/edge:
     post:
       tags: [ Authentication ]
       operationId: issueEdgeToken
@@ -1375,7 +1375,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/tokens/api:
+  /v1/tokens/api:
     post:
       tags: [ Authentication ]
       operationId: issueApiAccessToken
@@ -1408,7 +1408,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/contracts/export:
+  /v1/contracts/export:
     post:
       tags: [ Contracts ]
       operationId: exportContracts
@@ -1445,7 +1445,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/controllers:
+  /v1/controllers:
     get:
       tags: [ Registry ]
       operationId: listControllers
@@ -1476,7 +1476,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/controllers/{controller_id}:
+  /v1/controllers/{controller_id}:
     get:
       tags: [ Registry ]
       operationId: getController
@@ -1506,7 +1506,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/controllers/{controller_id}/heartbeat:
+  /v1/controllers/{controller_id}/heartbeat:
     get:
       tags: [ Registry ]
       operationId: getControllerHeartbeat
@@ -1536,7 +1536,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/tenants:
+  /v1/tenants:
     get:
       tags: [ Registry ]
       operationId: listTenants
@@ -1567,7 +1567,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/tenants/{tenant}/controllers:
+  /v1/tenants/{tenant}/controllers:
     get:
       tags: [ Registry ]
       operationId: listControllersByTenant
@@ -1576,7 +1576,7 @@ paths:
       - apiKey: []
       summary: List controllers for a tenant
       description: |
-        Lists controllers whose `tenant` path parameter matches. Same response shape as `GET /api/v1/controllers` but scoped to one tenant.
+        Lists controllers whose `tenant` path parameter matches. Same response shape as `GET /v1/controllers` but scoped to one tenant.
       parameters:
       - $ref: '#/components/parameters/Tenant'
       - $ref: '#/components/parameters/Limit'
@@ -1599,7 +1599,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/tenants/{tenant}/environments:
+  /v1/tenants/{tenant}/environments:
     get:
       tags: [ Registry ]
       operationId: listEnvironmentsByTenant
@@ -1631,7 +1631,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/tenants/{tenant}/bundles:
+  /v1/tenants/{tenant}/bundles:
     get:
       tags: [ Registry ]
       operationId: listBundlesByTenant
@@ -1663,7 +1663,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/bundles:
+  /v1/bundles:
     get:
       tags: [ Bundles ]
       operationId: listBundleKeys
@@ -1694,7 +1694,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/bundles/contracts:
+  /v1/bundles/contracts:
     get:
       tags: [ Bundles ]
       operationId: listContractsInBundle
@@ -1734,7 +1734,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/bundles/contracts/{contract_name}:
+  /v1/bundles/contracts/{contract_name}:
     get:
       tags: [ Bundles ]
       operationId: getContractInBundle
@@ -1768,7 +1768,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/bundles/sync:
+  /v1/bundles/sync:
     post:
       tags: [ Operations ]
       operationId: syncBundle
@@ -1810,7 +1810,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/status:
+  /v1/status:
     get:
       tags: [ System ]
       operationId: getStatus

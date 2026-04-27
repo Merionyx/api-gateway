@@ -97,7 +97,7 @@ func errContractNames(resp *apiserverclient.ListContractsInBundleResponse) error
 	return fmt.Errorf("api: HTTP %d: %s", resp.StatusCode(), trimBody(resp.Body))
 }
 
-// ListControllers calls GET /api/v1/controllers.
+// ListControllers calls GET /v1/controllers.
 func ListControllers(ctx context.Context, httpClient *http.Client, serverURL string, cursor *string) (*apiserverclient.ControllerListResponse, error) {
 	c, err := newClientWithResponses(serverURL, httpClient)
 	if err != nil {
@@ -117,7 +117,7 @@ func ListControllers(ctx context.Context, httpClient *http.Client, serverURL str
 	return nil, errControllersList(resp)
 }
 
-// ListTenants calls GET /api/v1/tenants.
+// ListTenants calls GET /v1/tenants.
 func ListTenants(ctx context.Context, httpClient *http.Client, serverURL string, cursor *string) (*apiserverclient.TenantListResponse, error) {
 	c, err := newClientWithResponses(serverURL, httpClient)
 	if err != nil {
@@ -137,7 +137,7 @@ func ListTenants(ctx context.Context, httpClient *http.Client, serverURL string,
 	return nil, errTenantsList(resp)
 }
 
-// ListControllersByTenant calls GET /api/v1/tenants/{tenant}/controllers.
+// ListControllersByTenant calls GET /v1/tenants/{tenant}/controllers.
 func ListControllersByTenant(ctx context.Context, httpClient *http.Client, serverURL, tenant string, cursor *string) (*apiserverclient.ControllerListResponse, error) {
 	c, err := newClientWithResponses(serverURL, httpClient)
 	if err != nil {
@@ -158,7 +158,7 @@ func ListControllersByTenant(ctx context.Context, httpClient *http.Client, serve
 	return nil, errControllersByTenant(resp)
 }
 
-// ListEnvironmentsByTenant calls GET /api/v1/tenants/{tenant}/environments.
+// ListEnvironmentsByTenant calls GET /v1/tenants/{tenant}/environments.
 func ListEnvironmentsByTenant(ctx context.Context, httpClient *http.Client, serverURL, tenant string, cursor *string) (*apiserverclient.EnvironmentListResponse, error) {
 	c, err := newClientWithResponses(serverURL, httpClient)
 	if err != nil {
@@ -179,7 +179,7 @@ func ListEnvironmentsByTenant(ctx context.Context, httpClient *http.Client, serv
 	return nil, errEnvironmentsByTenant(resp)
 }
 
-// ListBundlesByTenant calls GET /api/v1/tenants/{tenant}/bundles.
+// ListBundlesByTenant calls GET /v1/tenants/{tenant}/bundles.
 func ListBundlesByTenant(ctx context.Context, httpClient *http.Client, serverURL, tenant string, cursor *string) (*apiserverclient.BundleRefListResponse, error) {
 	c, err := newClientWithResponses(serverURL, httpClient)
 	if err != nil {
@@ -200,7 +200,7 @@ func ListBundlesByTenant(ctx context.Context, httpClient *http.Client, serverURL
 	return nil, errBundlesByTenant(resp)
 }
 
-// ListBundleKeys calls GET /api/v1/bundles.
+// ListBundleKeys calls GET /v1/bundles.
 func ListBundleKeys(ctx context.Context, httpClient *http.Client, serverURL string, cursor *string) (*apiserverclient.BundleRefListResponse, error) {
 	c, err := newClientWithResponses(serverURL, httpClient)
 	if err != nil {
@@ -220,7 +220,7 @@ func ListBundleKeys(ctx context.Context, httpClient *http.Client, serverURL stri
 	return nil, errBundleKeys(resp)
 }
 
-// ListContractNamesInBundle calls GET /api/v1/bundles/contracts (bundle_key query).
+// ListContractNamesInBundle calls GET /v1/bundles/contracts (bundle_key query).
 func ListContractNamesInBundle(ctx context.Context, httpClient *http.Client, serverURL, bundleKey string, cursor *string) (*apiserverclient.ContractNameListResponse, error) {
 	c, err := newClientWithResponses(serverURL, httpClient)
 	if err != nil {

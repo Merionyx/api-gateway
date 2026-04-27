@@ -29,7 +29,7 @@ type JWTHandler struct {
 	permissionEval *authz.PermissionEvaluator
 }
 
-// NewJWTHandler wires JWT HTTP handlers. apiAccessTTL<=0 defaults to 5m (POST /api/v1/tokens/api).
+// NewJWTHandler wires JWT HTTP handlers. apiAccessTTL<=0 defaults to 5m (POST /v1/tokens/api).
 func NewJWTHandler(
 	jwtUseCase *auth.JWTUseCase,
 	metricsEnabled bool,
@@ -48,7 +48,7 @@ func NewJWTHandler(
 }
 
 // GenerateToken generates a JWT token
-// POST /api/v1/tokens/edge (Edge profile; OpenAPI operation issueEdgeToken).
+// POST /v1/tokens/edge (Edge profile; OpenAPI operation issueEdgeToken).
 func (h *JWTHandler) GenerateToken(c fiber.Ctx) error {
 	span := beginHandlerSpan(c, "GenerateToken")
 	defer span.End()
@@ -100,7 +100,7 @@ func (h *JWTHandler) GenerateToken(c fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(token)
 }
 
-// IssueApiAccessToken mints a short-lived API-profile JWT (POST /api/v1/tokens/api; roadmap ш. 22).
+// IssueApiAccessToken mints a short-lived API-profile JWT (POST /v1/tokens/api; roadmap ш. 22).
 // Caller must already be authenticated (API-profile Bearer and/or X-API-Key via APISecurity).
 func (h *JWTHandler) IssueApiAccessToken(c fiber.Ctx) error {
 	span := beginHandlerSpan(c, "IssueApiAccessToken")
@@ -228,7 +228,7 @@ func (h *JWTHandler) GetJWKSEdge(c fiber.Ctx) error {
 }
 
 // GetSigningKeys returns a list of signing keys
-// GET /api/v1/keys
+// GET /v1/keys
 func (h *JWTHandler) GetSigningKeys(c fiber.Ctx) error {
 	span := beginHandlerSpan(c, "GetSigningKeys")
 	defer span.End()

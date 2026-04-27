@@ -46,7 +46,7 @@ func TestOIDCLoginUseCase_Start_RedirectNotAllowlisted(t *testing.T) {
 	_, err := uc.Start(t.Context(), OIDCLoginStartRequest{
 		ProviderID:          "p1",
 		RedirectURI:         "http://127.0.0.1:9999/wrong",
-		ServerCallbackURI:   "https://api.example.com/api/v1/auth/callback",
+		ServerCallbackURI:   "https://api.example.com/v1/auth/callback",
 		ResponseType:        "code",
 		ClientID:            "postman",
 		CodeChallenge:       "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~",
@@ -91,7 +91,7 @@ func TestOIDCLoginUseCase_Start_HappyPath(t *testing.T) {
 	loc, err := uc.Start(t.Context(), OIDCLoginStartRequest{
 		ProviderID:          "p1",
 		RedirectURI:         "http://127.0.0.1:8080/cb",
-		ServerCallbackURI:   "https://api.example.com/api/v1/auth/callback",
+		ServerCallbackURI:   "https://api.example.com/v1/auth/callback",
 		Nonce:               "n1",
 		RequestedAccessTTL:  24 * time.Hour,
 		RequestedRefreshTTL: 10 * 24 * time.Hour,
@@ -112,7 +112,7 @@ func TestOIDCLoginUseCase_Start_HappyPath(t *testing.T) {
 	if !strings.Contains(u.Path, "authorize") {
 		t.Fatalf("path %q", u.Path)
 	}
-	if q.Get("client_id") != "cid" || q.Get("redirect_uri") != "https://api.example.com/api/v1/auth/callback" {
+	if q.Get("client_id") != "cid" || q.Get("redirect_uri") != "https://api.example.com/v1/auth/callback" {
 		t.Fatalf("query %v", q)
 	}
 	if q.Get("nonce") != "n1" {

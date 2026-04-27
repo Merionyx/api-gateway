@@ -19,7 +19,7 @@ const (
 var tokenGenerateTotal = promauto.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "api_server_token_generate_total",
-		Help: "JWT token issuance outcomes for token minting routes (e.g. POST /api/v1/tokens/edge).",
+		Help: "JWT token issuance outcomes for token minting routes (e.g. POST /v1/tokens/edge).",
 	},
 	[]string{"result"},
 )

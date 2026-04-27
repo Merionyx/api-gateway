@@ -107,7 +107,7 @@ func isRefreshExpiredError(err error) bool {
 	if err == nil {
 		return false
 	}
-	// API problem code from refresh_token grant on POST /api/v1/auth/token.
+	// API problem code from refresh_token grant on POST /v1/auth/token.
 	return strings.Contains(err.Error(), "SESSION_REFRESH_EXPIRED")
 }
 

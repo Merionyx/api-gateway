@@ -14,7 +14,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
 )
 
-// OIDCLoginHandler serves GET /api/v1/auth/authorize (roadmap ш. 13).
+// OIDCLoginHandler serves GET /v1/auth/authorize (roadmap ш. 13).
 type OIDCLoginHandler struct {
 	uc *auth.OIDCLoginUseCase
 }
@@ -37,7 +37,7 @@ func (h *OIDCLoginHandler) Authorize(c fiber.Ctx, params apiserver.AuthorizeOidc
 	loc, err := h.uc.Start(ctx, auth.OIDCLoginStartRequest{
 		ProviderID:          stringOrEmpty(params.ProviderId),
 		RedirectURI:         params.RedirectUri,
-		ServerCallbackURI:   c.BaseURL() + "/api/v1/auth/callback",
+		ServerCallbackURI:   c.BaseURL() + "/v1/auth/callback",
 		Nonce:               nonce,
 		RequestedAccessTTL:  durationFromOptionalSeconds(params.RequestedAccessTokenTtlSeconds),
 		RequestedRefreshTTL: durationFromOptionalSeconds(params.RequestedRefreshTokenTtlSeconds),
@@ -75,7 +75,7 @@ func stringOrEmpty(s *string) string {
 	return *s
 }
 
-// ListOidcProviders returns public metadata for configured browser OIDC providers (GET /api/v1/auth/oidc-providers).
+// ListOidcProviders returns public metadata for configured browser OIDC providers (GET /v1/auth/oidc-providers).
 func (h *OIDCLoginHandler) ListOidcProviders(c fiber.Ctx) error {
 	rows := h.uc.ListPublicOIDCProviders()
 	out := make([]apiserver.OidcProviderDescriptor, len(rows))

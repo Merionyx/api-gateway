@@ -47,7 +47,7 @@ func TestResolveAuthLoginProviderID_UsesProviderNameForSingleProvider(t *testing
 	var out bytes.Buffer
 	httpClient := &http.Client{
 		Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-			if r.URL.Path != "/api/v1/auth/oidc-providers" {
+			if r.URL.Path != "/v1/auth/oidc-providers" {
 				return &http.Response{
 					StatusCode: http.StatusNotFound,
 					Header:     make(http.Header),

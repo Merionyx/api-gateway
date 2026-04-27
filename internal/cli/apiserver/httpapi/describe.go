@@ -29,7 +29,7 @@ func errContractGet(resp *apiserverclient.GetContractInBundleResponse) error {
 	return fmt.Errorf("api: HTTP %d: %s", resp.StatusCode(), trimBody(resp.Body))
 }
 
-// GetController calls GET /api/v1/controllers/{controller_id}.
+// GetController calls GET /v1/controllers/{controller_id}.
 func GetController(ctx context.Context, httpClient *http.Client, serverURL, controllerID string) (*apiserverclient.Controller, error) {
 	c, err := newClientWithResponses(serverURL, httpClient)
 	if err != nil {
@@ -46,7 +46,7 @@ func GetController(ctx context.Context, httpClient *http.Client, serverURL, cont
 	return nil, errControllerGet(resp)
 }
 
-// GetContractDocument calls GET /api/v1/bundles/contracts/{contract_name} (bundle_key query).
+// GetContractDocument calls GET /v1/bundles/contracts/{contract_name} (bundle_key query).
 func GetContractDocument(ctx context.Context, httpClient *http.Client, serverURL, bundleKey, contractName string) (apiserverclient.ContractDocument, error) {
 	c, err := newClientWithResponses(serverURL, httpClient)
 	if err != nil {
@@ -65,7 +65,7 @@ func GetContractDocument(ctx context.Context, httpClient *http.Client, serverURL
 	return nil, errContractGet(resp)
 }
 
-// FindTenant walks paginated GET /api/v1/tenants until name matches (exact).
+// FindTenant walks paginated GET /v1/tenants until name matches (exact).
 func FindTenant(ctx context.Context, httpClient *http.Client, serverURL, name string) (string, error) {
 	want := strings.TrimSpace(name)
 	if want == "" {
@@ -195,7 +195,7 @@ func findBundleInEnvironment(ctx context.Context, httpClient *http.Client, serve
 	return nil, fmt.Errorf("environment %q not found for tenant %q", envName, tenant)
 }
 
-// FindBundleKey walks paginated GET /api/v1/bundles until the bundle key string matches (exact).
+// FindBundleKey walks paginated GET /v1/bundles until the bundle key string matches (exact).
 func FindBundleKey(ctx context.Context, httpClient *http.Client, serverURL, key string) (string, error) {
 	want := strings.TrimSpace(key)
 	if want == "" {

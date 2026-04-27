@@ -43,7 +43,7 @@ type contractsExportResponse struct {
 	Files []contractsExportFileJSON `json:"files"`
 }
 
-// Export POST /api/v1/contracts/export — forwards to Contract Syncer (no etcd).
+// Export POST /v1/contracts/export — forwards to Contract Syncer (no etcd).
 func (h *ContractsExportHandler) Export(c fiber.Ctx) error {
 	span := beginHandlerSpan(c, "Export")
 	defer span.End()

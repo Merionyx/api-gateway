@@ -34,7 +34,7 @@ func TestAuthRefreshCommand_Success(t *testing.T) {
 			if r.Method != http.MethodPost {
 				t.Fatalf("method = %s", r.Method)
 			}
-			if r.URL.String() != "https://api.example.test/api/v1/auth/token" {
+			if r.URL.String() != "https://api.example.test/v1/auth/token" {
 				t.Fatalf("url = %s", r.URL.String())
 			}
 			body, err := io.ReadAll(r.Body)

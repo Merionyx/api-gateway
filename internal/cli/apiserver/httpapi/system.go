@@ -42,7 +42,7 @@ func Ready(ctx context.Context, httpClient *http.Client, serverURL string) (*api
 	return nil, resp.StatusCode(), fmt.Errorf("HTTP %d: %s", resp.StatusCode(), trimBody(resp.Body))
 }
 
-// ServerVersion calls GET /api/v1/version.
+// ServerVersion calls GET /v1/version.
 func ServerVersion(ctx context.Context, httpClient *http.Client, serverURL string) (*apiserverclient.VersionResponse, error) {
 	ctx, cancel := withServerTimeout(ctx)
 	defer cancel()
@@ -88,7 +88,7 @@ func ServerJWKS(ctx context.Context, httpClient *http.Client, serverURL string) 
 	return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode(), trimBody(resp.Body))
 }
 
-// ServerStatus calls GET /api/v1/status.
+// ServerStatus calls GET /v1/status.
 func ServerStatus(ctx context.Context, httpClient *http.Client, serverURL string) (*apiserverclient.StatusResponse, error) {
 	ctx, cancel := withServerTimeout(ctx)
 	defer cancel()

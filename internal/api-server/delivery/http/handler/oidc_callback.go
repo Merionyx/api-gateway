@@ -14,7 +14,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
 )
 
-// OIDCCallbackHandler serves GET /api/v1/auth/callback (roadmap ш. 14).
+// OIDCCallbackHandler serves GET /v1/auth/callback (roadmap ш. 14).
 type OIDCCallbackHandler struct {
 	uc *auth.OIDCCallbackUseCase
 }

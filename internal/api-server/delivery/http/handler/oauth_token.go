@@ -12,7 +12,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
 )
 
-// OAuthTokenHandler serves POST /api/v1/auth/token as OAuth 2.1 token endpoint.
+// OAuthTokenHandler serves POST /v1/auth/token as OAuth 2.1 token endpoint.
 type OAuthTokenHandler struct {
 	uc *auth.OAuthTokenUseCase
 }

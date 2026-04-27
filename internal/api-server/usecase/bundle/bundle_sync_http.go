@@ -5,12 +5,12 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
-	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 	"github.com/merionyx/api-gateway/internal/shared/bundlekey"
+	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
 	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
 
-// BundleHTTPSyncUseCase implements HTTP POST /api/v1/bundles/sync semantics (from_cache when etcd already has snapshots and force is false).
+// BundleHTTPSyncUseCase implements HTTP POST /v1/bundles/sync semantics (from_cache when etcd already has snapshots and force is false).
 type BundleHTTPSyncUseCase struct {
 	snapshots interfaces.SnapshotRepository
 	syncer    interfaces.BundleSyncUseCase

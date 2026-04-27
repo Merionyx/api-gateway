@@ -43,9 +43,9 @@ func newAuthLoginCmd(resolveServer func() (string, error)) *cobra.Command {
 		Use:   "login",
 		Short: "Browser OIDC login: loopback callback, save tokens to credentials file (0600)",
 		Long: strings.TrimSpace(`
-Opens the system browser for API Server GET /api/v1/auth/authorize, then receives the OAuth redirect on a local HTTP listener.
+Opens the system browser for API Server GET /v1/auth/authorize, then receives the OAuth redirect on a local HTTP listener.
 
-Without --provider-id, agwctl calls GET /api/v1/auth/oidc-providers: if there is a single provider it is chosen automatically; if there are several, you pick one from an interactive list (arrow keys + Enter) when stdin/stdout are a TTY—otherwise pass --provider-id explicitly.
+Without --provider-id, agwctl calls GET /v1/auth/oidc-providers: if there is a single provider it is chosen automatically; if there are several, you pick one from an interactive list (arrow keys + Enter) when stdin/stdout are a TTY—otherwise pass --provider-id explicitly.
 
 You must add the exact redirect URI to auth.oidc_providers[].redirect_uri_allowlist for this provider (default:
   http://127.0.0.1:21987/callback

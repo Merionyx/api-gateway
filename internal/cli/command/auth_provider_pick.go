@@ -24,7 +24,7 @@ func providerSelectLabel(p apiserverclient.OidcProviderDescriptor) string {
 	return fmt.Sprintf("%s  %s", name, style.S(true, style.Dim, fmt.Sprintf("(%s)", id)))
 }
 
-// resolveAuthLoginProviderID returns explicit non-empty id, or fetches GET /api/v1/auth/oidc-providers
+// resolveAuthLoginProviderID returns explicit non-empty id, or fetches GET /v1/auth/oidc-providers
 // and picks one (single provider auto-selected; multiple + TTY → arrow-key prompt; multiple + non-TTY → error).
 func resolveAuthLoginProviderID(ctx context.Context, server string, httpClient *http.Client, explicit string, out io.Writer) (string, error) {
 	if s := strings.TrimSpace(explicit); s != "" {

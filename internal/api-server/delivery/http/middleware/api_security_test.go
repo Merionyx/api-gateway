@@ -20,16 +20,16 @@ func Test_requiresAPISecurity(t *testing.T) {
 	if requiresAPISecurity(http.MethodGet, "/health") {
 		t.Fatal("health public")
 	}
-	if !requiresAPISecurity(http.MethodGet, "/api/v1/status") {
+	if !requiresAPISecurity(http.MethodGet, "/v1/status") {
 		t.Fatal("status protected")
 	}
-	if requiresAPISecurity(http.MethodPost, "/api/v1/auth/token") {
+	if requiresAPISecurity(http.MethodPost, "/v1/auth/token") {
 		t.Fatal("token endpoint public")
 	}
-	if requiresAPISecurity(http.MethodGet, "/api/v1/auth/callback") {
+	if requiresAPISecurity(http.MethodGet, "/v1/auth/callback") {
 		t.Fatal("oidc upstream callback public")
 	}
-	if requiresAPISecurity(http.MethodGet, "/api/v1/auth/oidc-providers") {
+	if requiresAPISecurity(http.MethodGet, "/v1/auth/oidc-providers") {
 		t.Fatal("oidc provider list public")
 	}
 }
@@ -57,9 +57,9 @@ func TestAPISecurity_blocksProtectedWithoutAuth(t *testing.T) {
 	uc := testJWTUC(t)
 	app := fiber.New()
 	app.Use(APISecurity(uc, nil))
-	app.Get("/api/v1/status", func(c fiber.Ctx) error { return c.SendString("no") })
+	app.Get("/v1/status", func(c fiber.Ctx) error { return c.SendString("no") })
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/status", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -78,7 +78,7 @@ func TestAPISecurity_legacyAuthPathFallsThroughTo404(t *testing.T) {
 	app.Use(APISecurity(uc, nil))
 	app.Get("/health", func(c fiber.Ctx) error { return c.SendString("ok") })
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/callback", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/auth/callback", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -107,9 +107,9 @@ func TestAPISecurity_rejectsEdgeProfileBearer(t *testing.T) {
 
 	app := fiber.New()
 	app.Use(APISecurity(uc, nil))
-	app.Get("/api/v1/status", func(c fiber.Ctx) error { return c.SendString("no") })
+	app.Get("/v1/status", func(c fiber.Ctx) error { return c.SendString("no") })
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/status", nil)
 	req.Header.Set(fiber.HeaderAuthorization, "Bearer "+edgeResp.Token)
 	resp, err := app.Test(req)
 	if err != nil {
@@ -131,9 +131,9 @@ func TestAPISecurity_allowsBearerAPIJWT(t *testing.T) {
 	}
 	app := fiber.New()
 	app.Use(APISecurity(uc, nil))
-	app.Get("/api/v1/status", func(c fiber.Ctx) error { return c.SendString("yes") })
+	app.Get("/v1/status", func(c fiber.Ctx) error { return c.SendString("yes") })
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/status", nil)
 	req.Header.Set(fiber.HeaderAuthorization, "Bearer "+tok)
 	resp, err := app.Test(req)
 	if err != nil {

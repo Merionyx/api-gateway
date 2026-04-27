@@ -53,10 +53,10 @@ func APISecurity(jwtUC *auth.JWTUseCase, apiKeys APIKeyRecordGetter) fiber.Handl
 
 func requiresAPISecurity(method, path string) bool {
 	switch path {
-	case "/health", "/ready", "/api/v1/version",
+	case "/health", "/ready", "/v1/version",
 		"/.well-known/jwks.json", "/.well-known/jwks-edge.json",
-		"/api/v1/keys",
-		"/api/v1/auth/oidc-providers", "/api/v1/auth/authorize", "/api/v1/auth/callback", "/api/v1/auth/token":
+		"/v1/keys",
+		"/v1/auth/oidc-providers", "/v1/auth/authorize", "/v1/auth/callback", "/v1/auth/token":
 		return false
 	default:
 		return true

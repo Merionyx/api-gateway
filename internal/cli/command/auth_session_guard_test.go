@@ -247,7 +247,7 @@ func TestWithAuthorizationHeader_SetsHeader(t *testing.T) {
 		}),
 	}
 	client := withAuthorizationHeader(base, "", "token-123")
-	req, err := http.NewRequest(http.MethodGet, "https://api.example.test/api/v1/status", nil)
+	req, err := http.NewRequest(http.MethodGet, "https://api.example.test/v1/status", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

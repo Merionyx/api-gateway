@@ -22,7 +22,7 @@ func (uc *JWTUseCase) GetJWKS(ctx context.Context) (*models.JWKS, error) {
 	return uc.buildJWKS(span, uc.apiSigningKeys)
 }
 
-// GetJWKSEdge returns the Edge-profile JWKS (data plane / ExtAuthz; POST /api/v1/tokens/edge).
+// GetJWKSEdge returns the Edge-profile JWKS (data plane / ExtAuthz; POST /v1/tokens/edge).
 func (uc *JWTUseCase) GetJWKSEdge(ctx context.Context) (*models.JWKS, error) {
 	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseAuthPkg, "GetJWKSEdge"))
 	defer span.End()
@@ -56,7 +56,7 @@ func (uc *JWTUseCase) buildJWKS(span trace.Span, signing map[string]*KeyPair) (*
 	return jwks, nil
 }
 
-// GetSigningKeys returns API-profile signing key metadata (GET /api/v1/keys).
+// GetSigningKeys returns API-profile signing key metadata (GET /v1/keys).
 func (uc *JWTUseCase) GetSigningKeys(ctx context.Context) []models.SigningKey {
 	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseAuthPkg, "GetSigningKeys"))
 	defer span.End()

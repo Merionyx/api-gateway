@@ -42,9 +42,9 @@ func TestJWTHandler_IssueApiAccessToken_viaAPIKey(t *testing.T) {
 	}
 	app := fiber.New()
 	app.Use(middleware.APISecurity(uc, repo))
-	app.Post("/api/v1/tokens/api", h.IssueApiAccessToken)
+	app.Post("/v1/tokens/api", h.IssueApiAccessToken)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/tokens/api", strings.NewReader(`{}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/tokens/api", strings.NewReader(`{}`))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	req.Header.Set("X-API-Key", secret)
 	resp, err := app.Test(req)
@@ -89,9 +89,9 @@ func TestJWTHandler_IssueApiAccessToken_forbiddenWrongAPIKeyRole(t *testing.T) {
 	}
 	app := fiber.New()
 	app.Use(middleware.APISecurity(uc, repo))
-	app.Post("/api/v1/tokens/api", h.IssueApiAccessToken)
+	app.Post("/v1/tokens/api", h.IssueApiAccessToken)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/tokens/api", strings.NewReader(`{}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/tokens/api", strings.NewReader(`{}`))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	req.Header.Set("X-API-Key", secret)
 	resp, err := app.Test(req)
@@ -126,9 +126,9 @@ func TestJWTHandler_IssueApiAccessToken_forbiddenBearerBaselineMember(t *testing
 	h := NewJWTHandler(uc, false, 2*time.Minute, nil)
 	app := fiber.New()
 	app.Use(middleware.APISecurity(uc, nil))
-	app.Post("/api/v1/tokens/api", h.IssueApiAccessToken)
+	app.Post("/v1/tokens/api", h.IssueApiAccessToken)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/tokens/api", strings.NewReader(`{}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/tokens/api", strings.NewReader(`{}`))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	req.Header.Set(fiber.HeaderAuthorization, "Bearer "+tok)
 	resp, err := app.Test(req)
@@ -159,9 +159,9 @@ func TestJWTHandler_IssueApiAccessToken_viaAPIKeyAdminBypass(t *testing.T) {
 	}
 	app := fiber.New()
 	app.Use(middleware.APISecurity(uc, repo))
-	app.Post("/api/v1/tokens/api", h.IssueApiAccessToken)
+	app.Post("/v1/tokens/api", h.IssueApiAccessToken)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/tokens/api", strings.NewReader(`{}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/tokens/api", strings.NewReader(`{}`))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	req.Header.Set("X-API-Key", secret)
 	resp, err := app.Test(req)
@@ -212,9 +212,9 @@ func TestJWTHandler_IssueApiAccessToken_viaBearer(t *testing.T) {
 	h := NewJWTHandler(uc, false, 2*time.Minute, nil)
 	app := fiber.New()
 	app.Use(middleware.APISecurity(uc, nil))
-	app.Post("/api/v1/tokens/api", h.IssueApiAccessToken)
+	app.Post("/v1/tokens/api", h.IssueApiAccessToken)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/tokens/api", nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/tokens/api", nil)
 	req.Header.Set(fiber.HeaderAuthorization, "Bearer "+tok)
 	resp, err := app.Test(req)
 	if err != nil {
@@ -249,9 +249,9 @@ func TestJWTHandler_IssueApiAccessToken_embedsRequestedPermissionsInTokenClaims(
 	}
 	app := fiber.New()
 	app.Use(middleware.APISecurity(uc, repo))
-	app.Post("/api/v1/tokens/api", h.IssueApiAccessToken)
+	app.Post("/v1/tokens/api", h.IssueApiAccessToken)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/tokens/api", strings.NewReader(`{"permissions":["api.token.edge.issue"]}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/tokens/api", strings.NewReader(`{"permissions":["api.token.edge.issue"]}`))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	req.Header.Set("X-API-Key", secret)
 	resp, err := app.Test(req)
@@ -302,9 +302,9 @@ func TestJWTHandler_IssueApiAccessToken_rejectsRequestedPermissionsOutsideCaller
 	}
 	app := fiber.New()
 	app.Use(middleware.APISecurity(uc, repo))
-	app.Post("/api/v1/tokens/api", h.IssueApiAccessToken)
+	app.Post("/v1/tokens/api", h.IssueApiAccessToken)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/tokens/api", strings.NewReader(`{"permissions":["api.token.edge.issue"]}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/tokens/api", strings.NewReader(`{"permissions":["api.token.edge.issue"]}`))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	req.Header.Set("X-API-Key", secret)
 	resp, err := app.Test(req)

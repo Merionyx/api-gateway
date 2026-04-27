@@ -89,7 +89,7 @@ func TestAPISecurity_apiKeySetsLocals(t *testing.T) {
 	}
 	app := fiber.New()
 	app.Use(APISecurity(uc, repo))
-	app.Get("/api/v1/status", func(c fiber.Ctx) error {
+	app.Get("/v1/status", func(c fiber.Ctx) error {
 		p, ok := APIKeyPrincipalFromCtx(c)
 		if !ok || p == nil || p.Roles[0] != "r1" {
 			return c.SendStatus(fiber.StatusTeapot)
@@ -97,7 +97,7 @@ func TestAPISecurity_apiKeySetsLocals(t *testing.T) {
 		return c.SendString("ok")
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/status", nil)
 	req.Header.Set("X-API-Key", secret)
 	resp, err := app.Test(req)
 	if err != nil {

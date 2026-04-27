@@ -15,7 +15,7 @@ const (
 var authRefreshTotal = promauto.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "api_server_auth_refresh_total",
-		Help: "OAuth refresh_token grant on POST /api/v1/auth/token successful outcomes (idp_up vs degraded).",
+		Help: "OAuth refresh_token grant on POST /v1/auth/token successful outcomes (idp_up vs degraded).",
 	},
 	[]string{"result"},
 )

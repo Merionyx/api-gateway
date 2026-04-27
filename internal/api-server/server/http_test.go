@@ -71,11 +71,11 @@ func TestProtectedRouteBearerPassesOpenAPIValidation(t *testing.T) {
 			AuthenticationFunc: AuthenticationFunc,
 		},
 	}))
-	app.Get("/api/v1/controllers", func(c fiber.Ctx) error {
+	app.Get("/v1/controllers", func(c fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/controllers?limit=50", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/controllers?limit=50", nil)
 	req.Header.Set(fiber.HeaderAccept, fiber.MIMEApplicationJSON)
 	req.Header.Set(fiber.HeaderAuthorization, "Bearer "+tok)
 	resp, err := app.Test(req)

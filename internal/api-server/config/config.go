@@ -26,7 +26,7 @@ type Config struct {
 	// GRPCContractSyncerClient: TLS when dialing Contract Syncer.
 	GRPCContractSyncerClient grpcobs.ClientTLSConfig `mapstructure:"grpc_contract_syncer_client" json:"grpc_contract_syncer_client"`
 	MetricsHTTP              metricshttp.Config      `mapstructure:"metrics_http" json:"metrics_http"`
-	// Idempotency configures POST /api/v1/bundles/sync replay when Idempotency-Key is sent.
+	// Idempotency configures POST /v1/bundles/sync replay when Idempotency-Key is sent.
 	Idempotency IdempotencyConfig `mapstructure:"idempotency" json:"idempotency"`
 	// Telemetry: OpenTelemetry trace export (optional). Merged with env; see FileBlock in the telemetry package.
 	Telemetry telemetry.FileBlock `mapstructure:"telemetry" json:"telemetry"`
@@ -88,7 +88,7 @@ type JWTConfig struct {
 	// Empty means "newest private key by file mtime" within each directory.
 	APISigningKid  string `mapstructure:"api_signing_kid" json:"api_signing_kid"`
 	EdgeSigningKid string `mapstructure:"edge_signing_kid" json:"edge_signing_kid"`
-	// EdgeIssuer / EdgeAudience are iss/aud for POST /api/v1/tokens/edge (data-plane / ExtAuthz profile).
+	// EdgeIssuer / EdgeAudience are iss/aud for POST /v1/tokens/edge (data-plane / ExtAuthz profile).
 	EdgeIssuer   string `mapstructure:"edge_issuer" json:"edge_issuer"`
 	EdgeAudience string `mapstructure:"edge_audience" json:"edge_audience"`
 }

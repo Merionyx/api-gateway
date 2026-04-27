@@ -78,7 +78,7 @@ type Container struct {
 
 	ControllerRegistryHandler *grpchandler.ControllerRegistryHandler
 
-	// BundleSyncIdempotency caches POST /api/v1/bundles/sync outcomes when Idempotency-Key is set (memory or etcd).
+	// BundleSyncIdempotency caches POST /v1/bundles/sync outcomes when Idempotency-Key is set (memory or etcd).
 	BundleSyncIdempotency idempotency.Executor
 }
 

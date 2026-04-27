@@ -121,7 +121,7 @@ type Access struct {
 	Secure *bool  `json:"secure,omitempty"`
 }
 
-// ApiAccessTokenIssued JSON body for **201** from `POST /api/v1/tokens/api` (name avoids clashing with client codegen type `IssueApiAccessTokenResponse`).
+// ApiAccessTokenIssued JSON body for **201** from `POST /v1/tokens/api` (name avoids clashing with client codegen type `IssueApiAccessTokenResponse`).
 type ApiAccessTokenIssued struct {
 	// AccessToken Short-lived **API profile** JWT for calling this HTTP API.
 	AccessToken string    `json:"access_token"`
@@ -350,7 +350,7 @@ type HealthStatus struct {
 	Status string `json:"status"`
 }
 
-// IssueApiAccessTokenRequest Draft body for `POST /api/v1/tokens/api`. Final fields follow RBAC/CEL and M2M policy (**roadmap steps 22–23**).
+// IssueApiAccessTokenRequest Draft body for `POST /v1/tokens/api`. Final fields follow RBAC/CEL and M2M policy (**roadmap steps 22–23**).
 type IssueApiAccessTokenRequest struct {
 	// Permissions Optional per-token delegated permissions; when accepted they are embedded into the issued API token claims (for this token only).
 	Permissions *[]string `json:"permissions,omitempty"`
@@ -434,7 +434,7 @@ type OAuthTokenResponse struct {
 
 // OidcProviderDescriptor Public metadata for one configured `auth.oidc_providers[]` entry. Safe for browser UIs and CLI; excludes client secrets and redirect allowlists.
 type OidcProviderDescriptor struct {
-	// Id Same as `provider_id` for `GET /api/v1/auth/authorize`.
+	// Id Same as `provider_id` for `GET /v1/auth/authorize`.
 	Id string `json:"id"`
 
 	// Issuer OIDC issuer URL configured for this provider.
@@ -995,6 +995,12 @@ type ClientInterface interface {
 	// GetJwks request
 	GetJwks(ctx context.Context, params *GetJwksParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetHealth request
+	GetHealth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetReady request
+	GetReady(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// AuthorizeOidc request
 	AuthorizeOidc(ctx context.Context, params *AuthorizeOidcParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -1067,12 +1073,6 @@ type ClientInterface interface {
 
 	// GetVersion request
 	GetVersion(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetHealth request
-	GetHealth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetReady request
-	GetReady(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) GetJwksEdge(ctx context.Context, params *GetJwksEdgeParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1089,6 +1089,30 @@ func (c *Client) GetJwksEdge(ctx context.Context, params *GetJwksEdgeParams, req
 
 func (c *Client) GetJwks(ctx context.Context, params *GetJwksParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetJwksRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetHealth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetHealthRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetReady(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetReadyRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -1411,30 +1435,6 @@ func (c *Client) GetVersion(ctx context.Context, reqEditors ...RequestEditorFn) 
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetHealth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetHealthRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetReady(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetReadyRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
 // NewGetJwksEdgeRequest generates requests for GetJwksEdge
 func NewGetJwksEdgeRequest(server string, params *GetJwksEdgeParams) (*http.Request, error) {
 	var err error
@@ -1519,6 +1519,60 @@ func NewGetJwksRequest(server string, params *GetJwksParams) (*http.Request, err
 	return req, nil
 }
 
+// NewGetHealthRequest generates requests for GetHealth
+func NewGetHealthRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/health")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetReadyRequest generates requests for GetReady
+func NewGetReadyRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/ready")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewAuthorizeOidcRequest generates requests for AuthorizeOidc
 func NewAuthorizeOidcRequest(server string, params *AuthorizeOidcParams) (*http.Request, error) {
 	var err error
@@ -1528,7 +1582,7 @@ func NewAuthorizeOidcRequest(server string, params *AuthorizeOidcParams) (*http.
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/auth/authorize")
+	operationPath := fmt.Sprintf("/v1/auth/authorize")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1670,7 +1724,7 @@ func NewCallbackOidcRequest(server string, params *CallbackOidcParams) (*http.Re
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/auth/callback")
+	operationPath := fmt.Sprintf("/v1/auth/callback")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1728,7 +1782,7 @@ func NewListOidcProvidersRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/auth/oidc-providers")
+	operationPath := fmt.Sprintf("/v1/auth/oidc-providers")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1766,7 +1820,7 @@ func NewTokenOidcRequestWithBody(server string, contentType string, body io.Read
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/auth/token")
+	operationPath := fmt.Sprintf("/v1/auth/token")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1795,7 +1849,7 @@ func NewListBundleKeysRequest(server string, params *ListBundleKeysParams) (*htt
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/bundles")
+	operationPath := fmt.Sprintf("/v1/bundles")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1876,7 +1930,7 @@ func NewListContractsInBundleRequest(server string, params *ListContractsInBundl
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/bundles/contracts")
+	operationPath := fmt.Sprintf("/v1/bundles/contracts")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2012,7 +2066,7 @@ func NewGetContractInBundleRequest(server string, contractName ContractName, par
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/bundles/contracts/%s", pathParam0)
+	operationPath := fmt.Sprintf("/v1/bundles/contracts/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2128,7 +2182,7 @@ func NewSyncBundleRequestWithBody(server string, params *SyncBundleParams, conte
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/bundles/sync")
+	operationPath := fmt.Sprintf("/v1/bundles/sync")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2183,7 +2237,7 @@ func NewExportContractsRequestWithBody(server string, contentType string, body i
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/contracts/export")
+	operationPath := fmt.Sprintf("/v1/contracts/export")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2212,7 +2266,7 @@ func NewListControllersRequest(server string, params *ListControllersParams) (*h
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/controllers")
+	operationPath := fmt.Sprintf("/v1/controllers")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2300,7 +2354,7 @@ func NewGetControllerRequest(server string, controllerId ControllerId, params *G
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/controllers/%s", pathParam0)
+	operationPath := fmt.Sprintf("/v1/controllers/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2349,7 +2403,7 @@ func NewGetControllerHeartbeatRequest(server string, controllerId ControllerId, 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/controllers/%s/heartbeat", pathParam0)
+	operationPath := fmt.Sprintf("/v1/controllers/%s/heartbeat", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2391,7 +2445,7 @@ func NewListSigningKeysRequest(server string, params *ListSigningKeysParams) (*h
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/keys")
+	operationPath := fmt.Sprintf("/v1/keys")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2433,7 +2487,7 @@ func NewGetStatusRequest(server string, params *GetStatusParams) (*http.Request,
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/status")
+	operationPath := fmt.Sprintf("/v1/status")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2475,7 +2529,7 @@ func NewListTenantsRequest(server string, params *ListTenantsParams) (*http.Requ
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/tenants")
+	operationPath := fmt.Sprintf("/v1/tenants")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2563,7 +2617,7 @@ func NewListBundlesByTenantRequest(server string, tenant Tenant, params *ListBun
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/tenants/%s/bundles", pathParam0)
+	operationPath := fmt.Sprintf("/v1/tenants/%s/bundles", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2651,7 +2705,7 @@ func NewListControllersByTenantRequest(server string, tenant Tenant, params *Lis
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/tenants/%s/controllers", pathParam0)
+	operationPath := fmt.Sprintf("/v1/tenants/%s/controllers", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2739,7 +2793,7 @@ func NewListEnvironmentsByTenantRequest(server string, tenant Tenant, params *Li
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/tenants/%s/environments", pathParam0)
+	operationPath := fmt.Sprintf("/v1/tenants/%s/environments", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2831,7 +2885,7 @@ func NewIssueApiAccessTokenRequestWithBody(server string, contentType string, bo
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/tokens/api")
+	operationPath := fmt.Sprintf("/v1/tokens/api")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2871,7 +2925,7 @@ func NewIssueEdgeTokenRequestWithBody(server string, contentType string, body io
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/tokens/edge")
+	operationPath := fmt.Sprintf("/v1/tokens/edge")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2900,61 +2954,7 @@ func NewGetVersionRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/version")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetHealthRequest generates requests for GetHealth
-func NewGetHealthRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/health")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetReadyRequest generates requests for GetReady
-func NewGetReadyRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/ready")
+	operationPath := fmt.Sprintf("/v1/version")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -3020,6 +3020,12 @@ type ClientWithResponsesInterface interface {
 
 	// GetJwksWithResponse request
 	GetJwksWithResponse(ctx context.Context, params *GetJwksParams, reqEditors ...RequestEditorFn) (*GetJwksResponse, error)
+
+	// GetHealthWithResponse request
+	GetHealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetHealthResponse, error)
+
+	// GetReadyWithResponse request
+	GetReadyWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetReadyResponse, error)
 
 	// AuthorizeOidcWithResponse request
 	AuthorizeOidcWithResponse(ctx context.Context, params *AuthorizeOidcParams, reqEditors ...RequestEditorFn) (*AuthorizeOidcResponse, error)
@@ -3093,12 +3099,6 @@ type ClientWithResponsesInterface interface {
 
 	// GetVersionWithResponse request
 	GetVersionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetVersionResponse, error)
-
-	// GetHealthWithResponse request
-	GetHealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetHealthResponse, error)
-
-	// GetReadyWithResponse request
-	GetReadyWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetReadyResponse, error)
 }
 
 type GetJwksEdgeResponse struct {
@@ -3143,6 +3143,53 @@ func (r GetJwksResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetJwksResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetHealthResponse struct {
+	Body                      []byte
+	HTTPResponse              *http.Response
+	JSON200                   *HealthStatus
+	ApplicationproblemJSON400 *BadRequest
+}
+
+// Status returns HTTPResponse.Status
+func (r GetHealthResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetHealthResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetReadyResponse struct {
+	Body                      []byte
+	HTTPResponse              *http.Response
+	JSON200                   *ReadinessStatus
+	ApplicationproblemJSON400 *BadRequest
+	JSON503                   *ReadinessStatus
+}
+
+// Status returns HTTPResponse.Status
+func (r GetReadyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetReadyResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -3661,53 +3708,6 @@ func (r GetVersionResponse) StatusCode() int {
 	return 0
 }
 
-type GetHealthResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *HealthStatus
-	ApplicationproblemJSON400 *BadRequest
-}
-
-// Status returns HTTPResponse.Status
-func (r GetHealthResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetHealthResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type GetReadyResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *ReadinessStatus
-	ApplicationproblemJSON400 *BadRequest
-	JSON503                   *ReadinessStatus
-}
-
-// Status returns HTTPResponse.Status
-func (r GetReadyResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetReadyResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
 // GetJwksEdgeWithResponse request returning *GetJwksEdgeResponse
 func (c *ClientWithResponses) GetJwksEdgeWithResponse(ctx context.Context, params *GetJwksEdgeParams, reqEditors ...RequestEditorFn) (*GetJwksEdgeResponse, error) {
 	rsp, err := c.GetJwksEdge(ctx, params, reqEditors...)
@@ -3724,6 +3724,24 @@ func (c *ClientWithResponses) GetJwksWithResponse(ctx context.Context, params *G
 		return nil, err
 	}
 	return ParseGetJwksResponse(rsp)
+}
+
+// GetHealthWithResponse request returning *GetHealthResponse
+func (c *ClientWithResponses) GetHealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetHealthResponse, error) {
+	rsp, err := c.GetHealth(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetHealthResponse(rsp)
+}
+
+// GetReadyWithResponse request returning *GetReadyResponse
+func (c *ClientWithResponses) GetReadyWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetReadyResponse, error) {
+	rsp, err := c.GetReady(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetReadyResponse(rsp)
 }
 
 // AuthorizeOidcWithResponse request returning *AuthorizeOidcResponse
@@ -3955,24 +3973,6 @@ func (c *ClientWithResponses) GetVersionWithResponse(ctx context.Context, reqEdi
 	return ParseGetVersionResponse(rsp)
 }
 
-// GetHealthWithResponse request returning *GetHealthResponse
-func (c *ClientWithResponses) GetHealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetHealthResponse, error) {
-	rsp, err := c.GetHealth(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetHealthResponse(rsp)
-}
-
-// GetReadyWithResponse request returning *GetReadyResponse
-func (c *ClientWithResponses) GetReadyWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetReadyResponse, error) {
-	rsp, err := c.GetReady(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetReadyResponse(rsp)
-}
-
 // ParseGetJwksEdgeResponse parses an HTTP response from a GetJwksEdgeWithResponse call
 func ParseGetJwksEdgeResponse(rsp *http.Response) (*GetJwksEdgeResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -4047,6 +4047,79 @@ func ParseGetJwksResponse(rsp *http.Response) (*GetJwksResponse, error) {
 			return nil, err
 		}
 		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetHealthResponse parses an HTTP response from a GetHealthWithResponse call
+func ParseGetHealthResponse(rsp *http.Response) (*GetHealthResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetHealthResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest HealthStatus
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetReadyResponse parses an HTTP response from a GetReadyWithResponse call
+func ParseGetReadyResponse(rsp *http.Response) (*GetReadyResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetReadyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ReadinessStatus
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ReadinessStatus
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 
@@ -4943,79 +5016,6 @@ func ParseGetVersionResponse(rsp *http.Response) (*GetVersionResponse, error) {
 			return nil, err
 		}
 		response.ApplicationproblemJSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetHealthResponse parses an HTTP response from a GetHealthWithResponse call
-func ParseGetHealthResponse(rsp *http.Response) (*GetHealthResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetHealthResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest HealthStatus
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON400 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetReadyResponse parses an HTTP response from a GetReadyWithResponse call
-func ParseGetReadyResponse(rsp *http.Response) (*GetReadyResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetReadyResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ReadinessStatus
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest ReadinessStatus
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON503 = &dest
 
 	}
 

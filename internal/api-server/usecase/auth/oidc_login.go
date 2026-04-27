@@ -39,7 +39,7 @@ type OIDCLoginStartRequest struct {
 	CodeChallengeMethod string
 }
 
-// OIDCLoginUseCase handles GET /api/v1/auth/authorize (roadmap ш. 13).
+// OIDCLoginUseCase handles GET /v1/auth/authorize (roadmap ш. 13).
 type OIDCLoginUseCase struct {
 	byID           map[string]config.OIDCProviderConfig
 	leaseTTL       time.Duration

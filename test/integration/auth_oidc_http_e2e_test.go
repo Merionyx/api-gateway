@@ -232,7 +232,7 @@ func TestE2E_ListOidcProviders(t *testing.T) {
 	defer cnt.Close()
 
 	app := fiberAppFromContainer(t, cnt)
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/auth/oidc-providers", nil)
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/v1/auth/oidc-providers", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -269,7 +269,7 @@ func performOIDCAuthorizeFlow(t *testing.T, app *fiber.App) (accessToken, refres
 	}
 	challenge := pkce.ChallengeS256(verifier)
 	clientState := "e2e-client-state"
-	authorizeURL := fmt.Sprintf("http://example.com/api/v1/auth/authorize?provider_id=%s&redirect_uri=%s&response_type=code&client_id=%s&state=%s&code_challenge=%s&code_challenge_method=S256",
+	authorizeURL := fmt.Sprintf("http://example.com/v1/auth/authorize?provider_id=%s&redirect_uri=%s&response_type=code&client_id=%s&state=%s&code_challenge=%s&code_challenge_method=S256",
 		url.QueryEscape(e2eOIDCProviderID),
 		url.QueryEscape(e2eRedirectURI),
 		url.QueryEscape(e2eOAuthClientID),
@@ -301,7 +301,7 @@ func performOIDCAuthorizeFlow(t *testing.T, app *fiber.App) (accessToken, refres
 		t.Fatalf("expected authorize path in %q", loc)
 	}
 
-	cbURL := fmt.Sprintf("http://example.com/api/v1/auth/callback?code=%s&state=%s",
+	cbURL := fmt.Sprintf("http://example.com/v1/auth/callback?code=%s&state=%s",
 		url.QueryEscape(e2eAuthCode), url.QueryEscape(upstreamState))
 	cbResp, err := app.Test(httptest.NewRequest(http.MethodGet, cbURL, nil))
 	if err != nil {
@@ -334,7 +334,7 @@ func performOIDCAuthorizeFlow(t *testing.T, app *fiber.App) (accessToken, refres
 	tokenForm.Set("redirect_uri", e2eRedirectURI)
 	tokenForm.Set("client_id", e2eOAuthClientID)
 	tokenForm.Set("code_verifier", verifier)
-	tokenReq := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/auth/token", strings.NewReader(tokenForm.Encode()))
+	tokenReq := httptest.NewRequest(http.MethodPost, "http://example.com/v1/auth/token", strings.NewReader(tokenForm.Encode()))
 	tokenReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	tokenResp, err := app.Test(tokenReq)
 	if err != nil {
@@ -421,7 +421,7 @@ func TestE2E_OIDCRefresh_IdPUnavailable_Degraded(t *testing.T) {
 	refreshForm := url.Values{}
 	refreshForm.Set("grant_type", "refresh_token")
 	refreshForm.Set("refresh_token", refresh1)
-	req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/auth/token", strings.NewReader(refreshForm.Encode()))
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/v1/auth/token", strings.NewReader(refreshForm.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	refreshResp, err := app.Test(req)
 	if err != nil {
@@ -551,7 +551,7 @@ func TestE2E_OIDCRefresh_ReuseOldRefreshTokenAfterRotate_401(t *testing.T) {
 		form := url.Values{}
 		form.Set("grant_type", "refresh_token")
 		form.Set("refresh_token", refreshHex)
-		req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/auth/token", strings.NewReader(form.Encode()))
+		req := httptest.NewRequest(http.MethodPost, "http://example.com/v1/auth/token", strings.NewReader(form.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		resp, err := app.Test(req)
 		if err != nil {

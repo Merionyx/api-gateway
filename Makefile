@@ -8,7 +8,7 @@ DOCKER_TAG=latest
 # Release Dockerfiles: runtime-alpine (shell, wget healthcheck) | runtime-distroless (production)
 DOCKER_BUILD_TARGET?=runtime-alpine
 
-# Metadata for build/release/Dockerfile (-ldflags → internal/api-server/version, GET /api/v1/version)
+# Metadata for build/release/Dockerfile (-ldflags → internal/api-server/version, GET /v1/version)
 GIT_REVISION ?= $(shell git rev-parse HEAD 2>/dev/null || echo unknown)
 BUILD_TIME ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 RELEASE_VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)

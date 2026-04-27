@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// OIDCProviderPublic is non-sensitive metadata for discovery (GET /api/v1/auth/oidc-providers).
+// OIDCProviderPublic is non-sensitive metadata for discovery (GET /v1/auth/oidc-providers).
 type OIDCProviderPublic struct {
 	ID     string
 	Name   string
