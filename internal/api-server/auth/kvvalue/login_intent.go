@@ -10,7 +10,8 @@ const (
 	LoginIntentSchemaV1     = 1
 	LoginIntentSchemaV2     = 2
 	LoginIntentSchemaV3     = 3
-	LoginIntentSchemaLatest = LoginIntentSchemaV3
+	LoginIntentSchemaV4     = 4
+	LoginIntentSchemaLatest = LoginIntentSchemaV4
 )
 
 // LoginIntentValue is the canonical login-intent value at login-intents/{intent_id}.
@@ -32,6 +33,17 @@ type LoginIntentValue struct {
 	RequestedAccessTokenTTLSeconds int64 `json:"requested_access_token_ttl_seconds,omitempty"`
 	// RequestedRefreshTokenTTLSeconds is the client-requested refresh-chain lifetime for callback issuance.
 	RequestedRefreshTokenTTLSeconds int64 `json:"requested_refresh_token_ttl_seconds,omitempty"`
+
+	// OAuthClientID is the downstream OAuth client_id from GET /api/v1/auth/login in OAuth 2.1 authorize mode.
+	OAuthClientID string `json:"oauth_client_id,omitempty"`
+	// OAuthClientRedirectURI is the downstream OAuth redirect_uri used after IdP callback.
+	OAuthClientRedirectURI string `json:"oauth_client_redirect_uri,omitempty"`
+	// OAuthClientState is echoed to the downstream client redirect as state.
+	OAuthClientState string `json:"oauth_client_state,omitempty"`
+	// OAuthClientCodeChallenge is the downstream PKCE challenge to validate at token exchange.
+	OAuthClientCodeChallenge string `json:"oauth_client_code_challenge,omitempty"`
+	// OAuthClientCodeChallengeMethod stores downstream PKCE method; only S256 is accepted.
+	OAuthClientCodeChallengeMethod string `json:"oauth_client_code_challenge_method,omitempty"`
 }
 
 const DefaultIntentProtocol = "oidc_v1"
@@ -77,6 +89,11 @@ func migrateLoginIntentV2(v2 loginIntentV2Wire) LoginIntentValue {
 	}
 }
 
+func migrateLoginIntentV3(v3 LoginIntentValue) LoginIntentValue {
+	v3.SchemaVersion = LoginIntentSchemaLatest
+	return v3
+}
+
 // ParseLoginIntentValueJSON parses JSON and migrates v1 → latest on read.
 func ParseLoginIntentValueJSON(data []byte) (LoginIntentValue, error) {
 	ver, err := peekPositiveSchemaVersion(data)
@@ -116,7 +133,19 @@ func ParseLoginIntentValueJSON(data []byte) (LoginIntentValue, error) {
 		if v3.IntentProtocol == "" {
 			v3.IntentProtocol = DefaultIntentProtocol
 		}
-		return v3, nil
+		return migrateLoginIntentV3(v3), nil
+	case LoginIntentSchemaV4:
+		var v4 LoginIntentValue
+		if err := json.Unmarshal(data, &v4); err != nil {
+			return LoginIntentValue{}, fmt.Errorf("kvvalue: login-intent v4: %w", err)
+		}
+		if v4.SchemaVersion != LoginIntentSchemaV4 {
+			return LoginIntentValue{}, ErrMissingSchemaVersion
+		}
+		if v4.IntentProtocol == "" {
+			v4.IntentProtocol = DefaultIntentProtocol
+		}
+		return v4, nil
 	default:
 		return LoginIntentValue{}, fmt.Errorf("%w: %d", ErrUnsupportedLoginIntentSchema, ver)
 	}

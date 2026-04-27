@@ -186,8 +186,9 @@ func runAuthLogin(
 	if err != nil {
 		return err
 	}
+	pid := chosenID
 	loginResp, err := apiNoRedir.LoginOidc(ctx, &apiserverclient.LoginOidcParams{
-		ProviderId:                      chosenID,
+		ProviderId:                      &pid,
 		RedirectUri:                     redirectURI,
 		RequestedAccessTokenTtlSeconds:  optionalSeconds(requestedTTLs.AccessTTL),
 		RequestedRefreshTokenTtlSeconds: optionalSeconds(requestedTTLs.RefreshTTL),

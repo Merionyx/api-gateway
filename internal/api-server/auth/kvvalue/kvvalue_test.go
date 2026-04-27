@@ -209,6 +209,11 @@ func TestLoginIntentNonceRoundtrip(t *testing.T) {
 		Nonce:                           "n-1",
 		RequestedAccessTokenTTLSeconds:  3600,
 		RequestedRefreshTokenTTLSeconds: 7200,
+		OAuthClientID:                   "postman",
+		OAuthClientRedirectURI:          "https://oauth.pstmn.io/v1/callback",
+		OAuthClientState:                "client-state-1",
+		OAuthClientCodeChallenge:        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~",
+		OAuthClientCodeChallengeMethod:  "S256",
 	}
 	raw, err := MarshalLoginIntentValueJSON(v)
 	if err != nil {
@@ -223,6 +228,12 @@ func TestLoginIntentNonceRoundtrip(t *testing.T) {
 	}
 	if got.RequestedAccessTokenTTLSeconds != 3600 || got.RequestedRefreshTokenTTLSeconds != 7200 {
 		t.Fatalf("requested ttls %+v", got)
+	}
+	if got.OAuthClientID != "postman" || got.OAuthClientRedirectURI != "https://oauth.pstmn.io/v1/callback" {
+		t.Fatalf("oauth client fields %+v", got)
+	}
+	if got.OAuthClientCodeChallengeMethod != "S256" || got.OAuthClientCodeChallenge == "" {
+		t.Fatalf("oauth pkce fields %+v", got)
 	}
 }
 

@@ -41,6 +41,13 @@ func (s *OpenAPIServer) CallbackOidc(c fiber.Ctx, params apiserver.CallbackOidcP
 	return s.c.OIDCCallbackHandler.Callback(c, params)
 }
 
+func (s *OpenAPIServer) TokenOidc(c fiber.Ctx) error {
+	if s.c.OAuthTokenHandler == nil {
+		return authFlowNotImplemented(c, "OAuth token endpoint requires auth.oidc_providers and auth.session_kek_base64.")
+	}
+	return s.c.OAuthTokenHandler.Token(c)
+}
+
 func (s *OpenAPIServer) RefreshSession(c fiber.Ctx) error {
 	if s.c.OIDCRefreshHandler == nil {
 		return authFlowNotImplemented(c, "Session refresh requires auth.oidc_providers and auth.session_kek_base64 (roadmap step 18: IdP down branch not implemented yet).")

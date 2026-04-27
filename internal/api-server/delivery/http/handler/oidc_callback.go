@@ -29,7 +29,7 @@ func (h *OIDCCallbackHandler) Callback(c fiber.Ctx, params apiserver.CallbackOid
 	ctx, cancel := context.WithTimeout(c.Context(), 30*time.Second)
 	defer cancel()
 
-	out, err := h.uc.Complete(ctx, params.Code, params.State)
+	out, err := h.uc.CompleteWithResult(ctx, params.Code, params.State)
 	if err != nil {
 		st, code, detail := auth.MapCallbackError(err)
 		switch st {
@@ -48,5 +48,13 @@ func (h *OIDCCallbackHandler) Callback(c fiber.Ctx, params apiserver.CallbackOid
 		}
 	}
 
-	return c.JSON(out)
+	if out.RedirectURL != "" {
+		c.Response().Header.Set("Location", out.RedirectURL)
+		c.Status(http.StatusFound)
+		return nil
+	}
+	if out.Tokens == nil {
+		return problem.Write(c, http.StatusInternalServerError, problem.WithCode(http.StatusInternalServerError, "INTERNAL_ERROR", "", "callback produced no output"))
+	}
+	return c.JSON(out.Tokens)
 }

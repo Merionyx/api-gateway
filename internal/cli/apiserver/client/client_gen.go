@@ -46,6 +46,24 @@ func (e ConfigSource) Valid() bool {
 	}
 }
 
+// Defines values for OAuthTokenRequestFormGrantType.
+const (
+	AuthorizationCode OAuthTokenRequestFormGrantType = "authorization_code"
+	RefreshToken      OAuthTokenRequestFormGrantType = "refresh_token"
+)
+
+// Valid indicates whether the value is a known member of the OAuthTokenRequestFormGrantType enum.
+func (e OAuthTokenRequestFormGrantType) Valid() bool {
+	switch e {
+	case AuthorizationCode:
+		return true
+	case RefreshToken:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ServiceLineScope.
 const (
 	ServiceLineScopeControllerRoot ServiceLineScope = "controller_root"
@@ -355,6 +373,65 @@ type Jwks struct {
 	Keys []Jwk `json:"keys"`
 }
 
+// OAuthTokenError defines model for OAuthTokenError.
+type OAuthTokenError struct {
+	// Error OAuth 2.1 error code (`invalid_request`, `invalid_grant`, `temporarily_unavailable`, `server_error`).
+	Error string `json:"error"`
+
+	// ErrorDescription Human-readable detail for diagnostics.
+	ErrorDescription *string `json:"error_description,omitempty"`
+}
+
+// OAuthTokenRequestForm defines model for OAuthTokenRequestForm.
+type OAuthTokenRequestForm struct {
+	// ClientId OAuth client id passed in authorize request.
+	ClientId *string `json:"client_id,omitempty"`
+
+	// Code Required for `authorization_code` grant.
+	Code *string `json:"code,omitempty"`
+
+	// CodeVerifier Required for `authorization_code` grant (`S256` PKCE).
+	CodeVerifier *string                        `json:"code_verifier,omitempty"`
+	GrantType    OAuthTokenRequestFormGrantType `json:"grant_type"`
+
+	// RedirectUri Required for `authorization_code` grant; must match authorize request.
+	RedirectUri *string `json:"redirect_uri,omitempty"`
+
+	// RefreshToken Required for `refresh_token` grant.
+	RefreshToken *string `json:"refresh_token,omitempty"`
+
+	// RequestedAccessTokenTtlSeconds Optional extension: requested access token lifetime in seconds (server clamps to policy).
+	RequestedAccessTokenTtlSeconds *int `json:"requested_access_token_ttl_seconds,omitempty"`
+
+	// RequestedRefreshTokenTtlSeconds Optional extension: requested refresh token lifetime in seconds (server clamps to policy and provider limits).
+	RequestedRefreshTokenTtlSeconds *int `json:"requested_refresh_token_ttl_seconds,omitempty"`
+}
+
+// OAuthTokenRequestFormGrantType defines model for OAuthTokenRequestForm.GrantType.
+type OAuthTokenRequestFormGrantType string
+
+// OAuthTokenResponse defines model for OAuthTokenResponse.
+type OAuthTokenResponse struct {
+	// AccessExpiresAt Extension for explicit access token expiry timestamp.
+	AccessExpiresAt *time.Time `json:"access_expires_at,omitempty"`
+	AccessToken     string     `json:"access_token"`
+
+	// ExpiresIn Access token lifetime in seconds from now.
+	ExpiresIn int `json:"expires_in"`
+
+	// RefreshExpiresAt Extension for explicit refresh token expiry timestamp.
+	RefreshExpiresAt *time.Time `json:"refresh_expires_at,omitempty"`
+
+	// RefreshExpiresIn Refresh token remaining lifetime in seconds from now.
+	RefreshExpiresIn *int `json:"refresh_expires_in,omitempty"`
+
+	// RefreshToken Present for both `authorization_code` and `refresh_token` grants.
+	RefreshToken *string `json:"refresh_token,omitempty"`
+
+	// TokenType OAuth token type (always Bearer).
+	TokenType string `json:"token_type"`
+}
+
 // OidcProviderDescriptor Public metadata for one configured `auth.oidc_providers[]` entry. Safe for browser UIs and CLI; excludes client secrets and redirect allowlists.
 type OidcProviderDescriptor struct {
 	// Id Same as `provider_id` for `GET /api/v1/auth/login`.
@@ -632,11 +709,26 @@ type CallbackOidcParams struct {
 
 // LoginOidcParams defines parameters for LoginOidc.
 type LoginOidcParams struct {
-	// ProviderId Registered IdP configuration identifier.
-	ProviderId string `form:"provider_id" json:"provider_id"`
+	// ProviderId Registered IdP configuration identifier. Optional when exactly one provider is configured.
+	ProviderId *string `form:"provider_id,omitempty" json:"provider_id,omitempty"`
 
-	// RedirectUri Callback URL registered for this client (allowlisted server-side).
+	// RedirectUri Downstream client callback URL (must be allowlisted for selected provider).
 	RedirectUri string `form:"redirect_uri" json:"redirect_uri"`
+
+	// ResponseType OAuth response type. For OAuth 2.1 mode must be `code`.
+	ResponseType *string `form:"response_type,omitempty" json:"response_type,omitempty"`
+
+	// ClientId OAuth client identifier (opaque for this server, validated round-trip with token endpoint).
+	ClientId *string `form:"client_id,omitempty" json:"client_id,omitempty"`
+
+	// State Opaque client state echoed back to `redirect_uri`.
+	State *string `form:"state,omitempty" json:"state,omitempty"`
+
+	// CodeChallenge PKCE code challenge (required in OAuth 2.1 mode).
+	CodeChallenge *string `form:"code_challenge,omitempty" json:"code_challenge,omitempty"`
+
+	// CodeChallengeMethod PKCE method. OAuth 2.1 requires `S256`.
+	CodeChallengeMethod *string `form:"code_challenge_method,omitempty" json:"code_challenge_method,omitempty"`
 
 	// Nonce Optional OIDC `nonce` (replay protection); echoed into the authorization request when set.
 	Nonce *string `form:"nonce,omitempty" json:"nonce,omitempty"`
@@ -813,6 +905,9 @@ type ListEnvironmentsByTenantParams struct {
 	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
 }
 
+// TokenOidcFormdataRequestBody defines body for TokenOidc for application/x-www-form-urlencoded ContentType.
+type TokenOidcFormdataRequestBody = OAuthTokenRequestForm
+
 // RefreshSessionJSONRequestBody defines body for RefreshSession for application/json ContentType.
 type RefreshSessionJSONRequestBody = AuthRefreshRequest
 
@@ -909,6 +1004,11 @@ type ClientInterface interface {
 
 	// CallbackOidc request
 	CallbackOidc(ctx context.Context, params *CallbackOidcParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// TokenOidcWithBody request with any body
+	TokenOidcWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	TokenOidcWithFormdataBody(ctx context.Context, body TokenOidcFormdataRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// LoginOidc request
 	LoginOidc(ctx context.Context, params *LoginOidcParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1013,6 +1113,30 @@ func (c *Client) GetJwks(ctx context.Context, params *GetJwksParams, reqEditors 
 
 func (c *Client) CallbackOidc(ctx context.Context, params *CallbackOidcParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCallbackOidcRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) TokenOidcWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTokenOidcRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) TokenOidcWithFormdataBody(ctx context.Context, body TokenOidcFormdataRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTokenOidcRequestWithFormdataBody(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1489,6 +1613,46 @@ func NewCallbackOidcRequest(server string, params *CallbackOidcParams) (*http.Re
 	return req, nil
 }
 
+// NewTokenOidcRequestWithFormdataBody calls the generic TokenOidc builder with application/x-www-form-urlencoded body
+func NewTokenOidcRequestWithFormdataBody(server string, body TokenOidcFormdataRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	bodyStr, err := runtime.MarshalForm(body, nil)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = strings.NewReader(bodyStr.Encode())
+	return NewTokenOidcRequestWithBody(server, "application/x-www-form-urlencoded", bodyReader)
+}
+
+// NewTokenOidcRequestWithBody generates requests for TokenOidc with any type of body
+func NewTokenOidcRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/auth/callback")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewLoginOidcRequest generates requests for LoginOidc
 func NewLoginOidcRequest(server string, params *LoginOidcParams) (*http.Request, error) {
 	var err error
@@ -1517,12 +1681,16 @@ func NewLoginOidcRequest(server string, params *LoginOidcParams) (*http.Request,
 		// per the OpenAPI spec (e.g. "color=blue,black,brown").
 		var rawQueryFragments []string
 
-		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "provider_id", params.ProviderId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-			return nil, err
-		} else {
-			for _, qp := range strings.Split(queryFrag, "&") {
-				rawQueryFragments = append(rawQueryFragments, qp)
+		if params.ProviderId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "provider_id", *params.ProviderId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
 			}
+
 		}
 
 		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "redirect_uri", params.RedirectUri, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uri"}); err != nil {
@@ -1531,6 +1699,66 @@ func NewLoginOidcRequest(server string, params *LoginOidcParams) (*http.Request,
 			for _, qp := range strings.Split(queryFrag, "&") {
 				rawQueryFragments = append(rawQueryFragments, qp)
 			}
+		}
+
+		if params.ResponseType != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "response_type", *params.ResponseType, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ClientId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "client_id", *params.ClientId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.State != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "state", *params.State, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.CodeChallenge != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "code_challenge", *params.CodeChallenge, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.CodeChallengeMethod != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "code_challenge_method", *params.CodeChallengeMethod, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
 		}
 
 		if params.Nonce != nil {
@@ -2888,6 +3116,11 @@ type ClientWithResponsesInterface interface {
 	// CallbackOidcWithResponse request
 	CallbackOidcWithResponse(ctx context.Context, params *CallbackOidcParams, reqEditors ...RequestEditorFn) (*CallbackOidcResponse, error)
 
+	// TokenOidcWithBodyWithResponse request with any body
+	TokenOidcWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TokenOidcResponse, error)
+
+	TokenOidcWithFormdataBodyWithResponse(ctx context.Context, body TokenOidcFormdataRequestBody, reqEditors ...RequestEditorFn) (*TokenOidcResponse, error)
+
 	// LoginOidcWithResponse request
 	LoginOidcWithResponse(ctx context.Context, params *LoginOidcParams, reqEditors ...RequestEditorFn) (*LoginOidcResponse, error)
 
@@ -3032,6 +3265,31 @@ func (r CallbackOidcResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r CallbackOidcResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type TokenOidcResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *OAuthTokenResponse
+	JSON400      *OAuthTokenError
+	JSON500      *OAuthTokenError
+	JSON503      *OAuthTokenError
+}
+
+// Status returns HTTPResponse.Status
+func (r TokenOidcResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r TokenOidcResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -3601,6 +3859,23 @@ func (c *ClientWithResponses) CallbackOidcWithResponse(ctx context.Context, para
 	return ParseCallbackOidcResponse(rsp)
 }
 
+// TokenOidcWithBodyWithResponse request with arbitrary body returning *TokenOidcResponse
+func (c *ClientWithResponses) TokenOidcWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TokenOidcResponse, error) {
+	rsp, err := c.TokenOidcWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTokenOidcResponse(rsp)
+}
+
+func (c *ClientWithResponses) TokenOidcWithFormdataBodyWithResponse(ctx context.Context, body TokenOidcFormdataRequestBody, reqEditors ...RequestEditorFn) (*TokenOidcResponse, error) {
+	rsp, err := c.TokenOidcWithFormdataBody(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTokenOidcResponse(rsp)
+}
+
 // LoginOidcWithResponse request returning *LoginOidcResponse
 func (c *ClientWithResponses) LoginOidcWithResponse(ctx context.Context, params *LoginOidcParams, reqEditors ...RequestEditorFn) (*LoginOidcResponse, error) {
 	rsp, err := c.LoginOidc(ctx, params, reqEditors...)
@@ -3960,6 +4235,53 @@ func ParseCallbackOidcResponse(rsp *http.Response) (*CallbackOidcResponse, error
 			return nil, err
 		}
 		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseTokenOidcResponse parses an HTTP response from a TokenOidcWithResponse call
+func ParseTokenOidcResponse(rsp *http.Response) (*TokenOidcResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &TokenOidcResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest OAuthTokenResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest OAuthTokenError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest OAuthTokenError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest OAuthTokenError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 

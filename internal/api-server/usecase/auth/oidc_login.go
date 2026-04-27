@@ -28,9 +28,15 @@ type loginIntentStore interface {
 type OIDCLoginStartRequest struct {
 	ProviderID          string
 	RedirectURI         string
+	ServerCallbackURI   string
 	Nonce               string
 	RequestedAccessTTL  time.Duration
 	RequestedRefreshTTL time.Duration
+	ResponseType        string
+	ClientID            string
+	State               string
+	CodeChallenge       string
+	CodeChallengeMethod string
 }
 
 // OIDCLoginUseCase handles GET /api/v1/auth/login (roadmap ш. 13).
@@ -86,16 +92,34 @@ func (u *OIDCLoginUseCase) Start(ctx context.Context, req OIDCLoginStartRequest)
 	if err != nil {
 		return "", fmt.Errorf("%w: %s", apierrors.ErrInvalidInput, err.Error())
 	}
-	p, ok := u.byID[strings.TrimSpace(req.ProviderID)]
+
+	oauthMode := isOAuthAuthorizationRequest(req)
+	providerID, err := u.resolveProviderID(strings.TrimSpace(req.ProviderID))
+	if err != nil {
+		return "", err
+	}
+	p, ok := u.byID[providerID]
 	if !ok {
 		return "", apierrors.ErrOIDCUnknownProvider
 	}
-	red := strings.TrimSpace(req.RedirectURI)
-	if _, err := url.ParseRequestURI(red); err != nil {
+
+	clientRedirectURI := strings.TrimSpace(req.RedirectURI)
+	if _, err := url.ParseRequestURI(clientRedirectURI); err != nil {
 		return "", fmt.Errorf("%w: redirect_uri: %w", apierrors.ErrInvalidInput, err)
 	}
 	if !RedirectURIAllowlisted(p.RedirectURIAllowlist, req.RedirectURI) {
 		return "", apierrors.ErrOIDCRedirectNotAllowlisted
+	}
+
+	idpRedirectURI := clientRedirectURI
+	if oauthMode {
+		if err := validateOAuthAuthorizeRequest(req); err != nil {
+			return "", fmt.Errorf("%w: %s", apierrors.ErrInvalidInput, err.Error())
+		}
+		idpRedirectURI = strings.TrimSpace(req.ServerCallbackURI)
+		if _, err := url.ParseRequestURI(idpRedirectURI); err != nil {
+			return "", fmt.Errorf("%w: server_callback_uri: %w", apierrors.ErrInvalidInput, err)
+		}
 	}
 
 	issuer := oidc.NormalizeIssuer(p.Issuer)
@@ -119,12 +143,19 @@ func (u *OIDCLoginUseCase) Start(ctx context.Context, req OIDCLoginStartRequest)
 
 	val := kvvalue.LoginIntentValue{
 		ProviderID:                      strings.TrimSpace(p.ID),
-		RedirectURI:                     red,
+		RedirectURI:                     idpRedirectURI,
 		OAuthState:                      state,
 		PKCEVerifier:                    ver,
 		Nonce:                           strings.TrimSpace(req.Nonce),
 		RequestedAccessTokenTTLSeconds:  int64(resolvedTTLs.AccessTTL / time.Second),
 		RequestedRefreshTokenTTLSeconds: int64(resolvedTTLs.RefreshTTL / time.Second),
+	}
+	if oauthMode {
+		val.OAuthClientID = strings.TrimSpace(req.ClientID)
+		val.OAuthClientRedirectURI = clientRedirectURI
+		val.OAuthClientState = strings.TrimSpace(req.State)
+		val.OAuthClientCodeChallenge = strings.TrimSpace(req.CodeChallenge)
+		val.OAuthClientCodeChallengeMethod = "S256"
 	}
 	if err := u.intents.Create(ctx, intentID, val, u.leaseTTL); err != nil {
 		return "", err
@@ -240,6 +271,60 @@ func mergeAuthorizeQuery(authEndpoint string, add url.Values) (string, error) {
 	return u.String(), nil
 }
 
+func isOAuthAuthorizationRequest(req OIDCLoginStartRequest) bool {
+	return strings.TrimSpace(req.ResponseType) != "" ||
+		strings.TrimSpace(req.ClientID) != "" ||
+		strings.TrimSpace(req.CodeChallenge) != "" ||
+		strings.TrimSpace(req.CodeChallengeMethod) != "" ||
+		strings.TrimSpace(req.State) != ""
+}
+
+func (u *OIDCLoginUseCase) resolveProviderID(providerID string) (string, error) {
+	if providerID != "" {
+		if _, ok := u.byID[providerID]; !ok {
+			return "", apierrors.ErrOIDCUnknownProvider
+		}
+		return providerID, nil
+	}
+	if len(u.byID) == 1 {
+		for id := range u.byID {
+			return id, nil
+		}
+	}
+	return "", apierrors.ErrOIDCUnknownProvider
+}
+
+func validateOAuthAuthorizeRequest(req OIDCLoginStartRequest) error {
+	if !strings.EqualFold(strings.TrimSpace(req.ResponseType), "code") {
+		return errors.New("response_type must be code")
+	}
+	if strings.TrimSpace(req.ClientID) == "" {
+		return errors.New("client_id is required")
+	}
+	if strings.TrimSpace(req.CodeChallenge) == "" {
+		return errors.New("code_challenge is required")
+	}
+	if !strings.EqualFold(strings.TrimSpace(req.CodeChallengeMethod), "S256") {
+		return errors.New("code_challenge_method must be S256")
+	}
+	cc := strings.TrimSpace(req.CodeChallenge)
+	if len(cc) < 43 || len(cc) > 128 {
+		return errors.New("code_challenge length must be in [43,128]")
+	}
+	for i := 0; i < len(cc); i++ {
+		c := cc[i]
+		switch {
+		case c >= 'a' && c <= 'z':
+		case c >= 'A' && c <= 'Z':
+		case c >= '0' && c <= '9':
+		case c == '-', c == '.', c == '_', c == '~':
+		default:
+			return errors.New("code_challenge has unsupported characters")
+		}
+	}
+	return nil
+}
+
 // MapStartError classifies errors from Start for HTTP mapping (returns same err if unclassified).
 func MapStartError(err error) (int, string, string) {
 	switch {
@@ -248,11 +333,11 @@ func MapStartError(err error) (int, string, string) {
 	case errors.Is(err, apierrors.ErrOIDCNotConfigured):
 		return 400, "OIDC_NOT_CONFIGURED", "Configure auth.oidc_providers to enable browser login."
 	case errors.Is(err, apierrors.ErrOIDCUnknownProvider):
-		return 400, "OIDC_UNKNOWN_PROVIDER", "Unknown provider_id."
+		return 400, "OIDC_UNKNOWN_PROVIDER", "Unknown provider_id or ambiguous provider selection."
 	case errors.Is(err, apierrors.ErrOIDCRedirectNotAllowlisted):
 		return 400, "OIDC_REDIRECT_NOT_ALLOWED", "redirect_uri is not allowlisted for this provider."
 	case errors.Is(err, apierrors.ErrInvalidInput):
-		return 400, "INVALID_REDIRECT_URI", "redirect_uri is not a valid absolute URI."
+		return 400, "INVALID_AUTHORIZE_REQUEST", err.Error()
 	case errors.Is(err, oidc.ErrDiscovery):
 		return 502, "OIDC_DISCOVERY_FAILED", "Could not load OpenID configuration from the issuer."
 	case errors.Is(err, apierrors.ErrStoreAccess):

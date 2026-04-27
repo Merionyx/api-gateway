@@ -415,6 +415,84 @@ components:
           description: Token type for `access_token` (e.g. Bearer).
           default: Bearer
 
+    OAuthTokenRequestForm:
+      type: object
+      required:
+      - grant_type
+      properties:
+        grant_type:
+          type: string
+          enum: [authorization_code, refresh_token]
+        code:
+          type: string
+          description: Required for `authorization_code` grant.
+        redirect_uri:
+          type: string
+          format: uri
+          description: Required for `authorization_code` grant; must match authorize request.
+        client_id:
+          type: string
+          description: OAuth client id passed in authorize request.
+        code_verifier:
+          type: string
+          description: Required for `authorization_code` grant (`S256` PKCE).
+        refresh_token:
+          type: string
+          description: Required for `refresh_token` grant.
+        requested_access_token_ttl_seconds:
+          type: integer
+          minimum: 1
+          description: "Optional extension: requested access token lifetime in seconds (server clamps to policy)."
+        requested_refresh_token_ttl_seconds:
+          type: integer
+          minimum: 1
+          description: "Optional extension: requested refresh token lifetime in seconds (server clamps to policy and provider limits)."
+
+    OAuthTokenResponse:
+      type: object
+      required:
+      - access_token
+      - token_type
+      - expires_in
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          description: OAuth token type (always Bearer).
+          default: Bearer
+        expires_in:
+          type: integer
+          minimum: 1
+          description: Access token lifetime in seconds from now.
+        refresh_token:
+          type: string
+          description: Present for both `authorization_code` and `refresh_token` grants.
+        refresh_expires_in:
+          type: integer
+          minimum: 1
+          description: Refresh token remaining lifetime in seconds from now.
+        access_expires_at:
+          type: string
+          format: date-time
+          description: Extension for explicit access token expiry timestamp.
+        refresh_expires_at:
+          type: string
+          format: date-time
+          description: Extension for explicit refresh token expiry timestamp.
+
+    OAuthTokenError:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: string
+          description: OAuth 2.1 error code (`invalid_request`, `invalid_grant`, `temporarily_unavailable`, `server_error`).
+        error_description:
+          type: string
+          description: Human-readable detail for diagnostics.
+
     OidcProviderDescriptor:
       type: object
       description: |
@@ -1103,23 +1181,55 @@ paths:
       tags: [ OIDC ]
       operationId: loginOidc
       security: []
-      summary: Start OIDC login (redirect)
+      summary: OAuth 2.1 authorize endpoint (upstream OIDC-backed)
       description: |
-        Draft: starts the browser OIDC authorization code + PKCE flow for a configured `provider_id`. The server responds with **302** to the IdP `authorization_endpoint` (Location), or returns **400** when parameters are invalid. `redirect_uri` must match operator allowlists (**roadmap / threat model**).
+        Starts the interactive OAuth authorization flow.
+        In OAuth 2.1 mode (`response_type=code` + PKCE params), this endpoint behaves as the authorization endpoint for clients (for example Postman), while delegating user authentication to configured upstream OIDC providers.
+        Legacy mode (`provider_id` + `redirect_uri`) is preserved for existing CLI/browser flow.
       parameters:
       - name: provider_id
         in: query
-        required: true
-        description: Registered IdP configuration identifier.
+        required: false
+        description: Registered IdP configuration identifier. Optional when exactly one provider is configured.
         schema:
           type: string
       - name: redirect_uri
         in: query
         required: true
-        description: Callback URL registered for this client (allowlisted server-side).
+        description: Downstream client callback URL (must be allowlisted for selected provider).
         schema:
           type: string
           format: uri
+      - name: response_type
+        in: query
+        required: false
+        description: OAuth response type. For OAuth 2.1 mode must be `code`.
+        schema:
+          type: string
+      - name: client_id
+        in: query
+        required: false
+        description: OAuth client identifier (opaque for this server, validated round-trip with token endpoint).
+        schema:
+          type: string
+      - name: state
+        in: query
+        required: false
+        description: Opaque client state echoed back to `redirect_uri`.
+        schema:
+          type: string
+      - name: code_challenge
+        in: query
+        required: false
+        description: PKCE code challenge (required in OAuth 2.1 mode).
+        schema:
+          type: string
+      - name: code_challenge_method
+        in: query
+        required: false
+        description: PKCE method. OAuth 2.1 requires `S256`.
+        schema:
+          type: string
       - name: nonce
         in: query
         required: false
@@ -1163,9 +1273,11 @@ paths:
       tags: [ OIDC ]
       operationId: callbackOidc
       security: []
-      summary: OIDC callback (authorization code exchange)
+      summary: OIDC callback from upstream IdP
       description: |
-        Draft: browser redirect target after IdP login. Exchanges `code` for tokens, runs first CEL mapping, establishes a server session, returns **200 JSON** with our `access_token` / `refresh_token` (**API profile only** in MVP).
+        Browser redirect target after upstream IdP login.
+        Legacy mode returns **200 JSON** with API tokens.
+        OAuth 2.1 mode redirects (**302**) to downstream `redirect_uri` with local authorization `code` and optional `state`.
       parameters:
       - name: code
         in: query
@@ -1179,17 +1291,64 @@ paths:
           type: string
       responses:
         '200':
-          description: Session established; API-profile tokens returned as JSON (not Set-Cookie).
+          description: "Legacy flow: session established; API-profile tokens returned as JSON."
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthSessionTokensResponse'
+        '302':
+          description: "OAuth mode: redirect to downstream client `redirect_uri` with authorization code."
+          headers:
+            Location:
+              description: Downstream callback URL containing `code` and optional `state`.
+              schema:
+                type: string
+                format: uri
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/InternalError'
+    post:
+      tags: [ OIDC ]
+      operationId: tokenOidc
+      security: []
+      summary: OAuth 2.1 token endpoint
+      description: |
+        Exchanges OAuth `authorization_code` + PKCE for API tokens, and supports `refresh_token` grant.
+        Uses `application/x-www-form-urlencoded` request body per OAuth 2.1 conventions.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OAuthTokenRequestForm'
+      responses:
+        '200':
+          description: OAuth token response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthTokenResponse'
+        '400':
+          description: OAuth client/request/grant error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthTokenError'
+        '503':
+          description: Token endpoint temporarily unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthTokenError'
+        '500':
+          description: Internal token endpoint error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthTokenError'
 
   /api/v1/auth/refresh:
     post:

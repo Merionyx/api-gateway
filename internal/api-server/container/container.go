@@ -51,6 +51,7 @@ type Container struct {
 	OIDCLoginUseCase    *auth.OIDCLoginUseCase
 	OIDCCallbackUseCase *auth.OIDCCallbackUseCase
 	OIDCRefreshUseCase  *auth.OIDCRefreshUseCase
+	OAuthTokenUseCase   *auth.OAuthTokenUseCase
 
 	SessionSealer             *sessioncrypto.Keyring
 	IdpAccessCache            *idpcache.Cache
@@ -64,6 +65,7 @@ type Container struct {
 
 	OIDCCallbackHandler *httphandler.OIDCCallbackHandler
 	OIDCRefreshHandler  *httphandler.OIDCRefreshHandler
+	OAuthTokenHandler   *httphandler.OAuthTokenHandler
 
 	ContractsExportHandler *httphandler.ContractsExportHandler
 
@@ -258,6 +260,20 @@ func (c *Container) initUseCases() error {
 			c.Config.Auth.IdpAccessCacheOpaqueMaxTTL,
 		)
 	}
+	if len(c.Config.Auth.OIDCProviders) > 0 && c.SessionSealer != nil {
+		c.OAuthTokenUseCase = auth.NewOAuthTokenUseCase(
+			c.LoginIntentRepository,
+			c.SessionRepository,
+			c.JWTUseCase,
+			c.OIDCRefreshUseCase,
+			auth.TokenTTLPolicy{
+				DefaultAccessTTL:  config.EffectiveInteractiveAccessTokenTTL(c.Config.Auth.InteractiveAccessTokenTTL),
+				MaxAccessTTL:      config.EffectiveInteractiveAccessTokenMaxTTL(c.Config.Auth.InteractiveAccessTokenMaxTTL),
+				DefaultRefreshTTL: config.EffectiveInteractiveRefreshTokenTTL(c.Config.Auth.InteractiveRefreshTokenTTL),
+				MaxRefreshTTL:     config.EffectiveInteractiveRefreshTokenMaxTTL(c.Config.Auth.InteractiveRefreshTokenMaxTTL),
+			},
+		)
+	}
 
 	c.ControllerRegistryUseCase = registry.NewControllerRegistryUseCase(
 		c.ControllerRepository,
@@ -309,6 +325,9 @@ func (c *Container) initHandlers() {
 	c.OIDCCallbackHandler = httphandler.NewOIDCCallbackHandler(c.OIDCCallbackUseCase)
 	if c.OIDCRefreshUseCase != nil {
 		c.OIDCRefreshHandler = httphandler.NewOIDCRefreshHandler(c.OIDCRefreshUseCase)
+	}
+	if c.OAuthTokenUseCase != nil {
+		c.OAuthTokenHandler = httphandler.NewOAuthTokenHandler(c.OAuthTokenUseCase)
 	}
 	exportUC := bundle.NewContractExportUseCase(c.ContractSyncerGRPC)
 	c.ContractsExportHandler = httphandler.NewContractsExportHandler(exportUC, c.PermissionEvaluator)

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -53,6 +54,12 @@ type OIDCCallbackUseCase struct {
 	idpOpaqueMaxTTL time.Duration
 }
 
+type OIDCCallbackResult struct {
+	Tokens          *apiserver.AuthSessionTokensResponse
+	RedirectURL     string
+	AuthorizationID string
+}
+
 // NewOIDCCallbackUseCase wires callback dependencies. hc nil uses http.DefaultClient.
 func NewOIDCCallbackUseCase(
 	providers []config.OIDCProviderConfig,
@@ -87,7 +94,19 @@ func NewOIDCCallbackUseCase(
 
 // Complete exchanges the authorization code, validates id_token, creates a session, and returns our token pair.
 func (u *OIDCCallbackUseCase) Complete(ctx context.Context, code, state string) (apiserver.AuthSessionTokensResponse, error) {
-	var out apiserver.AuthSessionTokensResponse
+	out, err := u.CompleteWithResult(ctx, code, state)
+	if err != nil {
+		return apiserver.AuthSessionTokensResponse{}, err
+	}
+	if out.Tokens == nil {
+		return apiserver.AuthSessionTokensResponse{}, fmt.Errorf("%w: oauth authorization flow requires token endpoint exchange", apierrors.ErrInvalidInput)
+	}
+	return *out.Tokens, nil
+}
+
+// CompleteWithResult exchanges the provider code and either returns direct tokens (legacy) or OAuth redirect data.
+func (u *OIDCCallbackUseCase) CompleteWithResult(ctx context.Context, code, state string) (OIDCCallbackResult, error) {
+	var out OIDCCallbackResult
 	if len(u.byID) == 0 {
 		return out, apierrors.ErrOIDCNotConfigured
 	}
@@ -168,19 +187,6 @@ func (u *OIDCCallbackUseCase) Complete(ctx context.Context, code, state string) 
 		return out, err
 	}
 
-	accessJWT, _, ourAccessExp, err := u.jwt.MintInteractiveAPIAccessJWTFromSnapshot(ctx, subject, snap, resolvedTTLs.AccessTTL)
-	if err != nil {
-		return out, err
-	}
-
-	ourRefresh := make([]byte, 32)
-	if _, err := rand.Read(ourRefresh); err != nil {
-		return out, fmt.Errorf("our refresh: %w", err)
-	}
-	ourRefreshStr := hex.EncodeToString(ourRefresh)
-	sum := sha256.Sum256([]byte(ourRefreshStr))
-	verifier := hex.EncodeToString(sum[:])
-
 	idpRT := strings.TrimSpace(tr.RefreshToken)
 	env, err := u.sealer.Seal([]byte(idpRT))
 	if err != nil {
@@ -191,8 +197,16 @@ func (u *OIDCCallbackUseCase) Complete(ctx context.Context, code, state string) 
 		return out, err
 	}
 
-	sessionID := uuid.NewString()
 	refreshExpiresAt := initialRefreshExpiry(time.Now().UTC(), resolvedTTLs.RefreshTTL, tr)
+	bootstrapRefresh, verifier, err := newOpaqueRefreshTokenAndVerifier()
+	if err != nil {
+		return out, err
+	}
+
+	sessionID := uuid.NewString()
+	if isOAuthClientIntent(intent) {
+		sessionID = state
+	}
 	sess := kvvalue.SessionValue{
 		EncryptedIDPRefresh: json.RawMessage(envBytes),
 		ClaimsSnapshot:      snap,
@@ -203,6 +217,30 @@ func (u *OIDCCallbackUseCase) Complete(ctx context.Context, code, state string) 
 		RefreshExpiresAt:    refreshExpiresAt,
 	}
 	if err := u.sessions.Create(ctx, sessionID, sess); err != nil {
+		return out, err
+	}
+
+	if isOAuthClientIntent(intent) {
+		loc, err := oauthAuthorizeClientRedirect(intent.OAuthClientRedirectURI, state, intent.OAuthClientState)
+		if err != nil {
+			return out, fmt.Errorf("%w: oauth redirect uri: %s", apierrors.ErrInvalidInput, err.Error())
+		}
+		out.RedirectURL = loc
+		out.AuthorizationID = state
+		if u.idpCache != nil {
+			at := strings.TrimSpace(tr.AccessToken)
+			if at != "" {
+				maxAccessExp := time.Now().UTC().Add(resolvedTTLs.AccessTTL)
+				if ttl, ok := idpcache.EntryTTL(u.idpCache.Now(), maxAccessExp, at, tr.ExpiresIn, u.idpOpaqueMaxTTL); ok {
+					u.idpCache.Put(sessionID, at, ttl)
+				}
+			}
+		}
+		return out, nil
+	}
+
+	accessJWT, _, ourAccessExp, err := u.jwt.MintInteractiveAPIAccessJWTFromSnapshot(ctx, subject, snap, resolvedTTLs.AccessTTL)
+	if err != nil {
 		return out, err
 	}
 
@@ -220,14 +258,46 @@ func (u *OIDCCallbackUseCase) Complete(ctx context.Context, code, state string) 
 	}
 
 	bt := "Bearer"
-	out = apiserver.AuthSessionTokensResponse{
+	legacyTokens := apiserver.AuthSessionTokensResponse{
 		AccessToken:      accessJWT,
 		AccessExpiresAt:  ourAccessExp,
-		RefreshToken:     ourRefreshStr,
+		RefreshToken:     bootstrapRefresh,
 		RefreshExpiresAt: refreshExpiresAt,
 		TokenType:        &bt,
 	}
+	out.Tokens = &legacyTokens
 	return out, nil
+}
+
+func isOAuthClientIntent(intent kvvalue.LoginIntentValue) bool {
+	return strings.TrimSpace(intent.OAuthClientRedirectURI) != "" &&
+		strings.TrimSpace(intent.OAuthClientCodeChallenge) != "" &&
+		strings.EqualFold(strings.TrimSpace(intent.OAuthClientCodeChallengeMethod), "S256")
+}
+
+func oauthAuthorizeClientRedirect(redirectURI, code, state string) (string, error) {
+	u, err := url.Parse(strings.TrimSpace(redirectURI))
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return "", errors.New("invalid redirect_uri")
+	}
+	q := u.Query()
+	q.Set("code", strings.TrimSpace(code))
+	if strings.TrimSpace(state) != "" {
+		q.Set("state", strings.TrimSpace(state))
+	}
+	u.RawQuery = q.Encode()
+	return u.String(), nil
+}
+
+func newOpaqueRefreshTokenAndVerifier() (token, verifier string, err error) {
+	raw := make([]byte, 32)
+	if _, err = rand.Read(raw); err != nil {
+		return "", "", fmt.Errorf("our refresh: %w", err)
+	}
+	token = hex.EncodeToString(raw)
+	sum := sha256.Sum256([]byte(token))
+	verifier = hex.EncodeToString(sum[:])
+	return token, verifier, nil
 }
 
 func tokenExchangeProblemDetail(err error) string {

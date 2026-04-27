@@ -35,11 +35,17 @@ func (h *OIDCLoginHandler) Login(c fiber.Ctx, params apiserver.LoginOidcParams) 
 	}
 
 	loc, err := h.uc.Start(ctx, auth.OIDCLoginStartRequest{
-		ProviderID:          params.ProviderId,
+		ProviderID:          stringOrEmpty(params.ProviderId),
 		RedirectURI:         params.RedirectUri,
+		ServerCallbackURI:   c.BaseURL() + "/api/v1/auth/callback",
 		Nonce:               nonce,
 		RequestedAccessTTL:  durationFromOptionalSeconds(params.RequestedAccessTokenTtlSeconds),
 		RequestedRefreshTTL: durationFromOptionalSeconds(params.RequestedRefreshTokenTtlSeconds),
+		ResponseType:        stringOrEmpty(params.ResponseType),
+		ClientID:            stringOrEmpty(params.ClientId),
+		State:               stringOrEmpty(params.State),
+		CodeChallenge:       stringOrEmpty(params.CodeChallenge),
+		CodeChallengeMethod: stringOrEmpty(params.CodeChallengeMethod),
 	})
 	if err != nil {
 		st, code, detail := auth.MapStartError(err)
@@ -60,6 +66,13 @@ func (h *OIDCLoginHandler) Login(c fiber.Ctx, params apiserver.LoginOidcParams) 
 	c.Response().Header.Set("Location", loc)
 	c.Status(http.StatusFound)
 	return nil
+}
+
+func stringOrEmpty(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 // ListOidcProviders returns public metadata for configured browser OIDC providers (GET /api/v1/auth/oidc-providers).
