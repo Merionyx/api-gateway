@@ -34,7 +34,13 @@ func (h *OIDCLoginHandler) Login(c fiber.Ctx, params apiserver.LoginOidcParams) 
 		nonce = *params.Nonce
 	}
 
-	loc, err := h.uc.Start(ctx, params.ProviderId, params.RedirectUri, nonce)
+	loc, err := h.uc.Start(ctx, auth.OIDCLoginStartRequest{
+		ProviderID:          params.ProviderId,
+		RedirectURI:         params.RedirectUri,
+		Nonce:               nonce,
+		RequestedAccessTTL:  durationFromOptionalSeconds(params.RequestedAccessTokenTtlSeconds),
+		RequestedRefreshTTL: durationFromOptionalSeconds(params.RequestedRefreshTokenTtlSeconds),
+	})
 	if err != nil {
 		st, code, detail := auth.MapStartError(err)
 		switch st {

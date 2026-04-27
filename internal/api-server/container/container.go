@@ -82,7 +82,12 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 	if err := config.ValidateOIDCProviders(cfg.Auth.OIDCProviders); err != nil {
 		return nil, err
 	}
-	if err := config.ValidateInteractiveTokenTTLs(cfg.Auth.InteractiveAccessTokenTTL, cfg.Auth.InteractiveRefreshTokenTTL); err != nil {
+	if err := config.ValidateInteractiveTokenTTLPolicy(
+		cfg.Auth.InteractiveAccessTokenTTL,
+		cfg.Auth.InteractiveAccessTokenMaxTTL,
+		cfg.Auth.InteractiveRefreshTokenTTL,
+		cfg.Auth.InteractiveRefreshTokenMaxTTL,
+	); err != nil {
 		return nil, err
 	}
 	if len(cfg.Auth.OIDCProviders) > 0 && strings.TrimSpace(cfg.Auth.SessionKEKBase64) == "" {
@@ -190,6 +195,12 @@ func (c *Container) initUseCases() error {
 		c.Config.Auth.LoginIntentLeaseTTL,
 		c.LoginIntentRepository,
 		&http.Client{Timeout: 12 * time.Second},
+		auth.TokenTTLPolicy{
+			DefaultAccessTTL:  config.EffectiveInteractiveAccessTokenTTL(c.Config.Auth.InteractiveAccessTokenTTL),
+			MaxAccessTTL:      config.EffectiveInteractiveAccessTokenMaxTTL(c.Config.Auth.InteractiveAccessTokenMaxTTL),
+			DefaultRefreshTTL: config.EffectiveInteractiveRefreshTokenTTL(c.Config.Auth.InteractiveRefreshTokenTTL),
+			MaxRefreshTTL:     config.EffectiveInteractiveRefreshTokenMaxTTL(c.Config.Auth.InteractiveRefreshTokenMaxTTL),
+		},
 	)
 
 	c.OIDCCallbackUseCase = auth.NewOIDCCallbackUseCase(
@@ -199,8 +210,12 @@ func (c *Container) initUseCases() error {
 		c.SessionSealer,
 		c.JWTUseCase,
 		&http.Client{Timeout: 20 * time.Second},
-		c.Config.Auth.InteractiveAccessTokenTTL,
-		c.Config.Auth.InteractiveRefreshTokenTTL,
+		auth.TokenTTLPolicy{
+			DefaultAccessTTL:  config.EffectiveInteractiveAccessTokenTTL(c.Config.Auth.InteractiveAccessTokenTTL),
+			MaxAccessTTL:      config.EffectiveInteractiveAccessTokenMaxTTL(c.Config.Auth.InteractiveAccessTokenMaxTTL),
+			DefaultRefreshTTL: config.EffectiveInteractiveRefreshTokenTTL(c.Config.Auth.InteractiveRefreshTokenTTL),
+			MaxRefreshTTL:     config.EffectiveInteractiveRefreshTokenMaxTTL(c.Config.Auth.InteractiveRefreshTokenMaxTTL),
+		},
 		idpAccessCache,
 		c.Config.Auth.IdpAccessCacheOpaqueMaxTTL,
 	)
@@ -212,8 +227,12 @@ func (c *Container) initUseCases() error {
 			c.SessionSealer,
 			c.JWTUseCase,
 			&http.Client{Timeout: 25 * time.Second},
-			c.Config.Auth.InteractiveAccessTokenTTL,
-			c.Config.Auth.InteractiveRefreshTokenTTL,
+			auth.TokenTTLPolicy{
+				DefaultAccessTTL:  config.EffectiveInteractiveAccessTokenTTL(c.Config.Auth.InteractiveAccessTokenTTL),
+				MaxAccessTTL:      config.EffectiveInteractiveAccessTokenMaxTTL(c.Config.Auth.InteractiveAccessTokenMaxTTL),
+				DefaultRefreshTTL: config.EffectiveInteractiveRefreshTokenTTL(c.Config.Auth.InteractiveRefreshTokenTTL),
+				MaxRefreshTTL:     config.EffectiveInteractiveRefreshTokenMaxTTL(c.Config.Auth.InteractiveRefreshTokenMaxTTL),
+			},
 			c.Config.MetricsHTTP.Enabled,
 			idpAccessCache,
 			c.Config.Auth.IdpAccessCacheOpaqueMaxTTL,

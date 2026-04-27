@@ -9,7 +9,8 @@ import (
 const (
 	LoginIntentSchemaV1     = 1
 	LoginIntentSchemaV2     = 2
-	LoginIntentSchemaLatest = LoginIntentSchemaV2
+	LoginIntentSchemaV3     = 3
+	LoginIntentSchemaLatest = LoginIntentSchemaV3
 )
 
 // LoginIntentValue is the canonical login-intent value at login-intents/{intent_id}.
@@ -26,6 +27,11 @@ type LoginIntentValue struct {
 
 	// Nonce is optional OIDC nonce for id_token validation at callback (roadmap ш. 13–14).
 	Nonce string `json:"nonce,omitempty"`
+
+	// RequestedAccessTokenTTLSeconds is the client-requested access token lifetime for callback issuance.
+	RequestedAccessTokenTTLSeconds int64 `json:"requested_access_token_ttl_seconds,omitempty"`
+	// RequestedRefreshTokenTTLSeconds is the client-requested refresh-chain lifetime for callback issuance.
+	RequestedRefreshTokenTTLSeconds int64 `json:"requested_refresh_token_ttl_seconds,omitempty"`
 }
 
 const DefaultIntentProtocol = "oidc_v1"
@@ -40,12 +46,34 @@ type loginIntentV1Wire struct {
 
 func migrateLoginIntentV1(v1 loginIntentV1Wire) LoginIntentValue {
 	return LoginIntentValue{
-		SchemaVersion:   LoginIntentSchemaLatest,
-		ProviderID:      v1.ProviderID,
-		RedirectURI:     v1.RedirectURI,
-		OAuthState:      v1.OAuthState,
-		PKCEVerifier:    v1.PKCEVerifier,
-		IntentProtocol:  DefaultIntentProtocol,
+		SchemaVersion:  LoginIntentSchemaLatest,
+		ProviderID:     v1.ProviderID,
+		RedirectURI:    v1.RedirectURI,
+		OAuthState:     v1.OAuthState,
+		PKCEVerifier:   v1.PKCEVerifier,
+		IntentProtocol: DefaultIntentProtocol,
+	}
+}
+
+type loginIntentV2Wire struct {
+	SchemaVersion  int    `json:"schema_version"`
+	ProviderID     string `json:"provider_id"`
+	RedirectURI    string `json:"redirect_uri"`
+	OAuthState     string `json:"oauth_state"`
+	PKCEVerifier   string `json:"pkce_verifier"`
+	IntentProtocol string `json:"intent_protocol"`
+	Nonce          string `json:"nonce,omitempty"`
+}
+
+func migrateLoginIntentV2(v2 loginIntentV2Wire) LoginIntentValue {
+	return LoginIntentValue{
+		SchemaVersion:  LoginIntentSchemaLatest,
+		ProviderID:     v2.ProviderID,
+		RedirectURI:    v2.RedirectURI,
+		OAuthState:     v2.OAuthState,
+		PKCEVerifier:   v2.PKCEVerifier,
+		IntentProtocol: v2.IntentProtocol,
+		Nonce:          v2.Nonce,
 	}
 }
 
@@ -66,7 +94,7 @@ func ParseLoginIntentValueJSON(data []byte) (LoginIntentValue, error) {
 		}
 		return migrateLoginIntentV1(v1), nil
 	case LoginIntentSchemaV2:
-		var v2 LoginIntentValue
+		var v2 loginIntentV2Wire
 		if err := json.Unmarshal(data, &v2); err != nil {
 			return LoginIntentValue{}, fmt.Errorf("kvvalue: login-intent v2: %w", err)
 		}
@@ -76,7 +104,19 @@ func ParseLoginIntentValueJSON(data []byte) (LoginIntentValue, error) {
 		if v2.IntentProtocol == "" {
 			v2.IntentProtocol = DefaultIntentProtocol
 		}
-		return v2, nil
+		return migrateLoginIntentV2(v2), nil
+	case LoginIntentSchemaV3:
+		var v3 LoginIntentValue
+		if err := json.Unmarshal(data, &v3); err != nil {
+			return LoginIntentValue{}, fmt.Errorf("kvvalue: login-intent v3: %w", err)
+		}
+		if v3.SchemaVersion != LoginIntentSchemaV3 {
+			return LoginIntentValue{}, ErrMissingSchemaVersion
+		}
+		if v3.IntentProtocol == "" {
+			v3.IntentProtocol = DefaultIntentProtocol
+		}
+		return v3, nil
 	default:
 		return LoginIntentValue{}, fmt.Errorf("%w: %d", ErrUnsupportedLoginIntentSchema, ver)
 	}

@@ -5,12 +5,18 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	apiserverclient "github.com/merionyx/api-gateway/internal/cli/apiserver/client"
 )
 
+type RequestedTokenTTLs struct {
+	AccessTTL  time.Duration
+	RefreshTTL time.Duration
+}
+
 // RefreshSession exchanges a saved refresh token for a rotated access/refresh pair.
-func RefreshSession(ctx context.Context, httpClient *http.Client, serverURL, refreshToken string) (*apiserverclient.AuthSessionTokensResponse, error) {
+func RefreshSession(ctx context.Context, httpClient *http.Client, serverURL, refreshToken string, requestedTTLs RequestedTokenTTLs) (*apiserverclient.AuthSessionTokensResponse, error) {
 	ctx, cancel := withServerTimeout(ctx)
 	defer cancel()
 
@@ -24,7 +30,9 @@ func RefreshSession(ctx context.Context, httpClient *http.Client, serverURL, ref
 		return nil, err
 	}
 	resp, err := c.RefreshSessionWithResponse(ctx, apiserverclient.AuthRefreshRequest{
-		RefreshToken: rt,
+		RefreshToken:                    rt,
+		RequestedAccessTokenTtlSeconds:  optionalSeconds(requestedTTLs.AccessTTL),
+		RequestedRefreshTokenTtlSeconds: optionalSeconds(requestedTTLs.RefreshTTL),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
@@ -45,4 +53,12 @@ func RefreshSession(ctx context.Context, httpClient *http.Client, serverURL, ref
 		return nil, fmt.Errorf("api: %s", problemString(resp.ApplicationproblemJSON500))
 	}
 	return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode(), trimBody(resp.Body))
+}
+
+func optionalSeconds(d time.Duration) *int {
+	if d <= 0 {
+		return nil
+	}
+	v := int(d / time.Second)
+	return &v
 }

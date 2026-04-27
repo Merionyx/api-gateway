@@ -35,6 +35,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
 	"github.com/merionyx/api-gateway/internal/api-server/server"
+	authuc "github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
 	sharedetcd "github.com/merionyx/api-gateway/internal/shared/etcd"
 	"github.com/merionyx/api-gateway/internal/shared/grpcobs"
 	"github.com/merionyx/api-gateway/internal/shared/metricshttp"
@@ -445,7 +446,7 @@ func TestE2E_OIDCRefresh_ConcurrentSameRefreshToken_One409(t *testing.T) {
 		go func(idx int) {
 			defer wg.Done()
 			<-start
-			_, err := cnt.OIDCRefreshUseCase.Refresh(ctx, refresh1)
+			_, err := cnt.OIDCRefreshUseCase.Refresh(ctx, authuc.OIDCRefreshRequest{RefreshToken: refresh1})
 			results[idx] = err
 		}(i)
 	}

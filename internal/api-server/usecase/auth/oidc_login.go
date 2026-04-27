@@ -25,12 +25,21 @@ type loginIntentStore interface {
 	Create(ctx context.Context, intentID string, v kvvalue.LoginIntentValue, leaseTTL time.Duration) error
 }
 
+type OIDCLoginStartRequest struct {
+	ProviderID          string
+	RedirectURI         string
+	Nonce               string
+	RequestedAccessTTL  time.Duration
+	RequestedRefreshTTL time.Duration
+}
+
 // OIDCLoginUseCase handles GET /api/v1/auth/login (roadmap ш. 13).
 type OIDCLoginUseCase struct {
-	byID     map[string]config.OIDCProviderConfig
-	leaseTTL time.Duration
-	intents  loginIntentStore
-	hc       *http.Client
+	byID           map[string]config.OIDCProviderConfig
+	leaseTTL       time.Duration
+	intents        loginIntentStore
+	hc             *http.Client
+	tokenTTLPolicy TokenTTLPolicy
 }
 
 // NewOIDCLoginUseCase builds a use case. leaseTTL<=0 defaults to 15m; hc nil uses http.DefaultClient.
@@ -39,6 +48,7 @@ func NewOIDCLoginUseCase(
 	leaseTTL time.Duration,
 	intents loginIntentStore,
 	hc *http.Client,
+	tokenTTLPolicy TokenTTLPolicy,
 ) *OIDCLoginUseCase {
 	by := make(map[string]config.OIDCProviderConfig, len(providers))
 	for _, p := range providers {
@@ -50,7 +60,7 @@ func NewOIDCLoginUseCase(
 	if hc == nil {
 		hc = http.DefaultClient
 	}
-	return &OIDCLoginUseCase{byID: by, leaseTTL: leaseTTL, intents: intents, hc: hc}
+	return &OIDCLoginUseCase{byID: by, leaseTTL: leaseTTL, intents: intents, hc: hc, tokenTTLPolicy: tokenTTLPolicy}
 }
 
 // RedirectURIAllowlisted reports whether redirect matches one allowlisted entry (exact string match after TrimSpace).
@@ -65,19 +75,26 @@ func RedirectURIAllowlisted(allow []string, redirect string) bool {
 }
 
 // Start persists a login-intent and returns the IdP authorization URL for HTTP 302 Location.
-func (u *OIDCLoginUseCase) Start(ctx context.Context, providerID, redirectURI, nonce string) (string, error) {
+func (u *OIDCLoginUseCase) Start(ctx context.Context, req OIDCLoginStartRequest) (string, error) {
 	if len(u.byID) == 0 {
 		return "", apierrors.ErrOIDCNotConfigured
 	}
-	p, ok := u.byID[strings.TrimSpace(providerID)]
+	resolvedTTLs, err := resolveRequestedTokenTTLs(u.tokenTTLPolicy, RequestedTokenTTLs{
+		AccessTTL:  req.RequestedAccessTTL,
+		RefreshTTL: req.RequestedRefreshTTL,
+	})
+	if err != nil {
+		return "", fmt.Errorf("%w: %s", apierrors.ErrInvalidInput, err.Error())
+	}
+	p, ok := u.byID[strings.TrimSpace(req.ProviderID)]
 	if !ok {
 		return "", apierrors.ErrOIDCUnknownProvider
 	}
-	red := strings.TrimSpace(redirectURI)
+	red := strings.TrimSpace(req.RedirectURI)
 	if _, err := url.ParseRequestURI(red); err != nil {
 		return "", fmt.Errorf("%w: redirect_uri: %w", apierrors.ErrInvalidInput, err)
 	}
-	if !RedirectURIAllowlisted(p.RedirectURIAllowlist, redirectURI) {
+	if !RedirectURIAllowlisted(p.RedirectURIAllowlist, req.RedirectURI) {
 		return "", apierrors.ErrOIDCRedirectNotAllowlisted
 	}
 
@@ -101,11 +118,13 @@ func (u *OIDCLoginUseCase) Start(ctx context.Context, providerID, redirectURI, n
 	state := intentID
 
 	val := kvvalue.LoginIntentValue{
-		ProviderID:   strings.TrimSpace(p.ID),
-		RedirectURI:  red,
-		OAuthState:   state,
-		PKCEVerifier: ver,
-		Nonce:        strings.TrimSpace(nonce),
+		ProviderID:                      strings.TrimSpace(p.ID),
+		RedirectURI:                     red,
+		OAuthState:                      state,
+		PKCEVerifier:                    ver,
+		Nonce:                           strings.TrimSpace(req.Nonce),
+		RequestedAccessTokenTTLSeconds:  int64(resolvedTTLs.AccessTTL / time.Second),
+		RequestedRefreshTokenTTLSeconds: int64(resolvedTTLs.RefreshTTL / time.Second),
 	}
 	if err := u.intents.Create(ctx, intentID, val, u.leaseTTL); err != nil {
 		return "", err

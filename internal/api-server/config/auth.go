@@ -244,12 +244,18 @@ type AuthConfig struct {
 	// Required when oidc_providers is non-empty (roadmap ш. 8–11, ш. 14).
 	SessionKEKBase64 string `mapstructure:"session_kek_base64" json:"session_kek_base64"`
 
-	// InteractiveAccessTokenTTL is our API-profile access JWT lifetime after OIDC login (default 5m; roadmap).
+	// InteractiveAccessTokenTTL is the default API-profile access JWT lifetime after OIDC login (default 5m; roadmap).
 	InteractiveAccessTokenTTL time.Duration `mapstructure:"interactive_access_token_ttl" json:"interactive_access_token_ttl"`
 
-	// InteractiveRefreshTokenTTL is the maximum lifetime of our interactive refresh chain (default 7d).
-	// When the IdP discloses a shorter refresh lifetime, our session is clamped to that shorter deadline.
+	// InteractiveAccessTokenMaxTTL is the maximum API-profile access JWT lifetime a client may request.
+	InteractiveAccessTokenMaxTTL time.Duration `mapstructure:"interactive_access_token_max_ttl" json:"interactive_access_token_max_ttl"`
+
+	// InteractiveRefreshTokenTTL is the default lifetime of our interactive refresh chain (default 7d).
 	InteractiveRefreshTokenTTL time.Duration `mapstructure:"interactive_refresh_token_ttl" json:"interactive_refresh_token_ttl"`
+
+	// InteractiveRefreshTokenMaxTTL is the maximum lifetime a client may request for our refresh chain.
+	// When the IdP discloses a shorter refresh lifetime, our session is clamped to that shorter deadline.
+	InteractiveRefreshTokenMaxTTL time.Duration `mapstructure:"interactive_refresh_token_max_ttl" json:"interactive_refresh_token_max_ttl"`
 
 	// IdpAccessCacheOpaqueMaxTTL caps inferred IdP access lifetime for opaque tokens without expires_in/JWT exp (ADR 0002, roadmap ш. 19). Zero uses idpcache.DefaultOpaqueMaxTTL for that branch only.
 	IdpAccessCacheOpaqueMaxTTL time.Duration `mapstructure:"idp_access_cache_opaque_max_ttl" json:"idp_access_cache_opaque_max_ttl"`
@@ -269,18 +275,49 @@ func EffectiveInteractiveRefreshTokenTTL(ttl time.Duration) time.Duration {
 	return ttl
 }
 
-// ValidateInteractiveTokenTTLs validates interactive token lifetimes after applying defaults for zero values.
-func ValidateInteractiveTokenTTLs(accessTTL, refreshTTL time.Duration) error {
+func EffectiveInteractiveAccessTokenMaxTTL(ttl time.Duration) time.Duration {
+	if ttl <= 0 {
+		return DefaultInteractiveAccessTokenTTL
+	}
+	return ttl
+}
+
+func EffectiveInteractiveRefreshTokenMaxTTL(ttl time.Duration) time.Duration {
+	if ttl <= 0 {
+		return DefaultInteractiveRefreshTokenTTL
+	}
+	return ttl
+}
+
+// ValidateInteractiveTokenTTLPolicy validates interactive default/max lifetimes after applying defaults for zero values.
+func ValidateInteractiveTokenTTLPolicy(accessTTL, accessMaxTTL, refreshTTL, refreshMaxTTL time.Duration) error {
 	accessTTL = EffectiveInteractiveAccessTokenTTL(accessTTL)
+	accessMaxTTL = EffectiveInteractiveAccessTokenMaxTTL(accessMaxTTL)
 	refreshTTL = EffectiveInteractiveRefreshTokenTTL(refreshTTL)
+	refreshMaxTTL = EffectiveInteractiveRefreshTokenMaxTTL(refreshMaxTTL)
 	if accessTTL <= 0 {
 		return fmt.Errorf("auth.interactive_access_token_ttl must be > 0")
+	}
+	if accessMaxTTL <= 0 {
+		return fmt.Errorf("auth.interactive_access_token_max_ttl must be > 0")
 	}
 	if refreshTTL <= 0 {
 		return fmt.Errorf("auth.interactive_refresh_token_ttl must be > 0")
 	}
+	if refreshMaxTTL <= 0 {
+		return fmt.Errorf("auth.interactive_refresh_token_max_ttl must be > 0")
+	}
+	if accessTTL > accessMaxTTL {
+		return fmt.Errorf("auth.interactive_access_token_ttl (%s) must be <= auth.interactive_access_token_max_ttl (%s)", accessTTL, accessMaxTTL)
+	}
+	if refreshTTL > refreshMaxTTL {
+		return fmt.Errorf("auth.interactive_refresh_token_ttl (%s) must be <= auth.interactive_refresh_token_max_ttl (%s)", refreshTTL, refreshMaxTTL)
+	}
 	if refreshTTL < accessTTL {
 		return fmt.Errorf("auth.interactive_refresh_token_ttl (%s) must be >= auth.interactive_access_token_ttl (%s)", refreshTTL, accessTTL)
+	}
+	if refreshMaxTTL < accessMaxTTL {
+		return fmt.Errorf("auth.interactive_refresh_token_max_ttl (%s) must be >= auth.interactive_access_token_max_ttl (%s)", refreshMaxTTL, accessMaxTTL)
 	}
 	return nil
 }

@@ -160,6 +160,32 @@ func TestLoginIntentMigrateV1(t *testing.T) {
 	}
 }
 
+func TestLoginIntentMigrateV2ToLatest(t *testing.T) {
+	t.Parallel()
+	raw := []byte(`{
+		"schema_version": 2,
+		"provider_id": "gitlab",
+		"redirect_uri": "https://cb",
+		"oauth_state": "st",
+		"pkce_verifier": "ver",
+		"intent_protocol": "oidc_v1",
+		"nonce": "n1"
+	}`)
+	got, err := ParseLoginIntentValueJSON(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.SchemaVersion != LoginIntentSchemaLatest {
+		t.Fatal("schema")
+	}
+	if got.Nonce != "n1" {
+		t.Fatalf("nonce %q", got.Nonce)
+	}
+	if got.RequestedAccessTokenTTLSeconds != 0 || got.RequestedRefreshTokenTTLSeconds != 0 {
+		t.Fatalf("unexpected requested ttls: %+v", got)
+	}
+}
+
 func TestLoginIntentMarshalRequiresFields(t *testing.T) {
 	t.Parallel()
 	_, err := MarshalLoginIntentValueJSON(LoginIntentValue{
@@ -174,13 +200,15 @@ func TestLoginIntentMarshalRequiresFields(t *testing.T) {
 func TestLoginIntentNonceRoundtrip(t *testing.T) {
 	t.Parallel()
 	v := LoginIntentValue{
-		SchemaVersion:  LoginIntentSchemaLatest,
-		ProviderID:     "p",
-		RedirectURI:    "https://a/cb",
-		OAuthState:     "st",
-		PKCEVerifier:   "pv",
-		IntentProtocol: DefaultIntentProtocol,
-		Nonce:          "n-1",
+		SchemaVersion:                   LoginIntentSchemaLatest,
+		ProviderID:                      "p",
+		RedirectURI:                     "https://a/cb",
+		OAuthState:                      "st",
+		PKCEVerifier:                    "pv",
+		IntentProtocol:                  DefaultIntentProtocol,
+		Nonce:                           "n-1",
+		RequestedAccessTokenTTLSeconds:  3600,
+		RequestedRefreshTokenTTLSeconds: 7200,
 	}
 	raw, err := MarshalLoginIntentValueJSON(v)
 	if err != nil {
@@ -192,6 +220,9 @@ func TestLoginIntentNonceRoundtrip(t *testing.T) {
 	}
 	if got.Nonce != "n-1" {
 		t.Fatalf("nonce %q", got.Nonce)
+	}
+	if got.RequestedAccessTokenTTLSeconds != 3600 || got.RequestedRefreshTokenTTLSeconds != 7200 {
+		t.Fatalf("requested ttls %+v", got)
 	}
 }
 

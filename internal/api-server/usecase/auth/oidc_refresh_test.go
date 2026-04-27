@@ -186,9 +186,14 @@ func TestOIDCRefresh_degraded_discovery503(t *testing.T) {
 		Issuer:       srv.URL,
 		ClientID:     "cid",
 		ClientSecret: "sec",
-	}}, st, kr, jwtUC, srv.Client(), 5*time.Minute, 7*24*time.Hour, false, cache, 0)
+	}}, st, kr, jwtUC, srv.Client(), TokenTTLPolicy{
+		DefaultAccessTTL:  5 * time.Minute,
+		MaxAccessTTL:      7 * 24 * time.Hour,
+		DefaultRefreshTTL: 7 * 24 * time.Hour,
+		MaxRefreshTTL:     30 * 24 * time.Hour,
+	}, false, cache, 0)
 
-	out, err := uc.Refresh(context.Background(), ourHex)
+	out, err := uc.Refresh(context.Background(), OIDCRefreshRequest{RefreshToken: ourHex})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -309,9 +314,14 @@ func TestOIDCRefresh_missingStoredIDPRefreshToken(t *testing.T) {
 		Kind:     "google",
 		Issuer:   "https://accounts.google.com",
 		ClientID: "cid",
-	}}, st, kr, jwtUC, http.DefaultClient, 5*time.Minute, 7*24*time.Hour, false, nil, 0)
+	}}, st, kr, jwtUC, http.DefaultClient, TokenTTLPolicy{
+		DefaultAccessTTL:  5 * time.Minute,
+		MaxAccessTTL:      7 * 24 * time.Hour,
+		DefaultRefreshTTL: 7 * 24 * time.Hour,
+		MaxRefreshTTL:     30 * 24 * time.Hour,
+	}, false, nil, 0)
 
-	_, err = uc.Refresh(context.Background(), ourHex)
+	_, err = uc.Refresh(context.Background(), OIDCRefreshRequest{RefreshToken: ourHex})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -380,9 +390,14 @@ func TestOIDCRefresh_expiredRefreshSession(t *testing.T) {
 		Name:     "Test Provider",
 		Issuer:   "https://issuer.example",
 		ClientID: "cid",
-	}}, st, kr, jwtUC, http.DefaultClient, 5*time.Minute, 7*24*time.Hour, false, nil, 0)
+	}}, st, kr, jwtUC, http.DefaultClient, TokenTTLPolicy{
+		DefaultAccessTTL:  5 * time.Minute,
+		MaxAccessTTL:      7 * 24 * time.Hour,
+		DefaultRefreshTTL: 7 * 24 * time.Hour,
+		MaxRefreshTTL:     30 * 24 * time.Hour,
+	}, false, nil, 0)
 
-	_, err = uc.Refresh(context.Background(), ourHex)
+	_, err = uc.Refresh(context.Background(), OIDCRefreshRequest{RefreshToken: ourHex})
 	if !errors.Is(err, apierrors.ErrSessionRefreshExpired) {
 		t.Fatalf("got %v", err)
 	}

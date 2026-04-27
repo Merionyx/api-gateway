@@ -20,11 +20,15 @@ type File struct {
 
 // Entry is one context's interactive session material (do not log).
 type Entry struct {
-	ProviderID   string `yaml:"provider_id"`
-	AccessToken  string `yaml:"access_token"`
-	RefreshToken string `yaml:"refresh_token"`
-	TokenType    string `yaml:"token_type,omitempty"`
-	SavedAt      string `yaml:"saved_at"`
+	ProviderID               string `yaml:"provider_id"`
+	AccessToken              string `yaml:"access_token"`
+	RefreshToken             string `yaml:"refresh_token"`
+	TokenType                string `yaml:"token_type,omitempty"`
+	AccessExpiresAt          string `yaml:"access_expires_at,omitempty"`
+	RefreshExpiresAt         string `yaml:"refresh_expires_at,omitempty"`
+	RequestedAccessTokenTTL  string `yaml:"requested_access_token_ttl,omitempty"`
+	RequestedRefreshTokenTTL string `yaml:"requested_refresh_token_ttl,omitempty"`
+	SavedAt                  string `yaml:"saved_at"`
 }
 
 // Path returns credentials file path ($AGWCTL_CREDENTIALS or ~/.config/agwctl/credentials.yaml).

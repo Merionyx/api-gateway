@@ -93,12 +93,24 @@ type App struct {
 type AuthRefreshRequest struct {
 	// RefreshToken Our refresh token from the last login or refresh response (server must not log this value).
 	RefreshToken string `json:"refresh_token"`
+
+	// RequestedAccessTokenTtlSeconds Optional requested access token lifetime in seconds. The server clamps this to policy.
+	RequestedAccessTokenTtlSeconds *int `json:"requested_access_token_ttl_seconds,omitempty"`
+
+	// RequestedRefreshTokenTtlSeconds Optional requested refresh-chain lifetime in seconds. The server clamps this to policy and provider refresh limits.
+	RequestedRefreshTokenTtlSeconds *int `json:"requested_refresh_token_ttl_seconds,omitempty"`
 }
 
 // AuthSessionTokensResponse defines model for AuthSessionTokensResponse.
 type AuthSessionTokensResponse struct {
+	// AccessExpiresAt Actual expiry instant of `access_token` after server policy clamping.
+	AccessExpiresAt time.Time `json:"access_expires_at"`
+
 	// AccessToken New **API profile** access JWT.
 	AccessToken string `json:"access_token"`
+
+	// RefreshExpiresAt Actual expiry instant of `refresh_token` after server policy and provider-limit clamping.
+	RefreshExpiresAt time.Time `json:"refresh_expires_at"`
 
 	// RefreshToken Rotated our refresh token; clients must discard the previous pair.
 	RefreshToken string `json:"refresh_token"`
@@ -628,6 +640,12 @@ type LoginOidcParams struct {
 
 	// Nonce Optional OIDC `nonce` (replay protection); echoed into the authorization request when set.
 	Nonce *string `form:"nonce,omitempty" json:"nonce,omitempty"`
+
+	// RequestedAccessTokenTtlSeconds Optional requested access token lifetime in seconds. The server clamps this to policy.
+	RequestedAccessTokenTtlSeconds *int `form:"requested_access_token_ttl_seconds,omitempty" json:"requested_access_token_ttl_seconds,omitempty"`
+
+	// RequestedRefreshTokenTtlSeconds Optional requested refresh-chain lifetime in seconds. The server clamps this to policy and provider refresh limits.
+	RequestedRefreshTokenTtlSeconds *int `form:"requested_refresh_token_ttl_seconds,omitempty" json:"requested_refresh_token_ttl_seconds,omitempty"`
 }
 
 // ListBundleKeysParams defines parameters for ListBundleKeys.
@@ -1518,6 +1536,30 @@ func NewLoginOidcRequest(server string, params *LoginOidcParams) (*http.Request,
 		if params.Nonce != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "nonce", *params.Nonce, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.RequestedAccessTokenTtlSeconds != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "requested_access_token_ttl_seconds", *params.RequestedAccessTokenTtlSeconds, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.RequestedRefreshTokenTtlSeconds != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "requested_refresh_token_ttl_seconds", *params.RequestedRefreshTokenTtlSeconds, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {

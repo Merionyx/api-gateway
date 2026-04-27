@@ -37,7 +37,11 @@ func (h *OIDCRefreshHandler) Refresh(c fiber.Ctx) error {
 		return problem.Write(c, http.StatusBadRequest, problem.BadRequest("REFRESH_TOKEN_REQUIRED", "", "refresh_token is required."))
 	}
 
-	out, err := h.uc.Refresh(ctx, body.RefreshToken)
+	out, err := h.uc.Refresh(ctx, auth.OIDCRefreshRequest{
+		RefreshToken:        body.RefreshToken,
+		RequestedAccessTTL:  durationFromOptionalSeconds(body.RequestedAccessTokenTtlSeconds),
+		RequestedRefreshTTL: durationFromOptionalSeconds(body.RequestedRefreshTokenTtlSeconds),
+	})
 	if err != nil {
 		st, code, detail := auth.MapRefreshError(err)
 		switch st {

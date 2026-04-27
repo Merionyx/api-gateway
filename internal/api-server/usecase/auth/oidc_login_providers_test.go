@@ -11,7 +11,7 @@ func TestOIDCLoginUseCase_ListPublicOIDCProviders_sortedAndKind(t *testing.T) {
 	uc := NewOIDCLoginUseCase([]config.OIDCProviderConfig{
 		{ID: "z", Name: "GitHub Enterprise", Issuer: "https://z.example", ClientID: "a", RedirectURIAllowlist: []string{"http://localhost/cb"}, Kind: "GitHub"},
 		{ID: "a", Name: "Local OIDC", Issuer: "https://a.example", ClientID: "b", RedirectURIAllowlist: []string{"http://localhost/cb"}},
-	}, 0, nil, nil)
+	}, 0, nil, nil, TokenTTLPolicy{})
 	got := uc.ListPublicOIDCProviders()
 	if len(got) != 2 {
 		t.Fatalf("len=%d %+v", len(got), got)
@@ -26,7 +26,7 @@ func TestOIDCLoginUseCase_ListPublicOIDCProviders_sortedAndKind(t *testing.T) {
 
 func TestOIDCLoginUseCase_ListPublicOIDCProviders_empty(t *testing.T) {
 	t.Parallel()
-	uc := NewOIDCLoginUseCase(nil, 0, nil, nil)
+	uc := NewOIDCLoginUseCase(nil, 0, nil, nil, TokenTTLPolicy{})
 	if uc.ListPublicOIDCProviders() != nil {
 		t.Fatal("want nil slice")
 	}

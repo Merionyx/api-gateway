@@ -11,11 +11,15 @@ func TestPutContext_roundTripAndMode0600(t *testing.T) {
 	t.Setenv("AGWCTL_CREDENTIALS", filepath.Join(dir, "creds.yaml"))
 
 	e := Entry{
-		ProviderID:   "p1",
-		AccessToken:  "at-test",
-		RefreshToken: "rt-test",
-		TokenType:    "Bearer",
-		SavedAt:      "2026-04-23T12:00:00Z",
+		ProviderID:               "p1",
+		AccessToken:              "at-test",
+		RefreshToken:             "rt-test",
+		TokenType:                "Bearer",
+		AccessExpiresAt:          "2026-04-30T12:00:00Z",
+		RefreshExpiresAt:         "2026-05-23T12:00:00Z",
+		RequestedAccessTokenTTL:  "168h",
+		RequestedRefreshTokenTTL: "720h",
+		SavedAt:                  "2026-04-23T12:00:00Z",
 	}
 	if err := PutContext("dev", e); err != nil {
 		t.Fatal(err)
@@ -39,7 +43,7 @@ func TestPutContext_roundTripAndMode0600(t *testing.T) {
 	if !ok {
 		t.Fatalf("contexts %+v", f.Contexts)
 	}
-	if got.AccessToken != e.AccessToken || got.RefreshToken != e.RefreshToken {
+	if got.AccessToken != e.AccessToken || got.RefreshToken != e.RefreshToken || got.RequestedAccessTokenTTL != e.RequestedAccessTokenTTL || got.RefreshExpiresAt != e.RefreshExpiresAt {
 		t.Fatalf("got %+v", got)
 	}
 }

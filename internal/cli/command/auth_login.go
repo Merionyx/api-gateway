@@ -31,6 +31,8 @@ func newAuthLoginCmd(resolveServer func() (string, error)) *cobra.Command {
 		callbackHost string
 		callbackPort int
 		noBrowser    bool
+		accessTTL    string
+		refreshTTL   string
 	)
 
 	cmd := &cobra.Command{
@@ -65,6 +67,10 @@ Tokens are written to ~/.config/agwctl/credentials.yaml (or AGWCTL_CREDENTIALS),
 				execCtx = context.Background()
 			}
 			chosenID, err := resolveAuthLoginProviderID(execCtx, server, baseHTTP, providerID, cmd.OutOrStdout())
+			if err != nil {
+				return err
+			}
+			requestedTTLs, err := requestedTTLsFromFlags(accessTTL, refreshTTL)
 			if err != nil {
 				return err
 			}
@@ -143,8 +149,10 @@ Tokens are written to ~/.config/agwctl/credentials.yaml (or AGWCTL_CREDENTIALS),
 				return err
 			}
 			loginResp, err := apiNoRedir.LoginOidc(execCtx, &apiserverclient.LoginOidcParams{
-				ProviderId:  chosenID,
-				RedirectUri: redirectURI,
+				ProviderId:                      chosenID,
+				RedirectUri:                     redirectURI,
+				RequestedAccessTokenTtlSeconds:  optionalSeconds(requestedTTLs.AccessTTL),
+				RequestedRefreshTokenTtlSeconds: optionalSeconds(requestedTTLs.RefreshTTL),
 			})
 			if err != nil {
 				return fmt.Errorf("login request: %w", err)
@@ -209,10 +217,14 @@ Tokens are written to ~/.config/agwctl/credentials.yaml (or AGWCTL_CREDENTIALS),
 				tt = strings.TrimSpace(*tok.TokenType)
 			}
 			if err := credentials.PutContext(ctxName, credentials.Entry{
-				ProviderID:   chosenID,
-				AccessToken:  tok.AccessToken,
-				RefreshToken: tok.RefreshToken,
-				TokenType:    tt,
+				ProviderID:               chosenID,
+				AccessToken:              tok.AccessToken,
+				RefreshToken:             tok.RefreshToken,
+				TokenType:                tt,
+				AccessExpiresAt:          tok.AccessExpiresAt.UTC().Format(time.RFC3339),
+				RefreshExpiresAt:         tok.RefreshExpiresAt.UTC().Format(time.RFC3339),
+				RequestedAccessTokenTTL:  strings.TrimSpace(accessTTL),
+				RequestedRefreshTokenTTL: strings.TrimSpace(refreshTTL),
 			}); err != nil {
 				return err
 			}
@@ -228,6 +240,8 @@ Tokens are written to ~/.config/agwctl/credentials.yaml (or AGWCTL_CREDENTIALS),
 	cmd.Flags().StringVar(&callbackHost, "callback-host", defaultCallbackHost, "loopback host for redirect_uri (must match allowlist)")
 	cmd.Flags().IntVar(&callbackPort, "callback-port", defaultCallbackPort, "TCP port for loopback redirect_uri (must match allowlist)")
 	cmd.Flags().BoolVar(&noBrowser, "no-browser", false, "print IdP URL instead of opening a browser")
+	cmd.Flags().StringVar(&accessTTL, "access-ttl", "", "requested access token lifetime (Go duration, e.g. 168h)")
+	cmd.Flags().StringVar(&refreshTTL, "refresh-ttl", "", "requested refresh token lifetime (Go duration, e.g. 720h)")
 	return cmd
 }
 

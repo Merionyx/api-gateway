@@ -48,13 +48,12 @@ type OIDCCallbackUseCase struct {
 	sealer          envelopeSealer
 	jwt             *JWTUseCase
 	hc              *http.Client
-	accessTTL       time.Duration
-	refreshTTL      time.Duration
+	tokenTTLPolicy  TokenTTLPolicy
 	idpCache        *idpcache.Cache
 	idpOpaqueMaxTTL time.Duration
 }
 
-// NewOIDCCallbackUseCase wires callback dependencies. accessTTL<=0 defaults to 5m; hc nil uses http.DefaultClient.
+// NewOIDCCallbackUseCase wires callback dependencies. hc nil uses http.DefaultClient.
 func NewOIDCCallbackUseCase(
 	providers []config.OIDCProviderConfig,
 	intents loginIntentReadDeleter,
@@ -62,8 +61,7 @@ func NewOIDCCallbackUseCase(
 	sealer envelopeSealer,
 	jwtUC *JWTUseCase,
 	hc *http.Client,
-	accessTTL time.Duration,
-	refreshTTL time.Duration,
+	tokenTTLPolicy TokenTTLPolicy,
 	idpCache *idpcache.Cache,
 	idpOpaqueMaxTTL time.Duration,
 ) *OIDCCallbackUseCase {
@@ -71,8 +69,6 @@ func NewOIDCCallbackUseCase(
 	for _, p := range providers {
 		by[strings.TrimSpace(p.ID)] = p
 	}
-	accessTTL = config.EffectiveInteractiveAccessTokenTTL(accessTTL)
-	refreshTTL = config.EffectiveInteractiveRefreshTokenTTL(refreshTTL)
 	if hc == nil {
 		hc = http.DefaultClient
 	}
@@ -83,8 +79,7 @@ func NewOIDCCallbackUseCase(
 		sealer:          sealer,
 		jwt:             jwtUC,
 		hc:              hc,
-		accessTTL:       accessTTL,
-		refreshTTL:      refreshTTL,
+		tokenTTLPolicy:  tokenTTLPolicy,
 		idpCache:        idpCache,
 		idpOpaqueMaxTTL: idpOpaqueMaxTTL,
 	}
@@ -160,12 +155,20 @@ func (u *OIDCCallbackUseCase) Complete(ctx context.Context, code, state string) 
 		return out, fmt.Errorf("%w: cannot derive subject from id_token (need email or sub)", apierrors.ErrInvalidInput)
 	}
 
+	resolvedTTLs, err := resolveRequestedTokenTTLs(u.tokenTTLPolicy, RequestedTokenTTLs{
+		AccessTTL:  time.Duration(intent.RequestedAccessTokenTTLSeconds) * time.Second,
+		RefreshTTL: time.Duration(intent.RequestedRefreshTokenTTLSeconds) * time.Second,
+	})
+	if err != nil {
+		return out, fmt.Errorf("%w: %s", apierrors.ErrInvalidInput, err.Error())
+	}
+
 	snap, err := claimsSnapshotFromProvider(ctx, p, idClaims, strings.TrimSpace(tr.AccessToken), u.hc)
 	if err != nil {
 		return out, err
 	}
 
-	accessJWT, _, ourAccessExp, err := u.jwt.MintInteractiveAPIAccessJWTFromSnapshot(ctx, subject, snap, u.accessTTL)
+	accessJWT, _, ourAccessExp, err := u.jwt.MintInteractiveAPIAccessJWTFromSnapshot(ctx, subject, snap, resolvedTTLs.AccessTTL)
 	if err != nil {
 		return out, err
 	}
@@ -189,7 +192,7 @@ func (u *OIDCCallbackUseCase) Complete(ctx context.Context, code, state string) 
 	}
 
 	sessionID := uuid.NewString()
-	refreshExpiresAt := initialRefreshExpiry(time.Now().UTC(), u.refreshTTL, tr)
+	refreshExpiresAt := initialRefreshExpiry(time.Now().UTC(), resolvedTTLs.RefreshTTL, tr)
 	sess := kvvalue.SessionValue{
 		EncryptedIDPRefresh: json.RawMessage(envBytes),
 		ClaimsSnapshot:      snap,
@@ -218,9 +221,11 @@ func (u *OIDCCallbackUseCase) Complete(ctx context.Context, code, state string) 
 
 	bt := "Bearer"
 	out = apiserver.AuthSessionTokensResponse{
-		AccessToken:  accessJWT,
-		RefreshToken: ourRefreshStr,
-		TokenType:    &bt,
+		AccessToken:      accessJWT,
+		AccessExpiresAt:  ourAccessExp,
+		RefreshToken:     ourRefreshStr,
+		RefreshExpiresAt: refreshExpiresAt,
+		TokenType:        &bt,
 	}
 	return out, nil
 }

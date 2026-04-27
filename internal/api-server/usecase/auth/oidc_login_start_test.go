@@ -37,8 +37,16 @@ func TestOIDCLoginUseCase_Start_RedirectNotAllowlisted(t *testing.T) {
 		Issuer:               "https://issuer.unused.example",
 		ClientID:             "c",
 		RedirectURIAllowlist: []string{"http://127.0.0.1:8080/cb"},
-	}}, time.Minute, stub, http.DefaultClient)
-	_, err := uc.Start(t.Context(), "p1", "http://127.0.0.1:9999/wrong", "")
+	}}, time.Minute, stub, http.DefaultClient, TokenTTLPolicy{
+		DefaultAccessTTL:  5 * time.Minute,
+		MaxAccessTTL:      7 * 24 * time.Hour,
+		DefaultRefreshTTL: 7 * 24 * time.Hour,
+		MaxRefreshTTL:     30 * 24 * time.Hour,
+	})
+	_, err := uc.Start(t.Context(), OIDCLoginStartRequest{
+		ProviderID:  "p1",
+		RedirectURI: "http://127.0.0.1:9999/wrong",
+	})
 	if !errors.Is(err, apierrors.ErrOIDCRedirectNotAllowlisted) {
 		t.Fatalf("got %v", err)
 	}
@@ -68,9 +76,20 @@ func TestOIDCLoginUseCase_Start_HappyPath(t *testing.T) {
 		Issuer:               srv.URL,
 		ClientID:             "cid",
 		RedirectURIAllowlist: []string{"http://127.0.0.1:8080/cb"},
-	}}, time.Minute, stub, srv.Client())
+	}}, time.Minute, stub, srv.Client(), TokenTTLPolicy{
+		DefaultAccessTTL:  5 * time.Minute,
+		MaxAccessTTL:      7 * 24 * time.Hour,
+		DefaultRefreshTTL: 7 * 24 * time.Hour,
+		MaxRefreshTTL:     30 * 24 * time.Hour,
+	})
 
-	loc, err := uc.Start(t.Context(), "p1", "http://127.0.0.1:8080/cb", "n1")
+	loc, err := uc.Start(t.Context(), OIDCLoginStartRequest{
+		ProviderID:          "p1",
+		RedirectURI:         "http://127.0.0.1:8080/cb",
+		Nonce:               "n1",
+		RequestedAccessTTL:  24 * time.Hour,
+		RequestedRefreshTTL: 10 * 24 * time.Hour,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,6 +116,9 @@ func TestOIDCLoginUseCase_Start_HappyPath(t *testing.T) {
 	}
 	if stub.last.OAuthState == "" || stub.last.PKCEVerifier == "" {
 		t.Fatalf("intent: %+v", stub.last)
+	}
+	if stub.last.RequestedAccessTokenTTLSeconds != 24*3600 || stub.last.RequestedRefreshTokenTTLSeconds != 10*24*3600 {
+		t.Fatalf("intent ttls %+v", stub.last)
 	}
 }
 

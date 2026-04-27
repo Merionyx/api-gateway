@@ -33,6 +33,12 @@ type refreshSessionStore interface {
 	ReplaceCASWithRefreshIndex(ctx context.Context, sessionID, oldVerifier, newVerifier string, v kvvalue.SessionValue, expectedModRevision int64) error
 }
 
+type OIDCRefreshRequest struct {
+	RefreshToken        string
+	RequestedAccessTTL  time.Duration
+	RequestedRefreshTTL time.Duration
+}
+
 // OIDCRefreshUseCase handles POST /api/v1/auth/refresh (IdP up + degraded, roadmap ш. 17–18).
 type OIDCRefreshUseCase struct {
 	byID            map[string]config.OIDCProviderConfig
@@ -40,22 +46,20 @@ type OIDCRefreshUseCase struct {
 	sealer          *sessioncrypto.Keyring
 	jwt             *JWTUseCase
 	hc              *http.Client
-	accessTTL       time.Duration
-	refreshTTL      time.Duration
+	tokenTTLPolicy  TokenTTLPolicy
 	metricsEnabled  bool
 	idpCache        *idpcache.Cache
 	idpOpaqueMaxTTL time.Duration
 }
 
-// NewOIDCRefreshUseCase wires refresh; accessTTL<=0 defaults to 5m; hc nil uses http.DefaultClient.
+// NewOIDCRefreshUseCase wires refresh. hc nil uses http.DefaultClient.
 func NewOIDCRefreshUseCase(
 	providers []config.OIDCProviderConfig,
 	sessions refreshSessionStore,
 	sealer *sessioncrypto.Keyring,
 	jwtUC *JWTUseCase,
 	hc *http.Client,
-	accessTTL time.Duration,
-	refreshTTL time.Duration,
+	tokenTTLPolicy TokenTTLPolicy,
 	metricsEnabled bool,
 	idpCache *idpcache.Cache,
 	idpOpaqueMaxTTL time.Duration,
@@ -64,8 +68,6 @@ func NewOIDCRefreshUseCase(
 	for _, p := range providers {
 		by[strings.TrimSpace(p.ID)] = p
 	}
-	accessTTL = config.EffectiveInteractiveAccessTokenTTL(accessTTL)
-	refreshTTL = config.EffectiveInteractiveRefreshTokenTTL(refreshTTL)
 	if hc == nil {
 		hc = http.DefaultClient
 	}
@@ -75,8 +77,7 @@ func NewOIDCRefreshUseCase(
 		sealer:          sealer,
 		jwt:             jwtUC,
 		hc:              hc,
-		accessTTL:       accessTTL,
-		refreshTTL:      refreshTTL,
+		tokenTTLPolicy:  tokenTTLPolicy,
 		metricsEnabled:  metricsEnabled,
 		idpCache:        idpCache,
 		idpOpaqueMaxTTL: idpOpaqueMaxTTL,
@@ -127,13 +128,14 @@ func (u *OIDCRefreshUseCase) completeSessionRefresh(
 	modRev int64,
 	nextEncryptedIDP, nextClaims json.RawMessage,
 	subject string,
+	accessTTL time.Duration,
 	refreshExpiresAt time.Time,
 	idpAccessForCache string,
 	idpExpiresInSec int,
 	metricResult string,
 ) (apiserver.AuthSessionTokensResponse, error) {
 	var out apiserver.AuthSessionTokensResponse
-	accessJWT, _, ourAccessExp, err := u.jwt.MintInteractiveAPIAccessJWTFromSnapshot(ctx, subject, nextClaims, u.accessTTL)
+	accessJWT, _, ourAccessExp, err := u.jwt.MintInteractiveAPIAccessJWTFromSnapshot(ctx, subject, nextClaims, accessTTL)
 	if err != nil {
 		return out, err
 	}
@@ -184,9 +186,11 @@ func (u *OIDCRefreshUseCase) completeSessionRefresh(
 
 	bt := "Bearer"
 	out = apiserver.AuthSessionTokensResponse{
-		AccessToken:  accessJWT,
-		RefreshToken: newOurStr,
-		TokenType:    &bt,
+		AccessToken:      accessJWT,
+		AccessExpiresAt:  ourAccessExp,
+		RefreshToken:     newOurStr,
+		RefreshExpiresAt: refreshExpiresAt,
+		TokenType:        &bt,
 	}
 	return out, nil
 }
@@ -224,7 +228,7 @@ func missingIDPRefreshTokenDetail(p config.OIDCProviderConfig) string {
 }
 
 // Refresh rotates our refresh; updates IdP material when the IdP is reachable, otherwise degraded refresh (roadmap ш. 17–18).
-func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, ourRefreshHex string) (apiserver.AuthSessionTokensResponse, error) {
+func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, req OIDCRefreshRequest) (apiserver.AuthSessionTokensResponse, error) {
 	var out apiserver.AuthSessionTokensResponse
 	if len(u.byID) == 0 {
 		return out, apierrors.ErrOIDCNotConfigured
@@ -233,6 +237,15 @@ func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, ourRefreshHex string) 
 		return out, fmt.Errorf("%w: refresh dependencies not configured", apierrors.ErrInvalidInput)
 	}
 
+	resolvedTTLs, err := resolveRequestedTokenTTLs(u.tokenTTLPolicy, RequestedTokenTTLs{
+		AccessTTL:  req.RequestedAccessTTL,
+		RefreshTTL: req.RequestedRefreshTTL,
+	})
+	if err != nil {
+		return out, fmt.Errorf("%w: %s", apierrors.ErrInvalidInput, err.Error())
+	}
+
+	ourRefreshHex := req.RefreshToken
 	ourRefreshHex = strings.TrimSpace(ourRefreshHex)
 	if _, err := hex.DecodeString(ourRefreshHex); err != nil || len(ourRefreshHex) != 64 {
 		return out, apierrors.ErrSessionAuthFailed
@@ -289,7 +302,7 @@ func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, ourRefreshHex string) 
 			return out, apierrors.ErrSessionAuthFailed
 		}
 		return u.completeSessionRefresh(ctx, sessionID, verifier, sess, modRev,
-			sess.EncryptedIDPRefresh, claimsSnap, subj, sess.RefreshExpiresAt, "", 0, metrics.AuthRefreshDegraded)
+			sess.EncryptedIDPRefresh, claimsSnap, subj, resolvedTTLs.AccessTTL, sess.RefreshExpiresAt, "", 0, metrics.AuthRefreshDegraded)
 	}
 	if dErr != nil {
 		return out, dErr
@@ -303,7 +316,7 @@ func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, ourRefreshHex string) 
 			return out, apierrors.ErrSessionAuthFailed
 		}
 		return u.completeSessionRefresh(ctx, sessionID, verifier, sess, modRev,
-			sess.EncryptedIDPRefresh, claimsSnap, subj, sess.RefreshExpiresAt, "", 0, metrics.AuthRefreshDegraded)
+			sess.EncryptedIDPRefresh, claimsSnap, subj, resolvedTTLs.AccessTTL, sess.RefreshExpiresAt, "", 0, metrics.AuthRefreshDegraded)
 	}
 	if tErr != nil {
 		return out, tErr
@@ -348,10 +361,10 @@ func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, ourRefreshHex string) 
 	if err != nil {
 		return out, err
 	}
-	refreshExpiresAt := rotatedRefreshExpiry(now, u.refreshTTL, sess.RefreshExpiresAt, tr)
+	refreshExpiresAt := rotatedRefreshExpiry(now, resolvedTTLs.RefreshTTL, sess.RefreshExpiresAt, tr)
 
 	return u.completeSessionRefresh(ctx, sessionID, verifier, sess, modRev,
-		json.RawMessage(envBytes), claimsSnap, subject, refreshExpiresAt, strings.TrimSpace(tr.AccessToken), tr.ExpiresIn, metrics.AuthRefreshIDPUp)
+		json.RawMessage(envBytes), claimsSnap, subject, resolvedTTLs.AccessTTL, refreshExpiresAt, strings.TrimSpace(tr.AccessToken), tr.ExpiresIn, metrics.AuthRefreshIDPUp)
 }
 
 // MapRefreshError maps Refresh errors to HTTP status and stable problem codes.

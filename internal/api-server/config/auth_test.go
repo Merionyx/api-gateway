@@ -159,17 +159,20 @@ func TestValidateOIDCProviders_NameRequired(t *testing.T) {
 	}
 }
 
-func TestValidateInteractiveTokenTTLs(t *testing.T) {
+func TestValidateInteractiveTokenTTLPolicy(t *testing.T) {
 	t.Parallel()
 
-	if err := ValidateInteractiveTokenTTLs(7*24*time.Hour, 30*24*time.Hour); err != nil {
+	if err := ValidateInteractiveTokenTTLPolicy(7*24*time.Hour, 30*24*time.Hour, 30*24*time.Hour, 90*24*time.Hour); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := ValidateInteractiveTokenTTLs(24*time.Hour, time.Hour); err == nil || !strings.Contains(err.Error(), "interactive_refresh_token_ttl") {
+	if err := ValidateInteractiveTokenTTLPolicy(24*time.Hour, 30*24*time.Hour, time.Hour, 90*24*time.Hour); err == nil || !strings.Contains(err.Error(), "interactive_refresh_token_ttl") {
 		t.Fatalf("expected ttl validation error, got %v", err)
 	}
-	if err := ValidateInteractiveTokenTTLs(0, 0); err != nil {
+	if err := ValidateInteractiveTokenTTLPolicy(0, 0, 0, 0); err != nil {
 		t.Fatalf("zero values should resolve to defaults, got %v", err)
+	}
+	if err := ValidateInteractiveTokenTTLPolicy(7*24*time.Hour, time.Hour, 30*24*time.Hour, 90*24*time.Hour); err == nil || !strings.Contains(err.Error(), "interactive_access_token_max_ttl") {
+		t.Fatalf("expected access max validation error, got %v", err)
 	}
 }
 

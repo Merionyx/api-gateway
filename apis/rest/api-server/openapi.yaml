@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: API Gateway — API Server HTTP API
-  version: 1.5.5
+  version: 1.5.6
   description: |
     HTTP API for the **API Server** control plane: authentication material (JWT, JWKS), contract export,
     registry views backed by **etcd** (controllers, tenants, bundles), and operational endpoints.
@@ -10,6 +10,8 @@ info:
     lifecycle is owned by the **Gateway Controller**; this API does not expose CRUD for environments.
 
     **JSON naming:** request and response bodies use **snake_case** field names unless noted.
+
+    **v1.5.6:** interactive OIDC login / refresh may request longer token lifetimes per client (`requested_*_token_ttl_seconds`), while the server clamps them to configured maxima and provider refresh limits; session responses now include actual `access_expires_at` / `refresh_expires_at`.
 
     **v1.5.5:** OIDC providers now include mandatory user-facing `name` in config and in **`GET /api/v1/auth/oidc-providers`** for UIs and **`agwctl auth login`**.
 
@@ -377,19 +379,37 @@ components:
         refresh_token:
           type: string
           description: Our refresh token from the last login or refresh response (server must not log this value).
+        requested_access_token_ttl_seconds:
+          type: integer
+          minimum: 1
+          description: Optional requested access token lifetime in seconds. The server clamps this to policy.
+        requested_refresh_token_ttl_seconds:
+          type: integer
+          minimum: 1
+          description: Optional requested refresh-chain lifetime in seconds. The server clamps this to policy and provider refresh limits.
 
     AuthSessionTokensResponse:
       type: object
       required:
       - access_token
+      - access_expires_at
       - refresh_token
+      - refresh_expires_at
       properties:
         access_token:
           type: string
           description: New **API profile** access JWT.
+        access_expires_at:
+          type: string
+          format: date-time
+          description: Actual expiry instant of `access_token` after server policy clamping.
         refresh_token:
           type: string
           description: Rotated our refresh token; clients must discard the previous pair.
+        refresh_expires_at:
+          type: string
+          format: date-time
+          description: Actual expiry instant of `refresh_token` after server policy and provider-limit clamping.
         token_type:
           type: string
           description: Token type for `access_token` (e.g. Bearer).
@@ -1106,6 +1126,20 @@ paths:
         description: Optional OIDC `nonce` (replay protection); echoed into the authorization request when set.
         schema:
           type: string
+      - name: requested_access_token_ttl_seconds
+        in: query
+        required: false
+        description: Optional requested access token lifetime in seconds. The server clamps this to policy.
+        schema:
+          type: integer
+          minimum: 1
+      - name: requested_refresh_token_ttl_seconds
+        in: query
+        required: false
+        description: Optional requested refresh-chain lifetime in seconds. The server clamps this to policy and provider refresh limits.
+        schema:
+          type: integer
+          minimum: 1
       responses:
         '302':
           description: Redirect to the IdP authorization endpoint.
