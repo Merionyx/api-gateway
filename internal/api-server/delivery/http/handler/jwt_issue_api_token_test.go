@@ -13,8 +13,10 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/api-server/adapter/etcd"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/kvvalue"
+	"github.com/merionyx/api-gateway/internal/api-server/auth/permissions"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/roles"
 	"github.com/merionyx/api-gateway/internal/api-server/config"
+	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/authz"
 	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/middleware"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
@@ -26,7 +28,7 @@ import (
 func TestJWTHandler_IssueApiAccessToken_viaAPIKey(t *testing.T) {
 	t.Parallel()
 	uc := jwtHandlerTestUC(t)
-	h := NewJWTHandler(uc, false, 5*time.Minute)
+	h := NewJWTHandler(uc, false, 5*time.Minute, nil, nil)
 	secret := "issue-api-test-secret"
 	d := etcd.SHA256DigestHexFromSecret(secret)
 	repo := &stubAPIKeyRepoForIssue{
@@ -73,7 +75,7 @@ func TestJWTHandler_IssueApiAccessToken_viaAPIKey(t *testing.T) {
 func TestJWTHandler_IssueApiAccessToken_forbiddenWrongAPIKeyRole(t *testing.T) {
 	t.Parallel()
 	uc := jwtHandlerTestUC(t)
-	h := NewJWTHandler(uc, false, 5*time.Minute)
+	h := NewJWTHandler(uc, false, 5*time.Minute, nil, nil)
 	secret := "issue-api-wrong-role"
 	d := etcd.SHA256DigestHexFromSecret(secret)
 	repo := &stubAPIKeyRepoForIssue{
@@ -81,7 +83,7 @@ func TestJWTHandler_IssueApiAccessToken_forbiddenWrongAPIKeyRole(t *testing.T) {
 		rec: kvvalue.APIKeyValue{
 			SchemaVersion: kvvalue.APIKeySchemaV2,
 			Algorithm:     "sha256",
-			Roles:         []string{roles.APIMember},
+			Roles:         []string{roles.APIRoleViewer},
 			RecordFormat:  kvvalue.DefaultAPIKeyRecordFormat,
 		},
 	}
@@ -121,7 +123,7 @@ func TestJWTHandler_IssueApiAccessToken_forbiddenBearerBaselineMember(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := NewJWTHandler(uc, false, 2*time.Minute)
+	h := NewJWTHandler(uc, false, 2*time.Minute, nil, nil)
 	app := fiber.New()
 	app.Use(middleware.APISecurity(uc, nil))
 	app.Post("/api/v1/tokens/api", h.IssueApiAccessToken)
@@ -143,7 +145,7 @@ func TestJWTHandler_IssueApiAccessToken_forbiddenBearerBaselineMember(t *testing
 func TestJWTHandler_IssueApiAccessToken_viaAPIKeyAdminBypass(t *testing.T) {
 	t.Parallel()
 	uc := jwtHandlerTestUC(t)
-	h := NewJWTHandler(uc, false, 5*time.Minute)
+	h := NewJWTHandler(uc, false, 5*time.Minute, nil, nil)
 	secret := "issue-api-admin-secret"
 	d := etcd.SHA256DigestHexFromSecret(secret)
 	repo := &stubAPIKeyRepoForIssue{
@@ -151,7 +153,7 @@ func TestJWTHandler_IssueApiAccessToken_viaAPIKeyAdminBypass(t *testing.T) {
 		rec: kvvalue.APIKeyValue{
 			SchemaVersion: kvvalue.APIKeySchemaV2,
 			Algorithm:     "sha256",
-			Roles:         []string{roles.APIAdmin},
+			Roles:         []string{roles.APIRoleAdmin},
 			RecordFormat:  kvvalue.DefaultAPIKeyRecordFormat,
 		},
 	}
@@ -185,6 +187,17 @@ func (s *stubAPIKeyRepoForIssue) Get(_ context.Context, digestHex string) (kvval
 	return s.rec, 1, nil
 }
 
+type tokenGrantWriterStub struct {
+	jti string
+	rec kvvalue.TokenGrantValue
+}
+
+func (s *tokenGrantWriterStub) Put(_ context.Context, jti string, rec kvvalue.TokenGrantValue) error {
+	s.jti = jti
+	s.rec = rec
+	return nil
+}
+
 func TestJWTHandler_IssueApiAccessToken_viaBearer(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -207,7 +220,7 @@ func TestJWTHandler_IssueApiAccessToken_viaBearer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := NewJWTHandler(uc, false, 2*time.Minute)
+	h := NewJWTHandler(uc, false, 2*time.Minute, nil, nil)
 	app := fiber.New()
 	app.Use(middleware.APISecurity(uc, nil))
 	app.Post("/api/v1/tokens/api", h.IssueApiAccessToken)
@@ -220,6 +233,92 @@ func TestJWTHandler_IssueApiAccessToken_viaBearer(t *testing.T) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusCreated {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status %d body %s", resp.StatusCode, b)
+	}
+}
+
+func TestJWTHandler_IssueApiAccessToken_storesRequestedScopesAsTokenGrant(t *testing.T) {
+	t.Parallel()
+	uc := jwtHandlerTestUC(t)
+	cat, err := roles.NewCatalog(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	grants := &tokenGrantWriterStub{}
+	eval := authz.NewPermissionEvaluator(cat, nil)
+	h := NewJWTHandler(uc, false, 2*time.Minute, eval, grants)
+	secret := "issue-api-admin-grant"
+	d := etcd.SHA256DigestHexFromSecret(secret)
+	repo := &stubAPIKeyRepoForIssue{
+		wantDigest: d,
+		rec: kvvalue.APIKeyValue{
+			SchemaVersion: kvvalue.APIKeySchemaV2,
+			Algorithm:     "sha256",
+			Roles:         []string{roles.APIRoleAdmin},
+			RecordFormat:  kvvalue.DefaultAPIKeyRecordFormat,
+		},
+	}
+	app := fiber.New()
+	app.Use(middleware.APISecurity(uc, repo))
+	app.Post("/api/v1/tokens/api", h.IssueApiAccessToken)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/tokens/api", strings.NewReader(`{"requested_scopes":["api.token.edge.issue"]}`))
+	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+	req.Header.Set("X-API-Key", secret)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusCreated {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status %d body %s", resp.StatusCode, b)
+	}
+	if grants.jti == "" {
+		t.Fatal("token grant was not stored")
+	}
+	if len(grants.rec.Permissions) != 1 || grants.rec.Permissions[0] != permissions.EdgeTokenIssue {
+		t.Fatalf("stored permissions %+v", grants.rec.Permissions)
+	}
+	if grants.rec.ExpiresAt.IsZero() {
+		t.Fatal("stored grant expires_at is zero")
+	}
+}
+
+func TestJWTHandler_IssueApiAccessToken_rejectsRequestedScopesOutsideCallerPermissions(t *testing.T) {
+	t.Parallel()
+	uc := jwtHandlerTestUC(t)
+	cat, err := roles.NewCatalog(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	eval := authz.NewPermissionEvaluator(cat, nil)
+	h := NewJWTHandler(uc, false, 2*time.Minute, eval, &tokenGrantWriterStub{})
+	secret := "issue-api-non-admin-grant"
+	d := etcd.SHA256DigestHexFromSecret(secret)
+	repo := &stubAPIKeyRepoForIssue{
+		wantDigest: d,
+		rec: kvvalue.APIKeyValue{
+			SchemaVersion: kvvalue.APIKeySchemaV2,
+			Algorithm:     "sha256",
+			Roles:         []string{roles.APIAccessTokensIssue},
+			RecordFormat:  kvvalue.DefaultAPIKeyRecordFormat,
+		},
+	}
+	app := fiber.New()
+	app.Use(middleware.APISecurity(uc, repo))
+	app.Post("/api/v1/tokens/api", h.IssueApiAccessToken)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/tokens/api", strings.NewReader(`{"requested_scopes":["api.token.edge.issue"]}`))
+	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+	req.Header.Set("X-API-Key", secret)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusForbidden {
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("status %d body %s", resp.StatusCode, b)
 	}

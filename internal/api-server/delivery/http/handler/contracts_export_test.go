@@ -41,7 +41,7 @@ func contractsExportApp(h *ContractsExportHandler, injectRoles []string) *fiber.
 
 func TestContractsExportHandler_invalidJSON(t *testing.T) {
 	t.Parallel()
-	h := NewContractsExportHandler(bundle.NewContractExportUseCase(&exportRemoteStub{}))
+	h := NewContractsExportHandler(bundle.NewContractExportUseCase(&exportRemoteStub{}), nil)
 	app := contractsExportApp(h, []string{roles.APIContractsExport})
 	req := httptest.NewRequest(fiber.MethodPost, "/", strings.NewReader(`{`))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
@@ -57,7 +57,7 @@ func TestContractsExportHandler_invalidJSON(t *testing.T) {
 
 func TestContractsExportHandler_missingRepoRef(t *testing.T) {
 	t.Parallel()
-	h := NewContractsExportHandler(bundle.NewContractExportUseCase(&exportRemoteStub{}))
+	h := NewContractsExportHandler(bundle.NewContractExportUseCase(&exportRemoteStub{}), nil)
 	app := contractsExportApp(h, []string{roles.APIContractsExport})
 	req := httptest.NewRequest(fiber.MethodPost, "/", strings.NewReader(`{"repository":"","ref":""}`))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
@@ -78,7 +78,7 @@ func TestContractsExportHandler_success(t *testing.T) {
 			{ContractName: "api", SourcePath: "x.yaml", Content: []byte("hello")},
 		},
 	}
-	h := NewContractsExportHandler(bundle.NewContractExportUseCase(remote))
+	h := NewContractsExportHandler(bundle.NewContractExportUseCase(remote), nil)
 	app := contractsExportApp(h, []string{roles.APIContractsExport})
 	body := `{"repository":"r","ref":"main","path":"p","contract_name":"api"}`
 	req := httptest.NewRequest(fiber.MethodPost, "/", strings.NewReader(body))
@@ -103,7 +103,7 @@ func TestContractsExportHandler_success(t *testing.T) {
 
 func TestContractsExportHandler_forbiddenWithoutPrincipal(t *testing.T) {
 	t.Parallel()
-	h := NewContractsExportHandler(bundle.NewContractExportUseCase(&exportRemoteStub{}))
+	h := NewContractsExportHandler(bundle.NewContractExportUseCase(&exportRemoteStub{}), nil)
 	app := contractsExportApp(h, nil)
 	body := `{"repository":"r","ref":"main"}`
 	req := httptest.NewRequest(fiber.MethodPost, "/", strings.NewReader(body))
@@ -120,8 +120,8 @@ func TestContractsExportHandler_forbiddenWithoutPrincipal(t *testing.T) {
 
 func TestContractsExportHandler_forbiddenWrongRole(t *testing.T) {
 	t.Parallel()
-	h := NewContractsExportHandler(bundle.NewContractExportUseCase(&exportRemoteStub{}))
-	app := contractsExportApp(h, []string{roles.APIMember})
+	h := NewContractsExportHandler(bundle.NewContractExportUseCase(&exportRemoteStub{}), nil)
+	app := contractsExportApp(h, []string{roles.APIRoleViewer})
 	body := `{"repository":"r","ref":"main"}`
 	req := httptest.NewRequest(fiber.MethodPost, "/", strings.NewReader(body))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)

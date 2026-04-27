@@ -36,7 +36,7 @@ func TestProviderSelectLabel(t *testing.T) {
 		Name: "GitHub Enterprise",
 		Kind: "github",
 	})
-	if got != "GitHub Enterprise  [github-enterprise] (github)" {
+	if got != "GitHub Enterprise  \x1b[2m(github-enterprise)\x1b[0m" {
 		t.Fatalf("got %q", got)
 	}
 }

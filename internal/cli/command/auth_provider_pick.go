@@ -20,8 +20,8 @@ func providerDisplayName(p apiserverclient.OidcProviderDescriptor) string {
 
 func providerSelectLabel(p apiserverclient.OidcProviderDescriptor) string {
 	name := providerDisplayName(p)
-	kind := strings.TrimSpace(p.Kind)
-	return fmt.Sprintf("%s  %s", name, style.S(true, style.Dim, fmt.Sprintf("(%s)", kind)))
+	id := strings.TrimSpace(p.Id)
+	return fmt.Sprintf("%s  %s", name, style.S(true, style.Dim, fmt.Sprintf("(%s)", id)))
 }
 
 // resolveAuthLoginProviderID returns explicit non-empty id, or fetches GET /api/v1/auth/oidc-providers

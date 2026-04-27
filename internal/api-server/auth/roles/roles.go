@@ -1,13 +1,14 @@
-// Package roles defines stable API Server role strings for RBAC (roadmap ш. 23).
-// CEL at login/refresh (IdP up) will populate or replace the `roles` claim; until then,
-// interactive sessions use a baseline role (see usecase auth snapshot helpers).
+// Package roles defines stable API Server role strings used by RBAC/ABAC authorization.
 package roles
 
 const (
-	// APIMember is the default interactive baseline: authenticated API callers without extra privileges.
-	APIMember = "api:member"
-	// APIAdmin grants all in-process RBAC checks (use sparingly; prefer narrow roles).
-	APIAdmin = "api:admin"
+	// APIRoleAdmin is the immutable built-in admin role (full access).
+	APIRoleAdmin = "api:role:admin"
+	// APIRoleViewer is the immutable built-in read-only baseline role.
+	APIRoleViewer = "api:role:viewer"
+
+	// APIEdgeTokensIssue allows POST /api/v1/tokens/edge.
+	APIEdgeTokensIssue = "api:edge_tokens:issue"
 	// APIAccessTokensIssue allows POST /api/v1/tokens/api (M2M or delegated interactive).
 	APIAccessTokensIssue = "api:access_tokens:issue"
 	// APIContractsExport allows POST /api/v1/contracts/export.

@@ -13,9 +13,9 @@ import (
 )
 
 // claimsSnapshotFromProvider builds the JSON claims_snapshot stored on the session after OIDC
-// callback and refresh (IdP-up path). Provider-specific enrichment adds roles on top of api:member.
+// callback and refresh (IdP-up path). Provider-specific enrichment adds roles on top of api:role:viewer.
 func claimsSnapshotFromProvider(ctx context.Context, p config.OIDCProviderConfig, idClaims jwt.MapClaims, idpOAuthAccess string, hc *http.Client) (json.RawMessage, error) {
-	roles := []string{apiroles.APIMember}
+	roles := []string{apiroles.APIRoleViewer}
 	if p.IsGitHubOIDCProvider() {
 		extras, err := githubExtraRoles(ctx, hc, p.GitHub, idpOAuthAccess, githubRESTBaseFor(p.GitHub))
 		if err != nil {

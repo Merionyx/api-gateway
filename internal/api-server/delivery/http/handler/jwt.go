@@ -1,9 +1,15 @@
 package handler
 
 import (
+	"context"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/gofiber/fiber/v3"
+
+	"github.com/merionyx/api-gateway/internal/api-server/auth/kvvalue"
+	"github.com/merionyx/api-gateway/internal/api-server/auth/permissions"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/roles"
 	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/authz"
 	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/middleware"
@@ -13,21 +19,32 @@ import (
 	apimetrics "github.com/merionyx/api-gateway/internal/api-server/metrics"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
 	"github.com/merionyx/api-gateway/internal/shared/telemetry"
-
-	"github.com/gofiber/fiber/v3"
 )
 
 const defaultAPIAccessTokenTTL = 5 * time.Minute
+
+// TokenGrantWriter stores per-access-token delegated permissions by jti.
+type TokenGrantWriter interface {
+	Put(ctx context.Context, jti string, rec kvvalue.TokenGrantValue) error
+}
 
 // JWTHandler serves JWT/JWKS HTTP endpoints (roadmap ш. 15, 22).
 type JWTHandler struct {
 	jwtUseCase     *auth.JWTUseCase
 	metricsEnabled bool
 	apiAccessTTL   time.Duration
+	permissionEval *authz.PermissionEvaluator
+	tokenGrants    TokenGrantWriter
 }
 
 // NewJWTHandler wires JWT HTTP handlers. apiAccessTTL<=0 defaults to 5m (POST /api/v1/tokens/api).
-func NewJWTHandler(jwtUseCase *auth.JWTUseCase, metricsEnabled bool, apiAccessTTL time.Duration) *JWTHandler {
+func NewJWTHandler(
+	jwtUseCase *auth.JWTUseCase,
+	metricsEnabled bool,
+	apiAccessTTL time.Duration,
+	permissionEval *authz.PermissionEvaluator,
+	tokenGrants TokenGrantWriter,
+) *JWTHandler {
 	if apiAccessTTL <= 0 {
 		apiAccessTTL = defaultAPIAccessTokenTTL
 	}
@@ -35,6 +52,8 @@ func NewJWTHandler(jwtUseCase *auth.JWTUseCase, metricsEnabled bool, apiAccessTT
 		jwtUseCase:     jwtUseCase,
 		metricsEnabled: metricsEnabled,
 		apiAccessTTL:   apiAccessTTL,
+		permissionEval: permissionEval,
+		tokenGrants:    tokenGrants,
 	}
 }
 
@@ -43,6 +62,14 @@ func NewJWTHandler(jwtUseCase *auth.JWTUseCase, metricsEnabled bool, apiAccessTT
 func (h *JWTHandler) GenerateToken(c fiber.Ctx) error {
 	span := beginHandlerSpan(c, "GenerateToken")
 	defer span.End()
+
+	if h.permissionEval != nil {
+		if denied, werr := h.permissionEval.RequireAnyHTTPPermission(c, permissions.EdgeTokenIssue); denied {
+			apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultForbidden)
+			return werr
+		}
+	}
+
 	var req models.GenerateTokenRequest
 	if err := c.Bind().Body(&req); err != nil {
 		telemetry.MarkError(span, err)
@@ -100,11 +127,17 @@ func (h *JWTHandler) IssueApiAccessToken(c fiber.Ctx) error {
 		))
 	}
 
-	if denied, werr := authz.RequireAnyHTTPRole(c, roles.APIAccessTokensIssue); denied {
+	if h.permissionEval != nil {
+		if denied, werr := h.permissionEval.RequireAnyHTTPPermission(c, permissions.APIAccessTokenIssue); denied {
+			apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultForbidden)
+			return werr
+		}
+	} else if denied, werr := authz.RequireAnyHTTPRole(c, roles.APIAccessTokensIssue); denied {
 		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultForbidden)
 		return werr
 	}
 
+	var requestedPermissions []string
 	if len(c.Body()) > 0 {
 		var body apiserver.IssueApiAccessTokenRequest
 		if err := c.Bind().Body(&body); err != nil {
@@ -112,7 +145,13 @@ func (h *JWTHandler) IssueApiAccessToken(c fiber.Ctx) error {
 			apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationBind)
 			return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidJSONBody, "", problem.DetailInvalidJSONBody))
 		}
-		_ = body.RequestedScopes
+		requestedPermissions = normalizeRequestedPermissions(body.RequestedScopes)
+		if h.permissionEval != nil {
+			if denied, werr := h.permissionEval.RequireDelegatedPermissions(c, requestedPermissions); denied {
+				apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultForbidden)
+				return werr
+			}
+		}
 	}
 
 	var subject string
@@ -135,11 +174,21 @@ func (h *JWTHandler) IssueApiAccessToken(c fiber.Ctx) error {
 		return problem.WriteInternal(c, err)
 	}
 
-	token, _, exp, err := h.jwtUseCase.MintInteractiveAPIAccessJWTFromSnapshot(c.Context(), subject, snap, h.apiAccessTTL)
+	token, jti, exp, err := h.jwtUseCase.MintInteractiveAPIAccessJWTFromSnapshot(c.Context(), subject, snap, h.apiAccessTTL)
 	if err != nil {
 		telemetry.MarkError(span, err)
 		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultInternalError)
 		return problem.RespondError(c, err)
+	}
+	if len(requestedPermissions) > 0 && h.tokenGrants != nil {
+		if err := h.tokenGrants.Put(c.Context(), jti, kvvalue.TokenGrantValue{
+			Permissions: requestedPermissions,
+			ExpiresAt:   exp,
+		}); err != nil {
+			telemetry.MarkError(span, err)
+			apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultInternalError)
+			return problem.WriteInternal(c, err)
+		}
 	}
 
 	apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultCreated)
@@ -148,6 +197,26 @@ func (h *JWTHandler) IssueApiAccessToken(c fiber.Ctx) error {
 		ExpiresAt:   exp,
 	}
 	return c.Status(fiber.StatusCreated).JSON(out)
+}
+
+func normalizeRequestedPermissions(in *[]string) []string {
+	if in == nil || len(*in) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(*in))
+	seen := make(map[string]struct{}, len(*in))
+	for i := range *in {
+		s := strings.TrimSpace((*in)[i])
+		if s == "" {
+			continue
+		}
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+	}
+	return out
 }
 
 // GetJWKS returns a JSON Web Key Set

@@ -502,3 +502,45 @@ func TestAuthConfig_BootstrapAPIKeyAllowed(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateAuthorizationConfig(t *testing.T) {
+	t.Parallel()
+	if err := ValidateAuthorizationConfig(AuthorizationConfig{
+		Roles: []AuthorizationRoleConfig{{
+			ID:          "api:role:token-generator",
+			Permissions: []string{"api.token.edge.issue"},
+		}},
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	err := ValidateAuthorizationConfig(AuthorizationConfig{
+		Roles: []AuthorizationRoleConfig{{
+			ID:          "api:role:admin",
+			Permissions: []string{"api.token.edge.issue"},
+		}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "immutable built-in") {
+		t.Fatalf("got %v", err)
+	}
+
+	err = ValidateAuthorizationConfig(AuthorizationConfig{
+		Roles: []AuthorizationRoleConfig{
+			{ID: "api:role:x", Permissions: []string{"p1"}},
+			{ID: "api:role:x", Permissions: []string{"p2"}},
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "duplicate role id") {
+		t.Fatalf("got %v", err)
+	}
+
+	err = ValidateAuthorizationConfig(AuthorizationConfig{
+		Roles: []AuthorizationRoleConfig{{
+			ID:          "api:role:empty",
+			Permissions: []string{},
+		}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "permissions must be non-empty") {
+		t.Fatalf("got %v", err)
+	}
+}

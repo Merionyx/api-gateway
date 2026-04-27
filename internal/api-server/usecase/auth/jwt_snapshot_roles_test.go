@@ -50,7 +50,7 @@ func TestMintInteractiveAPIAccessJWTFromSnapshot_includesProfileClaims(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	snap := []byte(`{"roles":["api:member"],"email":"u@example.com","preferred_username":"u","name":"User"}`)
+	snap := []byte(`{"roles":["api:role:viewer"],"email":"u@example.com","preferred_username":"u","name":"User"}`)
 	tok, _, _, err := uc.MintInteractiveAPIAccessJWTFromSnapshot(t.Context(), "u@example.com", snap, time.Minute)
 	if err != nil {
 		t.Fatal(err)

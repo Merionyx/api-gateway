@@ -58,6 +58,15 @@ auth:
   # interactive_access_token_max_ttl: "168h"  # default upper bound for client-requested access TTL
   # interactive_refresh_token_ttl: "168h"     # default refresh-chain lifetime when the client does not request another value
   # interactive_refresh_token_max_ttl: "720h" # default upper bound for client-requested refresh TTL; still clamped to provider refresh TTL
+  # authorization:
+  #   roles:
+  #     - id: "api:role:token-generator"
+  #       permissions: ["api.token.edge.issue"]
+  #     - id: "api:role:contract-exporter"
+  #       permissions: ["api.contracts.export"]
+  # Immutable built-ins (cannot be overridden in config):
+  #   - api:role:admin
+  #   - api:role:viewer
   # session_kek_base64: "<openssl rand -base64 32>"  # required when oidc_providers is set (32 bytes after decode)
   # oidc_providers:                 # browser GET /api/v1/auth/login; see docs/etcd-auth-paths.md
   #   - id: "dev-oidc"
@@ -80,7 +89,7 @@ auth:
   #       auth_flow: "oauth_app"   # or "github_app" for GitHub App user-to-server tokens (no OAuth scopes in authorize URL)
   #       allowed_org_logins: ["my-org"]
   #       team_role_bindings:
-  #         - { org: "my-org", team_slug: "admins", roles: ["api:admin"] }
+  #         - { org: "my-org", team_slug: "admins", roles: ["api:role:admin"] }
   # GitLab (roadmap ш.36): docs/idp/gitlab/README.md — issuer = https://gitlab.com or self-managed origin; kind: gitlab
   #   - id: "gitlab"
   #     name: "GitLab"
@@ -92,7 +101,7 @@ auth:
   #     gitlab:
   #       allowed_group_paths: ["my-root-group"]
   #       group_role_bindings:
-  #         - { group_full_path: "my-root-group/admins", roles: ["api:admin"] }
+  #         - { group_full_path: "my-root-group/admins", roles: ["api:role:admin"] }
   # Google (roadmap ш.37): docs/idp/google/README.md — issuer must be https://accounts.google.com ; kind: google
   #   - id: "google"
   #     name: "Google"
@@ -104,7 +113,7 @@ auth:
   #     google:
   #       allowed_hosted_domains: ["example.com"]
   #       hosted_domain_role_bindings:
-  #         - { hd: "example.com", roles: ["api:admin"] }
+  #         - { hd: "example.com", roles: ["api:role:admin"] }
   # Okta (roadmap ш.38): docs/idp/okta/README.md — issuer = Authorization Server URL (https); kind: okta
   #   - id: "okta"
   #     name: "Okta"
@@ -116,7 +125,7 @@ auth:
   #     okta:
   #       allowed_id_token_groups: ["API Gateway Users"]
   #       group_role_bindings:
-  #         - { group_name: "API Gateway Admins", roles: ["api:admin"] }
+  #         - { group_name: "API Gateway Admins", roles: ["api:role:admin"] }
   # Entra ID (roadmap ш.39): docs/idp/entra/README.md — issuer = v2.0 metadata URL (https); kind: entra
   #   - id: "entra"
   #     name: "Microsoft Entra ID"
@@ -129,7 +138,7 @@ auth:
   #       allowed_tenant_ids: ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]
   #       allowed_id_token_groups: ["<group object id as in id_token>"]
   #       group_role_bindings:
-  #         - { group: "<same string as in id_token groups>", roles: ["api:admin"] }
+  #         - { group: "<same string as in id_token groups>", roles: ["api:role:admin"] }
 
   # OpenTelemetry: optional; can be overridden (e.g. TELEMETRY_ENABLED) via environment.
   # telemetry:

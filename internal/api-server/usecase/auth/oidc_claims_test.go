@@ -41,7 +41,7 @@ func TestGithubExtraRoles_teamBindings(t *testing.T) {
 		switch r.URL.Path {
 		case "/user/teams":
 			_ = json.NewEncoder(w).Encode([]map[string]any{{
-				"slug": "platform",
+				"slug":         "platform",
 				"organization": map[string]string{"login": "acme"},
 			}})
 		default:
@@ -75,7 +75,7 @@ func TestClaimsSnapshotFromProvider_generic(t *testing.T) {
 		t.Fatal(err)
 	}
 	roles, _ := m["roles"].([]any)
-	if len(roles) != 1 || roles[0] != "api:member" {
+	if len(roles) != 1 || roles[0] != "api:role:viewer" {
 		t.Fatalf("%v", roles)
 	}
 }

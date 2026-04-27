@@ -5,6 +5,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	authroles "github.com/merionyx/api-gateway/internal/api-server/auth/roles"
 )
 
 const (
@@ -263,6 +265,20 @@ type AuthConfig struct {
 
 	// IdpAccessCacheOpaqueMaxTTL caps inferred IdP access lifetime for opaque tokens without expires_in/JWT exp (ADR 0002, roadmap ш. 19). Zero uses idpcache.DefaultOpaqueMaxTTL for that branch only.
 	IdpAccessCacheOpaqueMaxTTL time.Duration `mapstructure:"idp_access_cache_opaque_max_ttl" json:"idp_access_cache_opaque_max_ttl"`
+
+	// Authorization defines role->permission bindings for server-side authorization evaluation.
+	Authorization AuthorizationConfig `mapstructure:"authorization" json:"authorization"`
+}
+
+// AuthorizationConfig controls dynamic role definitions from config.
+type AuthorizationConfig struct {
+	Roles []AuthorizationRoleConfig `mapstructure:"roles" json:"roles,omitempty"`
+}
+
+// AuthorizationRoleConfig maps one role id to explicit permissions.
+type AuthorizationRoleConfig struct {
+	ID          string   `mapstructure:"id" json:"id"`
+	Permissions []string `mapstructure:"permissions" json:"permissions,omitempty"`
 }
 
 func EffectiveInteractiveAccessTokenTTL(ttl time.Duration) time.Duration {
@@ -352,6 +368,38 @@ func ValidateOIDCProviders(providers []OIDCProviderConfig) error {
 		}
 		if err := validateOIDCProviderKind(id, p); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// ValidateAuthorizationConfig validates dynamic role definitions and forbids overriding immutable built-ins.
+func ValidateAuthorizationConfig(cfg AuthorizationConfig) error {
+	immutable := make(map[string]struct{}, len(authroles.ImmutableRoleIDs()))
+	for _, roleID := range authroles.ImmutableRoleIDs() {
+		immutable[roleID] = struct{}{}
+	}
+	seen := make(map[string]struct{}, len(cfg.Roles))
+	for i := range cfg.Roles {
+		r := cfg.Roles[i]
+		id := strings.TrimSpace(r.ID)
+		if id == "" {
+			return fmt.Errorf("auth.authorization.roles[%d]: id is required", i)
+		}
+		if _, ok := immutable[id]; ok {
+			return fmt.Errorf("auth.authorization.roles[%q]: role is immutable built-in and cannot be configured", id)
+		}
+		if _, dup := seen[id]; dup {
+			return fmt.Errorf("auth.authorization.roles[%q]: duplicate role id", id)
+		}
+		seen[id] = struct{}{}
+		if len(r.Permissions) == 0 {
+			return fmt.Errorf("auth.authorization.roles[%q]: permissions must be non-empty", id)
+		}
+		for j, p := range r.Permissions {
+			if strings.TrimSpace(p) == "" {
+				return fmt.Errorf("auth.authorization.roles[%q].permissions[%d]: empty permission", id, j)
+			}
 		}
 	}
 	return nil

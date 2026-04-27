@@ -6,6 +6,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
+	"github.com/merionyx/api-gateway/internal/api-server/auth/permissions"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/roles"
 	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/authz"
 	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/problem"
@@ -14,11 +15,15 @@ import (
 )
 
 type ContractsExportHandler struct {
-	exportUC *bundle.ContractExportUseCase
+	exportUC       *bundle.ContractExportUseCase
+	permissionEval *authz.PermissionEvaluator
 }
 
-func NewContractsExportHandler(exportUC *bundle.ContractExportUseCase) *ContractsExportHandler {
-	return &ContractsExportHandler{exportUC: exportUC}
+func NewContractsExportHandler(exportUC *bundle.ContractExportUseCase, permissionEval *authz.PermissionEvaluator) *ContractsExportHandler {
+	return &ContractsExportHandler{
+		exportUC:       exportUC,
+		permissionEval: permissionEval,
+	}
 }
 
 type contractsExportRequest struct {
@@ -42,7 +47,11 @@ type contractsExportResponse struct {
 func (h *ContractsExportHandler) Export(c fiber.Ctx) error {
 	span := beginHandlerSpan(c, "Export")
 	defer span.End()
-	if denied, werr := authz.RequireAnyHTTPRole(c, roles.APIContractsExport); denied {
+	if h.permissionEval != nil {
+		if denied, werr := h.permissionEval.RequireAnyHTTPPermission(c, permissions.ContractsExport); denied {
+			return werr
+		}
+	} else if denied, werr := authz.RequireAnyHTTPRole(c, roles.APIContractsExport); denied {
 		return werr
 	}
 	var req contractsExportRequest

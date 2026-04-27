@@ -61,7 +61,7 @@ func SubjectRoles(c fiber.Ctx) []string {
 
 func subjectHasAdmin(have []string) bool {
 	for _, s := range have {
-		if s == roles.APIAdmin {
+		if s == roles.APIRoleAdmin {
 			return true
 		}
 	}

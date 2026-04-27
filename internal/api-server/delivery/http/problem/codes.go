@@ -20,7 +20,9 @@ const (
 	CodeTokenEnvironmentEmpty     = "TOKEN_ENVIRONMENT_EMPTY"
 	CodeTokenExpiresAtPast        = "TOKEN_EXPIRES_AT_PAST"
 
-	CodeExportRepositoryRefRequired = "EXPORT_REPOSITORY_REF_REQUIRED"
+	CodeExportRepositoryRefRequired    = "EXPORT_REPOSITORY_REF_REQUIRED"
+	CodeInsufficientPermissions        = "INSUFFICIENT_PERMISSIONS"
+	CodeRequestedPermissionsNotAllowed = "REQUESTED_PERMISSIONS_NOT_ALLOWED"
 
 	CodeIdempotencyKeyMismatch = "IDEMPOTENCY_KEY_MISMATCH"
 )

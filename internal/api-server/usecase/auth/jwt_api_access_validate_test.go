@@ -32,7 +32,7 @@ func TestParseAndValidateAPIProfileBearerToken_acceptsInteractiveMint(t *testing
 	if len(ra) != 1 {
 		t.Fatalf("roles %v", mc["roles"])
 	}
-	if ra[0] != "api:member" {
+	if ra[0] != "api:role:viewer" {
 		t.Fatalf("role %v", ra[0])
 	}
 }

@@ -180,6 +180,9 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	); err != nil {
 		return nil, err
 	}
+	if err := ValidateAuthorizationConfig(config.Auth.Authorization); err != nil {
+		return nil, err
+	}
 
 	return &config, nil
 }

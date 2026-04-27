@@ -98,7 +98,7 @@ func snapshotStringClaim(m map[string]any, key string) string {
 
 func parseInteractiveSnapshotForJWT(snapshot json.RawMessage) interactiveSnapshotJWTInputs {
 	var out interactiveSnapshotJWTInputs
-	out.Roles = []any{apiroles.APIMember}
+	out.Roles = []any{apiroles.APIRoleViewer}
 	if len(snapshot) == 0 {
 		return out
 	}
@@ -117,7 +117,7 @@ func parseInteractiveSnapshotForJWT(snapshot json.RawMessage) interactiveSnapsho
 		out.Roles = []any{}
 	}
 	if !rolesKeyPresent {
-		out.Roles = []any{apiroles.APIMember}
+		out.Roles = []any{apiroles.APIRoleViewer}
 	}
 	out.IDPIss = snapshotStringClaim(m, "idp_iss")
 	out.IDPSub = snapshotStringClaim(m, "idp_sub")

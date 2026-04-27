@@ -17,7 +17,7 @@ info:
 
     **v1.5.4:** **`GET /api/v1/auth/oidc-providers`** — public list of configured browser OIDC providers (`id`, `kind`, `issuer`) for UIs and **`agwctl auth login`** (no secrets).
 
-    **v1.5.3:** RBAC on selected operations (roadmap step **23**): role constants (e.g. `api:contracts:export`, `api:access_tokens:issue`, baseline `api:member`, wildcard `api:admin`); **403** `INSUFFICIENT_ROLES` when authenticated but not authorized.
+    **v1.5.3:** RBAC on selected operations (roadmap step **23**): role constants (e.g. `api:contracts:export`, `api:access_tokens:issue`, baseline `api:role:viewer`, wildcard `api:role:admin`); **403** `INSUFFICIENT_ROLES` when authenticated but not authorized.
 
     **v1.5.2:** HTTP **APISecurity** middleware (roadmap step 20): deny-by-default on secured routes; API-profile Bearer JWT and/or `X-API-Key`.
 
@@ -590,9 +590,9 @@ components:
       type: string
       description: Whether a service line belongs to the per-environment static merge or the controller root pool.
       enum:
-        - environment
-        - controller_root
-        - unspecified
+      - environment
+      - controller_root
+      - unspecified
 
     ServiceMeta:
       type: object
@@ -1226,8 +1226,8 @@ paths:
       tags: [ Authentication ]
       operationId: issueEdgeToken
       security:
-        - bearerAuth: []
-        - apiKey: []
+      - bearerAuth: []
+      - apiKey: []
       summary: Issue Edge profile JWT (data plane / ExtAuthz)
       description: |
         Mints an **Edge profile** JWT (distinct `iss` / `aud` / JWKS from API tokens). Request/response use **`GenerateTokenRequest`** / **`GenerateTokenResponse`** (same shape as pre-v1.5.0 application tokens; narrowing is **ш. 22**).
@@ -1256,12 +1256,12 @@ paths:
       tags: [ Authentication ]
       operationId: issueApiAccessToken
       security:
-        - bearerAuth: []
-        - apiKey: []
+      - bearerAuth: []
+      - apiKey: []
       summary: Issue API profile access JWT
       description: |
         Mints a short-lived **API profile** JWT for calling this HTTP API. Request **`IssueApiAccessTokenRequest`** and **201** body **`ApiAccessTokenIssued`** are stable for codegen; semantics/RBAC land in **roadmap step 22**.
-        **RBAC (step 23):** requires role **`api:access_tokens:issue`** or **`api:admin`** (JWT `roles` claim and/or API key `roles` in etcd).
+        **RBAC (step 23):** requires role **`api:access_tokens:issue`** or admin role (**`api:role:admin`**, legacy **`api:admin`**) via JWT `roles` and/or API key `roles` in etcd.
       requestBody:
         required: true
         content:
@@ -1289,12 +1289,12 @@ paths:
       tags: [ Contracts ]
       operationId: exportContracts
       security:
-        - bearerAuth: []
-        - apiKey: []
+      - bearerAuth: []
+      - apiKey: []
       summary: Export contract files from Git (via Contract Syncer)
       description: |
         Fetches contract YAML/JSON from a Git repository via the Contract Syncer service (not from etcd). Specify `repository` and `ref`; optionally narrow by `path` and/or a single `contract_name`. Response files carry base64-encoded content.
-        **RBAC (roadmap step 23):** requires **`api:contracts:export`** or **`api:admin`**.
+        **RBAC (roadmap step 23):** requires **`api:contracts:export`** or admin role (**`api:role:admin`**, legacy **`api:admin`**).
       requestBody:
         required: true
         content:
@@ -1326,8 +1326,8 @@ paths:
       tags: [ Registry ]
       operationId: listControllers
       security:
-        - bearerAuth: []
-        - apiKey: []
+      - bearerAuth: []
+      - apiKey: []
       summary: List registered controllers
       description: |
         Lists Gateway Controllers registered in etcd (`controller_id`, `tenant`, declared environments and static bundles). Paginated with `limit` / `cursor`. Use `If-None-Match` with the previous `ETag` to obtain `304` when nothing changed.
@@ -1357,8 +1357,8 @@ paths:
       tags: [ Registry ]
       operationId: getController
       security:
-        - bearerAuth: []
-        - apiKey: []
+      - bearerAuth: []
+      - apiKey: []
       summary: Get controller by ID
       description: |
         Returns one controller record by `controller_id`. Supports conditional GET via `If-None-Match` / `ETag`. `404` if the controller is unknown.
@@ -1387,8 +1387,8 @@ paths:
       tags: [ Registry ]
       operationId: getControllerHeartbeat
       security:
-        - bearerAuth: []
-        - apiKey: []
+      - bearerAuth: []
+      - apiKey: []
       summary: Get last heartbeat for a controller
       description: |
         Returns the last heartbeat timestamp stored for the controller (operator visibility). Not the same payload as full controller registration; use when you only need freshness. `404` if the controller does not exist.
@@ -1417,8 +1417,8 @@ paths:
       tags: [ Registry ]
       operationId: listTenants
       security:
-        - bearerAuth: []
-        - apiKey: []
+      - bearerAuth: []
+      - apiKey: []
       summary: List distinct tenants
       description: |
         Returns distinct `tenant` values observed across registered controllers. Cursor-paginated; combine with registry list endpoints to drill down.
@@ -1448,8 +1448,8 @@ paths:
       tags: [ Registry ]
       operationId: listControllersByTenant
       security:
-        - bearerAuth: []
-        - apiKey: []
+      - bearerAuth: []
+      - apiKey: []
       summary: List controllers for a tenant
       description: |
         Lists controllers whose `tenant` path parameter matches. Same response shape as `GET /api/v1/controllers` but scoped to one tenant.
@@ -1480,8 +1480,8 @@ paths:
       tags: [ Registry ]
       operationId: listEnvironmentsByTenant
       security:
-        - bearerAuth: []
-        - apiKey: []
+      - bearerAuth: []
+      - apiKey: []
       summary: Aggregated environments observed for a tenant (read-only snapshot)
       description: |
         Read-only aggregated view of environments (and their static bundles) as reported for this tenant. Environment lifecycle is owned by the Gateway Controller; this endpoint does not mutate configuration.
@@ -1512,8 +1512,8 @@ paths:
       tags: [ Registry ]
       operationId: listBundlesByTenant
       security:
-        - bearerAuth: []
-        - apiKey: []
+      - bearerAuth: []
+      - apiKey: []
       summary: Static bundles aggregated across environments for a tenant
       description: |
         Flattens static bundle descriptors (`name`, `repository`, `ref`, `path`) across environments for the tenant. Useful for overview UIs; not a substitute for etcd bundle-key APIs.
@@ -1544,8 +1544,8 @@ paths:
       tags: [ Bundles ]
       operationId: listBundleKeys
       security:
-        - bearerAuth: []
-        - apiKey: []
+      - bearerAuth: []
+      - apiKey: []
       summary: List bundles present in etcd
       description: |
         Lists bundles that exist under the API Server’s contract snapshot prefix in etcd (`repository`, `ref`, `path`, canonical `key`). Paginated; the `key` may require percent-encoding when used as path segments elsewhere.
@@ -1575,8 +1575,8 @@ paths:
       tags: [ Bundles ]
       operationId: listContractsInBundle
       security:
-        - bearerAuth: []
-        - apiKey: []
+      - bearerAuth: []
+      - apiKey: []
       summary: List contract names for a bundle key
       description: |
         Returns logical contract names stored for the bundle in etcd. Identify the bundle either with
@@ -1615,8 +1615,8 @@ paths:
       tags: [ Bundles ]
       operationId: getContractInBundle
       security:
-        - bearerAuth: []
-        - apiKey: []
+      - bearerAuth: []
+      - apiKey: []
       summary: Get a single contract document for a bundle
       description: |
         Returns one contract document from etcd-backed storage for the bundle (JSON object; YAML sources may be normalized to JSON). Identify the bundle with `bundle_key` **or** `repo` + `ref` (+ optional `path`) query parameters, same as `listContractsInBundle`. Supports `If-None-Match` for caching. `404` if the bundle or contract is missing.
@@ -1649,8 +1649,8 @@ paths:
       tags: [ Operations ]
       operationId: syncBundle
       security:
-        - bearerAuth: []
-        - apiKey: []
+      - bearerAuth: []
+      - apiKey: []
       summary: Trigger contract bundle synchronization (Schemas / bundle sync pipeline)
       description: |
         Triggers synchronization of a contract bundle from Git into etcd (same conceptual fields as `SyncContractBundle`: `repository`, `ref`, `bundle`, optional `force`). Idempotent retries may send the same `Idempotency-Key`. `502` indicates upstream/sync pipeline failure.
@@ -1691,8 +1691,8 @@ paths:
       tags: [ System ]
       operationId: getStatus
       security:
-        - bearerAuth: []
-        - apiKey: []
+      - bearerAuth: []
+      - apiKey: []
       summary: Dependency status for operators
       description: |
         Rich snapshot for dashboards and alerting (API Server self-check, etcd, Contract Syncer). **Not** a Kubernetes probe — use `GET /ready` for orchestrator readiness. Exact fields may evolve. Conditional GET via `ETag` / `If-None-Match`.
