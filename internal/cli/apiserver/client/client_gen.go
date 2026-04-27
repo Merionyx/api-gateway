@@ -730,8 +730,8 @@ type AuthorizeOidcParamsResponseType string
 // AuthorizeOidcParamsCodeChallengeMethod defines parameters for AuthorizeOidc.
 type AuthorizeOidcParamsCodeChallengeMethod string
 
-// CallbackOidcUpstreamParams defines parameters for CallbackOidcUpstream.
-type CallbackOidcUpstreamParams struct {
+// CallbackOidcParams defines parameters for CallbackOidc.
+type CallbackOidcParams struct {
 	Code  string `form:"code" json:"code"`
 	State string `form:"state" json:"state"`
 }
@@ -998,11 +998,11 @@ type ClientInterface interface {
 	// AuthorizeOidc request
 	AuthorizeOidc(ctx context.Context, params *AuthorizeOidcParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// CallbackOidc request
+	CallbackOidc(ctx context.Context, params *CallbackOidcParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListOidcProviders request
 	ListOidcProviders(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// CallbackOidcUpstream request
-	CallbackOidcUpstream(ctx context.Context, params *CallbackOidcUpstreamParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// TokenOidcWithBody request with any body
 	TokenOidcWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1111,8 +1111,8 @@ func (c *Client) AuthorizeOidc(ctx context.Context, params *AuthorizeOidcParams,
 	return c.Client.Do(req)
 }
 
-func (c *Client) ListOidcProviders(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListOidcProvidersRequest(c.Server)
+func (c *Client) CallbackOidc(ctx context.Context, params *CallbackOidcParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCallbackOidcRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -1123,8 +1123,8 @@ func (c *Client) ListOidcProviders(ctx context.Context, reqEditors ...RequestEdi
 	return c.Client.Do(req)
 }
 
-func (c *Client) CallbackOidcUpstream(ctx context.Context, params *CallbackOidcUpstreamParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCallbackOidcUpstreamRequest(c.Server, params)
+func (c *Client) ListOidcProviders(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListOidcProvidersRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -1661,8 +1661,8 @@ func NewAuthorizeOidcRequest(server string, params *AuthorizeOidcParams) (*http.
 	return req, nil
 }
 
-// NewListOidcProvidersRequest generates requests for ListOidcProviders
-func NewListOidcProvidersRequest(server string) (*http.Request, error) {
+// NewCallbackOidcRequest generates requests for CallbackOidc
+func NewCallbackOidcRequest(server string, params *CallbackOidcParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -1670,34 +1670,7 @@ func NewListOidcProvidersRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/auth/oidc-providers")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewCallbackOidcUpstreamRequest generates requests for CallbackOidcUpstream
-func NewCallbackOidcUpstreamRequest(server string, params *CallbackOidcUpstreamParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/v1/auth/oidc/callback")
+	operationPath := fmt.Sprintf("/api/v1/auth/callback")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1736,6 +1709,33 @@ func NewCallbackOidcUpstreamRequest(server string, params *CallbackOidcUpstreamP
 			rawQueryFragments = append(rawQueryFragments, encoded)
 		}
 		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListOidcProvidersRequest generates requests for ListOidcProviders
+func NewListOidcProvidersRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/auth/oidc-providers")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -3024,11 +3024,11 @@ type ClientWithResponsesInterface interface {
 	// AuthorizeOidcWithResponse request
 	AuthorizeOidcWithResponse(ctx context.Context, params *AuthorizeOidcParams, reqEditors ...RequestEditorFn) (*AuthorizeOidcResponse, error)
 
+	// CallbackOidcWithResponse request
+	CallbackOidcWithResponse(ctx context.Context, params *CallbackOidcParams, reqEditors ...RequestEditorFn) (*CallbackOidcResponse, error)
+
 	// ListOidcProvidersWithResponse request
 	ListOidcProvidersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListOidcProvidersResponse, error)
-
-	// CallbackOidcUpstreamWithResponse request
-	CallbackOidcUpstreamWithResponse(ctx context.Context, params *CallbackOidcUpstreamParams, reqEditors ...RequestEditorFn) (*CallbackOidcUpstreamResponse, error)
 
 	// TokenOidcWithBodyWithResponse request with any body
 	TokenOidcWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TokenOidcResponse, error)
@@ -3174,6 +3174,30 @@ func (r AuthorizeOidcResponse) StatusCode() int {
 	return 0
 }
 
+type CallbackOidcResponse struct {
+	Body                      []byte
+	HTTPResponse              *http.Response
+	ApplicationproblemJSON400 *BadRequest
+	ApplicationproblemJSON401 *Unauthorized
+	ApplicationproblemJSON500 *InternalError
+}
+
+// Status returns HTTPResponse.Status
+func (r CallbackOidcResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CallbackOidcResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListOidcProvidersResponse struct {
 	Body                      []byte
 	HTTPResponse              *http.Response
@@ -3191,30 +3215,6 @@ func (r ListOidcProvidersResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r ListOidcProvidersResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type CallbackOidcUpstreamResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	ApplicationproblemJSON400 *BadRequest
-	ApplicationproblemJSON401 *Unauthorized
-	ApplicationproblemJSON500 *InternalError
-}
-
-// Status returns HTTPResponse.Status
-func (r CallbackOidcUpstreamResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r CallbackOidcUpstreamResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -3735,6 +3735,15 @@ func (c *ClientWithResponses) AuthorizeOidcWithResponse(ctx context.Context, par
 	return ParseAuthorizeOidcResponse(rsp)
 }
 
+// CallbackOidcWithResponse request returning *CallbackOidcResponse
+func (c *ClientWithResponses) CallbackOidcWithResponse(ctx context.Context, params *CallbackOidcParams, reqEditors ...RequestEditorFn) (*CallbackOidcResponse, error) {
+	rsp, err := c.CallbackOidc(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCallbackOidcResponse(rsp)
+}
+
 // ListOidcProvidersWithResponse request returning *ListOidcProvidersResponse
 func (c *ClientWithResponses) ListOidcProvidersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListOidcProvidersResponse, error) {
 	rsp, err := c.ListOidcProviders(ctx, reqEditors...)
@@ -3742,15 +3751,6 @@ func (c *ClientWithResponses) ListOidcProvidersWithResponse(ctx context.Context,
 		return nil, err
 	}
 	return ParseListOidcProvidersResponse(rsp)
-}
-
-// CallbackOidcUpstreamWithResponse request returning *CallbackOidcUpstreamResponse
-func (c *ClientWithResponses) CallbackOidcUpstreamWithResponse(ctx context.Context, params *CallbackOidcUpstreamParams, reqEditors ...RequestEditorFn) (*CallbackOidcUpstreamResponse, error) {
-	rsp, err := c.CallbackOidcUpstream(ctx, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCallbackOidcUpstreamResponse(rsp)
 }
 
 // TokenOidcWithBodyWithResponse request with arbitrary body returning *TokenOidcResponse
@@ -4100,6 +4100,46 @@ func ParseAuthorizeOidcResponse(rsp *http.Response) (*AuthorizeOidcResponse, err
 	return response, nil
 }
 
+// ParseCallbackOidcResponse parses an HTTP response from a CallbackOidcWithResponse call
+func ParseCallbackOidcResponse(rsp *http.Response) (*CallbackOidcResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CallbackOidcResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListOidcProvidersResponse parses an HTTP response from a ListOidcProvidersWithResponse call
 func ParseListOidcProvidersResponse(rsp *http.Response) (*ListOidcProvidersResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -4120,46 +4160,6 @@ func ParseListOidcProvidersResponse(rsp *http.Response) (*ListOidcProvidersRespo
 			return nil, err
 		}
 		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest InternalError
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseCallbackOidcUpstreamResponse parses an HTTP response from a CallbackOidcUpstreamWithResponse call
-func ParseCallbackOidcUpstreamResponse(rsp *http.Response) (*CallbackOidcUpstreamResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &CallbackOidcUpstreamResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest BadRequest
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthorized
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON401 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalError

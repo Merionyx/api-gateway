@@ -56,9 +56,7 @@ func requiresAPISecurity(method, path string) bool {
 	case "/health", "/ready", "/api/v1/version",
 		"/.well-known/jwks.json", "/.well-known/jwks-edge.json",
 		"/api/v1/keys",
-		"/api/v1/auth/oidc-providers", "/api/v1/auth/authorize", "/api/v1/auth/oidc/callback", "/api/v1/auth/token",
-		// Legacy auth routes are intentionally left unauthenticated so unknown-route handling returns 404 (not 401).
-		"/api/v1/auth/login", "/api/v1/auth/callback", "/api/v1/auth/refresh":
+		"/api/v1/auth/oidc-providers", "/api/v1/auth/authorize", "/api/v1/auth/callback", "/api/v1/auth/token":
 		return false
 	default:
 		return true

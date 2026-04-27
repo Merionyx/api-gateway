@@ -54,7 +54,7 @@ func TestOIDCLoginUseCase_Start_OAuthAuthorizeMode(t *testing.T) {
 
 	_, err := uc.Start(t.Context(), OIDCLoginStartRequest{
 		RedirectURI:         "https://oauth.pstmn.io/v1/callback",
-		ServerCallbackURI:   "https://api.example.com/api/v1/auth/oidc/callback",
+		ServerCallbackURI:   "https://api.example.com/api/v1/auth/callback",
 		ResponseType:        "code",
 		ClientID:            "postman-client",
 		State:               "client-state-1",
@@ -67,7 +67,7 @@ func TestOIDCLoginUseCase_Start_OAuthAuthorizeMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got := strings.TrimSpace(stub.last.RedirectURI); got != "https://api.example.com/api/v1/auth/oidc/callback" {
+	if got := strings.TrimSpace(stub.last.RedirectURI); got != "https://api.example.com/api/v1/auth/callback" {
 		t.Fatalf("idp redirect_uri=%q", got)
 	}
 	if got := strings.TrimSpace(stub.last.OAuthClientRedirectURI); got != "https://oauth.pstmn.io/v1/callback" {

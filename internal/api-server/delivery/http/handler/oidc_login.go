@@ -37,7 +37,7 @@ func (h *OIDCLoginHandler) Authorize(c fiber.Ctx, params apiserver.AuthorizeOidc
 	loc, err := h.uc.Start(ctx, auth.OIDCLoginStartRequest{
 		ProviderID:          stringOrEmpty(params.ProviderId),
 		RedirectURI:         params.RedirectUri,
-		ServerCallbackURI:   c.BaseURL() + "/api/v1/auth/oidc/callback",
+		ServerCallbackURI:   c.BaseURL() + "/api/v1/auth/callback",
 		Nonce:               nonce,
 		RequestedAccessTTL:  durationFromOptionalSeconds(params.RequestedAccessTokenTtlSeconds),
 		RequestedRefreshTTL: durationFromOptionalSeconds(params.RequestedRefreshTokenTtlSeconds),

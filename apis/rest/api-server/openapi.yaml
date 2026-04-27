@@ -422,7 +422,7 @@ components:
       properties:
         grant_type:
           type: string
-          enum: [authorization_code, refresh_token]
+          enum: [ authorization_code, refresh_token ]
         code:
           type: string
           description: Required for `authorization_code` grant.
@@ -1205,7 +1205,7 @@ paths:
         description: OAuth response type (`code`).
         schema:
           type: string
-          enum: [code]
+          enum: [ code ]
       - name: client_id
         in: query
         required: true
@@ -1230,7 +1230,7 @@ paths:
         description: PKCE method. OAuth 2.1 requires `S256`.
         schema:
           type: string
-          enum: [S256]
+          enum: [ S256 ]
       - name: nonce
         in: query
         required: false
@@ -1269,10 +1269,10 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/auth/oidc/callback:
+  /api/v1/auth/callback:
     get:
       tags: [ OIDC ]
-      operationId: callbackOidcUpstream
+      operationId: callbackOidc
       security: []
       summary: OIDC callback from upstream IdP
       description: |

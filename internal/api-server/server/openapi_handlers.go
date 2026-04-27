@@ -37,7 +37,7 @@ func (s *OpenAPIServer) AuthorizeOidc(c fiber.Ctx, params apiserver.AuthorizeOid
 	return s.c.OIDCLoginHandler.Authorize(c, params)
 }
 
-func (s *OpenAPIServer) CallbackOidcUpstream(c fiber.Ctx, params apiserver.CallbackOidcUpstreamParams) error {
+func (s *OpenAPIServer) CallbackOidc(c fiber.Ctx, params apiserver.CallbackOidcParams) error {
 	return s.c.OIDCCallbackHandler.Callback(c, params)
 }
 

@@ -26,7 +26,7 @@ func Test_requiresAPISecurity(t *testing.T) {
 	if requiresAPISecurity(http.MethodPost, "/api/v1/auth/token") {
 		t.Fatal("token endpoint public")
 	}
-	if requiresAPISecurity(http.MethodGet, "/api/v1/auth/oidc/callback") {
+	if requiresAPISecurity(http.MethodGet, "/api/v1/auth/callback") {
 		t.Fatal("oidc upstream callback public")
 	}
 	if requiresAPISecurity(http.MethodGet, "/api/v1/auth/oidc-providers") {

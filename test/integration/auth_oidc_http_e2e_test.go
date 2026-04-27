@@ -301,7 +301,7 @@ func performOIDCAuthorizeFlow(t *testing.T, app *fiber.App) (accessToken, refres
 		t.Fatalf("expected authorize path in %q", loc)
 	}
 
-	cbURL := fmt.Sprintf("http://example.com/api/v1/auth/oidc/callback?code=%s&state=%s",
+	cbURL := fmt.Sprintf("http://example.com/api/v1/auth/callback?code=%s&state=%s",
 		url.QueryEscape(e2eAuthCode), url.QueryEscape(upstreamState))
 	cbResp, err := app.Test(httptest.NewRequest(http.MethodGet, cbURL, nil))
 	if err != nil {
