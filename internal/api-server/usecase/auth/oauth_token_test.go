@@ -80,7 +80,7 @@ func TestOAuthTokenUseCase_ExchangeAuthorizationCode_SuccessAndOneTimeCode(t *te
 	intentRepo := &oauthIntentRepoStub{m: map[string]kvvalue.LoginIntentValue{
 		code: {
 			ProviderID:                      "p1",
-			RedirectURI:                     "http://127.0.0.1:9999/api/v1/auth/callback",
+			RedirectURI:                     "http://127.0.0.1:9999/api/v1/auth/oidc/callback",
 			OAuthState:                      code,
 			PKCEVerifier:                    "idp-pkce-verifier",
 			OAuthClientID:                   "postman",
@@ -168,7 +168,7 @@ func TestOAuthTokenUseCase_ExchangeAuthorizationCode_InvalidPKCE(t *testing.T) {
 	intentRepo := &oauthIntentRepoStub{m: map[string]kvvalue.LoginIntentValue{
 		code: {
 			ProviderID:                     "p1",
-			RedirectURI:                    "http://127.0.0.1:9999/api/v1/auth/callback",
+			RedirectURI:                    "http://127.0.0.1:9999/api/v1/auth/oidc/callback",
 			OAuthState:                     code,
 			PKCEVerifier:                   "idp-pkce-verifier",
 			OAuthClientID:                  "postman",

@@ -68,14 +68,14 @@ auth:
   #   - api:role:admin
   #   - api:role:viewer
   # session_kek_base64: "<openssl rand -base64 32>"  # required when oidc_providers is set (32 bytes after decode)
-  # oidc_providers:                 # browser GET /api/v1/auth/login; see docs/etcd-auth-paths.md
+  # oidc_providers:                 # OAuth2.1 GET /api/v1/auth/authorize; see docs/etcd-auth-paths.md
   #   - id: "dev-oidc"
   #     name: "Development OIDC"
   #     issuer: "https://your-idp.example"
   #     client_id: "your-client-id"
   #     client_secret: "from-secret-manager"
   #     redirect_uri_allowlist:
-  #       - "http://127.0.0.1:8080/api/v1/auth/callback"
+  #       - "http://127.0.0.1:21987/callback"
   #     extra_scopes: ["email"]
   # GitHub (roadmap ш.35): docs/idp/github/README.md — issuer must be https://github.com/login/oauth ; kind: github
   #   - id: "github"

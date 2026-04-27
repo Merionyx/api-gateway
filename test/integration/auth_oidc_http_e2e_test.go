@@ -3,7 +3,6 @@
 package integration
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -29,6 +28,7 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 
 	"github.com/merionyx/api-gateway/internal/api-server/auth/oidc"
+	"github.com/merionyx/api-gateway/internal/api-server/auth/pkce"
 	"github.com/merionyx/api-gateway/internal/api-server/config"
 	"github.com/merionyx/api-gateway/internal/api-server/container"
 	httpxmw "github.com/merionyx/api-gateway/internal/api-server/delivery/http/middleware"
@@ -48,6 +48,7 @@ const (
 	e2eOIDCProviderID = "mock-idp"
 	e2eAuthCode       = "e2e-good-code"
 	e2eRedirectURI    = "http://127.0.0.1:19999/callback"
+	e2eOAuthClientID  = "agwctl-e2e"
 	e2eClientID       = "cid"
 	e2eClientSecret   = "sec"
 	e2eJWKSKeyID      = "e2e-kid"
@@ -259,21 +260,32 @@ func TestE2E_ListOidcProviders(t *testing.T) {
 	}
 }
 
-// performOIDCLoginCallback runs GET login → GET callback and returns access + refresh tokens (roadmap ш. 28).
-func performOIDCLoginCallback(t *testing.T, app *fiber.App) (accessToken, refreshToken string) {
+// performOIDCAuthorizeFlow runs authorize + upstream callback + token exchange and returns access + refresh tokens.
+func performOIDCAuthorizeFlow(t *testing.T, app *fiber.App) (accessToken, refreshToken string) {
 	t.Helper()
-	loginURL := fmt.Sprintf("http://example.com/api/v1/auth/login?provider_id=%s&redirect_uri=%s",
-		url.QueryEscape(e2eOIDCProviderID), url.QueryEscape(e2eRedirectURI))
-	loginResp, err := app.Test(httptest.NewRequest(http.MethodGet, loginURL, nil))
+	verifier, err := pkce.NewVerifier()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = loginResp.Body.Close() }()
-	if loginResp.StatusCode != http.StatusFound {
-		body, _ := io.ReadAll(loginResp.Body)
-		t.Fatalf("login status %d body %s", loginResp.StatusCode, string(body))
+	challenge := pkce.ChallengeS256(verifier)
+	clientState := "e2e-client-state"
+	authorizeURL := fmt.Sprintf("http://example.com/api/v1/auth/authorize?provider_id=%s&redirect_uri=%s&response_type=code&client_id=%s&state=%s&code_challenge=%s&code_challenge_method=S256",
+		url.QueryEscape(e2eOIDCProviderID),
+		url.QueryEscape(e2eRedirectURI),
+		url.QueryEscape(e2eOAuthClientID),
+		url.QueryEscape(clientState),
+		url.QueryEscape(challenge),
+	)
+	authorizeResp, err := app.Test(httptest.NewRequest(http.MethodGet, authorizeURL, nil))
+	if err != nil {
+		t.Fatal(err)
 	}
-	loc := loginResp.Header.Get("Location")
+	defer func() { _ = authorizeResp.Body.Close() }()
+	if authorizeResp.StatusCode != http.StatusFound {
+		body, _ := io.ReadAll(authorizeResp.Body)
+		t.Fatalf("authorize status %d body %s", authorizeResp.StatusCode, string(body))
+	}
+	loc := authorizeResp.Header.Get("Location")
 	if loc == "" {
 		t.Fatal("missing Location")
 	}
@@ -281,27 +293,60 @@ func performOIDCLoginCallback(t *testing.T, app *fiber.App) (accessToken, refres
 	if err != nil {
 		t.Fatal(err)
 	}
-	state := locU.Query().Get("state")
-	if state == "" {
+	upstreamState := locU.Query().Get("state")
+	if upstreamState == "" {
 		t.Fatalf("location %q", loc)
 	}
 	if !strings.Contains(locU.Path, "authorize") {
 		t.Fatalf("expected authorize path in %q", loc)
 	}
 
-	cbURL := fmt.Sprintf("http://example.com/api/v1/auth/callback?code=%s&state=%s",
-		url.QueryEscape(e2eAuthCode), url.QueryEscape(state))
+	cbURL := fmt.Sprintf("http://example.com/api/v1/auth/oidc/callback?code=%s&state=%s",
+		url.QueryEscape(e2eAuthCode), url.QueryEscape(upstreamState))
 	cbResp, err := app.Test(httptest.NewRequest(http.MethodGet, cbURL, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = cbResp.Body.Close() }()
-	if cbResp.StatusCode != http.StatusOK {
+	if cbResp.StatusCode != http.StatusFound {
 		body, _ := io.ReadAll(cbResp.Body)
 		t.Fatalf("callback status %d body %s", cbResp.StatusCode, string(body))
 	}
+	downstreamLoc := strings.TrimSpace(cbResp.Header.Get("Location"))
+	if downstreamLoc == "" {
+		t.Fatal("missing downstream callback location")
+	}
+	downstreamU, err := url.Parse(downstreamLoc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if downstreamU.Query().Get("state") != clientState {
+		t.Fatalf("downstream state mismatch: %q", downstreamU.Query().Get("state"))
+	}
+	localCode := downstreamU.Query().Get("code")
+	if strings.TrimSpace(localCode) == "" {
+		t.Fatalf("downstream location %q", downstreamLoc)
+	}
+
+	tokenForm := url.Values{}
+	tokenForm.Set("grant_type", "authorization_code")
+	tokenForm.Set("code", localCode)
+	tokenForm.Set("redirect_uri", e2eRedirectURI)
+	tokenForm.Set("client_id", e2eOAuthClientID)
+	tokenForm.Set("code_verifier", verifier)
+	tokenReq := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/auth/token", strings.NewReader(tokenForm.Encode()))
+	tokenReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	tokenResp, err := app.Test(tokenReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tokenResp.Body.Close() }()
+	if tokenResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(tokenResp.Body)
+		t.Fatalf("token status %d body %s", tokenResp.StatusCode, string(body))
+	}
 	var tokens map[string]any
-	if err := json.NewDecoder(cbResp.Body).Decode(&tokens); err != nil {
+	if err := json.NewDecoder(tokenResp.Body).Decode(&tokens); err != nil {
 		t.Fatal(err)
 	}
 	at, _ := tokens["access_token"].(string)
@@ -340,7 +385,7 @@ func TestE2E_OIDCLoginCallback_HappyPath(t *testing.T) {
 	defer cnt.Close()
 
 	app := fiberAppFromContainer(t, cnt)
-	performOIDCLoginCallback(t, app)
+	performOIDCAuthorizeFlow(t, app)
 }
 
 func TestE2E_OIDCRefresh_IdPUnavailable_Degraded(t *testing.T) {
@@ -371,11 +416,13 @@ func TestE2E_OIDCRefresh_IdPUnavailable_Degraded(t *testing.T) {
 	defer cnt.Close()
 
 	app := fiberAppFromContainer(t, cnt)
-	access1, refresh1 := performOIDCLoginCallback(t, app)
+	access1, refresh1 := performOIDCAuthorizeFlow(t, app)
 
-	refreshBody := fmt.Sprintf(`{"refresh_token":%q}`, refresh1)
-	req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/auth/refresh", bytes.NewReader([]byte(refreshBody)))
-	req.Header.Set("Content-Type", "application/json")
+	refreshForm := url.Values{}
+	refreshForm.Set("grant_type", "refresh_token")
+	refreshForm.Set("refresh_token", refresh1)
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/auth/token", strings.NewReader(refreshForm.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	refreshResp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -433,7 +480,7 @@ func TestE2E_OIDCRefresh_ConcurrentSameRefreshToken_One409(t *testing.T) {
 	}
 
 	app := fiberAppFromContainer(t, cnt)
-	_, refresh1 := performOIDCLoginCallback(t, app)
+	_, refresh1 := performOIDCAuthorizeFlow(t, app)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
@@ -497,13 +544,15 @@ func TestE2E_OIDCRefresh_ReuseOldRefreshTokenAfterRotate_401(t *testing.T) {
 	defer cnt.Close()
 
 	app := fiberAppFromContainer(t, cnt)
-	_, refresh1 := performOIDCLoginCallback(t, app)
+	_, refresh1 := performOIDCAuthorizeFlow(t, app)
 
 	doRefresh := func(refreshHex string) *http.Response {
 		t.Helper()
-		body := fmt.Sprintf(`{"refresh_token":%q}`, refreshHex)
-		req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/auth/refresh", bytes.NewReader([]byte(body)))
-		req.Header.Set("Content-Type", "application/json")
+		form := url.Values{}
+		form.Set("grant_type", "refresh_token")
+		form.Set("refresh_token", refreshHex)
+		req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/auth/token", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		resp, err := app.Test(req)
 		if err != nil {
 			t.Fatal(err)

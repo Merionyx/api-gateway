@@ -22,7 +22,6 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/auth/sessioncrypto"
 	"github.com/merionyx/api-gateway/internal/api-server/config"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
-	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
 	"github.com/merionyx/api-gateway/internal/api-server/metrics"
 )
 
@@ -39,7 +38,15 @@ type OIDCRefreshRequest struct {
 	RequestedRefreshTTL time.Duration
 }
 
-// OIDCRefreshUseCase handles POST /api/v1/auth/refresh (IdP up + degraded, roadmap ш. 17–18).
+type SessionTokenPair struct {
+	AccessToken      string
+	AccessExpiresAt  time.Time
+	RefreshToken     string
+	RefreshExpiresAt time.Time
+	TokenType        string
+}
+
+// OIDCRefreshUseCase handles interactive refresh rotation (IdP up + degraded, roadmap ш. 17–18).
 type OIDCRefreshUseCase struct {
 	byID            map[string]config.OIDCProviderConfig
 	sessions        refreshSessionStore
@@ -133,8 +140,8 @@ func (u *OIDCRefreshUseCase) completeSessionRefresh(
 	idpAccessForCache string,
 	idpExpiresInSec int,
 	metricResult string,
-) (apiserver.AuthSessionTokensResponse, error) {
-	var out apiserver.AuthSessionTokensResponse
+) (SessionTokenPair, error) {
+	var out SessionTokenPair
 	accessJWT, _, ourAccessExp, err := u.jwt.MintInteractiveAPIAccessJWTFromSnapshot(ctx, subject, nextClaims, accessTTL)
 	if err != nil {
 		return out, err
@@ -184,13 +191,12 @@ func (u *OIDCRefreshUseCase) completeSessionRefresh(
 
 	metrics.RecordAuthRefresh(u.metricsEnabled, metricResult)
 
-	bt := "Bearer"
-	out = apiserver.AuthSessionTokensResponse{
+	out = SessionTokenPair{
 		AccessToken:      accessJWT,
 		AccessExpiresAt:  ourAccessExp,
 		RefreshToken:     newOurStr,
 		RefreshExpiresAt: refreshExpiresAt,
-		TokenType:        &bt,
+		TokenType:        "Bearer",
 	}
 	return out, nil
 }
@@ -228,8 +234,8 @@ func missingIDPRefreshTokenDetail(p config.OIDCProviderConfig) string {
 }
 
 // Refresh rotates our refresh; updates IdP material when the IdP is reachable, otherwise degraded refresh (roadmap ш. 17–18).
-func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, req OIDCRefreshRequest) (apiserver.AuthSessionTokensResponse, error) {
-	var out apiserver.AuthSessionTokensResponse
+func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, req OIDCRefreshRequest) (SessionTokenPair, error) {
+	var out SessionTokenPair
 	if len(u.byID) == 0 {
 		return out, apierrors.ErrOIDCNotConfigured
 	}

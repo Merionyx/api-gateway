@@ -23,14 +23,23 @@ func Test_requiresAPISecurity(t *testing.T) {
 	if !requiresAPISecurity(http.MethodGet, "/api/v1/status") {
 		t.Fatal("status protected")
 	}
-	if requiresAPISecurity(http.MethodPost, "/api/v1/auth/refresh") {
-		t.Fatal("refresh public")
+	if requiresAPISecurity(http.MethodPost, "/api/v1/auth/token") {
+		t.Fatal("token endpoint public")
 	}
-	if !requiresAPISecurity(http.MethodGet, "/api/v1/auth/refresh") {
-		t.Fatal("non-post refresh protected")
+	if requiresAPISecurity(http.MethodGet, "/api/v1/auth/oidc/callback") {
+		t.Fatal("oidc upstream callback public")
 	}
 	if requiresAPISecurity(http.MethodGet, "/api/v1/auth/oidc-providers") {
 		t.Fatal("oidc provider list public")
+	}
+	if requiresAPISecurity(http.MethodGet, "/api/v1/auth/callback") {
+		t.Fatal("legacy callback should pass through to 404")
+	}
+	if requiresAPISecurity(http.MethodPost, "/api/v1/auth/refresh") {
+		t.Fatal("legacy refresh should pass through to 404")
+	}
+	if requiresAPISecurity(http.MethodGet, "/api/v1/auth/login") {
+		t.Fatal("legacy login should pass through to 404")
 	}
 }
 
@@ -71,13 +80,32 @@ func TestAPISecurity_blocksProtectedWithoutAuth(t *testing.T) {
 	}
 }
 
+func TestAPISecurity_legacyAuthPathFallsThroughTo404(t *testing.T) {
+	t.Parallel()
+	uc := testJWTUC(t)
+	app := fiber.New()
+	app.Use(APISecurity(uc, nil))
+	app.Get("/health", func(c fiber.Ctx) error { return c.SendString("ok") })
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/callback", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusNotFound {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status %d body %s", resp.StatusCode, b)
+	}
+}
+
 func TestAPISecurity_rejectsEdgeProfileBearer(t *testing.T) {
 	t.Parallel()
 	uc := testJWTUC(t)
 	edgeResp, err := uc.GenerateToken(t.Context(), &models.GenerateTokenRequest{
-		AppID:          "edge-app",
-		Environments:   []string{"dev"},
-		ExpiresAt:      time.Now().Add(time.Hour),
+		AppID:        "edge-app",
+		Environments: []string{"dev"},
+		ExpiresAt:    time.Now().Add(time.Hour),
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -33,11 +33,11 @@ func (s *OpenAPIServer) ListOidcProviders(c fiber.Ctx) error {
 	return s.c.OIDCLoginHandler.ListOidcProviders(c)
 }
 
-func (s *OpenAPIServer) LoginOidc(c fiber.Ctx, params apiserver.LoginOidcParams) error {
-	return s.c.OIDCLoginHandler.Login(c, params)
+func (s *OpenAPIServer) AuthorizeOidc(c fiber.Ctx, params apiserver.AuthorizeOidcParams) error {
+	return s.c.OIDCLoginHandler.Authorize(c, params)
 }
 
-func (s *OpenAPIServer) CallbackOidc(c fiber.Ctx, params apiserver.CallbackOidcParams) error {
+func (s *OpenAPIServer) CallbackOidcUpstream(c fiber.Ctx, params apiserver.CallbackOidcUpstreamParams) error {
 	return s.c.OIDCCallbackHandler.Callback(c, params)
 }
 
@@ -46,13 +46,6 @@ func (s *OpenAPIServer) TokenOidc(c fiber.Ctx) error {
 		return authFlowNotImplemented(c, "OAuth token endpoint requires auth.oidc_providers and auth.session_kek_base64.")
 	}
 	return s.c.OAuthTokenHandler.Token(c)
-}
-
-func (s *OpenAPIServer) RefreshSession(c fiber.Ctx) error {
-	if s.c.OIDCRefreshHandler == nil {
-		return authFlowNotImplemented(c, "Session refresh requires auth.oidc_providers and auth.session_kek_base64 (roadmap step 18: IdP down branch not implemented yet).")
-	}
-	return s.c.OIDCRefreshHandler.Refresh(c)
 }
 
 func (s *OpenAPIServer) IssueEdgeToken(c fiber.Ctx) error {

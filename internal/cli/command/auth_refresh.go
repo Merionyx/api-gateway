@@ -23,7 +23,7 @@ func newAuthRefreshCmd(resolveServer func() (string, error)) *cobra.Command {
 		Use:   "refresh",
 		Short: "Refresh saved API tokens for the current agwctl context",
 		Long: strings.TrimSpace(`
-Calls POST /api/v1/auth/refresh with the refresh token saved in ~/.config/agwctl/credentials.yaml
+Calls POST /api/v1/auth/token (grant_type=refresh_token) with the refresh token saved in ~/.config/agwctl/credentials.yaml
 (or AGWCTL_CREDENTIALS), using the current agwctl context unless --context is set.
 
 On success, agwctl overwrites the saved token pair for that context and keeps the provider id.
@@ -92,9 +92,9 @@ func runAuthRefresh(ctx context.Context, out io.Writer, server string, httpClien
 		return fmt.Errorf("refresh session: %w", err)
 	}
 
-	tokenType := strings.TrimSpace(saved.TokenType)
-	if tok.TokenType != nil && strings.TrimSpace(*tok.TokenType) != "" {
-		tokenType = strings.TrimSpace(*tok.TokenType)
+	tokenType := strings.TrimSpace(tok.TokenType)
+	if tokenType == "" {
+		tokenType = strings.TrimSpace(saved.TokenType)
 	}
 	if tokenType == "" {
 		tokenType = "Bearer"

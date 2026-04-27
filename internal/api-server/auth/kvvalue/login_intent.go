@@ -34,7 +34,7 @@ type LoginIntentValue struct {
 	// RequestedRefreshTokenTTLSeconds is the client-requested refresh-chain lifetime for callback issuance.
 	RequestedRefreshTokenTTLSeconds int64 `json:"requested_refresh_token_ttl_seconds,omitempty"`
 
-	// OAuthClientID is the downstream OAuth client_id from GET /api/v1/auth/login in OAuth 2.1 authorize mode.
+	// OAuthClientID is the downstream OAuth client_id from GET /api/v1/auth/authorize.
 	OAuthClientID string `json:"oauth_client_id,omitempty"`
 	// OAuthClientRedirectURI is the downstream OAuth redirect_uri used after IdP callback.
 	OAuthClientRedirectURI string `json:"oauth_client_redirect_uri,omitempty"`

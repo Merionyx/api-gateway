@@ -2,6 +2,10 @@ package command
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
@@ -39,7 +43,7 @@ func newAuthLoginCmd(resolveServer func() (string, error)) *cobra.Command {
 		Use:   "login",
 		Short: "Browser OIDC login: loopback callback, save tokens to credentials file (0600)",
 		Long: strings.TrimSpace(`
-Opens the system browser for API Server GET /api/v1/auth/login, then receives the IdP redirect on a local HTTP listener.
+Opens the system browser for API Server GET /api/v1/auth/authorize, then receives the OAuth redirect on a local HTTP listener.
 
 Without --provider-id, agwctl calls GET /api/v1/auth/oidc-providers: if there is a single provider it is chosen automatically; if there are several, you pick one from an interactive list (arrow keys + Enter) when stdin/stdout are a TTY—otherwise pass --provider-id explicitly.
 
@@ -112,6 +116,14 @@ func runAuthLogin(
 		return err
 	}
 	requestedTTLs = withDefaultRequestedTTLs(requestedTTLs)
+	codeVerifier, codeChallenge, err := newOAuthPKCES256()
+	if err != nil {
+		return err
+	}
+	clientState, err := newOAuthState()
+	if err != nil {
+		return err
+	}
 
 	redirectURI := fmt.Sprintf("http://%s:%d%s", strings.TrimSpace(callbackHost), callbackPort, callbackPath)
 	ln, err := net.Listen("tcp", net.JoinHostPort(callbackHost, fmt.Sprintf("%d", callbackPort)))
@@ -187,23 +199,31 @@ func runAuthLogin(
 		return err
 	}
 	pid := chosenID
-	loginResp, err := apiNoRedir.LoginOidc(ctx, &apiserverclient.LoginOidcParams{
+	redirectURIForToken := redirectURI
+	clientID := "agwctl"
+	state := clientState
+	authorizeResp, err := apiNoRedir.AuthorizeOidc(ctx, &apiserverclient.AuthorizeOidcParams{
 		ProviderId:                      &pid,
 		RedirectUri:                     redirectURI,
+		ResponseType:                    apiserverclient.Code,
+		ClientId:                        clientID,
+		State:                           &state,
+		CodeChallenge:                   codeChallenge,
+		CodeChallengeMethod:             apiserverclient.S256,
 		RequestedAccessTokenTtlSeconds:  optionalSeconds(requestedTTLs.AccessTTL),
 		RequestedRefreshTokenTtlSeconds: optionalSeconds(requestedTTLs.RefreshTTL),
 	})
 	if err != nil {
-		return fmt.Errorf("login request: %w", err)
+		return fmt.Errorf("authorize request: %w", err)
 	}
-	defer func() { _ = loginResp.Body.Close() }()
-	if loginResp.StatusCode != http.StatusFound {
-		body, _ := io.ReadAll(io.LimitReader(loginResp.Body, 4096))
-		return fmt.Errorf("login: expected HTTP 302, got %d: %s", loginResp.StatusCode, string(body))
+	defer func() { _ = authorizeResp.Body.Close() }()
+	if authorizeResp.StatusCode != http.StatusFound {
+		body, _ := io.ReadAll(io.LimitReader(authorizeResp.Body, 4096))
+		return fmt.Errorf("authorize: expected HTTP 302, got %d: %s", authorizeResp.StatusCode, string(body))
 	}
-	idpURL := strings.TrimSpace(loginResp.Header.Get("Location"))
+	idpURL := strings.TrimSpace(authorizeResp.Header.Get("Location"))
 	if idpURL == "" {
-		return fmt.Errorf("login: empty Location header")
+		return fmt.Errorf("authorize: empty Location header")
 	}
 
 	if noBrowser {
@@ -226,41 +246,72 @@ func runAuthLogin(
 	if cb.err != "" {
 		return fmt.Errorf("callback: %s", cb.err)
 	}
+	if subtleTrimEqualLogin(cb.state, clientState) == 0 {
+		return fmt.Errorf("callback: state mismatch")
+	}
 
-	apiClient, err := apiserverclient.NewClient(server, apiserverclient.WithHTTPClient(baseHTTP))
+	apiClient, err := apiserverclient.NewClientWithResponses(server, apiserverclient.WithHTTPClient(baseHTTP))
 	if err != nil {
 		return err
 	}
-	cbResp, err := apiClient.CallbackOidc(waitCtx, &apiserverclient.CallbackOidcParams{
-		Code:  cb.code,
-		State: cb.state,
+	tokenResp, err := apiClient.TokenOidcWithFormdataBodyWithResponse(waitCtx, apiserverclient.TokenOidcFormdataRequestBody{
+		GrantType:                       apiserverclient.AuthorizationCode,
+		Code:                            &cb.code,
+		RedirectUri:                     &redirectURIForToken,
+		ClientId:                        &clientID,
+		CodeVerifier:                    &codeVerifier,
+		RequestedAccessTokenTtlSeconds:  optionalSeconds(requestedTTLs.AccessTTL),
+		RequestedRefreshTokenTtlSeconds: optionalSeconds(requestedTTLs.RefreshTTL),
 	})
 	if err != nil {
-		return fmt.Errorf("callback API: %w", err)
+		return fmt.Errorf("token endpoint: %w", err)
 	}
-	parsed, err := apiserverclient.ParseCallbackOidcResponse(cbResp)
-	if err != nil {
-		return err
-	}
-	if parsed.JSON200 == nil {
-		body := string(parsed.Body)
+	if tokenResp.JSON200 == nil {
+		if tokenResp.JSON400 != nil {
+			return fmt.Errorf("token endpoint: %s", oauthTokenErrorString(tokenResp.JSON400))
+		}
+		if tokenResp.JSON503 != nil {
+			return fmt.Errorf("token endpoint unavailable: %s", oauthTokenErrorString(tokenResp.JSON503))
+		}
+		if tokenResp.JSON500 != nil {
+			return fmt.Errorf("token endpoint error: %s", oauthTokenErrorString(tokenResp.JSON500))
+		}
+		body := string(tokenResp.Body)
 		if len(body) > 2048 {
 			body = body[:2048] + "…"
 		}
-		return fmt.Errorf("callback: HTTP %d: %s", cbResp.StatusCode, body)
+		return fmt.Errorf("token endpoint: HTTP %d: %s", tokenResp.StatusCode(), body)
 	}
-	tok := parsed.JSON200
-	tt := "Bearer"
-	if tok.TokenType != nil && strings.TrimSpace(*tok.TokenType) != "" {
-		tt = strings.TrimSpace(*tok.TokenType)
+
+	tok := tokenResp.JSON200
+	tt := strings.TrimSpace(tok.TokenType)
+	if tt == "" {
+		tt = "Bearer"
+	}
+	refreshToken := ""
+	if tok.RefreshToken != nil {
+		refreshToken = strings.TrimSpace(*tok.RefreshToken)
+	}
+	if refreshToken == "" {
+		return fmt.Errorf("token endpoint: refresh_token is missing")
+	}
+	accessExpiresAt := time.Now().UTC().Add(time.Duration(tok.ExpiresIn) * time.Second)
+	if tok.AccessExpiresAt != nil {
+		accessExpiresAt = tok.AccessExpiresAt.UTC()
+	}
+	refreshExpiresAt := accessExpiresAt
+	if tok.RefreshExpiresAt != nil {
+		refreshExpiresAt = tok.RefreshExpiresAt.UTC()
+	} else if tok.RefreshExpiresIn != nil && *tok.RefreshExpiresIn > 0 {
+		refreshExpiresAt = time.Now().UTC().Add(time.Duration(*tok.RefreshExpiresIn) * time.Second)
 	}
 	if err := credentials.PutContext(contextName, credentials.Entry{
 		ProviderID:               chosenID,
 		AccessToken:              tok.AccessToken,
-		RefreshToken:             tok.RefreshToken,
+		RefreshToken:             refreshToken,
 		TokenType:                tt,
-		AccessExpiresAt:          tok.AccessExpiresAt.UTC().Format(time.RFC3339),
-		RefreshExpiresAt:         tok.RefreshExpiresAt.UTC().Format(time.RFC3339),
+		AccessExpiresAt:          accessExpiresAt.UTC().Format(time.RFC3339),
+		RefreshExpiresAt:         refreshExpiresAt.UTC().Format(time.RFC3339),
 		RequestedAccessTokenTTL:  resolvedTTLString(accessTTL, requestedTTLs.AccessTTL),
 		RequestedRefreshTokenTTL: resolvedTTLString(refreshTTL, requestedTTLs.RefreshTTL),
 	}); err != nil {
@@ -272,6 +323,55 @@ func runAuthLogin(
 	}
 	_, _ = fmt.Fprintf(out, "Saved tokens for context %q to %s (mode 0600).\n", contextName, credPath)
 	return nil
+}
+
+func newOAuthPKCES256() (verifier, challenge string, err error) {
+	raw := make([]byte, 32)
+	if _, err = rand.Read(raw); err != nil {
+		return "", "", fmt.Errorf("pkce verifier: %w", err)
+	}
+	verifier = base64.RawURLEncoding.EncodeToString(raw)
+	sum := sha256.Sum256([]byte(verifier))
+	challenge = base64.RawURLEncoding.EncodeToString(sum[:])
+	return verifier, challenge, nil
+}
+
+func newOAuthState() (string, error) {
+	raw := make([]byte, 16)
+	if _, err := rand.Read(raw); err != nil {
+		return "", fmt.Errorf("oauth state: %w", err)
+	}
+	return hex.EncodeToString(raw), nil
+}
+
+func oauthTokenErrorString(e *apiserverclient.OAuthTokenError) string {
+	if e == nil {
+		return ""
+	}
+	msg := strings.TrimSpace(e.Error)
+	if e.ErrorDescription != nil && strings.TrimSpace(*e.ErrorDescription) != "" {
+		if msg != "" {
+			return msg + ": " + strings.TrimSpace(*e.ErrorDescription)
+		}
+		return strings.TrimSpace(*e.ErrorDescription)
+	}
+	return msg
+}
+
+func subtleTrimEqualLogin(a, b string) int {
+	aa := strings.TrimSpace(a)
+	bb := strings.TrimSpace(b)
+	if len(aa) != len(bb) {
+		return 0
+	}
+	var diff byte
+	for i := 0; i < len(aa); i++ {
+		diff |= aa[i] ^ bb[i]
+	}
+	if diff == 0 {
+		return 1
+	}
+	return 0
 }
 
 func effectiveContextName(cmd *cobra.Command) (string, error) {

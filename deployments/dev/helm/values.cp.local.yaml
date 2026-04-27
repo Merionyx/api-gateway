@@ -104,8 +104,8 @@ components:
           # agwctl default
           - "http://127.0.0.1:21987/callback"
           # Browser / Postman: IdP redirects here with ?code=&state= (must match GitHub/Google/GitLab app settings)
-          - "http://185.41.122.122:30100/api/v1/auth/callback"
-          - "http://elg.mikhailminaev.com:30100/api/v1/auth/callback"
+          - "http://185.41.122.122:30100/api/v1/auth/oidc/callback"
+          - "http://elg.mikhailminaev.com:30100/api/v1/auth/oidc/callback"
           # Postman OAuth 2.0 (Get New Access Token) helper
           - "https://oauth.pstmn.io/v1/callback"
           github:
@@ -125,8 +125,8 @@ components:
           client_secret: ""
           redirect_uri_allowlist:
           - "http://127.0.0.1:21987/callback"
-          - "http://185.41.122.122:30100/api/v1/auth/callback"
-          - "http://elg.mikhailminaev.com:30100/api/v1/auth/callback"
+          - "http://185.41.122.122:30100/api/v1/auth/oidc/callback"
+          - "http://elg.mikhailminaev.com:30100/api/v1/auth/oidc/callback"
           - "https://oauth.pstmn.io/v1/callback"
         - id: google
           name: Google
@@ -136,8 +136,8 @@ components:
           client_secret: ""
           redirect_uri_allowlist:
           - "http://127.0.0.1:21987/callback"
-          - "http://185.41.122.122:30100/api/v1/auth/callback"
-          - "http://elg.mikhailminaev.com:30100/api/v1/auth/callback"
+          - "http://185.41.122.122:30100/api/v1/auth/oidc/callback"
+          - "http://elg.mikhailminaev.com:30100/api/v1/auth/oidc/callback"
           - "https://oauth.pstmn.io/v1/callback"
           # Optional: restrict to Workspace / domains (remove or edit for your tenant)
           # google:

@@ -14,7 +14,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
 )
 
-// OIDCCallbackHandler serves GET /api/v1/auth/callback (roadmap ш. 14).
+// OIDCCallbackHandler serves GET /api/v1/auth/oidc/callback (roadmap ш. 14).
 type OIDCCallbackHandler struct {
 	uc *auth.OIDCCallbackUseCase
 }
@@ -25,7 +25,7 @@ func NewOIDCCallbackHandler(uc *auth.OIDCCallbackUseCase) *OIDCCallbackHandler {
 }
 
 // Callback completes the authorization code flow and returns our token pair as JSON.
-func (h *OIDCCallbackHandler) Callback(c fiber.Ctx, params apiserver.CallbackOidcParams) error {
+func (h *OIDCCallbackHandler) Callback(c fiber.Ctx, params apiserver.CallbackOidcUpstreamParams) error {
 	ctx, cancel := context.WithTimeout(c.Context(), 30*time.Second)
 	defer cancel()
 
@@ -48,13 +48,10 @@ func (h *OIDCCallbackHandler) Callback(c fiber.Ctx, params apiserver.CallbackOid
 		}
 	}
 
-	if out.RedirectURL != "" {
-		c.Response().Header.Set("Location", out.RedirectURL)
-		c.Status(http.StatusFound)
-		return nil
+	if out.RedirectURL == "" {
+		return problem.Write(c, http.StatusInternalServerError, problem.WithCode(http.StatusInternalServerError, "INTERNAL_ERROR", "", "callback produced no redirect URL"))
 	}
-	if out.Tokens == nil {
-		return problem.Write(c, http.StatusInternalServerError, problem.WithCode(http.StatusInternalServerError, "INTERNAL_ERROR", "", "callback produced no output"))
-	}
-	return c.JSON(out.Tokens)
+	c.Response().Header.Set("Location", out.RedirectURL)
+	c.Status(http.StatusFound)
+	return nil
 }

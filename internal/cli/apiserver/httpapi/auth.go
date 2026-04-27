@@ -15,8 +15,16 @@ type RequestedTokenTTLs struct {
 	RefreshTTL time.Duration
 }
 
+type SessionTokens struct {
+	AccessToken      string
+	RefreshToken     string
+	TokenType        string
+	AccessExpiresAt  time.Time
+	RefreshExpiresAt time.Time
+}
+
 // RefreshSession exchanges a saved refresh token for a rotated access/refresh pair.
-func RefreshSession(ctx context.Context, httpClient *http.Client, serverURL, refreshToken string, requestedTTLs RequestedTokenTTLs) (*apiserverclient.AuthSessionTokensResponse, error) {
+func RefreshSession(ctx context.Context, httpClient *http.Client, serverURL, refreshToken string, requestedTTLs RequestedTokenTTLs) (*SessionTokens, error) {
 	ctx, cancel := withServerTimeout(ctx)
 	defer cancel()
 
@@ -29,8 +37,9 @@ func RefreshSession(ctx context.Context, httpClient *http.Client, serverURL, ref
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.RefreshSessionWithResponse(ctx, apiserverclient.AuthRefreshRequest{
-		RefreshToken:                    rt,
+	resp, err := c.TokenOidcWithFormdataBodyWithResponse(ctx, apiserverclient.TokenOidcFormdataRequestBody{
+		GrantType:                       apiserverclient.RefreshToken,
+		RefreshToken:                    &rt,
 		RequestedAccessTokenTtlSeconds:  optionalSeconds(requestedTTLs.AccessTTL),
 		RequestedRefreshTokenTtlSeconds: optionalSeconds(requestedTTLs.RefreshTTL),
 	})
@@ -38,21 +47,59 @@ func RefreshSession(ctx context.Context, httpClient *http.Client, serverURL, ref
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	if resp.JSON200 != nil {
-		return resp.JSON200, nil
+		tokenType := strings.TrimSpace(resp.JSON200.TokenType)
+		if tokenType == "" {
+			tokenType = "Bearer"
+		}
+		refreshTokenOut := ""
+		if resp.JSON200.RefreshToken != nil {
+			refreshTokenOut = strings.TrimSpace(*resp.JSON200.RefreshToken)
+		}
+		if refreshTokenOut == "" {
+			return nil, fmt.Errorf("api: refresh_token is missing in token response")
+		}
+		accessExpiresAt := time.Now().UTC().Add(time.Duration(resp.JSON200.ExpiresIn) * time.Second)
+		if resp.JSON200.AccessExpiresAt != nil {
+			accessExpiresAt = resp.JSON200.AccessExpiresAt.UTC()
+		}
+		refreshExpiresAt := accessExpiresAt
+		if resp.JSON200.RefreshExpiresAt != nil {
+			refreshExpiresAt = resp.JSON200.RefreshExpiresAt.UTC()
+		} else if resp.JSON200.RefreshExpiresIn != nil && *resp.JSON200.RefreshExpiresIn > 0 {
+			refreshExpiresAt = time.Now().UTC().Add(time.Duration(*resp.JSON200.RefreshExpiresIn) * time.Second)
+		}
+		return &SessionTokens{
+			AccessToken:      resp.JSON200.AccessToken,
+			RefreshToken:     refreshTokenOut,
+			TokenType:        tokenType,
+			AccessExpiresAt:  accessExpiresAt,
+			RefreshExpiresAt: refreshExpiresAt,
+		}, nil
 	}
-	if resp.ApplicationproblemJSON400 != nil {
-		return nil, fmt.Errorf("api: %s", problemString(resp.ApplicationproblemJSON400))
+	if resp.JSON400 != nil {
+		return nil, fmt.Errorf("api: %s", oauthTokenErrorString(resp.JSON400))
 	}
-	if resp.ApplicationproblemJSON401 != nil {
-		return nil, fmt.Errorf("api: %s", problemString(resp.ApplicationproblemJSON401))
+	if resp.JSON503 != nil {
+		return nil, fmt.Errorf("api: %s", oauthTokenErrorString(resp.JSON503))
 	}
-	if resp.ApplicationproblemJSON409 != nil {
-		return nil, fmt.Errorf("api: %s", problemString(resp.ApplicationproblemJSON409))
-	}
-	if resp.ApplicationproblemJSON500 != nil {
-		return nil, fmt.Errorf("api: %s", problemString(resp.ApplicationproblemJSON500))
+	if resp.JSON500 != nil {
+		return nil, fmt.Errorf("api: %s", oauthTokenErrorString(resp.JSON500))
 	}
 	return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode(), trimBody(resp.Body))
+}
+
+func oauthTokenErrorString(e *apiserverclient.OAuthTokenError) string {
+	if e == nil {
+		return ""
+	}
+	msg := strings.TrimSpace(e.Error)
+	if e.ErrorDescription != nil && strings.TrimSpace(*e.ErrorDescription) != "" {
+		if msg != "" {
+			return msg + ": " + strings.TrimSpace(*e.ErrorDescription)
+		}
+		return strings.TrimSpace(*e.ErrorDescription)
+	}
+	return msg
 }
 
 func optionalSeconds(d time.Duration) *int {

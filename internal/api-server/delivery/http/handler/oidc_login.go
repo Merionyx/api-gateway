@@ -14,7 +14,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
 )
 
-// OIDCLoginHandler serves GET /api/v1/auth/login (roadmap ш. 13).
+// OIDCLoginHandler serves GET /api/v1/auth/authorize (roadmap ш. 13).
 type OIDCLoginHandler struct {
 	uc *auth.OIDCLoginUseCase
 }
@@ -24,8 +24,8 @@ func NewOIDCLoginHandler(uc *auth.OIDCLoginUseCase) *OIDCLoginHandler {
 	return &OIDCLoginHandler{uc: uc}
 }
 
-// Login starts OIDC authorization code + PKCE and responds with 302 to the IdP.
-func (h *OIDCLoginHandler) Login(c fiber.Ctx, params apiserver.LoginOidcParams) error {
+// Authorize starts OAuth2/OIDC authorization code + PKCE and responds with 302 to the IdP.
+func (h *OIDCLoginHandler) Authorize(c fiber.Ctx, params apiserver.AuthorizeOidcParams) error {
 	ctx, cancel := context.WithTimeout(c.Context(), 25*time.Second)
 	defer cancel()
 
@@ -37,15 +37,15 @@ func (h *OIDCLoginHandler) Login(c fiber.Ctx, params apiserver.LoginOidcParams) 
 	loc, err := h.uc.Start(ctx, auth.OIDCLoginStartRequest{
 		ProviderID:          stringOrEmpty(params.ProviderId),
 		RedirectURI:         params.RedirectUri,
-		ServerCallbackURI:   c.BaseURL() + "/api/v1/auth/callback",
+		ServerCallbackURI:   c.BaseURL() + "/api/v1/auth/oidc/callback",
 		Nonce:               nonce,
 		RequestedAccessTTL:  durationFromOptionalSeconds(params.RequestedAccessTokenTtlSeconds),
 		RequestedRefreshTTL: durationFromOptionalSeconds(params.RequestedRefreshTokenTtlSeconds),
-		ResponseType:        stringOrEmpty(params.ResponseType),
-		ClientID:            stringOrEmpty(params.ClientId),
+		ResponseType:        string(params.ResponseType),
+		ClientID:            params.ClientId,
 		State:               stringOrEmpty(params.State),
-		CodeChallenge:       stringOrEmpty(params.CodeChallenge),
-		CodeChallengeMethod: stringOrEmpty(params.CodeChallengeMethod),
+		CodeChallenge:       params.CodeChallenge,
+		CodeChallengeMethod: string(params.CodeChallengeMethod),
 	})
 	if err != nil {
 		st, code, detail := auth.MapStartError(err)

@@ -39,7 +39,7 @@ type OIDCLoginStartRequest struct {
 	CodeChallengeMethod string
 }
 
-// OIDCLoginUseCase handles GET /api/v1/auth/login (roadmap ш. 13).
+// OIDCLoginUseCase handles GET /api/v1/auth/authorize (roadmap ш. 13).
 type OIDCLoginUseCase struct {
 	byID           map[string]config.OIDCProviderConfig
 	leaseTTL       time.Duration
@@ -85,6 +85,9 @@ func (u *OIDCLoginUseCase) Start(ctx context.Context, req OIDCLoginStartRequest)
 	if len(u.byID) == 0 {
 		return "", apierrors.ErrOIDCNotConfigured
 	}
+	if err := validateOAuthAuthorizeRequest(req); err != nil {
+		return "", fmt.Errorf("%w: %s", apierrors.ErrInvalidInput, err.Error())
+	}
 	resolvedTTLs, err := resolveRequestedTokenTTLs(u.tokenTTLPolicy, RequestedTokenTTLs{
 		AccessTTL:  req.RequestedAccessTTL,
 		RefreshTTL: req.RequestedRefreshTTL,
@@ -93,7 +96,6 @@ func (u *OIDCLoginUseCase) Start(ctx context.Context, req OIDCLoginStartRequest)
 		return "", fmt.Errorf("%w: %s", apierrors.ErrInvalidInput, err.Error())
 	}
 
-	oauthMode := isOAuthAuthorizationRequest(req)
 	providerID, err := u.resolveProviderID(strings.TrimSpace(req.ProviderID))
 	if err != nil {
 		return "", err
@@ -111,15 +113,9 @@ func (u *OIDCLoginUseCase) Start(ctx context.Context, req OIDCLoginStartRequest)
 		return "", apierrors.ErrOIDCRedirectNotAllowlisted
 	}
 
-	idpRedirectURI := clientRedirectURI
-	if oauthMode {
-		if err := validateOAuthAuthorizeRequest(req); err != nil {
-			return "", fmt.Errorf("%w: %s", apierrors.ErrInvalidInput, err.Error())
-		}
-		idpRedirectURI = strings.TrimSpace(req.ServerCallbackURI)
-		if _, err := url.ParseRequestURI(idpRedirectURI); err != nil {
-			return "", fmt.Errorf("%w: server_callback_uri: %w", apierrors.ErrInvalidInput, err)
-		}
+	idpRedirectURI := strings.TrimSpace(req.ServerCallbackURI)
+	if _, err := url.ParseRequestURI(idpRedirectURI); err != nil {
+		return "", fmt.Errorf("%w: server_callback_uri: %w", apierrors.ErrInvalidInput, err)
 	}
 
 	issuer := oidc.NormalizeIssuer(p.Issuer)
@@ -149,13 +145,11 @@ func (u *OIDCLoginUseCase) Start(ctx context.Context, req OIDCLoginStartRequest)
 		Nonce:                           strings.TrimSpace(req.Nonce),
 		RequestedAccessTokenTTLSeconds:  int64(resolvedTTLs.AccessTTL / time.Second),
 		RequestedRefreshTokenTTLSeconds: int64(resolvedTTLs.RefreshTTL / time.Second),
-	}
-	if oauthMode {
-		val.OAuthClientID = strings.TrimSpace(req.ClientID)
-		val.OAuthClientRedirectURI = clientRedirectURI
-		val.OAuthClientState = strings.TrimSpace(req.State)
-		val.OAuthClientCodeChallenge = strings.TrimSpace(req.CodeChallenge)
-		val.OAuthClientCodeChallengeMethod = "S256"
+		OAuthClientID:                   strings.TrimSpace(req.ClientID),
+		OAuthClientRedirectURI:          clientRedirectURI,
+		OAuthClientState:                strings.TrimSpace(req.State),
+		OAuthClientCodeChallenge:        strings.TrimSpace(req.CodeChallenge),
+		OAuthClientCodeChallengeMethod:  "S256",
 	}
 	if err := u.intents.Create(ctx, intentID, val, u.leaseTTL); err != nil {
 		return "", err
@@ -269,14 +263,6 @@ func mergeAuthorizeQuery(authEndpoint string, add url.Values) (string, error) {
 	}
 	u.RawQuery = existing.Encode()
 	return u.String(), nil
-}
-
-func isOAuthAuthorizationRequest(req OIDCLoginStartRequest) bool {
-	return strings.TrimSpace(req.ResponseType) != "" ||
-		strings.TrimSpace(req.ClientID) != "" ||
-		strings.TrimSpace(req.CodeChallenge) != "" ||
-		strings.TrimSpace(req.CodeChallengeMethod) != "" ||
-		strings.TrimSpace(req.State) != ""
 }
 
 func (u *OIDCLoginUseCase) resolveProviderID(providerID string) (string, error) {

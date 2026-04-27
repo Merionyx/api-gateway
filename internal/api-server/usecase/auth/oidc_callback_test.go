@@ -97,11 +97,16 @@ func TestOIDCCallbackUseCase_Complete_HappyPath(t *testing.T) {
 	intentID := uuid.NewString()
 	intents := &memIntentRepo{m: map[string]kvvalue.LoginIntentValue{
 		intentID: {
-			ProviderID:     "p1",
-			RedirectURI:    redirectURI,
-			OAuthState:     intentID,
-			PKCEVerifier:   pkceVerifier,
-			IntentProtocol: kvvalue.DefaultIntentProtocol,
+			ProviderID:                     "p1",
+			RedirectURI:                    redirectURI,
+			OAuthState:                     intentID,
+			PKCEVerifier:                   pkceVerifier,
+			IntentProtocol:                 kvvalue.DefaultIntentProtocol,
+			OAuthClientID:                  "test-client",
+			OAuthClientRedirectURI:         "http://127.0.0.1:21987/callback",
+			OAuthClientState:               "state-1",
+			OAuthClientCodeChallenge:       "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~",
+			OAuthClientCodeChallengeMethod: "S256",
 		},
 	}}
 	sessions := &memSessionRepo{}
@@ -194,12 +199,12 @@ func TestOIDCCallbackUseCase_Complete_HappyPath(t *testing.T) {
 		MaxRefreshTTL:     30 * 24 * time.Hour,
 	}, cache, 2*time.Minute)
 
-	out, err := uc.Complete(t.Context(), authCode, intentID)
+	out, err := uc.CompleteWithResult(t.Context(), authCode, intentID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.AccessToken == "" || out.RefreshToken == "" {
-		t.Fatalf("tokens: %+v", out)
+	if strings.TrimSpace(out.RedirectURL) == "" {
+		t.Fatalf("redirect: %+v", out)
 	}
 	if sessions.last.OurRefreshVerifier == "" || len(sessions.last.EncryptedIDPRefresh) == 0 {
 		t.Fatalf("session: %+v", sessions.last)
@@ -219,8 +224,8 @@ func TestOIDCCallbackUseCase_Complete_HappyPath(t *testing.T) {
 	intents.mu.Lock()
 	_, ok := intents.m[intentID]
 	intents.mu.Unlock()
-	if ok {
-		t.Fatal("intent should be deleted")
+	if !ok {
+		t.Fatal("intent should remain until token exchange")
 	}
 }
 
@@ -253,7 +258,7 @@ func TestOIDCCallbackUseCase_Complete_UnknownIntent(t *testing.T) {
 		DefaultRefreshTTL: 7 * 24 * time.Hour,
 		MaxRefreshTTL:     30 * 24 * time.Hour,
 	}, nil, 0)
-	_, err = uc.Complete(t.Context(), "code", uuid.NewString())
+	_, err = uc.CompleteWithResult(t.Context(), "code", uuid.NewString())
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -327,10 +332,14 @@ func TestOIDCCallbackUseCase_Complete_GitHubFallbackWithoutIDToken(t *testing.T)
 	intentID := uuid.NewString()
 	intents := &memIntentRepo{m: map[string]kvvalue.LoginIntentValue{
 		intentID: {
-			ProviderID:   "github",
-			RedirectURI:  "http://127.0.0.1:21987/callback",
-			OAuthState:   intentID,
-			PKCEVerifier: "pkce",
+			ProviderID:                     "github",
+			RedirectURI:                    "http://127.0.0.1:21987/callback",
+			OAuthState:                     intentID,
+			PKCEVerifier:                   "pkce",
+			OAuthClientID:                  "test-client",
+			OAuthClientRedirectURI:         "http://127.0.0.1:21987/callback",
+			OAuthClientCodeChallenge:       "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~",
+			OAuthClientCodeChallengeMethod: "S256",
 		},
 	}}
 	sessions := &memSessionRepo{}
@@ -351,11 +360,11 @@ func TestOIDCCallbackUseCase_Complete_GitHubFallbackWithoutIDToken(t *testing.T)
 		MaxRefreshTTL:     30 * 24 * time.Hour,
 	}, nil, 0)
 
-	out, err := uc.Complete(t.Context(), "authcode", intentID)
+	out, err := uc.CompleteWithResult(t.Context(), "authcode", intentID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(out.AccessToken) == "" || strings.TrimSpace(out.RefreshToken) == "" {
+	if strings.TrimSpace(out.RedirectURL) == "" {
 		t.Fatalf("unexpected output: %+v", out)
 	}
 	var snap map[string]any

@@ -21,7 +21,7 @@ info:
 
     **v1.5.2:** HTTP **APISecurity** middleware (roadmap step 20): deny-by-default on secured routes; API-profile Bearer JWT and/or `X-API-Key`.
 
-    **v1.5.1 (roadmap step 13):** optional `nonce` query on **`GET /api/v1/auth/login`** (stored with the login-intent for callback **ш. 14**).
+    **v1.5.1 (roadmap step 13):** optional `nonce` query on **`GET /api/v1/auth/authorize`** (stored with the login-intent for callback **ш. 14**).
 
     **v1.5.0 (roadmap step 5):** removes deprecated `POST /api/v1/tokens`; **Edge** issuance is **`POST /api/v1/tokens/edge`**
     only. **API**-profile issuance remains **`POST /api/v1/tokens/api`** (contract stabilized for codegen; handler **ш. 22**).
@@ -58,7 +58,7 @@ tags:
 - name: Authentication
   description: JWT issuance, JWKS, signing keys
 - name: OIDC
-  description: Interactive OAuth2/OIDC login, callback, and refresh (draft)
+  description: Interactive OAuth2/OIDC authorize, callback, and token endpoints
 - name: Contracts
   description: Contract export from Git via Contract Syncer
 - name: Registry
@@ -505,7 +505,7 @@ components:
       properties:
         id:
           type: string
-          description: Same as `provider_id` for `GET /api/v1/auth/login`.
+          description: Same as `provider_id` for `GET /api/v1/auth/authorize`.
         name:
           type: string
           description: User-facing provider label configured in `auth.oidc_providers[].name`.
@@ -1166,7 +1166,7 @@ paths:
         Does not include secrets. When OIDC is not configured, returns an empty array (**200**).
       responses:
         '200':
-          description: Providers available for `GET /api/v1/auth/login` (possibly empty).
+          description: Providers available for `GET /api/v1/auth/authorize` (possibly empty).
           content:
             application/json:
               schema:
@@ -1176,16 +1176,15 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/auth/login:
+  /api/v1/auth/authorize:
     get:
       tags: [ OIDC ]
-      operationId: loginOidc
+      operationId: authorizeOidc
       security: []
       summary: OAuth 2.1 authorize endpoint (upstream OIDC-backed)
       description: |
         Starts the interactive OAuth authorization flow.
-        In OAuth 2.1 mode (`response_type=code` + PKCE params), this endpoint behaves as the authorization endpoint for clients (for example Postman), while delegating user authentication to configured upstream OIDC providers.
-        Legacy mode (`provider_id` + `redirect_uri`) is preserved for existing CLI/browser flow.
+        The API Server acts as an OAuth 2.1 authorization server for clients (for example Postman), while delegating user authentication to configured upstream OIDC providers.
       parameters:
       - name: provider_id
         in: query
@@ -1202,13 +1201,14 @@ paths:
           format: uri
       - name: response_type
         in: query
-        required: false
-        description: OAuth response type. For OAuth 2.1 mode must be `code`.
+        required: true
+        description: OAuth response type (`code`).
         schema:
           type: string
+          enum: [code]
       - name: client_id
         in: query
-        required: false
+        required: true
         description: OAuth client identifier (opaque for this server, validated round-trip with token endpoint).
         schema:
           type: string
@@ -1220,16 +1220,17 @@ paths:
           type: string
       - name: code_challenge
         in: query
-        required: false
-        description: PKCE code challenge (required in OAuth 2.1 mode).
+        required: true
+        description: PKCE code challenge.
         schema:
           type: string
       - name: code_challenge_method
         in: query
-        required: false
+        required: true
         description: PKCE method. OAuth 2.1 requires `S256`.
         schema:
           type: string
+          enum: [S256]
       - name: nonce
         in: query
         required: false
@@ -1252,7 +1253,7 @@ paths:
           minimum: 1
       responses:
         '302':
-          description: Redirect to the IdP authorization endpoint.
+          description: Redirect to the upstream IdP authorization endpoint.
           headers:
             Location:
               description: IdP authorization URL including `state` and PKCE challenge.
@@ -1268,16 +1269,15 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/auth/callback:
+  /api/v1/auth/oidc/callback:
     get:
       tags: [ OIDC ]
-      operationId: callbackOidc
+      operationId: callbackOidcUpstream
       security: []
       summary: OIDC callback from upstream IdP
       description: |
         Browser redirect target after upstream IdP login.
-        Legacy mode returns **200 JSON** with API tokens.
-        OAuth 2.1 mode redirects (**302**) to downstream `redirect_uri` with local authorization `code` and optional `state`.
+        Always redirects (**302**) to downstream OAuth client `redirect_uri` with local authorization `code` and optional `state`.
       parameters:
       - name: code
         in: query
@@ -1290,12 +1290,6 @@ paths:
         schema:
           type: string
       responses:
-        '200':
-          description: "Legacy flow: session established; API-profile tokens returned as JSON."
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthSessionTokensResponse'
         '302':
           description: "OAuth mode: redirect to downstream client `redirect_uri` with authorization code."
           headers:
@@ -1310,6 +1304,7 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/InternalError'
+  /api/v1/auth/token:
     post:
       tags: [ OIDC ]
       operationId: tokenOidc
@@ -1349,36 +1344,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OAuthTokenError'
-
-  /api/v1/auth/refresh:
-    post:
-      tags: [ OIDC ]
-      operationId: refreshSession
-      security: []
-      summary: Refresh API session tokens
-      description: |
-        Draft: exchanges a valid our `refresh_token` for a new `access_token` / `refresh_token` pair. Implements **IdP up** (full CEL) and **IdP down / degraded** branches (see repo doc `docs/degraded-refresh-api-server.md`). Concurrent refresh conflicts return **409** (`application/problem+json`).
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AuthRefreshRequest'
-      responses:
-        '200':
-          description: New token pair (normal or degraded refresh).
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthSessionTokensResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '500':
-          $ref: '#/components/responses/InternalError'
 
   /api/v1/tokens/edge:
     post:

@@ -44,8 +44,13 @@ func TestOIDCLoginUseCase_Start_RedirectNotAllowlisted(t *testing.T) {
 		MaxRefreshTTL:     30 * 24 * time.Hour,
 	})
 	_, err := uc.Start(t.Context(), OIDCLoginStartRequest{
-		ProviderID:  "p1",
-		RedirectURI: "http://127.0.0.1:9999/wrong",
+		ProviderID:          "p1",
+		RedirectURI:         "http://127.0.0.1:9999/wrong",
+		ServerCallbackURI:   "https://api.example.com/api/v1/auth/oidc/callback",
+		ResponseType:        "code",
+		ClientID:            "postman",
+		CodeChallenge:       "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~",
+		CodeChallengeMethod: "S256",
 	})
 	if !errors.Is(err, apierrors.ErrOIDCRedirectNotAllowlisted) {
 		t.Fatalf("got %v", err)
@@ -86,9 +91,15 @@ func TestOIDCLoginUseCase_Start_HappyPath(t *testing.T) {
 	loc, err := uc.Start(t.Context(), OIDCLoginStartRequest{
 		ProviderID:          "p1",
 		RedirectURI:         "http://127.0.0.1:8080/cb",
+		ServerCallbackURI:   "https://api.example.com/api/v1/auth/oidc/callback",
 		Nonce:               "n1",
 		RequestedAccessTTL:  24 * time.Hour,
 		RequestedRefreshTTL: 10 * 24 * time.Hour,
+		ResponseType:        "code",
+		ClientID:            "postman",
+		State:               "state-1",
+		CodeChallenge:       "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~",
+		CodeChallengeMethod: "S256",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -101,7 +112,7 @@ func TestOIDCLoginUseCase_Start_HappyPath(t *testing.T) {
 	if !strings.Contains(u.Path, "authorize") {
 		t.Fatalf("path %q", u.Path)
 	}
-	if q.Get("client_id") != "cid" || q.Get("redirect_uri") != "http://127.0.0.1:8080/cb" {
+	if q.Get("client_id") != "cid" || q.Get("redirect_uri") != "https://api.example.com/api/v1/auth/oidc/callback" {
 		t.Fatalf("query %v", q)
 	}
 	if q.Get("nonce") != "n1" {
@@ -119,6 +130,9 @@ func TestOIDCLoginUseCase_Start_HappyPath(t *testing.T) {
 	}
 	if stub.last.RequestedAccessTokenTTLSeconds != 24*3600 || stub.last.RequestedRefreshTokenTTLSeconds != 10*24*3600 {
 		t.Fatalf("intent ttls %+v", stub.last)
+	}
+	if stub.last.OAuthClientID != "postman" || stub.last.OAuthClientRedirectURI != "http://127.0.0.1:8080/cb" {
+		t.Fatalf("oauth client intent %+v", stub.last)
 	}
 }
 

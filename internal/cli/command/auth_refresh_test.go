@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -33,14 +34,21 @@ func TestAuthRefreshCommand_Success(t *testing.T) {
 			if r.Method != http.MethodPost {
 				t.Fatalf("method = %s", r.Method)
 			}
-			if r.URL.String() != "https://api.example.test/api/v1/auth/refresh" {
+			if r.URL.String() != "https://api.example.test/api/v1/auth/token" {
 				t.Fatalf("url = %s", r.URL.String())
 			}
 			body, err := io.ReadAll(r.Body)
 			if err != nil {
 				t.Fatalf("read body: %v", err)
 			}
-			if !strings.Contains(string(body), `"refresh_token":"old-refresh"`) {
+			form, err := url.ParseQuery(string(body))
+			if err != nil {
+				t.Fatalf("parse body: %v", err)
+			}
+			if form.Get("grant_type") != "refresh_token" {
+				t.Fatalf("body = %s", string(body))
+			}
+			if form.Get("refresh_token") != "old-refresh" {
 				t.Fatalf("body = %s", string(body))
 			}
 			gotRefreshToken = "old-refresh"
@@ -116,10 +124,20 @@ func TestAuthRefreshCommand_UsesSavedRequestedTTLsByDefault(t *testing.T) {
 			if err != nil {
 				t.Fatalf("read body: %v", err)
 			}
-			if !strings.Contains(string(body), `"requested_access_token_ttl_seconds":604800`) {
+			form, err := url.ParseQuery(string(body))
+			if err != nil {
+				t.Fatalf("parse body: %v", err)
+			}
+			if form.Get("grant_type") != "refresh_token" {
 				t.Fatalf("body = %s", string(body))
 			}
-			if !strings.Contains(string(body), `"requested_refresh_token_ttl_seconds":2592000`) {
+			if form.Get("refresh_token") != "old-refresh" {
+				t.Fatalf("body = %s", string(body))
+			}
+			if form.Get("requested_access_token_ttl_seconds") != "604800" {
+				t.Fatalf("body = %s", string(body))
+			}
+			if form.Get("requested_refresh_token_ttl_seconds") != "2592000" {
 				t.Fatalf("body = %s", string(body))
 			}
 			return &http.Response{
@@ -159,10 +177,20 @@ func TestAuthRefreshCommand_UsesBuiltInRequestedTTLsWhenSavedAreMissing(t *testi
 			if err != nil {
 				t.Fatalf("read body: %v", err)
 			}
-			if !strings.Contains(string(body), `"requested_access_token_ttl_seconds":604800`) {
+			form, err := url.ParseQuery(string(body))
+			if err != nil {
+				t.Fatalf("parse body: %v", err)
+			}
+			if form.Get("grant_type") != "refresh_token" {
 				t.Fatalf("body = %s", string(body))
 			}
-			if !strings.Contains(string(body), `"requested_refresh_token_ttl_seconds":2592000`) {
+			if form.Get("refresh_token") != "old-refresh" {
+				t.Fatalf("body = %s", string(body))
+			}
+			if form.Get("requested_access_token_ttl_seconds") != "604800" {
+				t.Fatalf("body = %s", string(body))
+			}
+			if form.Get("requested_refresh_token_ttl_seconds") != "2592000" {
 				t.Fatalf("body = %s", string(body))
 			}
 			return &http.Response{

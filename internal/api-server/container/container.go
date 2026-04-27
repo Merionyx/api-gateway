@@ -64,7 +64,6 @@ type Container struct {
 	OIDCLoginHandler *httphandler.OIDCLoginHandler
 
 	OIDCCallbackHandler *httphandler.OIDCCallbackHandler
-	OIDCRefreshHandler  *httphandler.OIDCRefreshHandler
 	OAuthTokenHandler   *httphandler.OAuthTokenHandler
 
 	ContractsExportHandler *httphandler.ContractsExportHandler
@@ -323,9 +322,6 @@ func (c *Container) initHandlers() {
 	)
 	c.OIDCLoginHandler = httphandler.NewOIDCLoginHandler(c.OIDCLoginUseCase)
 	c.OIDCCallbackHandler = httphandler.NewOIDCCallbackHandler(c.OIDCCallbackUseCase)
-	if c.OIDCRefreshUseCase != nil {
-		c.OIDCRefreshHandler = httphandler.NewOIDCRefreshHandler(c.OIDCRefreshUseCase)
-	}
 	if c.OAuthTokenUseCase != nil {
 		c.OAuthTokenHandler = httphandler.NewOAuthTokenHandler(c.OAuthTokenUseCase)
 	}

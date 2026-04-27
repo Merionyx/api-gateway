@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 
 	"github.com/merionyx/api-gateway/internal/api-server/auth/idpcache"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/kvvalue"
@@ -22,7 +21,6 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/auth/sessioncrypto"
 	"github.com/merionyx/api-gateway/internal/api-server/config"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
-	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
 )
 
 // loginIntentReadDeleter loads and removes OIDC login-intent rows (etcd implementation).
@@ -41,7 +39,7 @@ type envelopeSealer interface {
 	Seal(plaintext []byte) (sessioncrypto.Envelope, error)
 }
 
-// OIDCCallbackUseCase completes GET /api/v1/auth/callback (roadmap ш. 14).
+// OIDCCallbackUseCase completes GET /api/v1/auth/oidc/callback (roadmap ш. 14).
 type OIDCCallbackUseCase struct {
 	byID            map[string]config.OIDCProviderConfig
 	intents         loginIntentReadDeleter
@@ -55,7 +53,6 @@ type OIDCCallbackUseCase struct {
 }
 
 type OIDCCallbackResult struct {
-	Tokens          *apiserver.AuthSessionTokensResponse
 	RedirectURL     string
 	AuthorizationID string
 }
@@ -92,19 +89,7 @@ func NewOIDCCallbackUseCase(
 	}
 }
 
-// Complete exchanges the authorization code, validates id_token, creates a session, and returns our token pair.
-func (u *OIDCCallbackUseCase) Complete(ctx context.Context, code, state string) (apiserver.AuthSessionTokensResponse, error) {
-	out, err := u.CompleteWithResult(ctx, code, state)
-	if err != nil {
-		return apiserver.AuthSessionTokensResponse{}, err
-	}
-	if out.Tokens == nil {
-		return apiserver.AuthSessionTokensResponse{}, fmt.Errorf("%w: oauth authorization flow requires token endpoint exchange", apierrors.ErrInvalidInput)
-	}
-	return *out.Tokens, nil
-}
-
-// CompleteWithResult exchanges the provider code and either returns direct tokens (legacy) or OAuth redirect data.
+// CompleteWithResult exchanges provider code and returns OAuth redirect data for the downstream client.
 func (u *OIDCCallbackUseCase) CompleteWithResult(ctx context.Context, code, state string) (OIDCCallbackResult, error) {
 	var out OIDCCallbackResult
 	if len(u.byID) == 0 {
@@ -125,6 +110,9 @@ func (u *OIDCCallbackUseCase) CompleteWithResult(ctx context.Context, code, stat
 	}
 	if intent.OAuthState != state {
 		return out, fmt.Errorf("%w: oauth state mismatch", apierrors.ErrInvalidInput)
+	}
+	if !isOAuthClientIntent(intent) {
+		return out, fmt.Errorf("%w: oauth callback intent is invalid", apierrors.ErrInvalidInput)
 	}
 
 	p, ok := u.byID[strings.TrimSpace(intent.ProviderID)]
@@ -198,15 +186,12 @@ func (u *OIDCCallbackUseCase) CompleteWithResult(ctx context.Context, code, stat
 	}
 
 	refreshExpiresAt := initialRefreshExpiry(time.Now().UTC(), resolvedTTLs.RefreshTTL, tr)
-	bootstrapRefresh, verifier, err := newOpaqueRefreshTokenAndVerifier()
+	_, verifier, err := newOpaqueRefreshTokenAndVerifier()
 	if err != nil {
 		return out, err
 	}
 
-	sessionID := uuid.NewString()
-	if isOAuthClientIntent(intent) {
-		sessionID = state
-	}
+	sessionID := state
 	sess := kvvalue.SessionValue{
 		EncryptedIDPRefresh: json.RawMessage(envBytes),
 		ClaimsSnapshot:      snap,
@@ -220,52 +205,21 @@ func (u *OIDCCallbackUseCase) CompleteWithResult(ctx context.Context, code, stat
 		return out, err
 	}
 
-	if isOAuthClientIntent(intent) {
-		loc, err := oauthAuthorizeClientRedirect(intent.OAuthClientRedirectURI, state, intent.OAuthClientState)
-		if err != nil {
-			return out, fmt.Errorf("%w: oauth redirect uri: %s", apierrors.ErrInvalidInput, err.Error())
-		}
-		out.RedirectURL = loc
-		out.AuthorizationID = state
-		if u.idpCache != nil {
-			at := strings.TrimSpace(tr.AccessToken)
-			if at != "" {
-				maxAccessExp := time.Now().UTC().Add(resolvedTTLs.AccessTTL)
-				if ttl, ok := idpcache.EntryTTL(u.idpCache.Now(), maxAccessExp, at, tr.ExpiresIn, u.idpOpaqueMaxTTL); ok {
-					u.idpCache.Put(sessionID, at, ttl)
-				}
-			}
-		}
-		return out, nil
-	}
-
-	accessJWT, _, ourAccessExp, err := u.jwt.MintInteractiveAPIAccessJWTFromSnapshot(ctx, subject, snap, resolvedTTLs.AccessTTL)
+	loc, err := oauthAuthorizeClientRedirect(intent.OAuthClientRedirectURI, state, intent.OAuthClientState)
 	if err != nil {
-		return out, err
+		return out, fmt.Errorf("%w: oauth redirect uri: %s", apierrors.ErrInvalidInput, err.Error())
 	}
-
+	out.RedirectURL = loc
+	out.AuthorizationID = state
 	if u.idpCache != nil {
 		at := strings.TrimSpace(tr.AccessToken)
 		if at != "" {
-			if ttl, ok := idpcache.EntryTTL(u.idpCache.Now(), ourAccessExp, at, tr.ExpiresIn, u.idpOpaqueMaxTTL); ok {
+			maxAccessExp := time.Now().UTC().Add(resolvedTTLs.AccessTTL)
+			if ttl, ok := idpcache.EntryTTL(u.idpCache.Now(), maxAccessExp, at, tr.ExpiresIn, u.idpOpaqueMaxTTL); ok {
 				u.idpCache.Put(sessionID, at, ttl)
 			}
 		}
 	}
-
-	if err := u.intents.Delete(ctx, state); err != nil {
-		return out, fmt.Errorf("login-intent delete: %w", err)
-	}
-
-	bt := "Bearer"
-	legacyTokens := apiserver.AuthSessionTokensResponse{
-		AccessToken:      accessJWT,
-		AccessExpiresAt:  ourAccessExp,
-		RefreshToken:     bootstrapRefresh,
-		RefreshExpiresAt: refreshExpiresAt,
-		TokenType:        &bt,
-	}
-	out.Tokens = &legacyTokens
 	return out, nil
 }
 

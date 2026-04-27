@@ -240,7 +240,7 @@ type AuthConfig struct {
 	// Must remain false in production Helm values.
 	AllowInsecureBootstrap bool `mapstructure:"allow_insecure_bootstrap" json:"allow_insecure_bootstrap"`
 
-	// OIDCProviders configures browser OIDC login (GET /api/v1/auth/login). Empty disables login until configured.
+	// OIDCProviders configures OAuth 2.1 authorize flow (GET /api/v1/auth/authorize). Empty disables interactive login until configured.
 	OIDCProviders []OIDCProviderConfig `mapstructure:"oidc_providers" json:"oidc_providers"`
 
 	// LoginIntentLeaseTTL is the etcd lease for login-intent keys (short-lived; default 15m).
