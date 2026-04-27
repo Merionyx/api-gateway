@@ -247,7 +247,7 @@ func TestValidateOIDCProviders_Google(t *testing.T) {
 			AllowedHostedDomains: []string{"example.com"},
 			EmailDomainRoleBindings: []GoogleEmailDomainRoleBinding{{
 				Domain: "example.com",
-				Roles:  []string{"api:admin"},
+				Roles:  []string{"api:role:admin"},
 			}},
 		},
 	}})
@@ -316,7 +316,7 @@ func TestValidateOIDCProviders_Okta(t *testing.T) {
 			AllowedIDTokenGroups: []string{"API-Admins"},
 			GroupRoleBindings: []OktaGroupRoleBinding{{
 				GroupName: "API-Admins",
-				Roles:     []string{"api:admin"},
+				Roles:     []string{"api:role:admin"},
 			}},
 		},
 	}})
@@ -386,7 +386,7 @@ func TestValidateOIDCProviders_Entra(t *testing.T) {
 			AllowedIDTokenGroups: []string{"admins"},
 			GroupRoleBindings: []EntraGroupRoleBinding{{
 				Group: "admins",
-				Roles: []string{"api:admin"},
+				Roles: []string{"api:role:admin"},
 			}},
 		},
 	}})

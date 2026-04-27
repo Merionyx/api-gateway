@@ -97,13 +97,13 @@ func TestGoogleExtraRoles_hdBindings(t *testing.T) {
 	roles, err := googleExtraRoles(&config.GoogleOIDCProviderConfig{
 		HostedDomainRoleBindings: []config.GoogleHostedDomainRoleBinding{{
 			HD:    "example.com",
-			Roles: []string{"api:admin"},
+			Roles: []string{"api:role:admin"},
 		}},
 	}, mc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(roles) != 1 || roles[0] != "api:admin" {
+	if len(roles) != 1 || roles[0] != "api:role:admin" {
 		t.Fatalf("%v", roles)
 	}
 }
@@ -160,13 +160,13 @@ func TestOktaExtraRoles_bindings(t *testing.T) {
 	roles, err := oktaExtraRoles(&config.OktaOIDCProviderConfig{
 		GroupRoleBindings: []config.OktaGroupRoleBinding{{
 			GroupName: "API-Admins",
-			Roles:     []string{"api:admin"},
+			Roles:     []string{"api:role:admin"},
 		}},
 	}, mc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(roles) != 1 || roles[0] != "api:admin" {
+	if len(roles) != 1 || roles[0] != "api:role:admin" {
 		t.Fatalf("%v", roles)
 	}
 }
@@ -222,13 +222,13 @@ func TestEntraExtraRoles_groupBindings(t *testing.T) {
 	roles, err := entraExtraRoles(&config.EntraOIDCProviderConfig{
 		GroupRoleBindings: []config.EntraGroupRoleBinding{{
 			Group: "admins-uuid",
-			Roles: []string{"api:admin"},
+			Roles: []string{"api:role:admin"},
 		}},
 	}, mc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(roles) != 1 || roles[0] != "api:admin" {
+	if len(roles) != 1 || roles[0] != "api:role:admin" {
 		t.Fatalf("%v", roles)
 	}
 }
@@ -277,13 +277,13 @@ func TestGitlabExtraRoles_groupBindings(t *testing.T) {
 		APIV4Base: srv.URL + "/api/v4",
 		GroupRoleBindings: []config.GitLabGroupRoleBinding{{
 			GroupFullPath: "acme/platform",
-			Roles:         []string{"api:admin"},
+			Roles:         []string{"api:role:admin"},
 		}},
 	}, "https://gitlab.com", "oauth-token")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(roles) != 1 || roles[0] != "api:admin" {
+	if len(roles) != 1 || roles[0] != "api:role:admin" {
 		t.Fatalf("%v", roles)
 	}
 }

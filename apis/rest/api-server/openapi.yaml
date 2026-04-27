@@ -1261,7 +1261,7 @@ paths:
       summary: Issue API profile access JWT
       description: |
         Mints a short-lived **API profile** JWT for calling this HTTP API. Request **`IssueApiAccessTokenRequest`** and **201** body **`ApiAccessTokenIssued`** are stable for codegen; semantics/RBAC land in **roadmap step 22**.
-        **RBAC (step 23):** requires role **`api:access_tokens:issue`** or admin role (**`api:role:admin`**, legacy **`api:admin`**) via JWT `roles` and/or API key `roles` in etcd.
+        **RBAC (step 23):** requires role **`api:access_tokens:issue`** or admin role (**`api:role:admin`**) via JWT `roles` and/or API key `roles` in etcd.
       requestBody:
         required: true
         content:
@@ -1294,7 +1294,7 @@ paths:
       summary: Export contract files from Git (via Contract Syncer)
       description: |
         Fetches contract YAML/JSON from a Git repository via the Contract Syncer service (not from etcd). Specify `repository` and `ref`; optionally narrow by `path` and/or a single `contract_name`. Response files carry base64-encoded content.
-        **RBAC (roadmap step 23):** requires **`api:contracts:export`** or admin role (**`api:role:admin`**, legacy **`api:admin`**).
+        **RBAC (roadmap step 23):** requires **`api:contracts:export`** or admin role (**`api:role:admin`**).
       requestBody:
         required: true
         content:

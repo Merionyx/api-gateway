@@ -82,7 +82,7 @@ func subjectHasAny(have []string, required []string) bool {
 }
 
 // RequireAnyHTTPRole writes **403** and returns **true** when the caller lacks required roles.
-// It returns **false** when the caller has **api:admin**, any of **required**, or when **required** is empty.
+// It returns **false** when the caller has **api:role:admin**, any of **required**, or when **required** is empty.
 // Unauthenticated callers must be rejected earlier by APISecurity (problem.Write typically returns nil on success,
 // so a bool is required — do not use the returned error alone as a guard).
 func RequireAnyHTTPRole(c fiber.Ctx, required ...string) (denied bool, _ error) {
