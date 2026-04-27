@@ -61,8 +61,8 @@ On success, agwctl overwrites the saved token pair for that context and keeps th
 			)
 		},
 	}
-	cmd.Flags().StringVar(&accessTTL, "access-ttl", "", "requested access token lifetime (Go duration or seconds, e.g. 168h or 604800)")
-	cmd.Flags().StringVar(&refreshTTL, "refresh-ttl", "", "requested refresh token lifetime (Go duration or seconds, e.g. 720h or 2592000)")
+	cmd.Flags().StringVar(&accessTTL, "access-ttl", "", "requested access token lifetime (default 168h; Go duration or seconds, e.g. 168h or 604800)")
+	cmd.Flags().StringVar(&refreshTTL, "refresh-ttl", "", "requested refresh token lifetime (default 720h; Go duration or seconds, e.g. 720h or 2592000)")
 	return cmd
 }
 
@@ -76,11 +76,16 @@ func runAuthRefresh(ctx context.Context, out io.Writer, server string, httpClien
 		return err
 	}
 	if !accessExplicit {
-		requestedTTLs.AccessTTL = savedTTLs.AccessTTL
+		if savedTTLs.AccessTTL > 0 {
+			requestedTTLs.AccessTTL = savedTTLs.AccessTTL
+		}
 	}
 	if !refreshExplicit {
-		requestedTTLs.RefreshTTL = savedTTLs.RefreshTTL
+		if savedTTLs.RefreshTTL > 0 {
+			requestedTTLs.RefreshTTL = savedTTLs.RefreshTTL
+		}
 	}
+	requestedTTLs = withDefaultRequestedTTLs(requestedTTLs)
 
 	tok, err := httpapi.RefreshSession(ctx, httpClient, server, saved.RefreshToken, requestedTTLs)
 	if err != nil {
@@ -94,13 +99,13 @@ func runAuthRefresh(ctx context.Context, out io.Writer, server string, httpClien
 	if tokenType == "" {
 		tokenType = "Bearer"
 	}
-	requestedAccessTTL := saved.RequestedAccessTokenTTL
-	requestedRefreshTTL := saved.RequestedRefreshTokenTTL
-	if accessExplicit && requestedTTLs.AccessTTL > 0 {
-		requestedAccessTTL = requestedTTLs.AccessTTL.String()
+	requestedAccessTTL := strings.TrimSpace(saved.RequestedAccessTokenTTL)
+	requestedRefreshTTL := strings.TrimSpace(saved.RequestedRefreshTokenTTL)
+	if accessExplicit || requestedAccessTTL == "" {
+		requestedAccessTTL = ttlString(requestedTTLs.AccessTTL)
 	}
-	if refreshExplicit && requestedTTLs.RefreshTTL > 0 {
-		requestedRefreshTTL = requestedTTLs.RefreshTTL.String()
+	if refreshExplicit || requestedRefreshTTL == "" {
+		requestedRefreshTTL = ttlString(requestedTTLs.RefreshTTL)
 	}
 
 	if err := credentials.PutContext(contextName, credentials.Entry{

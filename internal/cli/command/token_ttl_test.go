@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/merionyx/api-gateway/internal/cli/apiserver/httpapi"
 )
 
 func TestParseOptionalTTLFlag_AcceptsDuration(t *testing.T) {
@@ -45,5 +47,28 @@ func TestParseOptionalTTLFlag_RejectsInvalid(t *testing.T) {
 	_, err := parseOptionalTTLFlag("--access-ttl", "abc")
 	if err == nil || !strings.Contains(err.Error(), "time: invalid duration") {
 		t.Fatalf("expected invalid duration error, got %v", err)
+	}
+}
+
+func TestWithDefaultRequestedTTLs(t *testing.T) {
+	t.Parallel()
+
+	got := withDefaultRequestedTTLs(httpapi.RequestedTokenTTLs{})
+	if got.AccessTTL != 7*24*time.Hour || got.RefreshTTL != 30*24*time.Hour {
+		t.Fatalf("ttls = %+v", got)
+	}
+}
+
+func TestTTLString(t *testing.T) {
+	t.Parallel()
+
+	if got := ttlString(7 * 24 * time.Hour); got != "168h" {
+		t.Fatalf("ttlString = %q", got)
+	}
+	if got := ttlString(15 * time.Minute); got != "15m" {
+		t.Fatalf("ttlString = %q", got)
+	}
+	if got := ttlString(45 * time.Second); got != "45s" {
+		t.Fatalf("ttlString = %q", got)
 	}
 }

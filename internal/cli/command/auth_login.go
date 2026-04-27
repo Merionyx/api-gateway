@@ -74,6 +74,7 @@ Tokens are written to ~/.config/agwctl/credentials.yaml (or AGWCTL_CREDENTIALS),
 			if err != nil {
 				return err
 			}
+			requestedTTLs = withDefaultRequestedTTLs(requestedTTLs)
 
 			redirectURI := fmt.Sprintf("http://%s:%d%s", strings.TrimSpace(callbackHost), callbackPort, callbackPath)
 			ln, err := net.Listen("tcp", net.JoinHostPort(callbackHost, fmt.Sprintf("%d", callbackPort)))
@@ -223,8 +224,8 @@ Tokens are written to ~/.config/agwctl/credentials.yaml (or AGWCTL_CREDENTIALS),
 				TokenType:                tt,
 				AccessExpiresAt:          tok.AccessExpiresAt.UTC().Format(time.RFC3339),
 				RefreshExpiresAt:         tok.RefreshExpiresAt.UTC().Format(time.RFC3339),
-				RequestedAccessTokenTTL:  strings.TrimSpace(accessTTL),
-				RequestedRefreshTokenTTL: strings.TrimSpace(refreshTTL),
+				RequestedAccessTokenTTL:  resolvedTTLString(accessTTL, requestedTTLs.AccessTTL),
+				RequestedRefreshTokenTTL: resolvedTTLString(refreshTTL, requestedTTLs.RefreshTTL),
 			}); err != nil {
 				return err
 			}
@@ -240,8 +241,8 @@ Tokens are written to ~/.config/agwctl/credentials.yaml (or AGWCTL_CREDENTIALS),
 	cmd.Flags().StringVar(&callbackHost, "callback-host", defaultCallbackHost, "loopback host for redirect_uri (must match allowlist)")
 	cmd.Flags().IntVar(&callbackPort, "callback-port", defaultCallbackPort, "TCP port for loopback redirect_uri (must match allowlist)")
 	cmd.Flags().BoolVar(&noBrowser, "no-browser", false, "print IdP URL instead of opening a browser")
-	cmd.Flags().StringVar(&accessTTL, "access-ttl", "", "requested access token lifetime (Go duration or seconds, e.g. 168h or 604800)")
-	cmd.Flags().StringVar(&refreshTTL, "refresh-ttl", "", "requested refresh token lifetime (Go duration or seconds, e.g. 720h or 2592000)")
+	cmd.Flags().StringVar(&accessTTL, "access-ttl", "", "requested access token lifetime (default 168h; Go duration or seconds, e.g. 168h or 604800)")
+	cmd.Flags().StringVar(&refreshTTL, "refresh-ttl", "", "requested refresh token lifetime (default 720h; Go duration or seconds, e.g. 720h or 2592000)")
 	return cmd
 }
 

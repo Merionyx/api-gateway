@@ -11,6 +11,11 @@ import (
 	"github.com/merionyx/api-gateway/internal/cli/credentials"
 )
 
+const (
+	defaultRequestedAccessTTL  = 7 * 24 * time.Hour
+	defaultRequestedRefreshTTL = 30 * 24 * time.Hour
+)
+
 func parseOptionalTTLFlag(flagName, raw string) (time.Duration, error) {
 	s := strings.TrimSpace(raw)
 	if s == "" {
@@ -42,6 +47,38 @@ func parseTTLValue(raw string) (time.Duration, error) {
 		return 0, fmt.Errorf("duration seconds %d overflows Go time.Duration", secs)
 	}
 	return time.Duration(secs) * time.Second, nil
+}
+
+func withDefaultRequestedTTLs(ttls httpapi.RequestedTokenTTLs) httpapi.RequestedTokenTTLs {
+	if ttls.AccessTTL <= 0 {
+		ttls.AccessTTL = defaultRequestedAccessTTL
+	}
+	if ttls.RefreshTTL <= 0 {
+		ttls.RefreshTTL = defaultRequestedRefreshTTL
+	}
+	return ttls
+}
+
+func ttlString(d time.Duration) string {
+	switch {
+	case d <= 0:
+		return ""
+	case d%time.Hour == 0:
+		return fmt.Sprintf("%dh", d/time.Hour)
+	case d%time.Minute == 0:
+		return fmt.Sprintf("%dm", d/time.Minute)
+	case d%time.Second == 0:
+		return fmt.Sprintf("%ds", d/time.Second)
+	default:
+		return d.String()
+	}
+}
+
+func resolvedTTLString(raw string, resolved time.Duration) string {
+	if s := strings.TrimSpace(raw); s != "" {
+		return s
+	}
+	return ttlString(resolved)
 }
 
 func requestedTTLsFromFlags(accessFlag, refreshFlag string) (httpapi.RequestedTokenTTLs, error) {

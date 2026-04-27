@@ -142,6 +142,49 @@ func TestAuthRefreshCommand_UsesSavedRequestedTTLsByDefault(t *testing.T) {
 	}
 }
 
+func TestAuthRefreshCommand_UsesBuiltInRequestedTTLsWhenSavedAreMissing(t *testing.T) {
+	t.Setenv("AGWCTL_CREDENTIALS", filepath.Join(t.TempDir(), "credentials.yaml"))
+	if err := credentials.PutContext("dev", credentials.Entry{
+		ProviderID:   "google",
+		AccessToken:  "old-access",
+		RefreshToken: "old-refresh",
+		TokenType:    "Bearer",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	httpClient := &http.Client{
+		Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatalf("read body: %v", err)
+			}
+			if !strings.Contains(string(body), `"requested_access_token_ttl_seconds":604800`) {
+				t.Fatalf("body = %s", string(body))
+			}
+			if !strings.Contains(string(body), `"requested_refresh_token_ttl_seconds":2592000`) {
+				t.Fatalf("body = %s", string(body))
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+				Body:       io.NopCloser(strings.NewReader(`{"access_token":"new-access","access_expires_at":"2026-05-01T00:00:00Z","refresh_token":"new-refresh","refresh_expires_at":"2026-05-31T00:00:00Z","token_type":"Bearer"}`)),
+			}, nil
+		}),
+	}
+
+	if err := runAuthRefresh(context.Background(), io.Discard, "https://api.example.test", httpClient, "dev", httpapi.RequestedTokenTTLs{}, false, false); err != nil {
+		t.Fatal(err)
+	}
+	got, err := credentials.GetContext("dev")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.RequestedAccessTokenTTL != "168h" || got.RequestedRefreshTokenTTL != "720h" {
+		t.Fatalf("saved credentials = %+v", got)
+	}
+}
+
 func TestNewAuthCommand_IncludesRefreshSubcommand(t *testing.T) {
 	cmd := NewAuthCommand(func() (string, error) { return "https://api.example.test", nil })
 	found, _, err := cmd.Find([]string{"refresh"})
