@@ -384,6 +384,9 @@ type OAuthTokenError struct {
 
 // OAuthTokenRequestForm defines model for OAuthTokenRequestForm.
 type OAuthTokenRequestForm struct {
+	// AccessTtl Optional extension: requested access token lifetime in seconds (server clamps to policy).
+	AccessTtl *int `json:"access_ttl,omitempty"`
+
 	// ClientId OAuth client id passed in authorize request.
 	ClientId *string `json:"client_id,omitempty"`
 
@@ -400,11 +403,8 @@ type OAuthTokenRequestForm struct {
 	// RefreshToken Required for `refresh_token` grant.
 	RefreshToken *string `json:"refresh_token,omitempty"`
 
-	// RequestedAccessTokenTtlSeconds Optional extension: requested access token lifetime in seconds (server clamps to policy).
-	RequestedAccessTokenTtlSeconds *int `json:"requested_access_token_ttl_seconds,omitempty"`
-
-	// RequestedRefreshTokenTtlSeconds Optional extension: requested refresh token lifetime in seconds (server clamps to policy and provider limits).
-	RequestedRefreshTokenTtlSeconds *int `json:"requested_refresh_token_ttl_seconds,omitempty"`
+	// RefreshTtl Optional extension: requested refresh token lifetime in seconds (server clamps to policy and provider limits).
+	RefreshTtl *int `json:"refresh_ttl,omitempty"`
 }
 
 // OAuthTokenRequestFormGrantType defines model for OAuthTokenRequestForm.GrantType.
@@ -716,12 +716,6 @@ type AuthorizeOidcParams struct {
 
 	// Nonce Optional OIDC `nonce` (replay protection); echoed into the authorization request when set.
 	Nonce *string `form:"nonce,omitempty" json:"nonce,omitempty"`
-
-	// RequestedAccessTokenTtlSeconds Optional requested access token lifetime in seconds. The server clamps this to policy.
-	RequestedAccessTokenTtlSeconds *int `form:"requested_access_token_ttl_seconds,omitempty" json:"requested_access_token_ttl_seconds,omitempty"`
-
-	// RequestedRefreshTokenTtlSeconds Optional requested refresh-chain lifetime in seconds. The server clamps this to policy and provider refresh limits.
-	RequestedRefreshTokenTtlSeconds *int `form:"requested_refresh_token_ttl_seconds,omitempty" json:"requested_refresh_token_ttl_seconds,omitempty"`
 }
 
 // AuthorizeOidcParamsResponseType defines parameters for AuthorizeOidc.
@@ -1668,30 +1662,6 @@ func NewAuthorizeOidcRequest(server string, params *AuthorizeOidcParams) (*http.
 		if params.Nonce != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "nonce", *params.Nonce, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.RequestedAccessTokenTtlSeconds != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "requested_access_token_ttl_seconds", *params.RequestedAccessTokenTtlSeconds, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			} else {
-				for _, qp := range strings.Split(queryFrag, "&") {
-					rawQueryFragments = append(rawQueryFragments, qp)
-				}
-			}
-
-		}
-
-		if params.RequestedRefreshTokenTtlSeconds != nil {
-
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "requested_refresh_token_ttl_seconds", *params.RequestedRefreshTokenTtlSeconds, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {

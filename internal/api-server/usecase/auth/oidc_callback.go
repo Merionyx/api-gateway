@@ -162,14 +162,6 @@ func (u *OIDCCallbackUseCase) CompleteWithResult(ctx context.Context, code, stat
 		return out, fmt.Errorf("%w: cannot derive subject from id_token (need email or sub)", apierrors.ErrInvalidInput)
 	}
 
-	resolvedTTLs, err := resolveRequestedTokenTTLs(u.tokenTTLPolicy, RequestedTokenTTLs{
-		AccessTTL:  time.Duration(intent.RequestedAccessTokenTTLSeconds) * time.Second,
-		RefreshTTL: time.Duration(intent.RequestedRefreshTokenTTLSeconds) * time.Second,
-	})
-	if err != nil {
-		return out, fmt.Errorf("%w: %s", apierrors.ErrInvalidInput, err.Error())
-	}
-
 	snap, err := claimsSnapshotFromProvider(ctx, p, idClaims, strings.TrimSpace(tr.AccessToken), u.hc)
 	if err != nil {
 		return out, err
@@ -185,7 +177,15 @@ func (u *OIDCCallbackUseCase) CompleteWithResult(ctx context.Context, code, stat
 		return out, err
 	}
 
-	refreshExpiresAt := initialRefreshExpiry(time.Now().UTC(), resolvedTTLs.RefreshTTL, tr)
+	now := time.Now().UTC()
+	refreshCapTTL := u.tokenTTLPolicy.MaxRefreshTTL
+	if refreshCapTTL <= 0 {
+		refreshCapTTL = u.tokenTTLPolicy.DefaultRefreshTTL
+	}
+	if refreshCapTTL <= 0 {
+		return out, fmt.Errorf("%w: invalid refresh ttl policy", apierrors.ErrInvalidInput)
+	}
+	refreshExpiresAt := initialRefreshExpiry(now, refreshCapTTL, tr)
 	_, verifier, err := newOpaqueRefreshTokenAndVerifier()
 	if err != nil {
 		return out, err
@@ -214,7 +214,14 @@ func (u *OIDCCallbackUseCase) CompleteWithResult(ctx context.Context, code, stat
 	if u.idpCache != nil {
 		at := strings.TrimSpace(tr.AccessToken)
 		if at != "" {
-			maxAccessExp := time.Now().UTC().Add(resolvedTTLs.AccessTTL)
+			accessCapTTL := u.tokenTTLPolicy.MaxAccessTTL
+			if accessCapTTL <= 0 {
+				accessCapTTL = u.tokenTTLPolicy.DefaultAccessTTL
+			}
+			if accessCapTTL <= 0 {
+				accessCapTTL = time.Minute
+			}
+			maxAccessExp := now.Add(accessCapTTL)
 			if ttl, ok := idpcache.EntryTTL(u.idpCache.Now(), maxAccessExp, at, tr.ExpiresIn, u.idpOpaqueMaxTTL); ok {
 				u.idpCache.Put(sessionID, at, ttl)
 			}

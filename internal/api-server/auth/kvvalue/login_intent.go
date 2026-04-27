@@ -29,11 +29,6 @@ type LoginIntentValue struct {
 	// Nonce is optional OIDC nonce for id_token validation at callback (roadmap ш. 13–14).
 	Nonce string `json:"nonce,omitempty"`
 
-	// RequestedAccessTokenTTLSeconds is the client-requested access token lifetime for callback issuance.
-	RequestedAccessTokenTTLSeconds int64 `json:"requested_access_token_ttl_seconds,omitempty"`
-	// RequestedRefreshTokenTTLSeconds is the client-requested refresh-chain lifetime for callback issuance.
-	RequestedRefreshTokenTTLSeconds int64 `json:"requested_refresh_token_ttl_seconds,omitempty"`
-
 	// OAuthClientID is the downstream OAuth client_id from GET /v1/auth/authorize.
 	OAuthClientID string `json:"oauth_client_id,omitempty"`
 	// OAuthClientRedirectURI is the downstream OAuth redirect_uri used after IdP callback.

@@ -30,8 +30,6 @@ type OIDCLoginStartRequest struct {
 	RedirectURI         string
 	ServerCallbackURI   string
 	Nonce               string
-	RequestedAccessTTL  time.Duration
-	RequestedRefreshTTL time.Duration
 	ResponseType        string
 	ClientID            string
 	State               string
@@ -41,11 +39,10 @@ type OIDCLoginStartRequest struct {
 
 // OIDCLoginUseCase handles GET /v1/auth/authorize (roadmap ш. 13).
 type OIDCLoginUseCase struct {
-	byID           map[string]config.OIDCProviderConfig
-	leaseTTL       time.Duration
-	intents        loginIntentStore
-	hc             *http.Client
-	tokenTTLPolicy TokenTTLPolicy
+	byID     map[string]config.OIDCProviderConfig
+	leaseTTL time.Duration
+	intents  loginIntentStore
+	hc       *http.Client
 }
 
 // NewOIDCLoginUseCase builds a use case. leaseTTL<=0 defaults to 15m; hc nil uses http.DefaultClient.
@@ -54,7 +51,6 @@ func NewOIDCLoginUseCase(
 	leaseTTL time.Duration,
 	intents loginIntentStore,
 	hc *http.Client,
-	tokenTTLPolicy TokenTTLPolicy,
 ) *OIDCLoginUseCase {
 	by := make(map[string]config.OIDCProviderConfig, len(providers))
 	for _, p := range providers {
@@ -66,7 +62,7 @@ func NewOIDCLoginUseCase(
 	if hc == nil {
 		hc = http.DefaultClient
 	}
-	return &OIDCLoginUseCase{byID: by, leaseTTL: leaseTTL, intents: intents, hc: hc, tokenTTLPolicy: tokenTTLPolicy}
+	return &OIDCLoginUseCase{byID: by, leaseTTL: leaseTTL, intents: intents, hc: hc}
 }
 
 // RedirectURIAllowlisted reports whether redirect matches one allowlisted entry (exact string match after TrimSpace).
@@ -88,14 +84,6 @@ func (u *OIDCLoginUseCase) Start(ctx context.Context, req OIDCLoginStartRequest)
 	if err := validateOAuthAuthorizeRequest(req); err != nil {
 		return "", fmt.Errorf("%w: %s", apierrors.ErrInvalidInput, err.Error())
 	}
-	resolvedTTLs, err := resolveRequestedTokenTTLs(u.tokenTTLPolicy, RequestedTokenTTLs{
-		AccessTTL:  req.RequestedAccessTTL,
-		RefreshTTL: req.RequestedRefreshTTL,
-	})
-	if err != nil {
-		return "", fmt.Errorf("%w: %s", apierrors.ErrInvalidInput, err.Error())
-	}
-
 	providerID, err := u.resolveProviderID(strings.TrimSpace(req.ProviderID))
 	if err != nil {
 		return "", err
@@ -138,18 +126,16 @@ func (u *OIDCLoginUseCase) Start(ctx context.Context, req OIDCLoginStartRequest)
 	state := intentID
 
 	val := kvvalue.LoginIntentValue{
-		ProviderID:                      strings.TrimSpace(p.ID),
-		RedirectURI:                     idpRedirectURI,
-		OAuthState:                      state,
-		PKCEVerifier:                    ver,
-		Nonce:                           strings.TrimSpace(req.Nonce),
-		RequestedAccessTokenTTLSeconds:  int64(resolvedTTLs.AccessTTL / time.Second),
-		RequestedRefreshTokenTTLSeconds: int64(resolvedTTLs.RefreshTTL / time.Second),
-		OAuthClientID:                   strings.TrimSpace(req.ClientID),
-		OAuthClientRedirectURI:          clientRedirectURI,
-		OAuthClientState:                strings.TrimSpace(req.State),
-		OAuthClientCodeChallenge:        strings.TrimSpace(req.CodeChallenge),
-		OAuthClientCodeChallengeMethod:  "S256",
+		ProviderID:                     strings.TrimSpace(p.ID),
+		RedirectURI:                    idpRedirectURI,
+		OAuthState:                     state,
+		PKCEVerifier:                   ver,
+		Nonce:                          strings.TrimSpace(req.Nonce),
+		OAuthClientID:                  strings.TrimSpace(req.ClientID),
+		OAuthClientRedirectURI:         clientRedirectURI,
+		OAuthClientState:               strings.TrimSpace(req.State),
+		OAuthClientCodeChallenge:       strings.TrimSpace(req.CodeChallenge),
+		OAuthClientCodeChallengeMethod: "S256",
 	}
 	if err := u.intents.Create(ctx, intentID, val, u.leaseTTL); err != nil {
 		return "", err

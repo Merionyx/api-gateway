@@ -134,10 +134,10 @@ func TestAuthRefreshCommand_UsesSavedRequestedTTLsByDefault(t *testing.T) {
 			if form.Get("refresh_token") != "old-refresh" {
 				t.Fatalf("body = %s", string(body))
 			}
-			if form.Get("requested_access_token_ttl_seconds") != "604800" {
+			if form.Get("access_ttl") != "604800" {
 				t.Fatalf("body = %s", string(body))
 			}
-			if form.Get("requested_refresh_token_ttl_seconds") != "2592000" {
+			if form.Get("refresh_ttl") != "2592000" {
 				t.Fatalf("body = %s", string(body))
 			}
 			return &http.Response{
@@ -187,10 +187,10 @@ func TestAuthRefreshCommand_UsesBuiltInRequestedTTLsWhenSavedAreMissing(t *testi
 			if form.Get("refresh_token") != "old-refresh" {
 				t.Fatalf("body = %s", string(body))
 			}
-			if form.Get("requested_access_token_ttl_seconds") != "604800" {
+			if form.Get("access_ttl") != "604800" {
 				t.Fatalf("body = %s", string(body))
 			}
-			if form.Get("requested_refresh_token_ttl_seconds") != "2592000" {
+			if form.Get("refresh_ttl") != "2592000" {
 				t.Fatalf("body = %s", string(body))
 			}
 			return &http.Response{

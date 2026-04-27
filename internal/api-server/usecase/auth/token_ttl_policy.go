@@ -20,7 +20,7 @@ type TokenTTLPolicy struct {
 func resolveRequestedTokenTTLs(policy TokenTTLPolicy, requested RequestedTokenTTLs) (RequestedTokenTTLs, error) {
 	accessTTL := policy.DefaultAccessTTL
 	if requested.AccessTTL < 0 {
-		return RequestedTokenTTLs{}, fmt.Errorf("requested_access_token_ttl_seconds must be > 0")
+		return RequestedTokenTTLs{}, fmt.Errorf("access_ttl must be > 0")
 	}
 	if requested.AccessTTL > 0 {
 		accessTTL = requested.AccessTTL
@@ -31,7 +31,7 @@ func resolveRequestedTokenTTLs(policy TokenTTLPolicy, requested RequestedTokenTT
 
 	refreshTTL := policy.DefaultRefreshTTL
 	if requested.RefreshTTL < 0 {
-		return RequestedTokenTTLs{}, fmt.Errorf("requested_refresh_token_ttl_seconds must be > 0")
+		return RequestedTokenTTLs{}, fmt.Errorf("refresh_ttl must be > 0")
 	}
 	refreshExplicit := requested.RefreshTTL > 0
 	if refreshExplicit {
@@ -42,11 +42,11 @@ func resolveRequestedTokenTTLs(policy TokenTTLPolicy, requested RequestedTokenTT
 	}
 	if refreshTTL < accessTTL {
 		if refreshExplicit {
-			return RequestedTokenTTLs{}, fmt.Errorf("requested_refresh_token_ttl_seconds (%s) must be >= requested_access_token_ttl_seconds (%s)", refreshTTL, accessTTL)
+			return RequestedTokenTTLs{}, fmt.Errorf("refresh_ttl (%s) must be >= access_ttl (%s)", refreshTTL, accessTTL)
 		}
 		refreshTTL = accessTTL
 		if refreshTTL > policy.MaxRefreshTTL {
-			return RequestedTokenTTLs{}, fmt.Errorf("requested access token ttl (%s) exceeds refresh policy maximum (%s)", accessTTL, policy.MaxRefreshTTL)
+			return RequestedTokenTTLs{}, fmt.Errorf("access_ttl (%s) exceeds refresh policy maximum (%s)", accessTTL, policy.MaxRefreshTTL)
 		}
 	}
 

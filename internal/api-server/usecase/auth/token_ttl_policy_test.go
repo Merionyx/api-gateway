@@ -70,7 +70,7 @@ func TestResolveRequestedTokenTTLs_RejectsExplicitRefreshShorterThanAccess(t *te
 		AccessTTL:  2 * time.Hour,
 		RefreshTTL: time.Hour,
 	})
-	if err == nil || !strings.Contains(err.Error(), "requested_refresh_token_ttl_seconds") {
+	if err == nil || !strings.Contains(err.Error(), "refresh_ttl") {
 		t.Fatalf("got %v", err)
 	}
 }

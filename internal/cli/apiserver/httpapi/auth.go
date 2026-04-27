@@ -38,10 +38,10 @@ func RefreshSession(ctx context.Context, httpClient *http.Client, serverURL, ref
 		return nil, err
 	}
 	resp, err := c.TokenOidcWithFormdataBodyWithResponse(ctx, apiserverclient.TokenOidcFormdataRequestBody{
-		GrantType:                       apiserverclient.RefreshToken,
-		RefreshToken:                    &rt,
-		RequestedAccessTokenTtlSeconds:  optionalSeconds(requestedTTLs.AccessTTL),
-		RequestedRefreshTokenTtlSeconds: optionalSeconds(requestedTTLs.RefreshTTL),
+		GrantType:    apiserverclient.RefreshToken,
+		RefreshToken: &rt,
+		AccessTtl:    optionalSeconds(requestedTTLs.AccessTTL),
+		RefreshTtl:   optionalSeconds(requestedTTLs.RefreshTTL),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)

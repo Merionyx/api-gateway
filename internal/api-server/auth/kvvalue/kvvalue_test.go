@@ -181,9 +181,6 @@ func TestLoginIntentMigrateV2ToLatest(t *testing.T) {
 	if got.Nonce != "n1" {
 		t.Fatalf("nonce %q", got.Nonce)
 	}
-	if got.RequestedAccessTokenTTLSeconds != 0 || got.RequestedRefreshTokenTTLSeconds != 0 {
-		t.Fatalf("unexpected requested ttls: %+v", got)
-	}
 }
 
 func TestLoginIntentMarshalRequiresFields(t *testing.T) {
@@ -200,20 +197,18 @@ func TestLoginIntentMarshalRequiresFields(t *testing.T) {
 func TestLoginIntentNonceRoundtrip(t *testing.T) {
 	t.Parallel()
 	v := LoginIntentValue{
-		SchemaVersion:                   LoginIntentSchemaLatest,
-		ProviderID:                      "p",
-		RedirectURI:                     "https://a/cb",
-		OAuthState:                      "st",
-		PKCEVerifier:                    "pv",
-		IntentProtocol:                  DefaultIntentProtocol,
-		Nonce:                           "n-1",
-		RequestedAccessTokenTTLSeconds:  3600,
-		RequestedRefreshTokenTTLSeconds: 7200,
-		OAuthClientID:                   "postman",
-		OAuthClientRedirectURI:          "https://oauth.pstmn.io/v1/callback",
-		OAuthClientState:                "client-state-1",
-		OAuthClientCodeChallenge:        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~",
-		OAuthClientCodeChallengeMethod:  "S256",
+		SchemaVersion:                  LoginIntentSchemaLatest,
+		ProviderID:                     "p",
+		RedirectURI:                    "https://a/cb",
+		OAuthState:                     "st",
+		PKCEVerifier:                   "pv",
+		IntentProtocol:                 DefaultIntentProtocol,
+		Nonce:                          "n-1",
+		OAuthClientID:                  "postman",
+		OAuthClientRedirectURI:         "https://oauth.pstmn.io/v1/callback",
+		OAuthClientState:               "client-state-1",
+		OAuthClientCodeChallenge:       "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~",
+		OAuthClientCodeChallengeMethod: "S256",
 	}
 	raw, err := MarshalLoginIntentValueJSON(v)
 	if err != nil {
@@ -225,9 +220,6 @@ func TestLoginIntentNonceRoundtrip(t *testing.T) {
 	}
 	if got.Nonce != "n-1" {
 		t.Fatalf("nonce %q", got.Nonce)
-	}
-	if got.RequestedAccessTokenTTLSeconds != 3600 || got.RequestedRefreshTokenTTLSeconds != 7200 {
-		t.Fatalf("requested ttls %+v", got)
 	}
 	if got.OAuthClientID != "postman" || got.OAuthClientRedirectURI != "https://oauth.pstmn.io/v1/callback" {
 		t.Fatalf("oauth client fields %+v", got)

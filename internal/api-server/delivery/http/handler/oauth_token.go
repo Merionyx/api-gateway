@@ -35,14 +35,14 @@ func (h *OAuthTokenHandler) Token(c fiber.Ctx) error {
 	}
 
 	req := auth.OAuthTokenRequest{
-		GrantType:           grantType,
-		Code:                strings.TrimSpace(c.FormValue("code")),
-		RedirectURI:         strings.TrimSpace(c.FormValue("redirect_uri")),
-		ClientID:            clientID,
-		CodeVerifier:        strings.TrimSpace(c.FormValue("code_verifier")),
-		RefreshToken:        strings.TrimSpace(c.FormValue("refresh_token")),
-		RequestedAccessTTL:  durationFromOptionalFormSeconds(c.FormValue("requested_access_token_ttl_seconds")),
-		RequestedRefreshTTL: durationFromOptionalFormSeconds(c.FormValue("requested_refresh_token_ttl_seconds")),
+		GrantType:    grantType,
+		Code:         strings.TrimSpace(c.FormValue("code")),
+		RedirectURI:  strings.TrimSpace(c.FormValue("redirect_uri")),
+		ClientID:     clientID,
+		CodeVerifier: strings.TrimSpace(c.FormValue("code_verifier")),
+		RefreshToken: strings.TrimSpace(c.FormValue("refresh_token")),
+		AccessTTL:    durationFromOptionalFormSeconds(c.FormValue("access_ttl")),
+		RefreshTTL:   durationFromOptionalFormSeconds(c.FormValue("refresh_ttl")),
 	}
 
 	out, err := h.uc.Exchange(ctx, req)

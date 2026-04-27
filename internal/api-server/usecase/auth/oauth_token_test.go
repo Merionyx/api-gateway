@@ -88,8 +88,6 @@ func TestOAuthTokenUseCase_ExchangeAuthorizationCode_SuccessAndOneTimeCode(t *te
 			OAuthClientState:                "client-state-1",
 			OAuthClientCodeChallenge:        challenge,
 			OAuthClientCodeChallengeMethod:  "S256",
-			RequestedAccessTokenTTLSeconds:  3600,
-			RequestedRefreshTokenTTLSeconds: 7200,
 		},
 	}}
 

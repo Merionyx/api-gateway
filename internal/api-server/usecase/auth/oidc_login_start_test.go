@@ -37,12 +37,7 @@ func TestOIDCLoginUseCase_Start_RedirectNotAllowlisted(t *testing.T) {
 		Issuer:               "https://issuer.unused.example",
 		ClientID:             "c",
 		RedirectURIAllowlist: []string{"http://127.0.0.1:8080/cb"},
-	}}, time.Minute, stub, http.DefaultClient, TokenTTLPolicy{
-		DefaultAccessTTL:  5 * time.Minute,
-		MaxAccessTTL:      7 * 24 * time.Hour,
-		DefaultRefreshTTL: 7 * 24 * time.Hour,
-		MaxRefreshTTL:     30 * 24 * time.Hour,
-	})
+	}}, time.Minute, stub, http.DefaultClient)
 	_, err := uc.Start(t.Context(), OIDCLoginStartRequest{
 		ProviderID:          "p1",
 		RedirectURI:         "http://127.0.0.1:9999/wrong",
@@ -81,20 +76,13 @@ func TestOIDCLoginUseCase_Start_HappyPath(t *testing.T) {
 		Issuer:               srv.URL,
 		ClientID:             "cid",
 		RedirectURIAllowlist: []string{"http://127.0.0.1:8080/cb"},
-	}}, time.Minute, stub, srv.Client(), TokenTTLPolicy{
-		DefaultAccessTTL:  5 * time.Minute,
-		MaxAccessTTL:      7 * 24 * time.Hour,
-		DefaultRefreshTTL: 7 * 24 * time.Hour,
-		MaxRefreshTTL:     30 * 24 * time.Hour,
-	})
+	}}, time.Minute, stub, srv.Client())
 
 	loc, err := uc.Start(t.Context(), OIDCLoginStartRequest{
 		ProviderID:          "p1",
 		RedirectURI:         "http://127.0.0.1:8080/cb",
 		ServerCallbackURI:   "https://api.example.com/v1/auth/callback",
 		Nonce:               "n1",
-		RequestedAccessTTL:  24 * time.Hour,
-		RequestedRefreshTTL: 10 * 24 * time.Hour,
 		ResponseType:        "code",
 		ClientID:            "postman",
 		State:               "state-1",
@@ -127,9 +115,6 @@ func TestOIDCLoginUseCase_Start_HappyPath(t *testing.T) {
 	}
 	if stub.last.OAuthState == "" || stub.last.PKCEVerifier == "" {
 		t.Fatalf("intent: %+v", stub.last)
-	}
-	if stub.last.RequestedAccessTokenTTLSeconds != 24*3600 || stub.last.RequestedRefreshTokenTTLSeconds != 10*24*3600 {
-		t.Fatalf("intent ttls %+v", stub.last)
 	}
 	if stub.last.OAuthClientID != "postman" || stub.last.OAuthClientRedirectURI != "http://127.0.0.1:8080/cb" {
 		t.Fatalf("oauth client intent %+v", stub.last)

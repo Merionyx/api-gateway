@@ -39,8 +39,6 @@ func (h *OIDCLoginHandler) Authorize(c fiber.Ctx, params apiserver.AuthorizeOidc
 		RedirectURI:         params.RedirectUri,
 		ServerCallbackURI:   c.BaseURL() + "/v1/auth/callback",
 		Nonce:               nonce,
-		RequestedAccessTTL:  durationFromOptionalSeconds(params.RequestedAccessTokenTtlSeconds),
-		RequestedRefreshTTL: durationFromOptionalSeconds(params.RequestedRefreshTokenTtlSeconds),
 		ResponseType:        string(params.ResponseType),
 		ClientID:            params.ClientId,
 		State:               stringOrEmpty(params.State),

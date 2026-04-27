@@ -203,15 +203,13 @@ func runAuthLogin(
 	clientID := "agwctl"
 	state := clientState
 	authorizeResp, err := apiNoRedir.AuthorizeOidc(ctx, &apiserverclient.AuthorizeOidcParams{
-		ProviderId:                      &pid,
-		RedirectUri:                     redirectURI,
-		ResponseType:                    apiserverclient.Code,
-		ClientId:                        clientID,
-		State:                           &state,
-		CodeChallenge:                   codeChallenge,
-		CodeChallengeMethod:             apiserverclient.S256,
-		RequestedAccessTokenTtlSeconds:  optionalSeconds(requestedTTLs.AccessTTL),
-		RequestedRefreshTokenTtlSeconds: optionalSeconds(requestedTTLs.RefreshTTL),
+		ProviderId:          &pid,
+		RedirectUri:         redirectURI,
+		ResponseType:        apiserverclient.Code,
+		ClientId:            clientID,
+		State:               &state,
+		CodeChallenge:       codeChallenge,
+		CodeChallengeMethod: apiserverclient.S256,
 	})
 	if err != nil {
 		return fmt.Errorf("authorize request: %w", err)
@@ -255,13 +253,13 @@ func runAuthLogin(
 		return err
 	}
 	tokenResp, err := apiClient.TokenOidcWithFormdataBodyWithResponse(waitCtx, apiserverclient.TokenOidcFormdataRequestBody{
-		GrantType:                       apiserverclient.AuthorizationCode,
-		Code:                            &cb.code,
-		RedirectUri:                     &redirectURIForToken,
-		ClientId:                        &clientID,
-		CodeVerifier:                    &codeVerifier,
-		RequestedAccessTokenTtlSeconds:  optionalSeconds(requestedTTLs.AccessTTL),
-		RequestedRefreshTokenTtlSeconds: optionalSeconds(requestedTTLs.RefreshTTL),
+		GrantType:    apiserverclient.AuthorizationCode,
+		Code:         &cb.code,
+		RedirectUri:  &redirectURIForToken,
+		ClientId:     &clientID,
+		CodeVerifier: &codeVerifier,
+		AccessTtl:    optionalSeconds(requestedTTLs.AccessTTL),
+		RefreshTtl:   optionalSeconds(requestedTTLs.RefreshTTL),
 	})
 	if err != nil {
 		return fmt.Errorf("token endpoint: %w", err)

@@ -28,14 +28,14 @@ type oauthTokenSessionStore interface {
 }
 
 type OAuthTokenRequest struct {
-	GrantType           string
-	Code                string
-	RedirectURI         string
-	ClientID            string
-	CodeVerifier        string
-	RefreshToken        string
-	RequestedAccessTTL  time.Duration
-	RequestedRefreshTTL time.Duration
+	GrantType    string
+	Code         string
+	RedirectURI  string
+	ClientID     string
+	CodeVerifier string
+	RefreshToken string
+	AccessTTL    time.Duration
+	RefreshTTL   time.Duration
 }
 
 type OAuthTokenUseCase struct {
@@ -135,11 +135,16 @@ func (u *OAuthTokenUseCase) exchangeAuthorizationCode(ctx context.Context, req O
 	}
 
 	resolvedTTLs, err := resolveRequestedTokenTTLs(u.tokenTTLPolicy, RequestedTokenTTLs{
-		AccessTTL:  time.Duration(intent.RequestedAccessTokenTTLSeconds) * time.Second,
-		RefreshTTL: time.Duration(intent.RequestedRefreshTokenTTLSeconds) * time.Second,
+		AccessTTL:  req.AccessTTL,
+		RefreshTTL: req.RefreshTTL,
 	})
 	if err != nil {
 		return apiserver.OAuthTokenResponse{}, fmt.Errorf("%w: %s", apierrors.ErrInvalidInput, err.Error())
+	}
+	now := time.Now().UTC()
+	refreshExpiresAt := sessionRefreshExpiryFromRequest(now, sess.RefreshExpiresAt, resolvedTTLs.RefreshTTL)
+	if !refreshExpiresAt.After(now) {
+		return apiserver.OAuthTokenResponse{}, apierrors.ErrSessionRefreshExpired
 	}
 
 	subject, err := subjectFromClaimsSnapshot(sess.ClaimsSnapshot)
@@ -162,7 +167,7 @@ func (u *OAuthTokenUseCase) exchangeAuthorizationCode(ctx context.Context, req O
 		LoginIntentID:       sess.LoginIntentID,
 		ProviderID:          strings.TrimSpace(sess.ProviderID),
 		OurRefreshVerifier:  newVerifier,
-		RefreshExpiresAt:    sess.RefreshExpiresAt,
+		RefreshExpiresAt:    refreshExpiresAt,
 	}
 	if err := u.sessions.ReplaceCASWithRefreshIndex(ctx, code, sess.OurRefreshVerifier, newVerifier, newSess, modRev); err != nil {
 		if errors.Is(err, etcd.ErrSessionCASConflict) {
@@ -172,7 +177,7 @@ func (u *OAuthTokenUseCase) exchangeAuthorizationCode(ctx context.Context, req O
 	}
 	_ = u.intents.Delete(ctx, code)
 
-	return oauthTokenResponse(accessJWT, accessExp, refreshToken, sess.RefreshExpiresAt), nil
+	return oauthTokenResponse(accessJWT, accessExp, refreshToken, refreshExpiresAt), nil
 }
 
 func (u *OAuthTokenUseCase) exchangeRefreshToken(ctx context.Context, req OAuthTokenRequest) (apiserver.OAuthTokenResponse, error) {
@@ -181,13 +186,24 @@ func (u *OAuthTokenUseCase) exchangeRefreshToken(ctx context.Context, req OAuthT
 	}
 	out, err := u.refreshUC.Refresh(ctx, OIDCRefreshRequest{
 		RefreshToken:        strings.TrimSpace(req.RefreshToken),
-		RequestedAccessTTL:  req.RequestedAccessTTL,
-		RequestedRefreshTTL: req.RequestedRefreshTTL,
+		RequestedAccessTTL:  req.AccessTTL,
+		RequestedRefreshTTL: req.RefreshTTL,
 	})
 	if err != nil {
 		return apiserver.OAuthTokenResponse{}, err
 	}
 	return oauthTokenResponse(out.AccessToken, out.AccessExpiresAt, out.RefreshToken, out.RefreshExpiresAt), nil
+}
+
+func sessionRefreshExpiryFromRequest(now time.Time, absoluteCap time.Time, requestedTTL time.Duration) time.Time {
+	expiresAt := now.Add(requestedTTL)
+	if absoluteCap.IsZero() {
+		return expiresAt
+	}
+	if expiresAt.Before(absoluteCap) {
+		return expiresAt
+	}
+	return absoluteCap
 }
 
 func oauthTokenResponse(accessToken string, accessExpiresAt time.Time, refreshToken string, refreshExpiresAt time.Time) apiserver.OAuthTokenResponse {

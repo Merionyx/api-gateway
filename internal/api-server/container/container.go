@@ -216,12 +216,6 @@ func (c *Container) initUseCases() error {
 		c.Config.Auth.LoginIntentLeaseTTL,
 		c.LoginIntentRepository,
 		&http.Client{Timeout: 12 * time.Second},
-		auth.TokenTTLPolicy{
-			DefaultAccessTTL:  config.EffectiveInteractiveAccessTokenTTL(c.Config.Auth.InteractiveAccessTokenTTL),
-			MaxAccessTTL:      config.EffectiveInteractiveAccessTokenMaxTTL(c.Config.Auth.InteractiveAccessTokenMaxTTL),
-			DefaultRefreshTTL: config.EffectiveInteractiveRefreshTokenTTL(c.Config.Auth.InteractiveRefreshTokenTTL),
-			MaxRefreshTTL:     config.EffectiveInteractiveRefreshTokenMaxTTL(c.Config.Auth.InteractiveRefreshTokenMaxTTL),
-		},
 	)
 
 	c.OIDCCallbackUseCase = auth.NewOIDCCallbackUseCase(

@@ -45,12 +45,7 @@ func TestOIDCLoginUseCase_Start_OAuthAuthorizeMode(t *testing.T) {
 		Issuer:               issuer,
 		ClientID:             "idp-client-id",
 		RedirectURIAllowlist: []string{"https://oauth.pstmn.io/v1/callback"},
-	}}, time.Minute, stub, hc, TokenTTLPolicy{
-		DefaultAccessTTL:  5 * time.Minute,
-		MaxAccessTTL:      7 * 24 * time.Hour,
-		DefaultRefreshTTL: 7 * 24 * time.Hour,
-		MaxRefreshTTL:     30 * 24 * time.Hour,
-	})
+	}}, time.Minute, stub, hc)
 
 	_, err := uc.Start(t.Context(), OIDCLoginStartRequest{
 		RedirectURI:         "https://oauth.pstmn.io/v1/callback",
@@ -60,8 +55,6 @@ func TestOIDCLoginUseCase_Start_OAuthAuthorizeMode(t *testing.T) {
 		State:               "client-state-1",
 		CodeChallenge:       "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~",
 		CodeChallengeMethod: "S256",
-		RequestedAccessTTL:  30 * time.Minute,
-		RequestedRefreshTTL: 12 * time.Hour,
 	})
 	if err != nil {
 		t.Fatal(err)
