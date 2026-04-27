@@ -240,8 +240,8 @@ Tokens are written to ~/.config/agwctl/credentials.yaml (or AGWCTL_CREDENTIALS),
 	cmd.Flags().StringVar(&callbackHost, "callback-host", defaultCallbackHost, "loopback host for redirect_uri (must match allowlist)")
 	cmd.Flags().IntVar(&callbackPort, "callback-port", defaultCallbackPort, "TCP port for loopback redirect_uri (must match allowlist)")
 	cmd.Flags().BoolVar(&noBrowser, "no-browser", false, "print IdP URL instead of opening a browser")
-	cmd.Flags().StringVar(&accessTTL, "access-ttl", "", "requested access token lifetime (Go duration, e.g. 168h)")
-	cmd.Flags().StringVar(&refreshTTL, "refresh-ttl", "", "requested refresh token lifetime (Go duration, e.g. 720h)")
+	cmd.Flags().StringVar(&accessTTL, "access-ttl", "", "requested access token lifetime (Go duration or seconds, e.g. 168h or 604800)")
+	cmd.Flags().StringVar(&refreshTTL, "refresh-ttl", "", "requested refresh token lifetime (Go duration or seconds, e.g. 720h or 2592000)")
 	return cmd
 }
 

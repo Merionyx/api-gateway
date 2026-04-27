@@ -10,8 +10,12 @@ import (
 const (
 	// DefaultInteractiveAccessTokenTTL is the default API-profile access JWT lifetime after OIDC login.
 	DefaultInteractiveAccessTokenTTL = 5 * time.Minute
+	// DefaultInteractiveAccessTokenMaxTTL is the default upper bound for client-requested API access JWT lifetime.
+	DefaultInteractiveAccessTokenMaxTTL = 7 * 24 * time.Hour
 	// DefaultInteractiveRefreshTokenTTL is the default maximum lifetime of our interactive refresh chain.
 	DefaultInteractiveRefreshTokenTTL = 7 * 24 * time.Hour
+	// DefaultInteractiveRefreshTokenMaxTTL is the default upper bound for client-requested refresh-chain lifetime.
+	DefaultInteractiveRefreshTokenMaxTTL = 30 * 24 * time.Hour
 )
 
 // OIDCProviderConfig describes one generic OIDC IdP for browser login (roadmap ш. 12–13).
@@ -277,14 +281,14 @@ func EffectiveInteractiveRefreshTokenTTL(ttl time.Duration) time.Duration {
 
 func EffectiveInteractiveAccessTokenMaxTTL(ttl time.Duration) time.Duration {
 	if ttl <= 0 {
-		return DefaultInteractiveAccessTokenTTL
+		return DefaultInteractiveAccessTokenMaxTTL
 	}
 	return ttl
 }
 
 func EffectiveInteractiveRefreshTokenMaxTTL(ttl time.Duration) time.Duration {
 	if ttl <= 0 {
-		return DefaultInteractiveRefreshTokenTTL
+		return DefaultInteractiveRefreshTokenMaxTTL
 	}
 	return ttl
 }

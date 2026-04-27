@@ -61,8 +61,8 @@ On success, agwctl overwrites the saved token pair for that context and keeps th
 			)
 		},
 	}
-	cmd.Flags().StringVar(&accessTTL, "access-ttl", "", "requested access token lifetime (Go duration, e.g. 168h)")
-	cmd.Flags().StringVar(&refreshTTL, "refresh-ttl", "", "requested refresh token lifetime (Go duration, e.g. 720h)")
+	cmd.Flags().StringVar(&accessTTL, "access-ttl", "", "requested access token lifetime (Go duration or seconds, e.g. 168h or 604800)")
+	cmd.Flags().StringVar(&refreshTTL, "refresh-ttl", "", "requested refresh token lifetime (Go duration or seconds, e.g. 720h or 2592000)")
 	return cmd
 }
 

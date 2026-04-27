@@ -87,6 +87,12 @@ components:
         edge_signing_kid: edge-server-key-2026-04-23
       auth:
         environment: development
+
+        interactive_access_token_ttl: "5m"
+        interactive_access_token_max_ttl: "168h"
+        interactive_refresh_token_ttl: "168h"
+        interactive_refresh_token_max_ttl: "720h"
+
         oidc_providers:
         - id: github
           name: GitHub

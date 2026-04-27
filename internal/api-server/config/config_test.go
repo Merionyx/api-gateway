@@ -47,13 +47,13 @@ func TestLoadConfig_FromRepoSample(t *testing.T) {
 	if cfg.Auth.InteractiveAccessTokenTTL != DefaultInteractiveAccessTokenTTL {
 		t.Fatalf("InteractiveAccessTokenTTL: got %s", cfg.Auth.InteractiveAccessTokenTTL)
 	}
-	if cfg.Auth.InteractiveAccessTokenMaxTTL != DefaultInteractiveAccessTokenTTL {
+	if cfg.Auth.InteractiveAccessTokenMaxTTL != DefaultInteractiveAccessTokenMaxTTL {
 		t.Fatalf("InteractiveAccessTokenMaxTTL: got %s", cfg.Auth.InteractiveAccessTokenMaxTTL)
 	}
 	if cfg.Auth.InteractiveRefreshTokenTTL != DefaultInteractiveRefreshTokenTTL {
 		t.Fatalf("InteractiveRefreshTokenTTL: got %s", cfg.Auth.InteractiveRefreshTokenTTL)
 	}
-	if cfg.Auth.InteractiveRefreshTokenMaxTTL != DefaultInteractiveRefreshTokenTTL {
+	if cfg.Auth.InteractiveRefreshTokenMaxTTL != DefaultInteractiveRefreshTokenMaxTTL {
 		t.Fatalf("InteractiveRefreshTokenMaxTTL: got %s", cfg.Auth.InteractiveRefreshTokenMaxTTL)
 	}
 	if len(cfg.Server.CORS.AllowOrigins) != 0 {
@@ -72,13 +72,13 @@ func TestLoadConfig_NoFile_Defaults(t *testing.T) {
 	if cfg.JWT.Issuer != "api-gateway-api-server" {
 		t.Fatalf("JWT default issuer: %q", cfg.JWT.Issuer)
 	}
-	if cfg.Auth.InteractiveAccessTokenMaxTTL != DefaultInteractiveAccessTokenTTL {
+	if cfg.Auth.InteractiveAccessTokenMaxTTL != DefaultInteractiveAccessTokenMaxTTL {
 		t.Fatalf("access max ttl default: %s", cfg.Auth.InteractiveAccessTokenMaxTTL)
 	}
 	if cfg.Auth.InteractiveRefreshTokenTTL != DefaultInteractiveRefreshTokenTTL {
 		t.Fatalf("refresh ttl default: %s", cfg.Auth.InteractiveRefreshTokenTTL)
 	}
-	if cfg.Auth.InteractiveRefreshTokenMaxTTL != DefaultInteractiveRefreshTokenTTL {
+	if cfg.Auth.InteractiveRefreshTokenMaxTTL != DefaultInteractiveRefreshTokenMaxTTL {
 		t.Fatalf("refresh max ttl default: %s", cfg.Auth.InteractiveRefreshTokenMaxTTL)
 	}
 	if !cfg.LeaderElection.Enabled {

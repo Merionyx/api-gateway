@@ -2,6 +2,8 @@ package command
 
 import (
 	"fmt"
+	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,7 +16,7 @@ func parseOptionalTTLFlag(flagName, raw string) (time.Duration, error) {
 	if s == "" {
 		return 0, nil
 	}
-	d, err := time.ParseDuration(s)
+	d, err := parseTTLValue(s)
 	if err != nil {
 		return 0, fmt.Errorf("%s: %w", flagName, err)
 	}
@@ -25,6 +27,21 @@ func parseOptionalTTLFlag(flagName, raw string) (time.Duration, error) {
 		return 0, fmt.Errorf("%s must be a whole number of seconds", flagName)
 	}
 	return d, nil
+}
+
+func parseTTLValue(raw string) (time.Duration, error) {
+	d, parseErr := time.ParseDuration(raw)
+	if parseErr == nil {
+		return d, nil
+	}
+	secs, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return 0, parseErr
+	}
+	if secs > math.MaxInt64/int64(time.Second) {
+		return 0, fmt.Errorf("duration seconds %d overflows Go time.Duration", secs)
+	}
+	return time.Duration(secs) * time.Second, nil
 }
 
 func requestedTTLsFromFlags(accessFlag, refreshFlag string) (httpapi.RequestedTokenTTLs, error) {
