@@ -37,7 +37,7 @@ func jwtHandlerTestUC(t *testing.T) *auth.JWTUseCase {
 
 func TestJWTHandler_GenerateToken_ValidationAppID(t *testing.T) {
 	uc := jwtHandlerTestUC(t)
-	h := NewJWTHandler(uc, false, 5*time.Minute, nil, nil)
+	h := NewJWTHandler(uc, false, 5*time.Minute, nil)
 	app := fiber.New()
 	app.Post("/tokens", h.GenerateToken)
 
@@ -55,7 +55,7 @@ func TestJWTHandler_GenerateToken_ValidationAppID(t *testing.T) {
 
 func TestJWTHandler_GenerateToken_Created(t *testing.T) {
 	uc := jwtHandlerTestUC(t)
-	h := NewJWTHandler(uc, false, 5*time.Minute, nil, nil)
+	h := NewJWTHandler(uc, false, 5*time.Minute, nil)
 	app := fiber.New()
 	app.Post("/tokens", h.GenerateToken)
 
@@ -80,7 +80,7 @@ func TestJWTHandler_GenerateToken_forbiddenWithoutPermission(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := NewJWTHandler(uc, false, 5*time.Minute, authz.NewPermissionEvaluator(cat, nil), nil)
+	h := NewJWTHandler(uc, false, 5*time.Minute, authz.NewPermissionEvaluator(cat))
 	app := fiber.New()
 	app.Post("/tokens", h.GenerateToken)
 
@@ -104,7 +104,7 @@ func TestJWTHandler_GenerateToken_allowedByRolePermission(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := NewJWTHandler(uc, false, 5*time.Minute, authz.NewPermissionEvaluator(cat, nil), nil)
+	h := NewJWTHandler(uc, false, 5*time.Minute, authz.NewPermissionEvaluator(cat))
 	app := fiber.New()
 	app.Use(func(c fiber.Ctx) error {
 		c.Locals(middleware.CtxKeyAPIKeyPrincipal, &middleware.APIKeyPrincipal{

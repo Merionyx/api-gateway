@@ -334,8 +334,8 @@ type HealthStatus struct {
 
 // IssueApiAccessTokenRequest Draft body for `POST /api/v1/tokens/api`. Final fields follow RBAC/CEL and M2M policy (**roadmap steps 22–23**).
 type IssueApiAccessTokenRequest struct {
-	// RequestedScopes Optional hints; the server may ignore or narrow scopes.
-	RequestedScopes *[]string `json:"requested_scopes,omitempty"`
+	// Permissions Optional per-token delegated permissions; when accepted they are embedded into the issued API token claims (for this token only).
+	Permissions *[]string `json:"permissions,omitempty"`
 }
 
 // Jwk defines model for Jwk.

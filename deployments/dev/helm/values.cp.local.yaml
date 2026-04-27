@@ -115,7 +115,7 @@ components:
             - org: "merionyx"
               team_slug: "maintainers"
               roles:
-              - "api:admin"
+              - "api:role:admin"
         - id: gitlab
           name: GitLab
           kind: gitlab

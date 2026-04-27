@@ -76,6 +76,8 @@ func (uc *JWTUseCase) GenerateToken(ctx context.Context, req *models.GenerateTok
 // interactiveSnapshotJWTInputs is the subset of claims_snapshot copied into API-profile access JWTs.
 type interactiveSnapshotJWTInputs struct {
 	Roles             []any
+	OmitRoles         bool
+	Permissions       []any
 	IDPIss            string
 	IDPSub            string
 	Email             string
@@ -106,18 +108,24 @@ func parseInteractiveSnapshotForJWT(snapshot json.RawMessage) interactiveSnapsho
 	if err := json.Unmarshal(snapshot, &m); err != nil {
 		return out
 	}
-	rolesKeyPresent := false
-	if v, ok := m["roles"]; ok {
-		rolesKeyPresent = true
-		if a, ok := v.([]any); ok {
-			out.Roles = a
-		}
+	if omit, _ := m["omit_roles"].(bool); omit {
+		out.OmitRoles = true
+		out.Roles = nil
 	}
-	if out.Roles == nil {
+	if v, ok := m["roles"]; ok {
+		out.Roles = claimAnyList(v)
+		out.OmitRoles = false
+	}
+	if out.OmitRoles {
+		out.Roles = nil
+	} else if out.Roles == nil {
 		out.Roles = []any{}
 	}
-	if !rolesKeyPresent {
+	if _, ok := m["roles"]; !ok && !out.OmitRoles {
 		out.Roles = []any{apiroles.APIRoleViewer}
+	}
+	if v, ok := m["permissions"]; ok {
+		out.Permissions = claimAnyList(v)
 	}
 	out.IDPIss = snapshotStringClaim(m, "idp_iss")
 	out.IDPSub = snapshotStringClaim(m, "idp_sub")
@@ -142,13 +150,18 @@ func (uc *JWTUseCase) MintInteractiveAPIAccessJWTFromSnapshot(ctx context.Contex
 
 	parts := parseInteractiveSnapshotForJWT(snapshot)
 	claims := jwt.MapClaims{
-		"iss":   uc.apiIssuer,
-		"sub":   subject,
-		"aud":   uc.apiAudience,
-		"iat":   now.Unix(),
-		"exp":   exp.Unix(),
-		"jti":   jti,
-		"roles": parts.Roles,
+		"iss": uc.apiIssuer,
+		"sub": subject,
+		"aud": uc.apiAudience,
+		"iat": now.Unix(),
+		"exp": exp.Unix(),
+		"jti": jti,
+	}
+	if !parts.OmitRoles {
+		claims["roles"] = parts.Roles
+	}
+	if len(parts.Permissions) > 0 {
+		claims["permissions"] = parts.Permissions
 	}
 	if parts.IDPIss != "" {
 		claims["idp_iss"] = parts.IDPIss
@@ -193,4 +206,29 @@ func (uc *JWTUseCase) MintInteractiveAPIAccessJWTFromSnapshot(ctx context.Contex
 		return "", "", time.Time{}, err
 	}
 	return tokenStr, jti, exp, nil
+}
+
+func claimAnyList(v any) []any {
+	switch x := v.(type) {
+	case []any:
+		return append([]any(nil), x...)
+	case []string:
+		out := make([]any, 0, len(x))
+		for i := range x {
+			s := strings.TrimSpace(x[i])
+			if s == "" {
+				continue
+			}
+			out = append(out, s)
+		}
+		return out
+	case string:
+		s := strings.TrimSpace(x)
+		if s == "" {
+			return []any{}
+		}
+		return []any{s}
+	default:
+		return []any{}
+	}
 }

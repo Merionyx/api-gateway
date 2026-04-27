@@ -17,8 +17,12 @@ func subjectFromAPIJWTClaims(mc jwt.MapClaims) string {
 	return ""
 }
 
-func rolesFromAPIJWTClaims(mc jwt.MapClaims) []any {
-	v, ok := mc["roles"]
+func permissionsFromAPIJWTClaims(mc jwt.MapClaims) []any {
+	return mergeAnyUnique(claimSliceToAny(mc, "permissions"), claimSliceToAny(mc, "scopes"))
+}
+
+func claimSliceToAny(mc jwt.MapClaims, key string) []any {
+	v, ok := mc[key]
 	if !ok || v == nil {
 		return []any{}
 	}
@@ -31,24 +35,64 @@ func rolesFromAPIJWTClaims(mc jwt.MapClaims) []any {
 			out[i] = x[i]
 		}
 		return out
+	case string:
+		s := strings.TrimSpace(x)
+		if s == "" {
+			return []any{}
+		}
+		return []any{s}
 	default:
 		return []any{}
 	}
 }
 
-func rolesStringsToAny(in []string) []any {
+func stringsToAny(in []string) []any {
 	if len(in) == 0 {
 		return []any{}
 	}
-	out := make([]any, len(in))
+	out := make([]any, 0, len(in))
+	seen := make(map[string]struct{}, len(in))
 	for i := range in {
-		out[i] = in[i]
+		s := strings.TrimSpace(in[i])
+		if s == "" {
+			continue
+		}
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
 	}
 	return out
 }
 
-func snapshotForAPIAccess(roles []any, mc jwt.MapClaims) ([]byte, error) {
-	m := map[string]any{"roles": roles}
+func mergeAnyUnique(base, add []any) []any {
+	out := make([]any, 0, len(base)+len(add))
+	seen := make(map[string]struct{}, len(base)+len(add))
+	appendSlice := func(in []any) {
+		for i := range in {
+			s, _ := in[i].(string)
+			s = strings.TrimSpace(s)
+			if s == "" {
+				continue
+			}
+			if _, ok := seen[s]; ok {
+				continue
+			}
+			seen[s] = struct{}{}
+			out = append(out, s)
+		}
+	}
+	appendSlice(base)
+	appendSlice(add)
+	return out
+}
+
+func snapshotForAPIAccess(permissions []any, mc jwt.MapClaims) ([]byte, error) {
+	m := map[string]any{"omit_roles": true}
+	if len(permissions) > 0 {
+		m["permissions"] = permissions
+	}
 	if mc != nil {
 		if s, _ := mc["idp_iss"].(string); strings.TrimSpace(s) != "" {
 			m["idp_iss"] = strings.TrimSpace(s)

@@ -14,7 +14,4 @@ var (
 
 	// ErrUnsupportedAPIKeySchema is returned for unknown api-key schema_version.
 	ErrUnsupportedAPIKeySchema = errors.New("kvvalue: unsupported api-key schema_version")
-
-	// ErrUnsupportedTokenGrantSchema is returned for unknown token-grant schema_version.
-	ErrUnsupportedTokenGrantSchema = errors.New("kvvalue: unsupported token-grant schema_version")
 )

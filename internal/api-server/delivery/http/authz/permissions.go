@@ -1,42 +1,30 @@
 package authz
 
 import (
-	"context"
-	"errors"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/merionyx/api-gateway/internal/api-server/auth/kvvalue"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/permissions"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/roles"
 	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/middleware"
 	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/problem"
-	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 )
 
-// TokenGrantReader loads per-token delegated permissions by JWT jti.
-type TokenGrantReader interface {
-	Get(ctx context.Context, jti string) (kvvalue.TokenGrantValue, int64, error)
-}
-
-// PermissionEvaluator resolves subject permissions from roles + direct grants.
+// PermissionEvaluator resolves subject permissions from roles plus token/API-key direct permissions.
 type PermissionEvaluator struct {
 	roleCatalog *roles.Catalog
-	tokenGrants TokenGrantReader
 }
 
 // NewPermissionEvaluator builds a permission evaluator.
-func NewPermissionEvaluator(roleCatalog *roles.Catalog, tokenGrants TokenGrantReader) *PermissionEvaluator {
+func NewPermissionEvaluator(roleCatalog *roles.Catalog) *PermissionEvaluator {
 	if roleCatalog == nil {
 		roleCatalog, _ = roles.NewCatalog(nil)
 	}
 	return &PermissionEvaluator{
 		roleCatalog: roleCatalog,
-		tokenGrants: tokenGrants,
 	}
 }
 
@@ -122,27 +110,6 @@ func (e *PermissionEvaluator) SubjectPermissions(c fiber.Ctx) (map[string]struct
 	for _, s := range normalizeStrings(claimStrings(mc, "scopes")) {
 		out[s] = struct{}{}
 	}
-	if e.tokenGrants == nil {
-		return out, nil
-	}
-	jti := claimString(mc, "jti")
-	if jti == "" {
-		return out, nil
-	}
-	rec, _, err := e.tokenGrants.Get(c.Context(), jti)
-	if err != nil {
-		if errors.Is(err, apierrors.ErrNotFound) {
-			return out, nil
-		}
-		return nil, err
-	}
-	// ExpiresAt mirrors token exp; stale records are ignored to keep auth decisions deterministic.
-	if !rec.ExpiresAt.IsZero() && !time.Now().Before(rec.ExpiresAt) {
-		return out, nil
-	}
-	for _, p := range normalizeStrings(rec.Permissions) {
-		out[p] = struct{}{}
-	}
 	return out, nil
 }
 
@@ -181,11 +148,6 @@ func claimStrings(mc jwt.MapClaims, key string) []string {
 	default:
 		return nil
 	}
-}
-
-func claimString(mc jwt.MapClaims, key string) string {
-	s, _ := mc[key].(string)
-	return strings.TrimSpace(s)
 }
 
 func normalizeStrings(in ...[]string) []string {

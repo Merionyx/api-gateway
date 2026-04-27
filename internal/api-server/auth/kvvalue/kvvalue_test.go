@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
-	"time"
 )
 
 func TestSessionMigrateV1ToLatestOnRead(t *testing.T) {
@@ -263,39 +262,6 @@ func TestAPIKeyUnsupportedVersion(t *testing.T) {
 	t.Parallel()
 	_, err := ParseAPIKeyValueJSON([]byte(`{"schema_version":5,"algorithm":"sha256"}`))
 	if !errors.Is(err, ErrUnsupportedAPIKeySchema) {
-		t.Fatalf("got %v", err)
-	}
-}
-
-func TestTokenGrantRoundTrip(t *testing.T) {
-	t.Parallel()
-	v := TokenGrantValue{
-		Permissions: []string{"api.token.edge.issue"},
-		ExpiresAt:   time.Now().Add(time.Hour).UTC().Round(0),
-	}
-	raw, err := MarshalTokenGrantValueJSON(v)
-	if err != nil {
-		t.Fatal(err)
-	}
-	got, err := ParseTokenGrantValueJSON(raw)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.SchemaVersion != TokenGrantSchemaLatest {
-		t.Fatalf("schema %d", got.SchemaVersion)
-	}
-	if len(got.Permissions) != 1 || got.Permissions[0] != "api.token.edge.issue" {
-		t.Fatalf("permissions %+v", got.Permissions)
-	}
-	if !got.ExpiresAt.Equal(v.ExpiresAt) {
-		t.Fatalf("expires_at %s want %s", got.ExpiresAt, v.ExpiresAt)
-	}
-}
-
-func TestTokenGrantUnsupportedVersion(t *testing.T) {
-	t.Parallel()
-	_, err := ParseTokenGrantValueJSON([]byte(`{"schema_version":9,"permissions":["x"],"expires_at":"2026-01-01T00:00:00Z"}`))
-	if !errors.Is(err, ErrUnsupportedTokenGrantSchema) {
 		t.Fatalf("got %v", err)
 	}
 }

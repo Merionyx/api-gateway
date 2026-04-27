@@ -28,7 +28,7 @@ import (
 func TestJWTHandler_IssueApiAccessToken_viaAPIKey(t *testing.T) {
 	t.Parallel()
 	uc := jwtHandlerTestUC(t)
-	h := NewJWTHandler(uc, false, 5*time.Minute, nil, nil)
+	h := NewJWTHandler(uc, false, 5*time.Minute, nil)
 	secret := "issue-api-test-secret"
 	d := etcd.SHA256DigestHexFromSecret(secret)
 	repo := &stubAPIKeyRepoForIssue{
@@ -75,7 +75,7 @@ func TestJWTHandler_IssueApiAccessToken_viaAPIKey(t *testing.T) {
 func TestJWTHandler_IssueApiAccessToken_forbiddenWrongAPIKeyRole(t *testing.T) {
 	t.Parallel()
 	uc := jwtHandlerTestUC(t)
-	h := NewJWTHandler(uc, false, 5*time.Minute, nil, nil)
+	h := NewJWTHandler(uc, false, 5*time.Minute, nil)
 	secret := "issue-api-wrong-role"
 	d := etcd.SHA256DigestHexFromSecret(secret)
 	repo := &stubAPIKeyRepoForIssue{
@@ -123,7 +123,7 @@ func TestJWTHandler_IssueApiAccessToken_forbiddenBearerBaselineMember(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := NewJWTHandler(uc, false, 2*time.Minute, nil, nil)
+	h := NewJWTHandler(uc, false, 2*time.Minute, nil)
 	app := fiber.New()
 	app.Use(middleware.APISecurity(uc, nil))
 	app.Post("/api/v1/tokens/api", h.IssueApiAccessToken)
@@ -145,7 +145,7 @@ func TestJWTHandler_IssueApiAccessToken_forbiddenBearerBaselineMember(t *testing
 func TestJWTHandler_IssueApiAccessToken_viaAPIKeyAdminBypass(t *testing.T) {
 	t.Parallel()
 	uc := jwtHandlerTestUC(t)
-	h := NewJWTHandler(uc, false, 5*time.Minute, nil, nil)
+	h := NewJWTHandler(uc, false, 5*time.Minute, nil)
 	secret := "issue-api-admin-secret"
 	d := etcd.SHA256DigestHexFromSecret(secret)
 	repo := &stubAPIKeyRepoForIssue{
@@ -187,17 +187,6 @@ func (s *stubAPIKeyRepoForIssue) Get(_ context.Context, digestHex string) (kvval
 	return s.rec, 1, nil
 }
 
-type tokenGrantWriterStub struct {
-	jti string
-	rec kvvalue.TokenGrantValue
-}
-
-func (s *tokenGrantWriterStub) Put(_ context.Context, jti string, rec kvvalue.TokenGrantValue) error {
-	s.jti = jti
-	s.rec = rec
-	return nil
-}
-
 func TestJWTHandler_IssueApiAccessToken_viaBearer(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -220,7 +209,7 @@ func TestJWTHandler_IssueApiAccessToken_viaBearer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := NewJWTHandler(uc, false, 2*time.Minute, nil, nil)
+	h := NewJWTHandler(uc, false, 2*time.Minute, nil)
 	app := fiber.New()
 	app.Use(middleware.APISecurity(uc, nil))
 	app.Post("/api/v1/tokens/api", h.IssueApiAccessToken)
@@ -238,16 +227,15 @@ func TestJWTHandler_IssueApiAccessToken_viaBearer(t *testing.T) {
 	}
 }
 
-func TestJWTHandler_IssueApiAccessToken_storesRequestedScopesAsTokenGrant(t *testing.T) {
+func TestJWTHandler_IssueApiAccessToken_embedsRequestedPermissionsInTokenClaims(t *testing.T) {
 	t.Parallel()
 	uc := jwtHandlerTestUC(t)
 	cat, err := roles.NewCatalog(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	grants := &tokenGrantWriterStub{}
-	eval := authz.NewPermissionEvaluator(cat, nil)
-	h := NewJWTHandler(uc, false, 2*time.Minute, eval, grants)
+	eval := authz.NewPermissionEvaluator(cat)
+	h := NewJWTHandler(uc, false, 2*time.Minute, eval)
 	secret := "issue-api-admin-grant"
 	d := etcd.SHA256DigestHexFromSecret(secret)
 	repo := &stubAPIKeyRepoForIssue{
@@ -263,7 +251,7 @@ func TestJWTHandler_IssueApiAccessToken_storesRequestedScopesAsTokenGrant(t *tes
 	app.Use(middleware.APISecurity(uc, repo))
 	app.Post("/api/v1/tokens/api", h.IssueApiAccessToken)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/tokens/api", strings.NewReader(`{"requested_scopes":["api.token.edge.issue"]}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/tokens/api", strings.NewReader(`{"permissions":["api.token.edge.issue"]}`))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	req.Header.Set("X-API-Key", secret)
 	resp, err := app.Test(req)
@@ -275,26 +263,32 @@ func TestJWTHandler_IssueApiAccessToken_storesRequestedScopesAsTokenGrant(t *tes
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("status %d body %s", resp.StatusCode, b)
 	}
-	if grants.jti == "" {
-		t.Fatal("token grant was not stored")
+	var out apiserver.ApiAccessTokenIssued
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
 	}
-	if len(grants.rec.Permissions) != 1 || grants.rec.Permissions[0] != permissions.EdgeTokenIssue {
-		t.Fatalf("stored permissions %+v", grants.rec.Permissions)
+	mc, err := uc.ParseAndValidateAPIProfileBearerToken(out.AccessToken)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if grants.rec.ExpiresAt.IsZero() {
-		t.Fatal("stored grant expires_at is zero")
+	perms, _ := mc["permissions"].([]any)
+	if len(perms) != 1 || perms[0] != permissions.EdgeTokenIssue {
+		t.Fatalf("permissions claim %#v", mc["permissions"])
+	}
+	if _, ok := mc["roles"]; ok {
+		t.Fatalf("roles claim must be omitted, got %#v", mc["roles"])
 	}
 }
 
-func TestJWTHandler_IssueApiAccessToken_rejectsRequestedScopesOutsideCallerPermissions(t *testing.T) {
+func TestJWTHandler_IssueApiAccessToken_rejectsRequestedPermissionsOutsideCallerPermissions(t *testing.T) {
 	t.Parallel()
 	uc := jwtHandlerTestUC(t)
 	cat, err := roles.NewCatalog(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	eval := authz.NewPermissionEvaluator(cat, nil)
-	h := NewJWTHandler(uc, false, 2*time.Minute, eval, &tokenGrantWriterStub{})
+	eval := authz.NewPermissionEvaluator(cat)
+	h := NewJWTHandler(uc, false, 2*time.Minute, eval)
 	secret := "issue-api-non-admin-grant"
 	d := etcd.SHA256DigestHexFromSecret(secret)
 	repo := &stubAPIKeyRepoForIssue{
@@ -310,7 +304,7 @@ func TestJWTHandler_IssueApiAccessToken_rejectsRequestedScopesOutsideCallerPermi
 	app.Use(middleware.APISecurity(uc, repo))
 	app.Post("/api/v1/tokens/api", h.IssueApiAccessToken)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/tokens/api", strings.NewReader(`{"requested_scopes":["api.token.edge.issue"]}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/tokens/api", strings.NewReader(`{"permissions":["api.token.edge.issue"]}`))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	req.Header.Set("X-API-Key", secret)
 	resp, err := app.Test(req)

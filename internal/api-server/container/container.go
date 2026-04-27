@@ -40,7 +40,6 @@ type Container struct {
 	SnapshotRepository    interfaces.SnapshotRepository
 	ControllerRepository  interfaces.ControllerRepository
 	APIKeyRepository      *etcd.APIKeyRepository
-	TokenGrantRepository  *etcd.TokenGrantRepository
 	SessionRepository     *etcd.SessionRepository
 	LoginIntentRepository *etcd.LoginIntentRepository
 	RoleCatalog           *authzroles.Catalog
@@ -166,7 +165,6 @@ func (c *Container) initRepositories() {
 	c.SnapshotRepository = etcd.NewSnapshotRepository(c.EtcdClient)
 	c.ControllerRepository = etcd.NewControllerRepository(c.EtcdClient)
 	c.APIKeyRepository = etcd.NewAPIKeyRepository(c.EtcdClient, c.Config.Auth.EtcdKeyPrefix)
-	c.TokenGrantRepository = etcd.NewTokenGrantRepository(c.EtcdClient, c.Config.Auth.EtcdKeyPrefix)
 	c.SessionRepository = etcd.NewSessionRepository(c.EtcdClient, c.Config.Auth.EtcdKeyPrefix)
 	c.LoginIntentRepository = etcd.NewLoginIntentRepository(c.EtcdClient, c.Config.Auth.EtcdKeyPrefix)
 
@@ -300,13 +298,12 @@ func (c *Container) initHandlers() {
 		c.BundleSyncIdempotency = idempotency.NewStore(c.Config.Idempotency.BundleSyncTTL)
 		slog.Info("idempotency backend=memory")
 	}
-	c.PermissionEvaluator = httpauthz.NewPermissionEvaluator(c.RoleCatalog, c.TokenGrantRepository)
+	c.PermissionEvaluator = httpauthz.NewPermissionEvaluator(c.RoleCatalog)
 	c.JWTHandler = httphandler.NewJWTHandler(
 		c.JWTUseCase,
 		c.Config.MetricsHTTP.Enabled,
 		c.Config.Auth.InteractiveAccessTokenTTL,
 		c.PermissionEvaluator,
-		c.TokenGrantRepository,
 	)
 	c.OIDCLoginHandler = httphandler.NewOIDCLoginHandler(c.OIDCLoginUseCase)
 	c.OIDCCallbackHandler = httphandler.NewOIDCCallbackHandler(c.OIDCCallbackUseCase)

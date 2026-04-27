@@ -1,14 +1,12 @@
 package handler
 
 import (
-	"context"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
 
-	"github.com/merionyx/api-gateway/internal/api-server/auth/kvvalue"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/permissions"
 	"github.com/merionyx/api-gateway/internal/api-server/auth/roles"
 	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/authz"
@@ -23,18 +21,12 @@ import (
 
 const defaultAPIAccessTokenTTL = 5 * time.Minute
 
-// TokenGrantWriter stores per-access-token delegated permissions by jti.
-type TokenGrantWriter interface {
-	Put(ctx context.Context, jti string, rec kvvalue.TokenGrantValue) error
-}
-
 // JWTHandler serves JWT/JWKS HTTP endpoints (roadmap ш. 15, 22).
 type JWTHandler struct {
 	jwtUseCase     *auth.JWTUseCase
 	metricsEnabled bool
 	apiAccessTTL   time.Duration
 	permissionEval *authz.PermissionEvaluator
-	tokenGrants    TokenGrantWriter
 }
 
 // NewJWTHandler wires JWT HTTP handlers. apiAccessTTL<=0 defaults to 5m (POST /api/v1/tokens/api).
@@ -43,7 +35,6 @@ func NewJWTHandler(
 	metricsEnabled bool,
 	apiAccessTTL time.Duration,
 	permissionEval *authz.PermissionEvaluator,
-	tokenGrants TokenGrantWriter,
 ) *JWTHandler {
 	if apiAccessTTL <= 0 {
 		apiAccessTTL = defaultAPIAccessTokenTTL
@@ -53,7 +44,6 @@ func NewJWTHandler(
 		metricsEnabled: metricsEnabled,
 		apiAccessTTL:   apiAccessTTL,
 		permissionEval: permissionEval,
-		tokenGrants:    tokenGrants,
 	}
 }
 
@@ -145,7 +135,7 @@ func (h *JWTHandler) IssueApiAccessToken(c fiber.Ctx) error {
 			apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationBind)
 			return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidJSONBody, "", problem.DetailInvalidJSONBody))
 		}
-		requestedPermissions = normalizeRequestedPermissions(body.RequestedScopes)
+		requestedPermissions = normalizeRequestedPermissions(body.Permissions)
 		if h.permissionEval != nil {
 			if denied, werr := h.permissionEval.RequireDelegatedPermissions(c, requestedPermissions); denied {
 				apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultForbidden)
@@ -157,16 +147,18 @@ func (h *JWTHandler) IssueApiAccessToken(c fiber.Ctx) error {
 	var subject string
 	var snap []byte
 	var err error
+	requestedAny := stringsToAny(requestedPermissions)
 	if pOK {
 		subject = "m2m:" + p.DigestHex
-		snap, err = snapshotForAPIAccess(rolesStringsToAny(p.Roles), nil)
+		snap, err = snapshotForAPIAccess(requestedAny, nil)
 	} else {
 		subject = subjectFromAPIJWTClaims(mc)
 		if subject == "" {
 			apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationAppID)
 			return problem.Write(c, http.StatusBadRequest, problem.BadRequest("API_TOKEN_SUBJECT_MISSING", "", "Bearer token has no usable sub/email for API access issuance."))
 		}
-		snap, err = snapshotForAPIAccess(rolesFromAPIJWTClaims(mc), mc)
+		basePermissions := permissionsFromAPIJWTClaims(mc)
+		snap, err = snapshotForAPIAccess(mergeAnyUnique(basePermissions, requestedAny), mc)
 	}
 	if err != nil {
 		telemetry.MarkError(span, err)
@@ -174,21 +166,11 @@ func (h *JWTHandler) IssueApiAccessToken(c fiber.Ctx) error {
 		return problem.WriteInternal(c, err)
 	}
 
-	token, jti, exp, err := h.jwtUseCase.MintInteractiveAPIAccessJWTFromSnapshot(c.Context(), subject, snap, h.apiAccessTTL)
+	token, _, exp, err := h.jwtUseCase.MintInteractiveAPIAccessJWTFromSnapshot(c.Context(), subject, snap, h.apiAccessTTL)
 	if err != nil {
 		telemetry.MarkError(span, err)
 		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultInternalError)
 		return problem.RespondError(c, err)
-	}
-	if len(requestedPermissions) > 0 && h.tokenGrants != nil {
-		if err := h.tokenGrants.Put(c.Context(), jti, kvvalue.TokenGrantValue{
-			Permissions: requestedPermissions,
-			ExpiresAt:   exp,
-		}); err != nil {
-			telemetry.MarkError(span, err)
-			apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultInternalError)
-			return problem.WriteInternal(c, err)
-		}
 	}
 
 	apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultCreated)
