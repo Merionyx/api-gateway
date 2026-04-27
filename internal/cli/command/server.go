@@ -198,7 +198,7 @@ func newServerStatusCmd(resolveServer func() (string, error), output *string) *c
 			if err != nil {
 				return err
 			}
-			httpClient, err := httpClientFromCmd(cmd)
+			httpClient, err := authorizedHTTPClientFromCmd(cmd, server)
 			if err != nil {
 				return err
 			}

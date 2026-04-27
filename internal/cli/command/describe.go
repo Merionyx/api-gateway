@@ -115,7 +115,7 @@ Aliases match list (e.g. ctrl, env, bk, cn).`,
 			if err != nil {
 				return err
 			}
-			httpClient, err := httpClientFromCmd(cmd)
+			httpClient, err := authorizedHTTPClientFromCmd(cmd, server)
 			if err != nil {
 				return err
 			}

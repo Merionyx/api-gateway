@@ -88,7 +88,7 @@ Aliases are accepted (e.g. controllers, ctrl, cnt; bundles, tenant-bundles; envi
 			if err != nil {
 				return err
 			}
-			httpClient, err := httpClientFromCmd(cmd)
+			httpClient, err := authorizedHTTPClientFromCmd(cmd, server)
 			if err != nil {
 				return err
 			}
