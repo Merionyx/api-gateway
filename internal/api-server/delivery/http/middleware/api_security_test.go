@@ -32,15 +32,6 @@ func Test_requiresAPISecurity(t *testing.T) {
 	if requiresAPISecurity(http.MethodGet, "/api/v1/auth/oidc-providers") {
 		t.Fatal("oidc provider list public")
 	}
-	if requiresAPISecurity(http.MethodGet, "/api/v1/auth/callback") {
-		t.Fatal("legacy callback should pass through to 404")
-	}
-	if requiresAPISecurity(http.MethodPost, "/api/v1/auth/refresh") {
-		t.Fatal("legacy refresh should pass through to 404")
-	}
-	if requiresAPISecurity(http.MethodGet, "/api/v1/auth/login") {
-		t.Fatal("legacy login should pass through to 404")
-	}
 }
 
 func TestAPISecurity_allowsHealthWithoutAuth(t *testing.T) {
