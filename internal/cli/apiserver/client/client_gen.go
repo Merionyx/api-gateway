@@ -447,6 +447,15 @@ type OidcProviderDescriptor struct {
 	Name string `json:"name"`
 }
 
+// PermissionDescriptor One API permission and its human-readable description.
+type PermissionDescriptor struct {
+	// Description Human-readable explanation of what this permission grants.
+	Description string `json:"description"`
+
+	// Id Stable machine-readable permission identifier.
+	Id string `json:"id"`
+}
+
 // Problem RFC 7807 / RFC 9457 Problem Details.
 //
 // **Localization:** use `code` (stable `UPPER_SNAKE_CASE`) as the i18n message key, e.g. `problem.NOT_FOUND`
@@ -513,6 +522,14 @@ type RegistryService struct {
 	Upstream string `json:"upstream"`
 }
 
+// RolePermissions One role with its effective permission set.
+type RolePermissions struct {
+	Permissions []PermissionDescriptor `json:"permissions"`
+
+	// Role Role identifier (built-in or configured).
+	Role string `json:"role"`
+}
+
 // ServiceLineScope Whether a service line belongs to the per-environment static merge or the controller root pool.
 type ServiceLineScope string
 
@@ -551,6 +568,24 @@ type TenantListResponse struct {
 
 	// NextCursor Opaque cursor for the next page; null or omitted when there is no next page.
 	NextCursor *string `json:"next_cursor,omitempty"`
+}
+
+// TokenPermissionsRequest defines model for TokenPermissionsRequest.
+type TokenPermissionsRequest struct {
+	// AccessToken API-profile JWT to inspect.
+	AccessToken string `json:"access_token"`
+}
+
+// TokenPermissionsResponse defines model for TokenPermissionsResponse.
+type TokenPermissionsResponse struct {
+	// Permissions Effective permissions from role expansion plus direct `permissions` / `scopes` claims.
+	Permissions []PermissionDescriptor `json:"permissions"`
+
+	// Roles Role ids resolved from the token `roles` claim.
+	Roles []string `json:"roles"`
+
+	// Subject Token subject (`sub` claim, or fallback to `email`).
+	Subject string `json:"subject"`
 }
 
 // VersionResponse Process build metadata and the OpenAPI `info.version` of the HTTP surface served by this binary.
@@ -898,6 +933,9 @@ type ListEnvironmentsByTenantParams struct {
 // TokenOidcFormdataRequestBody defines body for TokenOidc for application/x-www-form-urlencoded ContentType.
 type TokenOidcFormdataRequestBody = OAuthTokenRequestForm
 
+// InspectTokenPermissionsJSONRequestBody defines body for InspectTokenPermissions for application/json ContentType.
+type InspectTokenPermissionsJSONRequestBody = TokenPermissionsRequest
+
 // SyncBundleJSONRequestBody defines body for SyncBundle for application/json ContentType.
 type SyncBundleJSONRequestBody = BundleSyncRequest
 
@@ -1004,10 +1042,21 @@ type ClientInterface interface {
 	// ListOidcProviders request
 	ListOidcProviders(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListAuthPermissions request
+	ListAuthPermissions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListAuthRoles request
+	ListAuthRoles(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// TokenOidcWithBody request with any body
 	TokenOidcWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	TokenOidcWithFormdataBody(ctx context.Context, body TokenOidcFormdataRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// InspectTokenPermissionsWithBody request with any body
+	InspectTokenPermissionsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	InspectTokenPermissions(ctx context.Context, body InspectTokenPermissionsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListBundleKeys request
 	ListBundleKeys(ctx context.Context, params *ListBundleKeysParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1153,6 +1202,30 @@ func (c *Client) ListOidcProviders(ctx context.Context, reqEditors ...RequestEdi
 	return c.Client.Do(req)
 }
 
+func (c *Client) ListAuthPermissions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAuthPermissionsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListAuthRoles(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAuthRolesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) TokenOidcWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewTokenOidcRequestWithBody(c.Server, contentType, body)
 	if err != nil {
@@ -1167,6 +1240,30 @@ func (c *Client) TokenOidcWithBody(ctx context.Context, contentType string, body
 
 func (c *Client) TokenOidcWithFormdataBody(ctx context.Context, body TokenOidcFormdataRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewTokenOidcRequestWithFormdataBody(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) InspectTokenPermissionsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewInspectTokenPermissionsRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) InspectTokenPermissions(ctx context.Context, body InspectTokenPermissionsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewInspectTokenPermissionsRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1770,6 +1867,60 @@ func NewListOidcProvidersRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewListAuthPermissionsRequest generates requests for ListAuthPermissions
+func NewListAuthPermissionsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/auth/permissions")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListAuthRolesRequest generates requests for ListAuthRoles
+func NewListAuthRolesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/auth/roles")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewTokenOidcRequestWithFormdataBody calls the generic TokenOidc builder with application/x-www-form-urlencoded body
 func NewTokenOidcRequestWithFormdataBody(server string, body TokenOidcFormdataRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -1791,6 +1942,46 @@ func NewTokenOidcRequestWithBody(server string, contentType string, body io.Read
 	}
 
 	operationPath := fmt.Sprintf("/v1/auth/token")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewInspectTokenPermissionsRequest calls the generic InspectTokenPermissions builder with application/json body
+func NewInspectTokenPermissionsRequest(server string, body InspectTokenPermissionsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewInspectTokenPermissionsRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewInspectTokenPermissionsRequestWithBody generates requests for InspectTokenPermissions with any type of body
+func NewInspectTokenPermissionsRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/auth/token-permissions")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -3006,10 +3197,21 @@ type ClientWithResponsesInterface interface {
 	// ListOidcProvidersWithResponse request
 	ListOidcProvidersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListOidcProvidersResponse, error)
 
+	// ListAuthPermissionsWithResponse request
+	ListAuthPermissionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAuthPermissionsResponse, error)
+
+	// ListAuthRolesWithResponse request
+	ListAuthRolesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAuthRolesResponse, error)
+
 	// TokenOidcWithBodyWithResponse request with any body
 	TokenOidcWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TokenOidcResponse, error)
 
 	TokenOidcWithFormdataBodyWithResponse(ctx context.Context, body TokenOidcFormdataRequestBody, reqEditors ...RequestEditorFn) (*TokenOidcResponse, error)
+
+	// InspectTokenPermissionsWithBodyWithResponse request with any body
+	InspectTokenPermissionsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*InspectTokenPermissionsResponse, error)
+
+	InspectTokenPermissionsWithResponse(ctx context.Context, body InspectTokenPermissionsJSONRequestBody, reqEditors ...RequestEditorFn) (*InspectTokenPermissionsResponse, error)
 
 	// ListBundleKeysWithResponse request
 	ListBundleKeysWithResponse(ctx context.Context, params *ListBundleKeysParams, reqEditors ...RequestEditorFn) (*ListBundleKeysResponse, error)
@@ -3238,6 +3440,52 @@ func (r ListOidcProvidersResponse) StatusCode() int {
 	return 0
 }
 
+type ListAuthPermissionsResponse struct {
+	Body                      []byte
+	HTTPResponse              *http.Response
+	JSON200                   *[]PermissionDescriptor
+	ApplicationproblemJSON500 *InternalError
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAuthPermissionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAuthPermissionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListAuthRolesResponse struct {
+	Body                      []byte
+	HTTPResponse              *http.Response
+	JSON200                   *[]RolePermissions
+	ApplicationproblemJSON500 *InternalError
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAuthRolesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAuthRolesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type TokenOidcResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -3257,6 +3505,31 @@ func (r TokenOidcResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r TokenOidcResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type InspectTokenPermissionsResponse struct {
+	Body                      []byte
+	HTTPResponse              *http.Response
+	JSON200                   *TokenPermissionsResponse
+	ApplicationproblemJSON400 *BadRequest
+	ApplicationproblemJSON401 *Unauthorized
+	ApplicationproblemJSON500 *InternalError
+}
+
+// Status returns HTTPResponse.Status
+func (r InspectTokenPermissionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r InspectTokenPermissionsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -3741,6 +4014,24 @@ func (c *ClientWithResponses) ListOidcProvidersWithResponse(ctx context.Context,
 	return ParseListOidcProvidersResponse(rsp)
 }
 
+// ListAuthPermissionsWithResponse request returning *ListAuthPermissionsResponse
+func (c *ClientWithResponses) ListAuthPermissionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAuthPermissionsResponse, error) {
+	rsp, err := c.ListAuthPermissions(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAuthPermissionsResponse(rsp)
+}
+
+// ListAuthRolesWithResponse request returning *ListAuthRolesResponse
+func (c *ClientWithResponses) ListAuthRolesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAuthRolesResponse, error) {
+	rsp, err := c.ListAuthRoles(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAuthRolesResponse(rsp)
+}
+
 // TokenOidcWithBodyWithResponse request with arbitrary body returning *TokenOidcResponse
 func (c *ClientWithResponses) TokenOidcWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TokenOidcResponse, error) {
 	rsp, err := c.TokenOidcWithBody(ctx, contentType, body, reqEditors...)
@@ -3756,6 +4047,23 @@ func (c *ClientWithResponses) TokenOidcWithFormdataBodyWithResponse(ctx context.
 		return nil, err
 	}
 	return ParseTokenOidcResponse(rsp)
+}
+
+// InspectTokenPermissionsWithBodyWithResponse request with arbitrary body returning *InspectTokenPermissionsResponse
+func (c *ClientWithResponses) InspectTokenPermissionsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*InspectTokenPermissionsResponse, error) {
+	rsp, err := c.InspectTokenPermissionsWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseInspectTokenPermissionsResponse(rsp)
+}
+
+func (c *ClientWithResponses) InspectTokenPermissionsWithResponse(ctx context.Context, body InspectTokenPermissionsJSONRequestBody, reqEditors ...RequestEditorFn) (*InspectTokenPermissionsResponse, error) {
+	rsp, err := c.InspectTokenPermissions(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseInspectTokenPermissionsResponse(rsp)
 }
 
 // ListBundleKeysWithResponse request returning *ListBundleKeysResponse
@@ -4216,6 +4524,72 @@ func ParseListOidcProvidersResponse(rsp *http.Response) (*ListOidcProvidersRespo
 	return response, nil
 }
 
+// ParseListAuthPermissionsResponse parses an HTTP response from a ListAuthPermissionsWithResponse call
+func ParseListAuthPermissionsResponse(rsp *http.Response) (*ListAuthPermissionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAuthPermissionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []PermissionDescriptor
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListAuthRolesResponse parses an HTTP response from a ListAuthRolesWithResponse call
+func ParseListAuthRolesResponse(rsp *http.Response) (*ListAuthRolesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAuthRolesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []RolePermissions
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseTokenOidcResponse parses an HTTP response from a TokenOidcWithResponse call
 func ParseTokenOidcResponse(rsp *http.Response) (*TokenOidcResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -4257,6 +4631,53 @@ func ParseTokenOidcResponse(rsp *http.Response) (*TokenOidcResponse, error) {
 			return nil, err
 		}
 		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseInspectTokenPermissionsResponse parses an HTTP response from a InspectTokenPermissionsWithResponse call
+func ParseInspectTokenPermissionsResponse(rsp *http.Response) (*InspectTokenPermissionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &InspectTokenPermissionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TokenPermissionsResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
 
 	}
 

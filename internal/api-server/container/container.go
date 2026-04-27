@@ -63,8 +63,9 @@ type Container struct {
 
 	OIDCLoginHandler *httphandler.OIDCLoginHandler
 
-	OIDCCallbackHandler *httphandler.OIDCCallbackHandler
-	OAuthTokenHandler   *httphandler.OAuthTokenHandler
+	OIDCCallbackHandler      *httphandler.OIDCCallbackHandler
+	OAuthTokenHandler        *httphandler.OAuthTokenHandler
+	AuthIntrospectionHandler *httphandler.AuthIntrospectionHandler
 
 	ContractsExportHandler *httphandler.ContractsExportHandler
 
@@ -319,6 +320,7 @@ func (c *Container) initHandlers() {
 	if c.OAuthTokenUseCase != nil {
 		c.OAuthTokenHandler = httphandler.NewOAuthTokenHandler(c.OAuthTokenUseCase)
 	}
+	c.AuthIntrospectionHandler = httphandler.NewAuthIntrospectionHandler(c.JWTUseCase, c.RoleCatalog)
 	exportUC := bundle.NewContractExportUseCase(c.ContractSyncerGRPC)
 	c.ContractsExportHandler = httphandler.NewContractsExportHandler(exportUC, c.PermissionEvaluator)
 	c.RegistryHandler = httphandler.NewRegistryHandler(

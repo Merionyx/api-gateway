@@ -56,7 +56,8 @@ func requiresAPISecurity(method, path string) bool {
 	case "/health", "/ready", "/v1/version",
 		"/.well-known/jwks.json", "/.well-known/jwks-edge.json",
 		"/v1/keys",
-		"/v1/auth/oidc-providers", "/v1/auth/authorize", "/v1/auth/callback", "/v1/auth/token":
+		"/v1/auth/oidc-providers", "/v1/auth/roles", "/v1/auth/permissions",
+		"/v1/auth/token-permissions", "/v1/auth/authorize", "/v1/auth/callback", "/v1/auth/token":
 		return false
 	default:
 		return true

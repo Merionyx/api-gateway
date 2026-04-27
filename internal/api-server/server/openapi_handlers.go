@@ -33,6 +33,14 @@ func (s *OpenAPIServer) ListOidcProviders(c fiber.Ctx) error {
 	return s.c.OIDCLoginHandler.ListOidcProviders(c)
 }
 
+func (s *OpenAPIServer) ListAuthPermissions(c fiber.Ctx) error {
+	return s.c.AuthIntrospectionHandler.ListPermissions(c)
+}
+
+func (s *OpenAPIServer) ListAuthRoles(c fiber.Ctx) error {
+	return s.c.AuthIntrospectionHandler.ListRoles(c)
+}
+
 func (s *OpenAPIServer) AuthorizeOidc(c fiber.Ctx, params apiserver.AuthorizeOidcParams) error {
 	return s.c.OIDCLoginHandler.Authorize(c, params)
 }
@@ -46,6 +54,10 @@ func (s *OpenAPIServer) TokenOidc(c fiber.Ctx) error {
 		return authFlowNotImplemented(c, "OAuth token endpoint requires auth.oidc_providers and auth.session_kek_base64.")
 	}
 	return s.c.OAuthTokenHandler.Token(c)
+}
+
+func (s *OpenAPIServer) InspectTokenPermissions(c fiber.Ctx) error {
+	return s.c.AuthIntrospectionHandler.InspectTokenPermissions(c)
 }
 
 func (s *OpenAPIServer) IssueEdgeToken(c fiber.Ctx) error {

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: API Gateway — API Server HTTP API
-  version: 1.5.6
+  version: 1.5.7
   description: |
     HTTP API for the **API Server** control plane: authentication material (JWT, JWKS), contract export,
     registry views backed by **etcd** (controllers, tenants, bundles), and operational endpoints.
@@ -11,7 +11,9 @@ info:
 
     **JSON naming:** request and response bodies use **snake_case** field names unless noted.
 
-    **v1.5.6:** interactive OIDC login / refresh may request longer token lifetimes per client (`requested_*_token_ttl_seconds`), while the server clamps them to configured maxima and provider refresh limits; session responses now include actual `access_expires_at` / `refresh_expires_at`.
+    **v1.5.7:** adds auth introspection endpoints: role catalog with permissions, permission catalog with descriptions, and token-permissions inspection by provided API access token.
+
+    **v1.5.6:** interactive OAuth token exchange / refresh may request token lifetimes per client (`access_ttl`, `refresh_ttl`), while the server clamps them to configured maxima and provider refresh limits; session responses include actual `access_expires_at` / `refresh_expires_at`.
 
     **v1.5.5:** OIDC providers now include mandatory user-facing `name` in config and in **`GET /v1/auth/oidc-providers`** for UIs and **`agwctl auth login`**.
 
@@ -517,6 +519,65 @@ components:
           type: string
           format: uri
           description: OIDC issuer URL configured for this provider.
+
+    PermissionDescriptor:
+      type: object
+      description: One API permission and its human-readable description.
+      required:
+      - id
+      - description
+      properties:
+        id:
+          type: string
+          description: Stable machine-readable permission identifier.
+        description:
+          type: string
+          description: Human-readable explanation of what this permission grants.
+
+    RolePermissions:
+      type: object
+      description: One role with its effective permission set.
+      required:
+      - role
+      - permissions
+      properties:
+        role:
+          type: string
+          description: Role identifier (built-in or configured).
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PermissionDescriptor'
+
+    TokenPermissionsRequest:
+      type: object
+      required:
+      - access_token
+      properties:
+        access_token:
+          type: string
+          description: API-profile JWT to inspect.
+
+    TokenPermissionsResponse:
+      type: object
+      required:
+      - subject
+      - roles
+      - permissions
+      properties:
+        subject:
+          type: string
+          description: Token subject (`sub` claim, or fallback to `email`).
+        roles:
+          type: array
+          items:
+            type: string
+          description: Role ids resolved from the token `roles` claim.
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PermissionDescriptor'
+          description: Effective permissions from role expansion plus direct `permissions` / `scopes` claims.
 
     IssueApiAccessTokenRequest:
       type: object
@@ -1173,6 +1234,78 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/OidcProviderDescriptor'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/auth/roles:
+    get:
+      tags: [ Authentication ]
+      operationId: listAuthRoles
+      security: []
+      summary: List roles with effective permissions
+      description: |
+        Returns the role catalog used by API authorization (built-in and configured roles), with each role expanded to its effective permissions.
+      responses:
+        '200':
+          description: Role catalog with permission descriptors.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RolePermissions'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/auth/permissions:
+    get:
+      tags: [ Authentication ]
+      operationId: listAuthPermissions
+      security: []
+      summary: List documented permissions
+      description: |
+        Returns all available permission identifiers and descriptions:
+        built-in permissions plus custom permissions referenced by configured roles.
+      responses:
+        '200':
+          description: Permission catalog.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PermissionDescriptor'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/auth/token-permissions:
+    post:
+      tags: [ Authentication ]
+      operationId: inspectTokenPermissions
+      security: []
+      summary: Inspect permissions from an API access token
+      description: |
+        Validates a provided API-profile JWT and returns effective permissions with descriptions.
+        Effective permissions are resolved as:
+        1) permissions inherited from `roles` via role catalog;
+        2) direct token claims `permissions` and `scopes`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenPermissionsRequest'
+      responses:
+        '200':
+          description: Effective permissions for the provided token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPermissionsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/InternalError'
 

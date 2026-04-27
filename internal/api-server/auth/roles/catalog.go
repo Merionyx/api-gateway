@@ -2,6 +2,7 @@ package roles
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/merionyx/api-gateway/internal/api-server/auth/permissions"
@@ -16,6 +17,12 @@ type ConfiguredRole struct {
 // Catalog resolves role IDs into effective permissions.
 type Catalog struct {
 	permissionsByRole map[string]map[string]struct{}
+}
+
+// RolePermissions is one role with its effective permission ids.
+type RolePermissions struct {
+	RoleID      string
+	Permissions []string
 }
 
 // ImmutableRoleIDs returns built-in role IDs that cannot be overridden by config.
@@ -64,6 +71,32 @@ func (c *Catalog) ResolvePermissions(roleIDs []string) map[string]struct{} {
 		for permission := range set {
 			out[permission] = struct{}{}
 		}
+	}
+	return out
+}
+
+// ListRolePermissions returns all known roles with sorted permission ids.
+func (c *Catalog) ListRolePermissions() []RolePermissions {
+	if c == nil {
+		return nil
+	}
+	roleIDs := make([]string, 0, len(c.permissionsByRole))
+	for roleID := range c.permissionsByRole {
+		roleIDs = append(roleIDs, roleID)
+	}
+	sort.Strings(roleIDs)
+	out := make([]RolePermissions, 0, len(roleIDs))
+	for _, roleID := range roleIDs {
+		set := c.permissionsByRole[roleID]
+		perms := make([]string, 0, len(set))
+		for p := range set {
+			perms = append(perms, p)
+		}
+		sort.Strings(perms)
+		out = append(out, RolePermissions{
+			RoleID:      roleID,
+			Permissions: perms,
+		})
 	}
 	return out
 }

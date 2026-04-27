@@ -32,6 +32,15 @@ func Test_requiresAPISecurity(t *testing.T) {
 	if requiresAPISecurity(http.MethodGet, "/v1/auth/oidc-providers") {
 		t.Fatal("oidc provider list public")
 	}
+	if requiresAPISecurity(http.MethodGet, "/v1/auth/roles") {
+		t.Fatal("auth roles public")
+	}
+	if requiresAPISecurity(http.MethodGet, "/v1/auth/permissions") {
+		t.Fatal("auth permissions public")
+	}
+	if requiresAPISecurity(http.MethodPost, "/v1/auth/token-permissions") {
+		t.Fatal("token permissions endpoint public")
+	}
 }
 
 func TestAPISecurity_allowsHealthWithoutAuth(t *testing.T) {
