@@ -100,13 +100,14 @@ func setupRoutes(app *fiber.App, c *container.Container) error {
 	swagger.Servers = nil
 
 	app.Use(httpTraceMiddleware())
+	app.Use(bindFiberContextForStrictHandlers())
 	app.Use(httpxmw.APISecurity(c.JWTUseCase, c.APIKeyRepository))
 	app.Use(oapimw.OapiRequestValidatorWithOptions(swagger, &oapimw.Options{
 		Options: openapi3filter.Options{
 			AuthenticationFunc: AuthenticationFunc,
 		},
 	}))
-	apiserver.RegisterHandlers(app, NewOpenAPIServer(c))
+	apiserver.RegisterHandlers(app, apiserver.NewStrictHandler(NewStrictOpenAPIServer(c), nil))
 	return nil
 }
 
