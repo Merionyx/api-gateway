@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
-	"net/http/httptest"
+	"strings"
 	"testing"
-	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 
@@ -15,55 +15,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 )
 
-func TestGithubExtraRoles_orgDenied(t *testing.T) {
-	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/user/orgs":
-			_ = json.NewEncoder(w).Encode([]map[string]string{{"login": "other-org"}})
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	t.Cleanup(srv.Close)
-
-	_, err := githubExtraRoles(t.Context(), srv.Client(), &config.GitHubOIDCProviderConfig{
-		AllowedOrgLogins: []string{"acme"},
-	}, "oauth-token", srv.URL)
-	if !errors.Is(err, apierrors.ErrGitHubLoginDenied) {
-		t.Fatalf("got %v", err)
-	}
-}
-
-func TestGithubExtraRoles_teamBindings(t *testing.T) {
-	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/user/teams":
-			_ = json.NewEncoder(w).Encode([]map[string]any{{
-				"slug":         "platform",
-				"organization": map[string]string{"login": "acme"},
-			}})
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	t.Cleanup(srv.Close)
-
-	roles, err := githubExtraRoles(t.Context(), srv.Client(), &config.GitHubOIDCProviderConfig{
-		TeamRoleBindings: []config.GitHubTeamRoleBinding{{
-			Org: "acme", TeamSlug: "platform", Roles: []string{"api:contracts:export", "api:access_tokens:issue"},
-		}},
-	}, "oauth-token", srv.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(roles) != 2 {
-		t.Fatalf("roles=%v", roles)
-	}
-}
-
-func TestClaimsSnapshotFromProvider_generic(t *testing.T) {
+func TestClaimsSnapshotFromProvider_DefaultViewer(t *testing.T) {
 	t.Parallel()
 	mc := jwt.MapClaims{"sub": "u1", "email": "a@b.c"}
 	raw, err := claimsSnapshotFromProvider(context.Background(), config.OIDCProviderConfig{}, mc, "", http.DefaultClient)
@@ -76,214 +28,174 @@ func TestClaimsSnapshotFromProvider_generic(t *testing.T) {
 	}
 	roles, _ := m["roles"].([]any)
 	if len(roles) != 1 || roles[0] != "api:role:viewer" {
-		t.Fatalf("%v", roles)
+		t.Fatalf("roles=%v", roles)
+	}
+	if m["email"] != "a@b.c" {
+		t.Fatalf("email=%v", m["email"])
 	}
 }
 
-func TestGoogleExtraRoles_hdDenied(t *testing.T) {
+func TestClaimsSnapshotFromProvider_CEL_Deny(t *testing.T) {
 	t.Parallel()
-	mc := jwt.MapClaims{"hd": "other.com", "email": "u@other.com"}
-	_, err := googleExtraRoles(&config.GoogleOIDCProviderConfig{
-		AllowedHostedDomains: []string{"example.com"},
-	}, mc)
-	if !errors.Is(err, apierrors.ErrGoogleLoginDenied) {
-		t.Fatalf("got %v", err)
+	p := config.OIDCProviderConfig{
+		ClaimMapping: &config.OIDCClaimMappingConfig{Rules: []config.OIDCClaimMappingRule{{
+			Name:        "corp-only",
+			When:        "!id_token.email.endsWith('@example.com')",
+			Deny:        true,
+			DenyCode:    "EMAIL_DOMAIN_DENIED",
+			DenyMessage: "Only @example.com users are allowed.",
+		}}},
+	}
+	_, err := claimsSnapshotFromProvider(context.Background(), p, jwt.MapClaims{"email": "u@other.com"}, "", http.DefaultClient)
+	if !errors.Is(err, apierrors.ErrOIDCClaimMappingDenied) {
+		t.Fatalf("expected deny, got %v", err)
+	}
+	var deny *oidcClaimMappingDenyError
+	if !errors.As(err, &deny) {
+		t.Fatalf("expected deny error type, got %T", err)
+	}
+	if deny.Code != "EMAIL_DOMAIN_DENIED" {
+		t.Fatalf("deny code=%q", deny.Code)
 	}
 }
 
-func TestGoogleExtraRoles_hdBindings(t *testing.T) {
+func TestClaimsSnapshotFromProvider_CEL_AddRolesPermissionsClaims(t *testing.T) {
 	t.Parallel()
-	mc := jwt.MapClaims{"hd": "example.com", "email": "u@example.com"}
-	roles, err := googleExtraRoles(&config.GoogleOIDCProviderConfig{
-		HostedDomainRoleBindings: []config.GoogleHostedDomainRoleBinding{{
-			HD:    "example.com",
-			Roles: []string{"api:role:admin"},
+	p := config.OIDCProviderConfig{
+		ClaimMapping: &config.OIDCClaimMappingConfig{Rules: []config.OIDCClaimMappingRule{
+			{
+				Name:           "groups-to-roles",
+				When:           "has(id_token.groups)",
+				AddRolesExpr:   "id_token.groups",
+				AddPermissions: []string{"api.contracts.export"},
+				AddGroupsExpr:  "id_token.groups",
+				SetClaims:      map[string]string{"tenant": "id_token.tid"},
+			},
 		}},
-	}, mc)
-	if err != nil {
-		t.Fatal(err)
 	}
-	if len(roles) != 1 || roles[0] != "api:role:admin" {
-		t.Fatalf("%v", roles)
-	}
-}
-
-func TestGoogleExtraRoles_emailDomainGate(t *testing.T) {
-	t.Parallel()
-	mc := jwt.MapClaims{"email": "u@example.com"}
-	_, err := googleExtraRoles(&config.GoogleOIDCProviderConfig{
-		AllowedEmailDomains: []string{"other.org"},
-	}, mc)
-	if !errors.Is(err, apierrors.ErrGoogleLoginDenied) {
-		t.Fatalf("got %v", err)
-	}
-	roles, err := googleExtraRoles(&config.GoogleOIDCProviderConfig{
-		AllowedEmailDomains: []string{"example.com"},
-		EmailDomainRoleBindings: []config.GoogleEmailDomainRoleBinding{{
-			Domain: "example.com",
-			Roles:  []string{"api:contracts:export"},
-		}},
-	}, mc)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(roles) != 1 {
-		t.Fatalf("%v", roles)
-	}
-}
-
-func TestOktaExtraRoles_gateDenied(t *testing.T) {
-	t.Parallel()
-	mc := jwt.MapClaims{"groups": []any{"Other"}}
-	_, err := oktaExtraRoles(&config.OktaOIDCProviderConfig{
-		AllowedIDTokenGroups: []string{"API-Admins"},
-	}, mc)
-	if !errors.Is(err, apierrors.ErrOktaLoginDenied) {
-		t.Fatalf("got %v", err)
-	}
-}
-
-func TestOktaExtraRoles_noGroupsClaimWhenRequired(t *testing.T) {
-	t.Parallel()
-	mc := jwt.MapClaims{"sub": "u1"}
-	_, err := oktaExtraRoles(&config.OktaOIDCProviderConfig{
-		AllowedIDTokenGroups: []string{"API-Admins"},
-	}, mc)
-	if !errors.Is(err, apierrors.ErrOktaLoginDenied) {
-		t.Fatalf("got %v", err)
-	}
-}
-
-func TestOktaExtraRoles_bindings(t *testing.T) {
-	t.Parallel()
-	mc := jwt.MapClaims{"groups": []any{"API-Admins", "Everyone"}}
-	roles, err := oktaExtraRoles(&config.OktaOIDCProviderConfig{
-		GroupRoleBindings: []config.OktaGroupRoleBinding{{
-			GroupName: "API-Admins",
-			Roles:     []string{"api:role:admin"},
-		}},
-	}, mc)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(roles) != 1 || roles[0] != "api:role:admin" {
-		t.Fatalf("%v", roles)
-	}
-}
-
-func TestIdTokenStringArrayClaim_string(t *testing.T) {
-	t.Parallel()
-	got := idTokenStringArrayClaim(jwt.MapClaims{"groups": " Solo "}, "groups")
-	if len(got) != 1 || got[0] != "Solo" {
-		t.Fatalf("%v", got)
-	}
-}
-
-func TestEntraExtraRoles_tenantDenied(t *testing.T) {
-	t.Parallel()
-	mc := jwt.MapClaims{"tid": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"}
-	_, err := entraExtraRoles(&config.EntraOIDCProviderConfig{
-		AllowedTenantIDs: []string{"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"},
-	}, mc)
-	if !errors.Is(err, apierrors.ErrEntraLoginDenied) {
-		t.Fatalf("got %v", err)
-	}
-}
-
-func TestEntraExtraRoles_tenantCaseInsensitive(t *testing.T) {
-	t.Parallel()
-	mc := jwt.MapClaims{"tid": "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"}
-	_, err := entraExtraRoles(&config.EntraOIDCProviderConfig{
-		AllowedTenantIDs: []string{"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"},
-	}, mc)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestEntraExtraRoles_groupsGate(t *testing.T) {
-	t.Parallel()
-	mc := jwt.MapClaims{"tid": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "groups": []any{"Other"}}
-	_, err := entraExtraRoles(&config.EntraOIDCProviderConfig{
-		AllowedTenantIDs:     []string{"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"},
-		AllowedIDTokenGroups: []string{"API-Admins"},
-	}, mc)
-	if !errors.Is(err, apierrors.ErrEntraLoginDenied) {
-		t.Fatalf("got %v", err)
-	}
-}
-
-func TestEntraExtraRoles_groupBindings(t *testing.T) {
-	t.Parallel()
 	mc := jwt.MapClaims{
-		"tid":    "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-		"groups": []any{"everyone-uuid", "admins-uuid"},
+		"sub":    "u1",
+		"tid":    "tenant-a",
+		"groups": []any{"api:role:admin", "platform"},
 	}
-	roles, err := entraExtraRoles(&config.EntraOIDCProviderConfig{
-		GroupRoleBindings: []config.EntraGroupRoleBinding{{
-			Group: "admins-uuid",
-			Roles: []string{"api:role:admin"},
+	raw, err := claimsSnapshotFromProvider(context.Background(), p, mc, "", http.DefaultClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out map[string]any
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatal(err)
+	}
+	roles := asStringSlice(t, out["roles"])
+	if len(roles) != 3 {
+		t.Fatalf("roles=%v", roles)
+	}
+	perms := asStringSlice(t, out["permissions"])
+	if len(perms) != 1 || perms[0] != "api.contracts.export" {
+		t.Fatalf("permissions=%v", perms)
+	}
+	groups := asStringSlice(t, out["groups"])
+	if len(groups) != 2 {
+		t.Fatalf("groups=%v", groups)
+	}
+	if out["tenant"] != "tenant-a" {
+		t.Fatalf("tenant=%v", out["tenant"])
+	}
+}
+
+func TestClaimsSnapshotFromProvider_CEL_GitHubProviderData(t *testing.T) {
+	t.Parallel()
+	hc := &http.Client{
+		Transport: claimMappingRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			status := http.StatusOK
+			body := ""
+			switch {
+			case strings.HasSuffix(r.URL.Path, "/user/orgs"):
+				body = `[{"login":"acme"}]`
+			case strings.HasSuffix(r.URL.Path, "/user/teams"):
+				body = `[{"slug":"platform","organization":{"login":"acme"}}]`
+			default:
+				status = http.StatusNotFound
+				body = `{"message":"not found"}`
+			}
+			return &http.Response{
+				StatusCode: status,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader(body)),
+				Request:    r,
+			}, nil
+		}),
+	}
+
+	p := config.OIDCProviderConfig{
+		Kind: "github",
+		GitHub: &config.GitHubOIDCProviderConfig{
+			RESTAPIBase: "https://github.local/api/v3",
+		},
+		ClaimMapping: &config.OIDCClaimMappingConfig{Rules: []config.OIDCClaimMappingRule{
+			{
+				Name:     "org-check",
+				When:     "provider.github.org_logins.exists(o, o == 'acme')",
+				AddRoles: []string{"api:role:admin"},
+			},
+			{
+				Name:           "team-check",
+				When:           "provider.github.teams.exists(t, t.org_login == 'acme' && t.slug == 'platform')",
+				AddPermissions: []string{"api.token.edge.issue"},
+			},
 		}},
-	}, mc)
+	}
+	raw, err := claimsSnapshotFromProvider(context.Background(), p, jwt.MapClaims{"sub": "u1"}, "oauth-token", hc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(roles) != 1 || roles[0] != "api:role:admin" {
-		t.Fatalf("%v", roles)
-	}
-}
-
-func TestClaimsSnapshotFromProvider_githubNoExtraCalls(t *testing.T) {
-	t.Parallel()
-	mc := jwt.MapClaims{"sub": "1", "exp": float64(time.Now().Add(time.Hour).Unix())}
-	_, err := claimsSnapshotFromProvider(context.Background(), config.OIDCProviderConfig{Kind: "github"}, mc, "", http.DefaultClient)
-	if err != nil {
+	var out map[string]any
+	if err := json.Unmarshal(raw, &out); err != nil {
 		t.Fatal(err)
 	}
+	roles := asStringSlice(t, out["roles"])
+	if len(roles) != 2 {
+		t.Fatalf("roles=%v", roles)
+	}
+	perms := asStringSlice(t, out["permissions"])
+	if len(perms) != 1 || perms[0] != "api.token.edge.issue" {
+		t.Fatalf("permissions=%v", perms)
+	}
 }
 
-func TestGitlabExtraRoles_groupDenied(t *testing.T) {
+type claimMappingRoundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f claimMappingRoundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func TestClaimsSnapshotFromProvider_CEL_RuntimeError(t *testing.T) {
 	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/v4/groups" {
-			_ = json.NewEncoder(w).Encode([]map[string]string{{"full_path": "other/top"}})
-			return
+	p := config.OIDCProviderConfig{
+		ClaimMapping: &config.OIDCClaimMappingConfig{Rules: []config.OIDCClaimMappingRule{{
+			When:     "id_token.",
+			AddRoles: []string{"api:role:admin"},
+		}}},
+	}
+	_, err := claimsSnapshotFromProvider(context.Background(), p, jwt.MapClaims{"sub": "u1"}, "", http.DefaultClient)
+	if !errors.Is(err, apierrors.ErrOIDCClaimMappingRuntime) {
+		t.Fatalf("expected runtime mapping error, got %v", err)
+	}
+}
+
+func asStringSlice(t *testing.T, v any) []string {
+	t.Helper()
+	raw, ok := v.([]any)
+	if !ok {
+		t.Fatalf("expected []any, got %T", v)
+	}
+	out := make([]string, 0, len(raw))
+	for i := range raw {
+		s, ok := raw[i].(string)
+		if !ok {
+			t.Fatalf("item[%d] type=%T", i, raw[i])
 		}
-		http.NotFound(w, r)
-	}))
-	t.Cleanup(srv.Close)
-
-	_, err := gitlabExtraRoles(t.Context(), srv.Client(), &config.GitLabOIDCProviderConfig{
-		APIV4Base:         srv.URL + "/api/v4",
-		AllowedGroupPaths: []string{"acme"},
-	}, "https://gitlab.com", "oauth-token")
-	if !errors.Is(err, apierrors.ErrGitLabLoginDenied) {
-		t.Fatalf("got %v", err)
+		out = append(out, s)
 	}
-}
-
-func TestGitlabExtraRoles_groupBindings(t *testing.T) {
-	t.Parallel()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/v4/groups" {
-			_ = json.NewEncoder(w).Encode([]map[string]string{{"full_path": "acme/platform"}})
-			return
-		}
-		http.NotFound(w, r)
-	}))
-	t.Cleanup(srv.Close)
-
-	roles, err := gitlabExtraRoles(t.Context(), srv.Client(), &config.GitLabOIDCProviderConfig{
-		APIV4Base: srv.URL + "/api/v4",
-		GroupRoleBindings: []config.GitLabGroupRoleBinding{{
-			GroupFullPath: "acme/platform",
-			Roles:         []string{"api:role:admin"},
-		}},
-	}, "https://gitlab.com", "oauth-token")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(roles) != 1 || roles[0] != "api:role:admin" {
-		t.Fatalf("%v", roles)
-	}
+	return out
 }

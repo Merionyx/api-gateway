@@ -337,6 +337,22 @@ func MapCallbackError(err error) (status int, code, detail string) {
 		return 403, "OKTA_LOGIN_DENIED", "Okta user id_token groups do not satisfy policy for this provider."
 	case errors.Is(err, apierrors.ErrEntraLoginDenied):
 		return 403, "ENTRA_LOGIN_DENIED", "Microsoft Entra user id_token tid/groups do not satisfy policy for this provider."
+	case errors.Is(err, apierrors.ErrOIDCClaimMappingDenied):
+		var deny *oidcClaimMappingDenyError
+		if errors.As(err, &deny) {
+			code := strings.TrimSpace(deny.Code)
+			if code == "" {
+				code = "OIDC_CLAIM_MAPPING_DENIED"
+			}
+			detail := strings.TrimSpace(deny.Message)
+			if detail == "" {
+				detail = "The authenticated provider user was denied by claim_mapping rules."
+			}
+			return 403, code, detail
+		}
+		return 403, "OIDC_CLAIM_MAPPING_DENIED", "The authenticated provider user was denied by claim_mapping rules."
+	case errors.Is(err, apierrors.ErrOIDCClaimMappingRuntime):
+		return 502, "OIDC_CLAIM_MAPPING_RUNTIME_ERROR", "Failed to evaluate provider claim_mapping rules."
 	case errors.Is(err, apierrors.ErrNoActiveSigningKey), errors.Is(err, apierrors.ErrUnsupportedSigningAlgorithm), errors.Is(err, apierrors.ErrSigningOperationFailed):
 		return 503, "JWT_SIGNING_UNAVAILABLE", "Could not mint API access token."
 	case errors.Is(err, apierrors.ErrStoreAccess):

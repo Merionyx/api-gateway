@@ -77,7 +77,11 @@ auth:
   #     redirect_uri_allowlist:
   #       - "http://127.0.0.1:21987/callback"
   #     extra_scopes: ["email"]
-  # GitHub (roadmap ш.35): docs/idp/github/README.md — issuer must be https://github.com/login/oauth ; kind: github
+  # CEL claim mapping (roadmap ш.41+): each rule evaluates against:
+  #   - id_token.* (validated upstream token claims)
+  #   - provider.*  (provider metadata and fetched provider API data for kind-specific providers)
+  #
+  # GitHub (issuer must be https://github.com/login/oauth ; kind: github)
   #   - id: "github"
   #     name: "GitHub"
   #     kind: "github"
@@ -87,10 +91,19 @@ auth:
   #     redirect_uri_allowlist: ["http://127.0.0.1:21987/callback"]
   #     github:
   #       auth_flow: "oauth_app"   # or "github_app" for GitHub App user-to-server tokens (no OAuth scopes in authorize URL)
-  #       allowed_org_logins: ["my-org"]
-  #       team_role_bindings:
-  #         - { org: "my-org", team_slug: "admins", roles: ["api:role:admin"] }
-  # GitLab (roadmap ш.36): docs/idp/gitlab/README.md — issuer = https://gitlab.com or self-managed origin; kind: gitlab
+  #     claim_mapping:
+  #       rules:
+  #         - name: "deny-non-org"
+  #           when: "!provider.github.org_logins.exists(o, o == 'my-org')"
+  #           deny: true
+  #           deny_code: "GITHUB_ORG_REQUIRED"
+  #           deny_message: "User must be in my-org"
+  #         - name: "platform-admins"
+  #           when: "provider.github.teams.exists(t, t.org_login == 'my-org' && t.slug == 'admins')"
+  #           add_roles: ["api:role:admin"]
+  #           add_permissions: ["api.token.edge.issue"]
+  #
+  # GitLab (issuer = https://gitlab.com or self-managed origin; kind: gitlab)
   #   - id: "gitlab"
   #     name: "GitLab"
   #     kind: "gitlab"
@@ -98,11 +111,16 @@ auth:
   #     client_id: "…"
   #     client_secret: "…"
   #     redirect_uri_allowlist: ["http://127.0.0.1:21987/callback"]
-  #     gitlab:
-  #       allowed_group_paths: ["my-root-group"]
-  #       group_role_bindings:
-  #         - { group_full_path: "my-root-group/admins", roles: ["api:role:admin"] }
-  # Google (roadmap ш.37): docs/idp/google/README.md — issuer must be https://accounts.google.com ; kind: google
+  #     claim_mapping:
+  #       rules:
+  #         - name: "gitlab-root-check"
+  #           when: "provider.gitlab.group_full_paths.exists(g, g == 'my-root-group' || g.startsWith('my-root-group/'))"
+  #           add_roles: ["api:role:viewer"]
+  #         - name: "gitlab-admin"
+  #           when: "provider.gitlab.group_full_paths.exists(g, g == 'my-root-group/admins')"
+  #           add_roles: ["api:role:admin"]
+  #
+  # Google (issuer must be https://accounts.google.com ; kind: google)
   #   - id: "google"
   #     name: "Google"
   #     kind: "google"
@@ -110,11 +128,17 @@ auth:
   #     client_id: "….apps.googleusercontent.com"
   #     client_secret: "…"
   #     redirect_uri_allowlist: ["http://127.0.0.1:21987/callback"]
-  #     google:
-  #       allowed_hosted_domains: ["example.com"]
-  #       hosted_domain_role_bindings:
-  #         - { hd: "example.com", roles: ["api:role:admin"] }
-  # Okta (roadmap ш.38): docs/idp/okta/README.md — issuer = Authorization Server URL (https); kind: okta
+  #     claim_mapping:
+  #       rules:
+  #         - name: "google-workspace-only"
+  #           when: "id_token.hd != 'example.com'"
+  #           deny: true
+  #           deny_code: "GOOGLE_HD_REQUIRED"
+  #         - name: "google-admins"
+  #           when: "id_token.hd == 'example.com'"
+  #           add_roles: ["api:role:admin"]
+  #
+  # Okta (issuer = Authorization Server URL (https); kind: okta)
   #   - id: "okta"
   #     name: "Okta"
   #     kind: "okta"
@@ -122,11 +146,13 @@ auth:
   #     client_id: "…"
   #     client_secret: "…"
   #     redirect_uri_allowlist: ["http://127.0.0.1:21987/callback"]
-  #     okta:
-  #       allowed_id_token_groups: ["API Gateway Users"]
-  #       group_role_bindings:
-  #         - { group_name: "API Gateway Admins", roles: ["api:role:admin"] }
-  # Entra ID (roadmap ш.39): docs/idp/entra/README.md — issuer = v2.0 metadata URL (https); kind: entra
+  #     claim_mapping:
+  #       rules:
+  #         - name: "okta-groups"
+  #           when: "id_token.groups.exists(g, g == 'API Gateway Admins')"
+  #           add_roles: ["api:role:admin"]
+  #
+  # Entra ID (issuer = v2.0 metadata URL (https); kind: entra)
   #   - id: "entra"
   #     name: "Microsoft Entra ID"
   #     kind: "entra"
@@ -134,11 +160,15 @@ auth:
   #     client_id: "…"
   #     client_secret: "…"
   #     redirect_uri_allowlist: ["http://127.0.0.1:21987/callback"]
-  #     entra:
-  #       allowed_tenant_ids: ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]
-  #       allowed_id_token_groups: ["<group object id as in id_token>"]
-  #       group_role_bindings:
-  #         - { group: "<same string as in id_token groups>", roles: ["api:role:admin"] }
+  #     claim_mapping:
+  #       rules:
+  #         - name: "entra-tenant-check"
+  #           when: "id_token.tid != 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'"
+  #           deny: true
+  #           deny_code: "ENTRA_TENANT_DENIED"
+  #         - name: "entra-admin-group"
+  #           when: "id_token.groups.exists(g, g == '<group object id as in id_token>')"
+  #           add_roles: ["api:role:admin"]
 
   # OpenTelemetry: optional; can be overridden (e.g. TELEMETRY_ENABLED) via environment.
   # telemetry:

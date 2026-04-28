@@ -398,6 +398,22 @@ func MapRefreshError(err error) (status int, code, detail string) {
 		return http.StatusUnauthorized, "OIDC_TOKEN_REFRESH_FAILED", "IdP rejected the refresh request."
 	case errors.Is(err, oidc.ErrIDTokenValidation):
 		return http.StatusUnauthorized, "OIDC_ID_TOKEN_INVALID", "IdP id_token validation failed after refresh."
+	case errors.Is(err, apierrors.ErrOIDCClaimMappingDenied):
+		var deny *oidcClaimMappingDenyError
+		if errors.As(err, &deny) {
+			code := strings.TrimSpace(deny.Code)
+			if code == "" {
+				code = "OIDC_CLAIM_MAPPING_DENIED"
+			}
+			detail := strings.TrimSpace(deny.Message)
+			if detail == "" {
+				detail = "The authenticated provider user was denied by claim_mapping rules."
+			}
+			return http.StatusForbidden, code, detail
+		}
+		return http.StatusForbidden, "OIDC_CLAIM_MAPPING_DENIED", "The authenticated provider user was denied by claim_mapping rules."
+	case errors.Is(err, apierrors.ErrOIDCClaimMappingRuntime):
+		return http.StatusBadGateway, "OIDC_CLAIM_MAPPING_RUNTIME_ERROR", "Failed to evaluate provider claim_mapping rules."
 	case errors.Is(err, apierrors.ErrGitHubLoginDenied):
 		return http.StatusForbidden, "GITHUB_LOGIN_DENIED", "GitHub user no longer satisfies organization policy for this provider."
 	case errors.Is(err, apierrors.ErrGitLabLoginDenied):

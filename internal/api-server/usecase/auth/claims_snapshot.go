@@ -7,51 +7,17 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
-
-	apiroles "github.com/merionyx/api-gateway/internal/api-server/auth/roles"
 	"github.com/merionyx/api-gateway/internal/api-server/config"
 )
 
 // claimsSnapshotFromProvider builds the JSON claims_snapshot stored on the session after OIDC
-// callback and refresh (IdP-up path). Provider-specific enrichment adds roles on top of api:role:viewer.
+// callback and refresh (IdP-up path) using CEL-based mapping rules.
 func claimsSnapshotFromProvider(ctx context.Context, p config.OIDCProviderConfig, idClaims jwt.MapClaims, idpOAuthAccess string, hc *http.Client) (json.RawMessage, error) {
-	roles := []string{apiroles.APIRoleViewer}
-	if p.IsGitHubOIDCProvider() {
-		extras, err := githubExtraRoles(ctx, hc, p.GitHub, idpOAuthAccess, githubRESTBaseFor(p.GitHub))
-		if err != nil {
-			return nil, err
-		}
-		roles = mergeUniqueStrings(roles, extras)
+	mapped, err := applyOIDCClaimMapping(ctx, p, idClaims, idpOAuthAccess, hc)
+	if err != nil {
+		return nil, err
 	}
-	if p.IsGitLabOIDCProvider() {
-		extras, err := gitlabExtraRoles(ctx, hc, p.GitLab, strings.TrimSpace(p.Issuer), idpOAuthAccess)
-		if err != nil {
-			return nil, err
-		}
-		roles = mergeUniqueStrings(roles, extras)
-	}
-	if p.IsGoogleOIDCProvider() {
-		extras, err := googleExtraRoles(p.Google, idClaims)
-		if err != nil {
-			return nil, err
-		}
-		roles = mergeUniqueStrings(roles, extras)
-	}
-	if p.IsOktaOIDCProvider() {
-		extras, err := oktaExtraRoles(p.Okta, idClaims)
-		if err != nil {
-			return nil, err
-		}
-		roles = mergeUniqueStrings(roles, extras)
-	}
-	if p.IsEntraOIDCProvider() {
-		extras, err := entraExtraRoles(p.Entra, idClaims)
-		if err != nil {
-			return nil, err
-		}
-		roles = mergeUniqueStrings(roles, extras)
-	}
-	return marshalClaimsSnapshot(idClaims, roles)
+	return marshalClaimsSnapshot(mapped.Claims, mapped.Roles, mapped.Permissions)
 }
 
 func mergeUniqueStrings(base, add []string) []string {
@@ -82,14 +48,18 @@ func mergeUniqueStrings(base, add []string) []string {
 	return out
 }
 
-func marshalClaimsSnapshot(mc jwt.MapClaims, roles []string) (json.RawMessage, error) {
-	m := map[string]any{
-		"roles": roles,
-	}
-	for _, k := range []string{"sub", "email", "name", "preferred_username", "hd", "tid"} {
-		if v, ok := mc[k]; ok {
-			m[k] = v
+func marshalClaimsSnapshot(claims map[string]any, roles, permissions []string) (json.RawMessage, error) {
+	m := make(map[string]any)
+	for k, v := range claims {
+		kk := strings.TrimSpace(k)
+		if kk == "" {
+			continue
 		}
+		m[kk] = normalizeClaimValue(v)
+	}
+	m["roles"] = roles
+	if len(permissions) > 0 {
+		m["permissions"] = permissions
 	}
 	b, err := json.Marshal(m)
 	if err != nil {

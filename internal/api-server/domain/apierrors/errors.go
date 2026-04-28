@@ -75,4 +75,10 @@ var (
 
 	// ErrEntraLoginDenied means the user failed Microsoft Entra id_token tid/groups policy at callback (HTTP 403).
 	ErrEntraLoginDenied = errors.New("entra login denied by tenant or id_token groups policy")
+
+	// ErrOIDCClaimMappingDenied means CEL claim-mapping policy rejected the authenticated user (HTTP 403).
+	ErrOIDCClaimMappingDenied = errors.New("oidc claim mapping denied")
+
+	// ErrOIDCClaimMappingRuntime means CEL claim-mapping could not be evaluated due to runtime/config issues (HTTP 500).
+	ErrOIDCClaimMappingRuntime = errors.New("oidc claim mapping runtime failure")
 )

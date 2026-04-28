@@ -109,12 +109,17 @@ components:
           # Postman OAuth 2.0 (Get New Access Token) helper
           - "https://oauth.pstmn.io/v1/callback"
           github:
-            allowed_org_logins:
-            - "merionyx"
-            team_role_bindings:
-            - org: "merionyx"
-              team_slug: "maintainers"
-              roles:
+            auth_flow: "oauth_app"
+          claim_mapping:
+            rules:
+            - name: "github-org-required"
+              when: "!provider.github.org_logins.exists(o, o == 'merionyx')"
+              deny: true
+              deny_code: "GITHUB_ORG_REQUIRED"
+              deny_message: "User must be in GitHub organization merionyx."
+            - name: "github-maintainers-admin"
+              when: "provider.github.teams.exists(t, t.org_login == 'merionyx' && t.slug == 'maintainers')"
+              add_roles:
               - "api:role:admin"
         - id: gitlab
           name: GitLab
@@ -139,10 +144,12 @@ components:
           - "http://185.41.122.122:30100/v1/auth/callback"
           - "http://elg.mikhailminaev.com:30100/v1/auth/callback"
           - "https://oauth.pstmn.io/v1/callback"
-          # Optional: restrict to Workspace / domains (remove or edit for your tenant)
-          # google:
-          #   allowed_hosted_domains: ["yourcompany.com"]
-          #   allowed_email_domains: ["gmail.com"]
+          # Optional CEL mapping example:
+          # claim_mapping:
+          #   rules:
+          #   - name: "google-workspace-only"
+          #     when: "id_token.hd != 'yourcompany.com'"
+          #     deny: true
 
   contractSyncer:
     image:

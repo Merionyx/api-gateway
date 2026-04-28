@@ -36,6 +36,8 @@ type OIDCProviderConfig struct {
 	RedirectURIAllowlist []string `mapstructure:"redirect_uri_allowlist" json:"redirect_uri_allowlist"`
 	// ExtraScopes are appended after "openid" (e.g. "email", "profile").
 	ExtraScopes []string `mapstructure:"extra_scopes" json:"extra_scopes"`
+	// ClaimMapping configures CEL-based mapping from provider responses into our snapshot/JWT contract.
+	ClaimMapping *OIDCClaimMappingConfig `mapstructure:"claim_mapping" json:"claim_mapping,omitempty"`
 	// Kind selects IdP-specific behavior. Empty or "generic" keeps standard OIDC only. "github" enables org/team checks (roadmap ш. 35). "gitlab" enables group checks (ш. 36). "google" uses id_token hd/email (ш. 37). "okta" uses id_token groups (ш. 38). "entra" uses id_token tid/groups (ш. 39).
 	Kind string `mapstructure:"kind" json:"kind,omitempty"`
 	// GitHub is read when Kind is "github" (allowed orgs, team→role bindings). Optional; nil means no extra restrictions beyond GitHub OAuth.
@@ -58,9 +60,9 @@ type GitHubOIDCProviderConfig struct {
 	AuthFlow string `mapstructure:"auth_flow" json:"auth_flow,omitempty"`
 	// RESTAPIBase overrides https://api.github.com (GitHub Enterprise Server: https://HOST/api/v3).
 	RESTAPIBase string `mapstructure:"rest_api_base" json:"rest_api_base,omitempty"`
-	// AllowedOrgLogins, if non-empty, requires the user to be a member of at least one listed organization (login names, case-insensitive).
+	// AllowedOrgLogins is unsupported after CEL migration; use claim_mapping.rules with provider.github.org_logins.
 	AllowedOrgLogins []string `mapstructure:"allowed_org_logins" json:"allowed_org_logins,omitempty"`
-	// TeamRoleBindings grant API roles when the user belongs to org/team_slug on GitHub (requires read:org; added automatically for kind=github).
+	// TeamRoleBindings is unsupported after CEL migration; use claim_mapping.rules with provider.github.teams.
 	TeamRoleBindings []GitHubTeamRoleBinding `mapstructure:"team_role_bindings" json:"team_role_bindings,omitempty"`
 }
 
@@ -78,10 +80,9 @@ const GitHubOIDCDiscoveryIssuer = "https://github.com/login/oauth"
 type GitLabOIDCProviderConfig struct {
 	// APIV4Base overrides the default {issuer origin}/api/v4 (e.g. https://gitlab.com/api/v4 or self-managed).
 	APIV4Base string `mapstructure:"api_v4_base" json:"api_v4_base,omitempty"`
-	// AllowedGroupPaths, if non-empty, requires the user to belong to at least one group whose full_path equals a path
-	// or starts with path+"/" (GitLab group path, case-sensitive as on GitLab).
+	// AllowedGroupPaths is unsupported after CEL migration; use claim_mapping.rules with provider.gitlab.group_full_paths.
 	AllowedGroupPaths []string `mapstructure:"allowed_group_paths" json:"allowed_group_paths,omitempty"`
-	// GroupRoleBindings grant API roles when the user is a direct member of the given group full_path.
+	// GroupRoleBindings is unsupported after CEL migration; use claim_mapping.rules with provider.gitlab.group_full_paths.
 	GroupRoleBindings []GitLabGroupRoleBinding `mapstructure:"group_role_bindings" json:"group_role_bindings,omitempty"`
 }
 
@@ -118,13 +119,13 @@ func (p OIDCProviderConfig) IsGitLabOIDCProvider() bool {
 
 // GoogleOIDCProviderConfig restricts or enriches login using Google id_token claims (hd, email); no Admin SDK in MVP.
 type GoogleOIDCProviderConfig struct {
-	// AllowedHostedDomains, if non-empty, requires a non-empty id_token "hd" claim matching one entry (Google Workspace; case-insensitive).
+	// AllowedHostedDomains is unsupported after CEL migration; use claim_mapping.rules with id_token.hd.
 	AllowedHostedDomains []string `mapstructure:"allowed_hosted_domains" json:"allowed_hosted_domains,omitempty"`
-	// AllowedEmailDomains, if used without allowed_hosted_domains, requires email domain to match one entry (case-insensitive, no leading @ in config).
+	// AllowedEmailDomains is unsupported after CEL migration; use claim_mapping.rules with id_token.email.
 	AllowedEmailDomains []string `mapstructure:"allowed_email_domains" json:"allowed_email_domains,omitempty"`
-	// HostedDomainRoleBindings grant roles when id_token "hd" matches (case-insensitive).
+	// HostedDomainRoleBindings is unsupported after CEL migration; use claim_mapping.rules.
 	HostedDomainRoleBindings []GoogleHostedDomainRoleBinding `mapstructure:"hosted_domain_role_bindings" json:"hosted_domain_role_bindings,omitempty"`
-	// EmailDomainRoleBindings grant roles when the email address domain matches (case-insensitive).
+	// EmailDomainRoleBindings is unsupported after CEL migration; use claim_mapping.rules.
 	EmailDomainRoleBindings []GoogleEmailDomainRoleBinding `mapstructure:"email_domain_role_bindings" json:"email_domain_role_bindings,omitempty"`
 }
 
@@ -150,9 +151,9 @@ func (p OIDCProviderConfig) IsGoogleOIDCProvider() bool {
 
 // OktaOIDCProviderConfig restricts or enriches login using the id_token "groups" claim (configure Okta Authorization Server + app).
 type OktaOIDCProviderConfig struct {
-	// AllowedIDTokenGroups, if non-empty, requires the id_token "groups" claim to contain at least one of these names (exact match after TrimSpace).
+	// AllowedIDTokenGroups is unsupported after CEL migration; use claim_mapping.rules with id_token.groups.
 	AllowedIDTokenGroups []string `mapstructure:"allowed_id_token_groups" json:"allowed_id_token_groups,omitempty"`
-	// GroupRoleBindings grant API roles when the user has the given group name in id_token "groups".
+	// GroupRoleBindings is unsupported after CEL migration; use claim_mapping.rules with id_token.groups.
 	GroupRoleBindings []OktaGroupRoleBinding `mapstructure:"group_role_bindings" json:"group_role_bindings,omitempty"`
 }
 
@@ -169,11 +170,11 @@ func (p OIDCProviderConfig) IsOktaOIDCProvider() bool {
 
 // EntraOIDCProviderConfig restricts or enriches login using Microsoft Entra id_token claims (tid, groups).
 type EntraOIDCProviderConfig struct {
-	// AllowedTenantIDs, if non-empty, requires id_token "tid" to match one entry (GUID string; comparison is case-insensitive).
+	// AllowedTenantIDs is unsupported after CEL migration; use claim_mapping.rules with id_token.tid.
 	AllowedTenantIDs []string `mapstructure:"allowed_tenant_ids" json:"allowed_tenant_ids,omitempty"`
-	// AllowedIDTokenGroups, if non-empty, requires id_token "groups" to intersect this list (exact string match after TrimSpace, as emitted in the token).
+	// AllowedIDTokenGroups is unsupported after CEL migration; use claim_mapping.rules with id_token.groups.
 	AllowedIDTokenGroups []string `mapstructure:"allowed_id_token_groups" json:"allowed_id_token_groups,omitempty"`
-	// GroupRoleBindings grant roles when an id_token "groups" entry matches Group (object ID or name, depending on Entra token configuration).
+	// GroupRoleBindings is unsupported after CEL migration; use claim_mapping.rules with id_token.groups.
 	GroupRoleBindings []EntraGroupRoleBinding `mapstructure:"group_role_bindings" json:"group_role_bindings,omitempty"`
 }
 
@@ -181,6 +182,40 @@ type EntraOIDCProviderConfig struct {
 type EntraGroupRoleBinding struct {
 	Group string   `mapstructure:"group" json:"group"`
 	Roles []string `mapstructure:"roles" json:"roles,omitempty"`
+}
+
+// OIDCClaimMappingConfig defines CEL-driven mapping from provider data to our auth snapshot fields.
+type OIDCClaimMappingConfig struct {
+	// Rules are evaluated in order; each matching rule can append roles/permissions/groups and set claims.
+	Rules []OIDCClaimMappingRule `mapstructure:"rules" json:"rules,omitempty"`
+}
+
+// OIDCClaimMappingRule is one CEL policy rule evaluated against provider response data.
+type OIDCClaimMappingRule struct {
+	// Name is optional and used in diagnostics.
+	Name string `mapstructure:"name" json:"name,omitempty"`
+	// When is a CEL boolean expression; rule applies only when it evaluates to true.
+	When string `mapstructure:"when" json:"when"`
+	// Deny marks this rule as terminal deny when When is true.
+	Deny bool `mapstructure:"deny" json:"deny,omitempty"`
+	// DenyCode is an optional stable machine-readable token for deny diagnostics.
+	DenyCode string `mapstructure:"deny_code" json:"deny_code,omitempty"`
+	// DenyMessage is an optional user-facing detail for deny diagnostics.
+	DenyMessage string `mapstructure:"deny_message" json:"deny_message,omitempty"`
+	// AddRoles appends static role IDs when rule matches.
+	AddRoles []string `mapstructure:"add_roles" json:"add_roles,omitempty"`
+	// AddPermissions appends static permission IDs when rule matches.
+	AddPermissions []string `mapstructure:"add_permissions" json:"add_permissions,omitempty"`
+	// AddGroups appends static group strings when rule matches.
+	AddGroups []string `mapstructure:"add_groups" json:"add_groups,omitempty"`
+	// AddRolesExpr evaluates to string or list(string) and appends to roles.
+	AddRolesExpr string `mapstructure:"add_roles_expr" json:"add_roles_expr,omitempty"`
+	// AddPermissionsExpr evaluates to string or list(string) and appends to permissions.
+	AddPermissionsExpr string `mapstructure:"add_permissions_expr" json:"add_permissions_expr,omitempty"`
+	// AddGroupsExpr evaluates to string or list(string) and appends to groups.
+	AddGroupsExpr string `mapstructure:"add_groups_expr" json:"add_groups_expr,omitempty"`
+	// SetClaims maps JWT claim keys to CEL expressions; each expression result is written as claim value.
+	SetClaims map[string]string `mapstructure:"set_claims" json:"set_claims,omitempty"`
 }
 
 // IsEntraOIDCProvider reports whether this entry uses Microsoft Entra-specific id_token handling.
@@ -424,7 +459,7 @@ func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
 		if p.Entra != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: set kind: entra when using entra block", id)
 		}
-		return nil
+		return validateOIDCClaimMapping(id, p.ClaimMapping)
 	case "github":
 		if p.GitLab != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=github must not set gitlab block", id)
@@ -445,31 +480,17 @@ func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
 		if flow := p.GitHubAuthFlow(); flow != "oauth_app" && flow != "github_app" {
 			return fmt.Errorf("auth.oidc_providers[%q].github.auth_flow: want oauth_app or github_app", id)
 		}
-		if g == nil {
-			return nil
-		}
-		for j, org := range g.AllowedOrgLogins {
-			if strings.TrimSpace(org) == "" {
-				return fmt.Errorf("auth.oidc_providers[%q].github.allowed_org_logins[%d]: empty entry", id, j)
-			}
-		}
-		for j, b := range g.TeamRoleBindings {
-			if strings.TrimSpace(b.Org) == "" {
-				return fmt.Errorf("auth.oidc_providers[%q].github.team_role_bindings[%d]: org is required", id, j)
-			}
-			if strings.TrimSpace(b.TeamSlug) == "" {
-				return fmt.Errorf("auth.oidc_providers[%q].github.team_role_bindings[%d]: team_slug is required", id, j)
-			}
-			if len(b.Roles) == 0 {
-				return fmt.Errorf("auth.oidc_providers[%q].github.team_role_bindings[%d]: roles must be non-empty", id, j)
-			}
-			for ri, role := range b.Roles {
-				if strings.TrimSpace(role) == "" {
-					return fmt.Errorf("auth.oidc_providers[%q].github.team_role_bindings[%d].roles[%d]: empty role", id, j, ri)
+		if g != nil {
+			if strings.TrimSpace(g.RESTAPIBase) != "" {
+				if _, err := url.Parse(strings.TrimSpace(g.RESTAPIBase)); err != nil {
+					return fmt.Errorf("auth.oidc_providers[%q].github.rest_api_base: invalid URL", id)
 				}
 			}
+			if len(g.AllowedOrgLogins) > 0 || len(g.TeamRoleBindings) > 0 {
+				return fmt.Errorf("auth.oidc_providers[%q].github.* org/team role fields were removed; migrate to claim_mapping.rules", id)
+			}
 		}
-		return nil
+		return validateOIDCClaimMapping(id, p.ClaimMapping)
 	case "gitlab":
 		if p.GitHub != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=gitlab must not set github block", id)
@@ -487,33 +508,17 @@ func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=gitlab requires a valid issuer URL (e.g. https://gitlab.com or self-managed origin): %w", id, err)
 		}
 		gl := p.GitLab
-		if gl == nil {
-			return nil
-		}
-		if b := strings.TrimSpace(gl.APIV4Base); b != "" {
-			if _, err := url.Parse(b); err != nil || !strings.HasPrefix(strings.ToLower(b), "http") {
-				return fmt.Errorf("auth.oidc_providers[%q].gitlab.api_v4_base: invalid URL", id)
-			}
-		}
-		for j, path := range gl.AllowedGroupPaths {
-			if strings.TrimSpace(path) == "" {
-				return fmt.Errorf("auth.oidc_providers[%q].gitlab.allowed_group_paths[%d]: empty entry", id, j)
-			}
-		}
-		for j, b := range gl.GroupRoleBindings {
-			if strings.TrimSpace(b.GroupFullPath) == "" {
-				return fmt.Errorf("auth.oidc_providers[%q].gitlab.group_role_bindings[%d]: group_full_path is required", id, j)
-			}
-			if len(b.Roles) == 0 {
-				return fmt.Errorf("auth.oidc_providers[%q].gitlab.group_role_bindings[%d]: roles must be non-empty", id, j)
-			}
-			for ri, role := range b.Roles {
-				if strings.TrimSpace(role) == "" {
-					return fmt.Errorf("auth.oidc_providers[%q].gitlab.group_role_bindings[%d].roles[%d]: empty role", id, j, ri)
+		if gl != nil {
+			if b := strings.TrimSpace(gl.APIV4Base); b != "" {
+				if _, err := url.Parse(b); err != nil || !strings.HasPrefix(strings.ToLower(b), "http") {
+					return fmt.Errorf("auth.oidc_providers[%q].gitlab.api_v4_base: invalid URL", id)
 				}
 			}
+			if len(gl.AllowedGroupPaths) > 0 || len(gl.GroupRoleBindings) > 0 {
+				return fmt.Errorf("auth.oidc_providers[%q].gitlab.* group role fields were removed; migrate to claim_mapping.rules", id)
+			}
 		}
-		return nil
+		return validateOIDCClaimMapping(id, p.ClaimMapping)
 	case "google":
 		if p.GitHub != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=google must not set github block", id)
@@ -530,47 +535,15 @@ func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
 		if strings.TrimSuffix(strings.TrimSpace(p.Issuer), "/") != GoogleOIDCDiscoveryIssuer {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=google requires issuer %q", id, GoogleOIDCDiscoveryIssuer)
 		}
-		g := p.Google
-		if g == nil {
-			return nil
-		}
-		for j, d := range g.AllowedHostedDomains {
-			if strings.TrimSpace(d) == "" {
-				return fmt.Errorf("auth.oidc_providers[%q].google.allowed_hosted_domains[%d]: empty entry", id, j)
+		if g := p.Google; g != nil {
+			if len(g.AllowedHostedDomains) > 0 ||
+				len(g.AllowedEmailDomains) > 0 ||
+				len(g.HostedDomainRoleBindings) > 0 ||
+				len(g.EmailDomainRoleBindings) > 0 {
+				return fmt.Errorf("auth.oidc_providers[%q].google.* hosted/email role fields were removed; migrate to claim_mapping.rules", id)
 			}
 		}
-		for j, d := range g.AllowedEmailDomains {
-			if strings.TrimSpace(d) == "" {
-				return fmt.Errorf("auth.oidc_providers[%q].google.allowed_email_domains[%d]: empty entry", id, j)
-			}
-		}
-		for j, b := range g.HostedDomainRoleBindings {
-			if strings.TrimSpace(b.HD) == "" {
-				return fmt.Errorf("auth.oidc_providers[%q].google.hosted_domain_role_bindings[%d]: hd is required", id, j)
-			}
-			if len(b.Roles) == 0 {
-				return fmt.Errorf("auth.oidc_providers[%q].google.hosted_domain_role_bindings[%d]: roles must be non-empty", id, j)
-			}
-			for ri, role := range b.Roles {
-				if strings.TrimSpace(role) == "" {
-					return fmt.Errorf("auth.oidc_providers[%q].google.hosted_domain_role_bindings[%d].roles[%d]: empty role", id, j, ri)
-				}
-			}
-		}
-		for j, b := range g.EmailDomainRoleBindings {
-			if strings.TrimSpace(b.Domain) == "" {
-				return fmt.Errorf("auth.oidc_providers[%q].google.email_domain_role_bindings[%d]: domain is required", id, j)
-			}
-			if len(b.Roles) == 0 {
-				return fmt.Errorf("auth.oidc_providers[%q].google.email_domain_role_bindings[%d]: roles must be non-empty", id, j)
-			}
-			for ri, role := range b.Roles {
-				if strings.TrimSpace(role) == "" {
-					return fmt.Errorf("auth.oidc_providers[%q].google.email_domain_role_bindings[%d].roles[%d]: empty role", id, j, ri)
-				}
-			}
-		}
-		return nil
+		return validateOIDCClaimMapping(id, p.ClaimMapping)
 	case "okta":
 		if p.GitHub != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=okta must not set github block", id)
@@ -587,29 +560,12 @@ func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
 		if err := ValidateOktaIssuer(p.Issuer); err != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=okta: %w", id, err)
 		}
-		o := p.Okta
-		if o == nil {
-			return nil
-		}
-		for j, g := range o.AllowedIDTokenGroups {
-			if strings.TrimSpace(g) == "" {
-				return fmt.Errorf("auth.oidc_providers[%q].okta.allowed_id_token_groups[%d]: empty entry", id, j)
+		if o := p.Okta; o != nil {
+			if len(o.AllowedIDTokenGroups) > 0 || len(o.GroupRoleBindings) > 0 {
+				return fmt.Errorf("auth.oidc_providers[%q].okta.* group role fields were removed; migrate to claim_mapping.rules", id)
 			}
 		}
-		for j, b := range o.GroupRoleBindings {
-			if strings.TrimSpace(b.GroupName) == "" {
-				return fmt.Errorf("auth.oidc_providers[%q].okta.group_role_bindings[%d]: group_name is required", id, j)
-			}
-			if len(b.Roles) == 0 {
-				return fmt.Errorf("auth.oidc_providers[%q].okta.group_role_bindings[%d]: roles must be non-empty", id, j)
-			}
-			for ri, role := range b.Roles {
-				if strings.TrimSpace(role) == "" {
-					return fmt.Errorf("auth.oidc_providers[%q].okta.group_role_bindings[%d].roles[%d]: empty role", id, j, ri)
-				}
-			}
-		}
-		return nil
+		return validateOIDCClaimMapping(id, p.ClaimMapping)
 	case "entra":
 		if p.GitHub != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=entra must not set github block", id)
@@ -626,37 +582,92 @@ func validateOIDCProviderKind(id string, p OIDCProviderConfig) error {
 		if err := ValidateEntraIssuer(p.Issuer); err != nil {
 			return fmt.Errorf("auth.oidc_providers[%q]: kind=entra: %w", id, err)
 		}
-		e := p.Entra
-		if e == nil {
-			return nil
-		}
-		for j, t := range e.AllowedTenantIDs {
-			if strings.TrimSpace(t) == "" {
-				return fmt.Errorf("auth.oidc_providers[%q].entra.allowed_tenant_ids[%d]: empty entry", id, j)
+		if e := p.Entra; e != nil {
+			if len(e.AllowedTenantIDs) > 0 || len(e.AllowedIDTokenGroups) > 0 || len(e.GroupRoleBindings) > 0 {
+				return fmt.Errorf("auth.oidc_providers[%q].entra.* tenant/group role fields were removed; migrate to claim_mapping.rules", id)
 			}
 		}
-		for j, g := range e.AllowedIDTokenGroups {
-			if strings.TrimSpace(g) == "" {
-				return fmt.Errorf("auth.oidc_providers[%q].entra.allowed_id_token_groups[%d]: empty entry", id, j)
-			}
-		}
-		for j, b := range e.GroupRoleBindings {
-			if strings.TrimSpace(b.Group) == "" {
-				return fmt.Errorf("auth.oidc_providers[%q].entra.group_role_bindings[%d]: group is required", id, j)
-			}
-			if len(b.Roles) == 0 {
-				return fmt.Errorf("auth.oidc_providers[%q].entra.group_role_bindings[%d]: roles must be non-empty", id, j)
-			}
-			for ri, role := range b.Roles {
-				if strings.TrimSpace(role) == "" {
-					return fmt.Errorf("auth.oidc_providers[%q].entra.group_role_bindings[%d].roles[%d]: empty role", id, j, ri)
-				}
-			}
-		}
-		return nil
+		return validateOIDCClaimMapping(id, p.ClaimMapping)
 	default:
 		return fmt.Errorf("auth.oidc_providers[%q]: unknown kind %q (supported: generic, github, gitlab, google, okta, entra)", id, strings.TrimSpace(p.Kind))
 	}
+}
+
+func validateOIDCClaimMapping(providerID string, m *OIDCClaimMappingConfig) error {
+	if m == nil {
+		return nil
+	}
+	for i := range m.Rules {
+		r := m.Rules[i]
+		if strings.TrimSpace(r.When) == "" {
+			return fmt.Errorf("auth.oidc_providers[%q].claim_mapping.rules[%d]: when is required", providerID, i)
+		}
+		if strings.TrimSpace(r.DenyCode) != "" {
+			if strings.ContainsAny(r.DenyCode, " \t\r\n") {
+				return fmt.Errorf("auth.oidc_providers[%q].claim_mapping.rules[%d].deny_code: must not contain whitespace", providerID, i)
+			}
+		}
+		for j, role := range r.AddRoles {
+			if strings.TrimSpace(role) == "" {
+				return fmt.Errorf("auth.oidc_providers[%q].claim_mapping.rules[%d].add_roles[%d]: empty role", providerID, i, j)
+			}
+		}
+		for j, perm := range r.AddPermissions {
+			if strings.TrimSpace(perm) == "" {
+				return fmt.Errorf("auth.oidc_providers[%q].claim_mapping.rules[%d].add_permissions[%d]: empty permission", providerID, i, j)
+			}
+		}
+		for j, grp := range r.AddGroups {
+			if strings.TrimSpace(grp) == "" {
+				return fmt.Errorf("auth.oidc_providers[%q].claim_mapping.rules[%d].add_groups[%d]: empty group", providerID, i, j)
+			}
+		}
+		if strings.TrimSpace(r.AddRolesExpr) == "" && r.AddRolesExpr != "" {
+			return fmt.Errorf("auth.oidc_providers[%q].claim_mapping.rules[%d].add_roles_expr: must not be blank", providerID, i)
+		}
+		if strings.TrimSpace(r.AddPermissionsExpr) == "" && r.AddPermissionsExpr != "" {
+			return fmt.Errorf("auth.oidc_providers[%q].claim_mapping.rules[%d].add_permissions_expr: must not be blank", providerID, i)
+		}
+		if strings.TrimSpace(r.AddGroupsExpr) == "" && r.AddGroupsExpr != "" {
+			return fmt.Errorf("auth.oidc_providers[%q].claim_mapping.rules[%d].add_groups_expr: must not be blank", providerID, i)
+		}
+		if len(r.SetClaims) > 0 {
+			for claim, expr := range r.SetClaims {
+				key := strings.TrimSpace(claim)
+				if key == "" {
+					return fmt.Errorf("auth.oidc_providers[%q].claim_mapping.rules[%d].set_claims: claim key is required", providerID, i)
+				}
+				if strings.TrimSpace(expr) == "" {
+					return fmt.Errorf("auth.oidc_providers[%q].claim_mapping.rules[%d].set_claims[%q]: expression is required", providerID, i, key)
+				}
+				switch key {
+				case "iss", "aud", "exp", "iat", "nbf", "jti":
+					return fmt.Errorf("auth.oidc_providers[%q].claim_mapping.rules[%d].set_claims[%q]: reserved JWT claim", providerID, i, key)
+				}
+			}
+		}
+		hasActions := r.Deny ||
+			len(r.AddRoles) > 0 ||
+			len(r.AddPermissions) > 0 ||
+			len(r.AddGroups) > 0 ||
+			strings.TrimSpace(r.AddRolesExpr) != "" ||
+			strings.TrimSpace(r.AddPermissionsExpr) != "" ||
+			strings.TrimSpace(r.AddGroupsExpr) != "" ||
+			len(r.SetClaims) > 0
+		if !hasActions {
+			return fmt.Errorf("auth.oidc_providers[%q].claim_mapping.rules[%d]: rule has no action", providerID, i)
+		}
+		if r.Deny && (len(r.AddRoles) > 0 ||
+			len(r.AddPermissions) > 0 ||
+			len(r.AddGroups) > 0 ||
+			strings.TrimSpace(r.AddRolesExpr) != "" ||
+			strings.TrimSpace(r.AddPermissionsExpr) != "" ||
+			strings.TrimSpace(r.AddGroupsExpr) != "" ||
+			len(r.SetClaims) > 0) {
+			return fmt.Errorf("auth.oidc_providers[%q].claim_mapping.rules[%d]: deny rule cannot include add/set actions", providerID, i)
+		}
+	}
+	return nil
 }
 
 // BootstrapAPIKeyAllowed reports whether the insecure bootstrap path may run (roadmap step 10).

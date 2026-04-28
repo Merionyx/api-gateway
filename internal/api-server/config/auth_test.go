@@ -6,7 +6,22 @@ import (
 	"time"
 )
 
-func TestValidateOIDCProviders_GitHub(t *testing.T) {
+func TestValidateOIDCProviders_NameRequired(t *testing.T) {
+	t.Parallel()
+	err := ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "github",
+		Issuer:               GitHubOIDCDiscoveryIssuer,
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		Kind:                 "github",
+	}})
+	if err == nil || !strings.Contains(err.Error(), "name is required") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestValidateOIDCProviders_GitHub_AuthFlowAndIssuer(t *testing.T) {
 	t.Parallel()
 	err := ValidateOIDCProviders([]OIDCProviderConfig{{
 		ID:                   "gh",
@@ -19,43 +34,6 @@ func TestValidateOIDCProviders_GitHub(t *testing.T) {
 	}})
 	if err == nil || !strings.Contains(err.Error(), "kind=github requires issuer") {
 		t.Fatalf("expected issuer validation error, got %v", err)
-	}
-
-	err = ValidateOIDCProviders([]OIDCProviderConfig{{
-		ID:                   "gh",
-		Name:                 "GitHub",
-		Issuer:               GitHubOIDCDiscoveryIssuer,
-		ClientID:             "c",
-		ClientSecret:         "s",
-		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
-		Kind:                 "github",
-		GitHub: &GitHubOIDCProviderConfig{
-			TeamRoleBindings: []GitHubTeamRoleBinding{{
-				Org: "acme", TeamSlug: "t", Roles: []string{},
-			}},
-		},
-	}})
-	if err == nil || !strings.Contains(err.Error(), "roles must be non-empty") {
-		t.Fatalf("expected team binding roles error, got %v", err)
-	}
-
-	err = ValidateOIDCProviders([]OIDCProviderConfig{{
-		ID:                   "gh",
-		Name:                 "GitHub",
-		Issuer:               GitHubOIDCDiscoveryIssuer,
-		ClientID:             "c",
-		ClientSecret:         "s",
-		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
-		Kind:                 "github",
-		GitHub: &GitHubOIDCProviderConfig{
-			AllowedOrgLogins: []string{"acme"},
-			TeamRoleBindings: []GitHubTeamRoleBinding{{
-				Org: "acme", TeamSlug: "platform", Roles: []string{"api:contracts:export"},
-			}},
-		},
-	}})
-	if err != nil {
-		t.Fatal(err)
 	}
 
 	err = ValidateOIDCProviders([]OIDCProviderConfig{{
@@ -87,74 +65,184 @@ func TestValidateOIDCProviders_GitHub(t *testing.T) {
 	}
 }
 
-func TestValidateOIDCProviders_GitLab(t *testing.T) {
+func TestValidateOIDCProviders_RejectsLegacyRoleMappingFields(t *testing.T) {
 	t.Parallel()
-	err := ValidateOIDCProviders([]OIDCProviderConfig{{
-		ID:                   "gl",
-		Name:                 "GitLab",
-		Issuer:               "https://gitlab.example.com",
-		ClientID:             "c",
-		ClientSecret:         "s",
-		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
-		Kind:                 "gitlab",
-		GitHub:               &GitHubOIDCProviderConfig{},
-	}})
-	if err == nil || !strings.Contains(err.Error(), "must not set github block") {
-		t.Fatalf("got %v", err)
-	}
-
-	err = ValidateOIDCProviders([]OIDCProviderConfig{{
-		ID:                   "gl",
-		Name:                 "GitLab",
-		Issuer:               "https://gitlab.com",
-		ClientID:             "c",
-		ClientSecret:         "s",
-		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
-		Kind:                 "gitlab",
-		GitLab: &GitLabOIDCProviderConfig{
-			GroupRoleBindings: []GitLabGroupRoleBinding{{
-				GroupFullPath: "a/b",
-				Roles:         []string{},
-			}},
+	cases := []OIDCProviderConfig{
+		{
+			ID:                   "gh",
+			Name:                 "GitHub",
+			Issuer:               GitHubOIDCDiscoveryIssuer,
+			ClientID:             "c",
+			ClientSecret:         "s",
+			RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+			Kind:                 "github",
+			GitHub: &GitHubOIDCProviderConfig{
+				AllowedOrgLogins: []string{"acme"},
+			},
 		},
-	}})
-	if err == nil || !strings.Contains(err.Error(), "roles must be non-empty") {
-		t.Fatalf("got %v", err)
-	}
-
-	err = ValidateOIDCProviders([]OIDCProviderConfig{{
-		ID:                   "gl",
-		Name:                 "GitLab",
-		Issuer:               "https://gitlab.com",
-		ClientID:             "c",
-		ClientSecret:         "s",
-		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
-		Kind:                 "gitlab",
-		GitLab: &GitLabOIDCProviderConfig{
-			AllowedGroupPaths: []string{"acme"},
-			GroupRoleBindings: []GitLabGroupRoleBinding{{
-				GroupFullPath: "acme/devops",
-				Roles:         []string{"api:contracts:export"},
-			}},
+		{
+			ID:                   "gl",
+			Name:                 "GitLab",
+			Issuer:               "https://gitlab.com",
+			ClientID:             "c",
+			ClientSecret:         "s",
+			RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+			Kind:                 "gitlab",
+			GitLab: &GitLabOIDCProviderConfig{
+				AllowedGroupPaths: []string{"acme"},
+			},
 		},
-	}})
-	if err != nil {
-		t.Fatal(err)
+		{
+			ID:                   "google",
+			Name:                 "Google",
+			Issuer:               GoogleOIDCDiscoveryIssuer,
+			ClientID:             "c",
+			ClientSecret:         "s",
+			RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+			Kind:                 "google",
+			Google: &GoogleOIDCProviderConfig{
+				AllowedHostedDomains: []string{"example.com"},
+			},
+		},
+		{
+			ID:                   "okta",
+			Name:                 "Okta",
+			Issuer:               "https://dev-123.okta.com/oauth2/default",
+			ClientID:             "c",
+			ClientSecret:         "s",
+			RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+			Kind:                 "okta",
+			Okta: &OktaOIDCProviderConfig{
+				AllowedIDTokenGroups: []string{"admins"},
+			},
+		},
+		{
+			ID:                   "entra",
+			Name:                 "Entra",
+			Issuer:               "https://login.microsoftonline.com/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/v2.0",
+			ClientID:             "c",
+			ClientSecret:         "s",
+			RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+			Kind:                 "entra",
+			Entra: &EntraOIDCProviderConfig{
+				AllowedTenantIDs: []string{"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"},
+			},
+		},
+	}
+	for i := range cases {
+		err := ValidateOIDCProviders([]OIDCProviderConfig{cases[i]})
+		if err == nil || !strings.Contains(err.Error(), "migrate to claim_mapping.rules") {
+			t.Fatalf("case[%d] expected migration error, got %v", i, err)
+		}
 	}
 }
 
-func TestValidateOIDCProviders_NameRequired(t *testing.T) {
+func TestValidateOIDCProviders_ClaimMapping(t *testing.T) {
 	t.Parallel()
-
-	err := ValidateOIDCProviders([]OIDCProviderConfig{{
-		ID:                   "github",
+	base := OIDCProviderConfig{
+		ID:                   "gh",
+		Name:                 "GitHub",
 		Issuer:               GitHubOIDCDiscoveryIssuer,
 		ClientID:             "c",
 		ClientSecret:         "s",
 		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
 		Kind:                 "github",
+	}
+
+	badMissingWhen := base
+	badMissingWhen.ClaimMapping = &OIDCClaimMappingConfig{Rules: []OIDCClaimMappingRule{{
+		AddRoles: []string{"api:role:admin"},
+	}}}
+	err := ValidateOIDCProviders([]OIDCProviderConfig{badMissingWhen})
+	if err == nil || !strings.Contains(err.Error(), "when is required") {
+		t.Fatalf("got %v", err)
+	}
+
+	badNoAction := base
+	badNoAction.ClaimMapping = &OIDCClaimMappingConfig{Rules: []OIDCClaimMappingRule{{
+		When: "true",
+	}}}
+	err = ValidateOIDCProviders([]OIDCProviderConfig{badNoAction})
+	if err == nil || !strings.Contains(err.Error(), "rule has no action") {
+		t.Fatalf("got %v", err)
+	}
+
+	badReservedClaim := base
+	badReservedClaim.ClaimMapping = &OIDCClaimMappingConfig{Rules: []OIDCClaimMappingRule{{
+		When:      "true",
+		SetClaims: map[string]string{"iss": "\"x\""},
+	}}}
+	err = ValidateOIDCProviders([]OIDCProviderConfig{badReservedClaim})
+	if err == nil || !strings.Contains(err.Error(), "reserved JWT claim") {
+		t.Fatalf("got %v", err)
+	}
+
+	badDenyWithAction := base
+	badDenyWithAction.ClaimMapping = &OIDCClaimMappingConfig{Rules: []OIDCClaimMappingRule{{
+		When:     "true",
+		Deny:     true,
+		AddRoles: []string{"api:role:admin"},
+	}}}
+	err = ValidateOIDCProviders([]OIDCProviderConfig{badDenyWithAction})
+	if err == nil || !strings.Contains(err.Error(), "deny rule cannot include") {
+		t.Fatalf("got %v", err)
+	}
+
+	good := base
+	good.ClaimMapping = &OIDCClaimMappingConfig{Rules: []OIDCClaimMappingRule{{
+		Name:           "admins",
+		When:           "provider.kind == 'github'",
+		AddRoles:       []string{"api:role:admin"},
+		AddPermissions: []string{"api.contracts.export"},
+		SetClaims: map[string]string{
+			"team": "'platform'",
+		},
+	}}}
+	err = ValidateOIDCProviders([]OIDCProviderConfig{good})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestValidateOIDCProviders_TwoGitHubKindDistinctIDs(t *testing.T) {
+	t.Parallel()
+	err := ValidateOIDCProviders([]OIDCProviderConfig{
+		{
+			ID:                   "github-a",
+			Name:                 "GitHub A",
+			Issuer:               GitHubOIDCDiscoveryIssuer,
+			ClientID:             "a",
+			ClientSecret:         "sa",
+			RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+			Kind:                 "github",
+		},
+		{
+			ID:                   "github-b",
+			Name:                 "GitHub B",
+			Issuer:               GitHubOIDCDiscoveryIssuer,
+			ClientID:             "b",
+			ClientSecret:         "sb",
+			RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+			Kind:                 "github",
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected validation error: %v", err)
+	}
+}
+
+func TestValidateOIDCProviders_GenericMustNotSetIdpBlocks(t *testing.T) {
+	t.Parallel()
+	err := ValidateOIDCProviders([]OIDCProviderConfig{{
+		ID:                   "g",
+		Name:                 "Generic",
+		Issuer:               "https://idp.example",
+		ClientID:             "c",
+		ClientSecret:         "s",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
+		GitLab:               &GitLabOIDCProviderConfig{},
 	}})
-	if err == nil || !strings.Contains(err.Error(), "name is required") {
+	if err == nil || !strings.Contains(err.Error(), "set kind: gitlab") {
 		t.Fatalf("got %v", err)
 	}
 }
@@ -184,363 +272,5 @@ func TestGitLabAPIV4BaseFromIssuer(t *testing.T) {
 	}
 	if got != "https://gitlab.com/api/v4" {
 		t.Fatalf("got %q", got)
-	}
-}
-
-func TestValidateOIDCProviders_Google(t *testing.T) {
-	t.Parallel()
-	err := ValidateOIDCProviders([]OIDCProviderConfig{{
-		ID:                   "g",
-		Name:                 "Google",
-		Issuer:               "https://accounts.google.com",
-		ClientID:             "c",
-		ClientSecret:         "s",
-		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
-		Kind:                 "google",
-		GitHub:               &GitHubOIDCProviderConfig{},
-	}})
-	if err == nil || !strings.Contains(err.Error(), "must not set github block") {
-		t.Fatalf("got %v", err)
-	}
-
-	err = ValidateOIDCProviders([]OIDCProviderConfig{{
-		ID:                   "g",
-		Name:                 "Google",
-		Issuer:               "https://evil.example",
-		ClientID:             "c",
-		ClientSecret:         "s",
-		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
-		Kind:                 "google",
-	}})
-	if err == nil || !strings.Contains(err.Error(), "kind=google requires issuer") {
-		t.Fatalf("got %v", err)
-	}
-
-	err = ValidateOIDCProviders([]OIDCProviderConfig{{
-		ID:                   "g",
-		Name:                 "Google",
-		Issuer:               "https://accounts.google.com",
-		ClientID:             "c",
-		ClientSecret:         "s",
-		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
-		Kind:                 "google",
-		Google: &GoogleOIDCProviderConfig{
-			HostedDomainRoleBindings: []GoogleHostedDomainRoleBinding{{
-				HD:    "example.com",
-				Roles: []string{},
-			}},
-		},
-	}})
-	if err == nil || !strings.Contains(err.Error(), "roles must be non-empty") {
-		t.Fatalf("got %v", err)
-	}
-
-	err = ValidateOIDCProviders([]OIDCProviderConfig{{
-		ID:                   "g",
-		Name:                 "Google",
-		Issuer:               "https://accounts.google.com",
-		ClientID:             "c",
-		ClientSecret:         "s",
-		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
-		Kind:                 "google",
-		Google: &GoogleOIDCProviderConfig{
-			AllowedHostedDomains: []string{"example.com"},
-			EmailDomainRoleBindings: []GoogleEmailDomainRoleBinding{{
-				Domain: "example.com",
-				Roles:  []string{"api:role:admin"},
-			}},
-		},
-	}})
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestValidateOIDCProviders_Okta(t *testing.T) {
-	t.Parallel()
-	err := ValidateOIDCProviders([]OIDCProviderConfig{{
-		ID:                   "ok",
-		Name:                 "Okta",
-		Issuer:               "https://dev-123.okta.com/oauth2/default",
-		ClientID:             "c",
-		ClientSecret:         "s",
-		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
-		Kind:                 "okta",
-		GitHub:               &GitHubOIDCProviderConfig{},
-	}})
-	if err == nil || !strings.Contains(err.Error(), "must not set github block") {
-		t.Fatalf("got %v", err)
-	}
-
-	err = ValidateOIDCProviders([]OIDCProviderConfig{{
-		ID:                   "ok",
-		Name:                 "Okta",
-		Issuer:               "http://dev-123.okta.com/oauth2/default",
-		ClientID:             "c",
-		ClientSecret:         "s",
-		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
-		Kind:                 "okta",
-	}})
-	if err == nil || !strings.Contains(err.Error(), "https") {
-		t.Fatalf("got %v", err)
-	}
-
-	err = ValidateOIDCProviders([]OIDCProviderConfig{{
-		ID:                   "ok",
-		Name:                 "Okta",
-		Issuer:               "https://dev-123.okta.com/oauth2/default",
-		ClientID:             "c",
-		ClientSecret:         "s",
-		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
-		Kind:                 "okta",
-		Okta: &OktaOIDCProviderConfig{
-			GroupRoleBindings: []OktaGroupRoleBinding{{
-				GroupName: "Everyone",
-				Roles:     []string{},
-			}},
-		},
-	}})
-	if err == nil || !strings.Contains(err.Error(), "roles must be non-empty") {
-		t.Fatalf("got %v", err)
-	}
-
-	err = ValidateOIDCProviders([]OIDCProviderConfig{{
-		ID:                   "ok",
-		Name:                 "Okta",
-		Issuer:               "https://dev-123.okta.com/oauth2/default",
-		ClientID:             "c",
-		ClientSecret:         "s",
-		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
-		Kind:                 "okta",
-		Okta: &OktaOIDCProviderConfig{
-			AllowedIDTokenGroups: []string{"API-Admins"},
-			GroupRoleBindings: []OktaGroupRoleBinding{{
-				GroupName: "API-Admins",
-				Roles:     []string{"api:role:admin"},
-			}},
-		},
-	}})
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestValidateOIDCProviders_Entra(t *testing.T) {
-	t.Parallel()
-	err := ValidateOIDCProviders([]OIDCProviderConfig{{
-		ID:                   "ent",
-		Name:                 "Microsoft Entra ID",
-		Issuer:               "https://login.microsoftonline.com/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/v2.0",
-		ClientID:             "c",
-		ClientSecret:         "s",
-		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
-		Kind:                 "entra",
-		GitHub:               &GitHubOIDCProviderConfig{},
-	}})
-	if err == nil || !strings.Contains(err.Error(), "must not set github block") {
-		t.Fatalf("got %v", err)
-	}
-
-	err = ValidateOIDCProviders([]OIDCProviderConfig{{
-		ID:                   "ent",
-		Name:                 "Microsoft Entra ID",
-		Issuer:               "http://login.microsoftonline.com/common/v2.0",
-		ClientID:             "c",
-		ClientSecret:         "s",
-		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
-		Kind:                 "entra",
-	}})
-	if err == nil || !strings.Contains(err.Error(), "https") {
-		t.Fatalf("got %v", err)
-	}
-
-	err = ValidateOIDCProviders([]OIDCProviderConfig{{
-		ID:                   "ent",
-		Name:                 "Microsoft Entra ID",
-		Issuer:               "https://login.microsoftonline.com/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/v2.0",
-		ClientID:             "c",
-		ClientSecret:         "s",
-		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
-		Kind:                 "entra",
-		Entra: &EntraOIDCProviderConfig{
-			GroupRoleBindings: []EntraGroupRoleBinding{{
-				Group: "g",
-				Roles: []string{},
-			}},
-		},
-	}})
-	if err == nil || !strings.Contains(err.Error(), "roles must be non-empty") {
-		t.Fatalf("got %v", err)
-	}
-
-	err = ValidateOIDCProviders([]OIDCProviderConfig{{
-		ID:                   "ent",
-		Name:                 "Microsoft Entra ID",
-		Issuer:               "https://login.microsoftonline.com/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/v2.0",
-		ClientID:             "c",
-		ClientSecret:         "s",
-		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
-		Kind:                 "entra",
-		Entra: &EntraOIDCProviderConfig{
-			AllowedTenantIDs:     []string{"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"},
-			AllowedIDTokenGroups: []string{"admins"},
-			GroupRoleBindings: []EntraGroupRoleBinding{{
-				Group: "admins",
-				Roles: []string{"api:role:admin"},
-			}},
-		},
-	}})
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestValidateOIDCProviders_TwoGitHubKindDistinctIDs(t *testing.T) {
-	t.Parallel()
-	err := ValidateOIDCProviders([]OIDCProviderConfig{
-		{
-			ID:                   "github-corp-a",
-			Name:                 "GitHub Corp A",
-			Issuer:               GitHubOIDCDiscoveryIssuer,
-			ClientID:             "a",
-			ClientSecret:         "sa",
-			RedirectURIAllowlist: []string{"http://127.0.0.1:21987/callback"},
-			Kind:                 "github",
-			GitHub:               &GitHubOIDCProviderConfig{AllowedOrgLogins: []string{"corp-a"}},
-		},
-		{
-			ID:                   "github-corp-b",
-			Name:                 "GitHub Corp B",
-			Issuer:               GitHubOIDCDiscoveryIssuer,
-			ClientID:             "b",
-			ClientSecret:         "sb",
-			RedirectURIAllowlist: []string{"http://127.0.0.1:21988/callback"},
-			Kind:                 "github",
-			GitHub:               &GitHubOIDCProviderConfig{AllowedOrgLogins: []string{"corp-b"}},
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestValidateOIDCProviders_GenericMustNotSetIdpBlocks(t *testing.T) {
-	t.Parallel()
-	err := ValidateOIDCProviders([]OIDCProviderConfig{{
-		ID:                   "x",
-		Name:                 "Generic OIDC",
-		Issuer:               "https://idp.example",
-		ClientID:             "c",
-		ClientSecret:         "s",
-		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
-		GitLab:               &GitLabOIDCProviderConfig{},
-	}})
-	if err == nil || !strings.Contains(err.Error(), "set kind: gitlab") {
-		t.Fatalf("got %v", err)
-	}
-
-	err = ValidateOIDCProviders([]OIDCProviderConfig{{
-		ID:                   "x",
-		Name:                 "Generic OIDC",
-		Issuer:               "https://accounts.google.com",
-		ClientID:             "c",
-		ClientSecret:         "s",
-		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
-		Google:               &GoogleOIDCProviderConfig{},
-	}})
-	if err == nil || !strings.Contains(err.Error(), "set kind: google") {
-		t.Fatalf("got %v", err)
-	}
-
-	err = ValidateOIDCProviders([]OIDCProviderConfig{{
-		ID:                   "x",
-		Name:                 "Generic OIDC",
-		Issuer:               "https://dev-1.okta.com/oauth2/default",
-		ClientID:             "c",
-		ClientSecret:         "s",
-		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
-		Okta:                 &OktaOIDCProviderConfig{},
-	}})
-	if err == nil || !strings.Contains(err.Error(), "set kind: okta") {
-		t.Fatalf("got %v", err)
-	}
-
-	err = ValidateOIDCProviders([]OIDCProviderConfig{{
-		ID:                   "x",
-		Name:                 "Generic OIDC",
-		Issuer:               "https://login.microsoftonline.com/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/v2.0",
-		ClientID:             "c",
-		ClientSecret:         "s",
-		RedirectURIAllowlist: []string{"http://127.0.0.1/cb"},
-		Entra:                &EntraOIDCProviderConfig{},
-	}})
-	if err == nil || !strings.Contains(err.Error(), "set kind: entra") {
-		t.Fatalf("got %v", err)
-	}
-}
-
-func TestAuthConfig_BootstrapAPIKeyAllowed(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		name  string
-		cfg   AuthConfig
-		allow bool
-	}{
-		{"off", AuthConfig{AllowInsecureBootstrap: false, Environment: "development"}, false},
-		{"prod flag on still blocked", AuthConfig{AllowInsecureBootstrap: true, Environment: "production"}, false},
-		{"staging blocked", AuthConfig{AllowInsecureBootstrap: true, Environment: "staging"}, false},
-		{"dev ok", AuthConfig{AllowInsecureBootstrap: true, Environment: "development"}, true},
-		{"local ok", AuthConfig{AllowInsecureBootstrap: true, Environment: "local"}, true},
-		{"dev case", AuthConfig{AllowInsecureBootstrap: true, Environment: "Development"}, true},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			if got := tc.cfg.BootstrapAPIKeyAllowed(); got != tc.allow {
-				t.Fatalf("BootstrapAPIKeyAllowed()=%v want %v", got, tc.allow)
-			}
-		})
-	}
-}
-
-func TestValidateAuthorizationConfig(t *testing.T) {
-	t.Parallel()
-	if err := ValidateAuthorizationConfig(AuthorizationConfig{
-		Roles: []AuthorizationRoleConfig{{
-			ID:          "api:role:token-generator",
-			Permissions: []string{"api.token.edge.issue"},
-		}},
-	}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	err := ValidateAuthorizationConfig(AuthorizationConfig{
-		Roles: []AuthorizationRoleConfig{{
-			ID:          "api:role:admin",
-			Permissions: []string{"api.token.edge.issue"},
-		}},
-	})
-	if err == nil || !strings.Contains(err.Error(), "immutable built-in") {
-		t.Fatalf("got %v", err)
-	}
-
-	err = ValidateAuthorizationConfig(AuthorizationConfig{
-		Roles: []AuthorizationRoleConfig{
-			{ID: "api:role:x", Permissions: []string{"p1"}},
-			{ID: "api:role:x", Permissions: []string{"p2"}},
-		},
-	})
-	if err == nil || !strings.Contains(err.Error(), "duplicate role id") {
-		t.Fatalf("got %v", err)
-	}
-
-	err = ValidateAuthorizationConfig(AuthorizationConfig{
-		Roles: []AuthorizationRoleConfig{{
-			ID:          "api:role:empty",
-			Permissions: []string{},
-		}},
-	})
-	if err == nil || !strings.Contains(err.Error(), "permissions must be non-empty") {
-		t.Fatalf("got %v", err)
 	}
 }
