@@ -41,7 +41,7 @@ func GetController(ctx context.Context, httpClient *http.Client, serverURL, cont
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	if resp.JSON200 != nil {
-		return resp.JSON200, nil
+		return &resp.JSON200.Data, nil
 	}
 	return nil, errControllerGet(resp)
 }
@@ -60,7 +60,7 @@ func GetContractDocument(ctx context.Context, httpClient *http.Client, serverURL
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	if resp.JSON200 != nil {
-		return *resp.JSON200, nil
+		return resp.JSON200.Data, nil
 	}
 	return nil, errContractGet(resp)
 }

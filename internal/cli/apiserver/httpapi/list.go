@@ -112,7 +112,7 @@ func ListControllers(ctx context.Context, httpClient *http.Client, serverURL str
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	if resp.JSON200 != nil {
-		return resp.JSON200, nil
+		return &resp.JSON200.Data, nil
 	}
 	return nil, errControllersList(resp)
 }
@@ -132,7 +132,7 @@ func ListTenants(ctx context.Context, httpClient *http.Client, serverURL string,
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	if resp.JSON200 != nil {
-		return resp.JSON200, nil
+		return &resp.JSON200.Data, nil
 	}
 	return nil, errTenantsList(resp)
 }
@@ -153,7 +153,7 @@ func ListControllersByTenant(ctx context.Context, httpClient *http.Client, serve
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	if resp.JSON200 != nil {
-		return resp.JSON200, nil
+		return &resp.JSON200.Data, nil
 	}
 	return nil, errControllersByTenant(resp)
 }
@@ -174,7 +174,7 @@ func ListEnvironmentsByTenant(ctx context.Context, httpClient *http.Client, serv
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	if resp.JSON200 != nil {
-		return resp.JSON200, nil
+		return &resp.JSON200.Data, nil
 	}
 	return nil, errEnvironmentsByTenant(resp)
 }
@@ -195,7 +195,7 @@ func ListBundlesByTenant(ctx context.Context, httpClient *http.Client, serverURL
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	if resp.JSON200 != nil {
-		return resp.JSON200, nil
+		return &resp.JSON200.Data, nil
 	}
 	return nil, errBundlesByTenant(resp)
 }
@@ -215,7 +215,7 @@ func ListBundleKeys(ctx context.Context, httpClient *http.Client, serverURL stri
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	if resp.JSON200 != nil {
-		return resp.JSON200, nil
+		return &resp.JSON200.Data, nil
 	}
 	return nil, errBundleKeys(resp)
 }
@@ -237,7 +237,7 @@ func ListContractNamesInBundle(ctx context.Context, httpClient *http.Client, ser
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	if resp.JSON200 != nil {
-		return resp.JSON200, nil
+		return &resp.JSON200.Data, nil
 	}
 	return nil, errContractNames(resp)
 }

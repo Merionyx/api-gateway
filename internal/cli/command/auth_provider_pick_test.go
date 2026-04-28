@@ -58,7 +58,7 @@ func TestResolveAuthLoginProviderID_UsesProviderNameForSingleProvider(t *testing
 			return &http.Response{
 				StatusCode: http.StatusOK,
 				Header:     http.Header{"Content-Type": []string{"application/json"}},
-				Body:       io.NopCloser(strings.NewReader(`[{"id":"github-enterprise","name":"GitHub Enterprise","kind":"github","issuer":"https://github.example.com"}]`)),
+				Body:       io.NopCloser(strings.NewReader(`{"data":[{"id":"github-enterprise","name":"GitHub Enterprise","kind":"github","issuer":"https://github.example.com"}]}`)),
 				Request:    r,
 			}, nil
 		}),

@@ -1093,7 +1093,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HealthStatus'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/HealthStatus'
+                required:
+                - data
         '400':
           $ref: '#/components/responses/BadRequest'
 
@@ -1113,7 +1118,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ReadinessStatus'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ReadinessStatus'
+                required:
+                - data
         '503':
           description: Not ready (required dependency check failed)
           content:
@@ -1137,7 +1147,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VersionResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/VersionResponse'
+                required:
+                - data
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -1214,9 +1229,14 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/SigningKey'
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SigningKey'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '400':
@@ -1232,16 +1252,21 @@ paths:
       summary: List configured OIDC login providers
       description: |
         Returns the set of `auth.oidc_providers` entries exposed for interactive login (`provider_id`, name, kind, issuer).
-        Does not include secrets. When OIDC is not configured, returns an empty array (**200**).
+        Does not include secrets. When OIDC is not configured, returns `{ "data": [] }` (**200**).
       responses:
         '200':
           description: Providers available for `GET /v1/auth/authorize` (possibly empty).
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/OidcProviderDescriptor'
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OidcProviderDescriptor'
+                required:
+                - data
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -1259,9 +1284,14 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/RolePermissions'
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RolePermissions'
+                required:
+                - data
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -1280,9 +1310,14 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/PermissionDescriptor'
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PermissionDescriptor'
+                required:
+                - data
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -1302,14 +1337,24 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/TokenPermissionsRequest'
+              type: object
+              properties:
+                data:
+                  $ref: '#/components/schemas/TokenPermissionsRequest'
+              required:
+              - data
       responses:
         '200':
           description: Effective permissions for the provided token.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TokenPermissionsResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/TokenPermissionsResponse'
+                required:
+                - data
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1452,7 +1497,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OAuthTokenResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OAuthTokenResponse'
+                required:
+                - data
         '400':
           description: OAuth client/request/grant error.
           content:
@@ -1487,14 +1537,24 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenerateTokenRequest'
+              type: object
+              properties:
+                data:
+                  $ref: '#/components/schemas/GenerateTokenRequest'
+              required:
+              - data
       responses:
         '201':
           description: Edge token created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GenerateTokenResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/GenerateTokenResponse'
+                required:
+                - data
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1519,14 +1579,24 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/IssueApiAccessTokenRequest'
+              type: object
+              properties:
+                data:
+                  $ref: '#/components/schemas/IssueApiAccessTokenRequest'
+              required:
+              - data
       responses:
         '201':
           description: API access token created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiAccessTokenIssued'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ApiAccessTokenIssued'
+                required:
+                - data
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1552,14 +1622,24 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ContractsExportRequest'
+              type: object
+              properties:
+                data:
+                  $ref: '#/components/schemas/ContractsExportRequest'
+              required:
+              - data
       responses:
         '200':
           description: Exported files
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ContractsExportResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ContractsExportResponse'
+                required:
+                - data
         '400':
           $ref: '#/components/responses/BadRequest'
         '403':
@@ -1596,7 +1676,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ControllerListResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ControllerListResponse'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '400':
@@ -1626,7 +1711,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Controller'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Controller'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '404':
@@ -1656,7 +1746,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ControllerHeartbeat'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ControllerHeartbeat'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '404':
@@ -1687,7 +1782,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TenantListResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/TenantListResponse'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '400':
@@ -1719,7 +1819,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ControllerListResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ControllerListResponse'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '400':
@@ -1751,7 +1856,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EnvironmentListResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EnvironmentListResponse'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '400':
@@ -1783,7 +1893,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BundleRefListResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BundleRefListResponse'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '400':
@@ -1814,7 +1929,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BundleRefListResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BundleRefListResponse'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '400':
@@ -1852,7 +1972,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ContractNameListResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ContractNameListResponse'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '400':
@@ -1888,7 +2013,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ContractDocument'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ContractDocument'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '404':
@@ -1913,14 +2043,24 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/BundleSyncRequest'
+              type: object
+              properties:
+                data:
+                  $ref: '#/components/schemas/BundleSyncRequest'
+              required:
+              - data
       responses:
         '200':
           description: Sync completed
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BundleSyncResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BundleSyncResponse'
+                required:
+                - data
         '400':
           $ref: '#/components/responses/BadRequest'
         '409':
@@ -1959,7 +2099,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/StatusResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/StatusResponse'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '400':

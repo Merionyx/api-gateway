@@ -31,7 +31,7 @@ func Ready(ctx context.Context, httpClient *http.Client, serverURL string) (*api
 		return nil, 0, fmt.Errorf("request failed: %w", err)
 	}
 	if resp.JSON200 != nil {
-		return resp.JSON200, http.StatusOK, nil
+		return &resp.JSON200.Data, http.StatusOK, nil
 	}
 	if resp.JSON503 != nil {
 		return resp.JSON503, http.StatusServiceUnavailable, nil
@@ -55,7 +55,7 @@ func ServerVersion(ctx context.Context, httpClient *http.Client, serverURL strin
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	if resp.JSON200 != nil {
-		return resp.JSON200, nil
+		return &resp.JSON200.Data, nil
 	}
 	if resp.ApplicationproblemJSON500 != nil {
 		return nil, fmt.Errorf("api: %s", problemString(resp.ApplicationproblemJSON500))
@@ -102,7 +102,7 @@ func ServerStatus(ctx context.Context, httpClient *http.Client, serverURL string
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	if resp.JSON200 != nil {
-		return resp.JSON200, nil
+		return &resp.JSON200.Data, nil
 	}
 	if resp.ApplicationproblemJSON400 != nil {
 		return nil, fmt.Errorf("api: %s", problemString(resp.ApplicationproblemJSON400))

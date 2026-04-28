@@ -16,12 +16,12 @@ func ExportContracts(ctx context.Context, httpClient *http.Client, serverURL str
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.ExportContractsWithResponse(ctx, req)
+	resp, err := c.ExportContractsWithResponse(ctx, apiserverclient.ExportContractsJSONRequestBody{Data: req})
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	if resp.JSON200 != nil {
-		return resp.JSON200.Files, nil
+		return resp.JSON200.Data.Files, nil
 	}
 	return nil, exportError(resp)
 }

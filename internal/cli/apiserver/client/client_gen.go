@@ -771,6 +771,11 @@ type CallbackOidcParams struct {
 	State string `form:"state" json:"state"`
 }
 
+// InspectTokenPermissionsJSONBody defines parameters for InspectTokenPermissions.
+type InspectTokenPermissionsJSONBody struct {
+	Data TokenPermissionsRequest `json:"data"`
+}
+
 // ListBundleKeysParams defines parameters for ListBundleKeys.
 type ListBundleKeysParams struct {
 	// Limit Maximum number of items to return (cursor pagination).
@@ -836,11 +841,21 @@ type GetContractInBundleParams struct {
 	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
 }
 
+// SyncBundleJSONBody defines parameters for SyncBundle.
+type SyncBundleJSONBody struct {
+	Data BundleSyncRequest `json:"data"`
+}
+
 // SyncBundleParams defines parameters for SyncBundle.
 type SyncBundleParams struct {
 	// IdempotencyKey Optional unique key for safely retrying the same logical request. If the server has already
 	// completed a successful operation with this key, it may return the same response without repeating work.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// ExportContractsJSONBody defines parameters for ExportContracts.
+type ExportContractsJSONBody struct {
+	Data ContractsExportRequest `json:"data"`
 }
 
 // ListControllersParams defines parameters for ListControllers.
@@ -936,23 +951,34 @@ type ListEnvironmentsByTenantParams struct {
 	IfNoneMatch *IfNoneMatch `json:"If-None-Match,omitempty"`
 }
 
+// IssueApiAccessTokenJSONBody defines parameters for IssueApiAccessToken.
+type IssueApiAccessTokenJSONBody struct {
+	// Data Draft body for `POST /v1/tokens/api`. Final fields follow RBAC/CEL and M2M policy (**roadmap steps 22–23**).
+	Data IssueApiAccessTokenRequest `json:"data"`
+}
+
+// IssueEdgeTokenJSONBody defines parameters for IssueEdgeToken.
+type IssueEdgeTokenJSONBody struct {
+	Data GenerateTokenRequest `json:"data"`
+}
+
 // TokenOidcFormdataRequestBody defines body for TokenOidc for application/x-www-form-urlencoded ContentType.
 type TokenOidcFormdataRequestBody = OAuthTokenRequestForm
 
 // InspectTokenPermissionsJSONRequestBody defines body for InspectTokenPermissions for application/json ContentType.
-type InspectTokenPermissionsJSONRequestBody = TokenPermissionsRequest
+type InspectTokenPermissionsJSONRequestBody InspectTokenPermissionsJSONBody
 
 // SyncBundleJSONRequestBody defines body for SyncBundle for application/json ContentType.
-type SyncBundleJSONRequestBody = BundleSyncRequest
+type SyncBundleJSONRequestBody SyncBundleJSONBody
 
 // ExportContractsJSONRequestBody defines body for ExportContracts for application/json ContentType.
-type ExportContractsJSONRequestBody = ContractsExportRequest
+type ExportContractsJSONRequestBody ExportContractsJSONBody
 
 // IssueApiAccessTokenJSONRequestBody defines body for IssueApiAccessToken for application/json ContentType.
-type IssueApiAccessTokenJSONRequestBody = IssueApiAccessTokenRequest
+type IssueApiAccessTokenJSONRequestBody IssueApiAccessTokenJSONBody
 
 // IssueEdgeTokenJSONRequestBody defines body for IssueEdgeToken for application/json ContentType.
-type IssueEdgeTokenJSONRequestBody = GenerateTokenRequest
+type IssueEdgeTokenJSONRequestBody IssueEdgeTokenJSONBody
 
 // RequestEditorFn  is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -3328,9 +3354,11 @@ func (r GetJwksResponse) StatusCode() int {
 }
 
 type GetHealthResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *HealthStatus
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data HealthStatus `json:"data"`
+	}
 	ApplicationproblemJSON400 *BadRequest
 }
 
@@ -3351,9 +3379,13 @@ func (r GetHealthResponse) StatusCode() int {
 }
 
 type GetReadyResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *ReadinessStatus
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data Kubernetes-style readiness: **200** when `status` is `ok`, **503** when `not_ready`.
+		// Contract Syncer may be `skipped` when the server is configured not to require it for readiness.
+		Data ReadinessStatus `json:"data"`
+	}
 	ApplicationproblemJSON400 *BadRequest
 	JSON503                   *ReadinessStatus
 }
@@ -3424,9 +3456,11 @@ func (r CallbackOidcResponse) StatusCode() int {
 }
 
 type ListOidcProvidersResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *[]OidcProviderDescriptor
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data []OidcProviderDescriptor `json:"data"`
+	}
 	ApplicationproblemJSON500 *InternalError
 }
 
@@ -3447,9 +3481,11 @@ func (r ListOidcProvidersResponse) StatusCode() int {
 }
 
 type ListAuthPermissionsResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *[]PermissionDescriptor
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data []PermissionDescriptor `json:"data"`
+	}
 	ApplicationproblemJSON500 *InternalError
 }
 
@@ -3470,9 +3506,11 @@ func (r ListAuthPermissionsResponse) StatusCode() int {
 }
 
 type ListAuthRolesResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *[]RolePermissions
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data []RolePermissions `json:"data"`
+	}
 	ApplicationproblemJSON500 *InternalError
 }
 
@@ -3495,10 +3533,12 @@ func (r ListAuthRolesResponse) StatusCode() int {
 type TokenOidcResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *OAuthTokenResponse
-	JSON400      *OAuthTokenError
-	JSON500      *OAuthTokenError
-	JSON503      *OAuthTokenError
+	JSON200      *struct {
+		Data OAuthTokenResponse `json:"data"`
+	}
+	JSON400 *OAuthTokenError
+	JSON500 *OAuthTokenError
+	JSON503 *OAuthTokenError
 }
 
 // Status returns HTTPResponse.Status
@@ -3518,9 +3558,11 @@ func (r TokenOidcResponse) StatusCode() int {
 }
 
 type InspectTokenPermissionsResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *TokenPermissionsResponse
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data TokenPermissionsResponse `json:"data"`
+	}
 	ApplicationproblemJSON400 *BadRequest
 	ApplicationproblemJSON401 *Unauthorized
 	ApplicationproblemJSON500 *InternalError
@@ -3543,9 +3585,11 @@ func (r InspectTokenPermissionsResponse) StatusCode() int {
 }
 
 type ListBundleKeysResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *BundleRefListResponse
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data BundleRefListResponse `json:"data"`
+	}
 	ApplicationproblemJSON400 *BadRequest
 	ApplicationproblemJSON500 *InternalError
 }
@@ -3567,9 +3611,11 @@ func (r ListBundleKeysResponse) StatusCode() int {
 }
 
 type ListContractsInBundleResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *ContractNameListResponse
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data ContractNameListResponse `json:"data"`
+	}
 	ApplicationproblemJSON400 *BadRequest
 	ApplicationproblemJSON404 *NotFound
 	ApplicationproblemJSON500 *InternalError
@@ -3592,9 +3638,12 @@ func (r ListContractsInBundleResponse) StatusCode() int {
 }
 
 type GetContractInBundleResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *ContractDocument
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data Parsed contract document as JSON (YAML contracts are exposed as a canonical JSON representation).
+		Data ContractDocument `json:"data"`
+	}
 	ApplicationproblemJSON404 *NotFound
 	ApplicationproblemJSON500 *InternalError
 }
@@ -3616,9 +3665,11 @@ func (r GetContractInBundleResponse) StatusCode() int {
 }
 
 type SyncBundleResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *BundleSyncResponse
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data BundleSyncResponse `json:"data"`
+	}
 	ApplicationproblemJSON400 *BadRequest
 	ApplicationproblemJSON409 *Problem
 	ApplicationproblemJSON500 *InternalError
@@ -3642,9 +3693,11 @@ func (r SyncBundleResponse) StatusCode() int {
 }
 
 type ExportContractsResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *ContractsExportResponse
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data ContractsExportResponse `json:"data"`
+	}
 	ApplicationproblemJSON400 *BadRequest
 	ApplicationproblemJSON403 *Forbidden
 	ApplicationproblemJSON500 *InternalError
@@ -3668,9 +3721,11 @@ func (r ExportContractsResponse) StatusCode() int {
 }
 
 type ListControllersResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *ControllerListResponse
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data ControllerListResponse `json:"data"`
+	}
 	ApplicationproblemJSON400 *BadRequest
 	ApplicationproblemJSON500 *InternalError
 }
@@ -3692,9 +3747,11 @@ func (r ListControllersResponse) StatusCode() int {
 }
 
 type GetControllerResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *Controller
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data Controller `json:"data"`
+	}
 	ApplicationproblemJSON404 *NotFound
 	ApplicationproblemJSON500 *InternalError
 }
@@ -3716,9 +3773,11 @@ func (r GetControllerResponse) StatusCode() int {
 }
 
 type GetControllerHeartbeatResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *ControllerHeartbeat
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data ControllerHeartbeat `json:"data"`
+	}
 	ApplicationproblemJSON404 *NotFound
 	ApplicationproblemJSON500 *InternalError
 }
@@ -3740,9 +3799,11 @@ func (r GetControllerHeartbeatResponse) StatusCode() int {
 }
 
 type ListSigningKeysResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *[]SigningKey
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data []SigningKey `json:"data"`
+	}
 	ApplicationproblemJSON400 *BadRequest
 	ApplicationproblemJSON500 *InternalError
 }
@@ -3764,9 +3825,12 @@ func (r ListSigningKeysResponse) StatusCode() int {
 }
 
 type GetStatusResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *StatusResponse
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data Aggregate health of API Server dependencies (exact fields may evolve).
+		Data StatusResponse `json:"data"`
+	}
 	ApplicationproblemJSON400 *BadRequest
 	ApplicationproblemJSON500 *InternalError
 }
@@ -3788,9 +3852,11 @@ func (r GetStatusResponse) StatusCode() int {
 }
 
 type ListTenantsResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *TenantListResponse
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data TenantListResponse `json:"data"`
+	}
 	ApplicationproblemJSON400 *BadRequest
 	ApplicationproblemJSON500 *InternalError
 }
@@ -3812,9 +3878,11 @@ func (r ListTenantsResponse) StatusCode() int {
 }
 
 type ListBundlesByTenantResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *BundleRefListResponse
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data BundleRefListResponse `json:"data"`
+	}
 	ApplicationproblemJSON400 *BadRequest
 	ApplicationproblemJSON500 *InternalError
 }
@@ -3836,9 +3904,11 @@ func (r ListBundlesByTenantResponse) StatusCode() int {
 }
 
 type ListControllersByTenantResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *ControllerListResponse
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data ControllerListResponse `json:"data"`
+	}
 	ApplicationproblemJSON400 *BadRequest
 	ApplicationproblemJSON500 *InternalError
 }
@@ -3860,9 +3930,11 @@ func (r ListControllersByTenantResponse) StatusCode() int {
 }
 
 type ListEnvironmentsByTenantResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *EnvironmentListResponse
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Data EnvironmentListResponse `json:"data"`
+	}
 	ApplicationproblemJSON400 *BadRequest
 	ApplicationproblemJSON500 *InternalError
 }
@@ -3884,9 +3956,12 @@ func (r ListEnvironmentsByTenantResponse) StatusCode() int {
 }
 
 type IssueApiAccessTokenResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON201                   *ApiAccessTokenIssued
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *struct {
+		// Data JSON body for **201** from `POST /v1/tokens/api` (name avoids clashing with client codegen type `IssueApiAccessTokenResponse`).
+		Data ApiAccessTokenIssued `json:"data"`
+	}
 	ApplicationproblemJSON400 *BadRequest
 	ApplicationproblemJSON401 *Unauthorized
 	ApplicationproblemJSON403 *Forbidden
@@ -3910,9 +3985,11 @@ func (r IssueApiAccessTokenResponse) StatusCode() int {
 }
 
 type IssueEdgeTokenResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON201                   *GenerateTokenResponse
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *struct {
+		Data GenerateTokenResponse `json:"data"`
+	}
 	ApplicationproblemJSON400 *BadRequest
 	ApplicationproblemJSON401 *Unauthorized
 	ApplicationproblemJSON500 *InternalError
@@ -3935,9 +4012,12 @@ func (r IssueEdgeTokenResponse) StatusCode() int {
 }
 
 type GetVersionResponse struct {
-	Body                      []byte
-	HTTPResponse              *http.Response
-	JSON200                   *VersionResponse
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// Data Process build metadata and the OpenAPI `info.version` of the HTTP surface served by this binary.
+		Data VersionResponse `json:"data"`
+	}
 	ApplicationproblemJSON500 *InternalError
 }
 
@@ -4352,7 +4432,9 @@ func ParseGetHealthResponse(rsp *http.Response) (*GetHealthResponse, error) {
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest HealthStatus
+		var dest struct {
+			Data HealthStatus `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -4385,7 +4467,11 @@ func ParseGetReadyResponse(rsp *http.Response) (*GetReadyResponse, error) {
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ReadinessStatus
+		var dest struct {
+			// Data Kubernetes-style readiness: **200** when `status` is `ok`, **503** when `not_ready`.
+			// Contract Syncer may be `skipped` when the server is configured not to require it for readiness.
+			Data ReadinessStatus `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -4512,7 +4598,9 @@ func ParseListOidcProvidersResponse(rsp *http.Response) (*ListOidcProvidersRespo
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest []OidcProviderDescriptor
+		var dest struct {
+			Data []OidcProviderDescriptor `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -4545,7 +4633,9 @@ func ParseListAuthPermissionsResponse(rsp *http.Response) (*ListAuthPermissionsR
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest []PermissionDescriptor
+		var dest struct {
+			Data []PermissionDescriptor `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -4578,7 +4668,9 @@ func ParseListAuthRolesResponse(rsp *http.Response) (*ListAuthRolesResponse, err
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest []RolePermissions
+		var dest struct {
+			Data []RolePermissions `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -4611,7 +4703,9 @@ func ParseTokenOidcResponse(rsp *http.Response) (*TokenOidcResponse, error) {
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest OAuthTokenResponse
+		var dest struct {
+			Data OAuthTokenResponse `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -4658,7 +4752,9 @@ func ParseInspectTokenPermissionsResponse(rsp *http.Response) (*InspectTokenPerm
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest TokenPermissionsResponse
+		var dest struct {
+			Data TokenPermissionsResponse `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -4705,7 +4801,9 @@ func ParseListBundleKeysResponse(rsp *http.Response) (*ListBundleKeysResponse, e
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest BundleRefListResponse
+		var dest struct {
+			Data BundleRefListResponse `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -4745,7 +4843,9 @@ func ParseListContractsInBundleResponse(rsp *http.Response) (*ListContractsInBun
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ContractNameListResponse
+		var dest struct {
+			Data ContractNameListResponse `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -4792,7 +4892,10 @@ func ParseGetContractInBundleResponse(rsp *http.Response) (*GetContractInBundleR
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ContractDocument
+		var dest struct {
+			// Data Parsed contract document as JSON (YAML contracts are exposed as a canonical JSON representation).
+			Data ContractDocument `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -4832,7 +4935,9 @@ func ParseSyncBundleResponse(rsp *http.Response) (*SyncBundleResponse, error) {
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest BundleSyncResponse
+		var dest struct {
+			Data BundleSyncResponse `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -4886,7 +4991,9 @@ func ParseExportContractsResponse(rsp *http.Response) (*ExportContractsResponse,
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ContractsExportResponse
+		var dest struct {
+			Data ContractsExportResponse `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -4940,7 +5047,9 @@ func ParseListControllersResponse(rsp *http.Response) (*ListControllersResponse,
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ControllerListResponse
+		var dest struct {
+			Data ControllerListResponse `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -4980,7 +5089,9 @@ func ParseGetControllerResponse(rsp *http.Response) (*GetControllerResponse, err
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest Controller
+		var dest struct {
+			Data Controller `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -5020,7 +5131,9 @@ func ParseGetControllerHeartbeatResponse(rsp *http.Response) (*GetControllerHear
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ControllerHeartbeat
+		var dest struct {
+			Data ControllerHeartbeat `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -5060,7 +5173,9 @@ func ParseListSigningKeysResponse(rsp *http.Response) (*ListSigningKeysResponse,
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest []SigningKey
+		var dest struct {
+			Data []SigningKey `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -5100,7 +5215,10 @@ func ParseGetStatusResponse(rsp *http.Response) (*GetStatusResponse, error) {
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest StatusResponse
+		var dest struct {
+			// Data Aggregate health of API Server dependencies (exact fields may evolve).
+			Data StatusResponse `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -5140,7 +5258,9 @@ func ParseListTenantsResponse(rsp *http.Response) (*ListTenantsResponse, error) 
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest TenantListResponse
+		var dest struct {
+			Data TenantListResponse `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -5180,7 +5300,9 @@ func ParseListBundlesByTenantResponse(rsp *http.Response) (*ListBundlesByTenantR
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest BundleRefListResponse
+		var dest struct {
+			Data BundleRefListResponse `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -5220,7 +5342,9 @@ func ParseListControllersByTenantResponse(rsp *http.Response) (*ListControllersB
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ControllerListResponse
+		var dest struct {
+			Data ControllerListResponse `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -5260,7 +5384,9 @@ func ParseListEnvironmentsByTenantResponse(rsp *http.Response) (*ListEnvironment
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest EnvironmentListResponse
+		var dest struct {
+			Data EnvironmentListResponse `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -5300,7 +5426,10 @@ func ParseIssueApiAccessTokenResponse(rsp *http.Response) (*IssueApiAccessTokenR
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
-		var dest ApiAccessTokenIssued
+		var dest struct {
+			// Data JSON body for **201** from `POST /v1/tokens/api` (name avoids clashing with client codegen type `IssueApiAccessTokenResponse`).
+			Data ApiAccessTokenIssued `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -5354,7 +5483,9 @@ func ParseIssueEdgeTokenResponse(rsp *http.Response) (*IssueEdgeTokenResponse, e
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
-		var dest GenerateTokenResponse
+		var dest struct {
+			Data GenerateTokenResponse `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -5401,7 +5532,10 @@ func ParseGetVersionResponse(rsp *http.Response) (*GetVersionResponse, error) {
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest VersionResponse
+		var dest struct {
+			// Data Process build metadata and the OpenAPI `info.version` of the HTTP surface served by this binary.
+			Data VersionResponse `json:"data"`
+		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

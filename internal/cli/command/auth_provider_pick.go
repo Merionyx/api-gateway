@@ -44,7 +44,7 @@ func resolveAuthLoginProviderID(ctx context.Context, server string, httpClient *
 	if resp.JSON200 == nil {
 		return "", fmt.Errorf("list OIDC providers: unexpected response body")
 	}
-	providers := *resp.JSON200
+	providers := resp.JSON200.Data
 	if len(providers) == 0 {
 		return "", fmt.Errorf("API Server has no configured OIDC providers (auth.oidc_providers is empty)")
 	}

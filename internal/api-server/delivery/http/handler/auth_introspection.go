@@ -43,7 +43,9 @@ func (h *AuthIntrospectionHandler) ListRoles(c fiber.Ctx) error {
 			Permissions: permissionDescriptorsFromIDs(roleRows[i].Permissions),
 		})
 	}
-	return c.JSON(out)
+	return c.JSON(struct {
+		Data []apiserver.RolePermissions `json:"data"`
+	}{Data: out})
 }
 
 // ListPermissions returns documented permissions (GET /v1/auth/permissions).
@@ -74,7 +76,9 @@ func (h *AuthIntrospectionHandler) ListPermissions(c fiber.Ctx) error {
 			Description: byID[id],
 		})
 	}
-	return c.JSON(out)
+	return c.JSON(struct {
+		Data []apiserver.PermissionDescriptor `json:"data"`
+	}{Data: out})
 }
 
 // InspectTokenPermissions validates API token and returns effective permission descriptors (POST /v1/auth/token-permissions).

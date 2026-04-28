@@ -275,5 +275,16 @@ func (h *JWTHandler) GetSigningKeys(c fiber.Ctx) error {
 	span := beginHandlerSpan(c, "GetSigningKeys")
 	defer span.End()
 	keys := h.jwtUseCase.GetSigningKeys(c.Context())
-	return c.JSON(keys)
+	out := make([]apiserver.SigningKey, 0, len(keys))
+	for i := range keys {
+		out = append(out, apiserver.SigningKey{
+			Kid:       keys[i].Kid,
+			Algorithm: keys[i].Algorithm,
+			Active:    keys[i].Active,
+			CreatedAt: keys[i].CreatedAt,
+		})
+	}
+	return c.JSON(struct {
+		Data []apiserver.SigningKey `json:"data"`
+	}{Data: out})
 }

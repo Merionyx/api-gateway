@@ -47,29 +47,29 @@ func RefreshSession(ctx context.Context, httpClient *http.Client, serverURL, ref
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	if resp.JSON200 != nil {
-		tokenType := strings.TrimSpace(resp.JSON200.TokenType)
+		tokenType := strings.TrimSpace(resp.JSON200.Data.TokenType)
 		if tokenType == "" {
 			tokenType = "Bearer"
 		}
 		refreshTokenOut := ""
-		if resp.JSON200.RefreshToken != nil {
-			refreshTokenOut = strings.TrimSpace(*resp.JSON200.RefreshToken)
+		if resp.JSON200.Data.RefreshToken != nil {
+			refreshTokenOut = strings.TrimSpace(*resp.JSON200.Data.RefreshToken)
 		}
 		if refreshTokenOut == "" {
 			return nil, fmt.Errorf("api: refresh_token is missing in token response")
 		}
-		accessExpiresAt := time.Now().UTC().Add(time.Duration(resp.JSON200.ExpiresIn) * time.Second)
-		if resp.JSON200.AccessExpiresAt != nil {
-			accessExpiresAt = resp.JSON200.AccessExpiresAt.UTC()
+		accessExpiresAt := time.Now().UTC().Add(time.Duration(resp.JSON200.Data.ExpiresIn) * time.Second)
+		if resp.JSON200.Data.AccessExpiresAt != nil {
+			accessExpiresAt = resp.JSON200.Data.AccessExpiresAt.UTC()
 		}
 		refreshExpiresAt := accessExpiresAt
-		if resp.JSON200.RefreshExpiresAt != nil {
-			refreshExpiresAt = resp.JSON200.RefreshExpiresAt.UTC()
-		} else if resp.JSON200.RefreshExpiresIn != nil && *resp.JSON200.RefreshExpiresIn > 0 {
-			refreshExpiresAt = time.Now().UTC().Add(time.Duration(*resp.JSON200.RefreshExpiresIn) * time.Second)
+		if resp.JSON200.Data.RefreshExpiresAt != nil {
+			refreshExpiresAt = resp.JSON200.Data.RefreshExpiresAt.UTC()
+		} else if resp.JSON200.Data.RefreshExpiresIn != nil && *resp.JSON200.Data.RefreshExpiresIn > 0 {
+			refreshExpiresAt = time.Now().UTC().Add(time.Duration(*resp.JSON200.Data.RefreshExpiresIn) * time.Second)
 		}
 		return &SessionTokens{
-			AccessToken:      resp.JSON200.AccessToken,
+			AccessToken:      resp.JSON200.Data.AccessToken,
 			RefreshToken:     refreshTokenOut,
 			TokenType:        tokenType,
 			AccessExpiresAt:  accessExpiresAt,

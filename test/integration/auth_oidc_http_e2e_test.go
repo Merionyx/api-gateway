@@ -242,21 +242,23 @@ func TestE2E_ListOidcProviders(t *testing.T) {
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("status %d: %s", resp.StatusCode, string(b))
 	}
-	var got []map[string]any
+	var got struct {
+		Data []map[string]any `json:"data"`
+	}
 	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 1 {
-		t.Fatalf("providers: %+v", got)
+	if len(got.Data) != 1 {
+		t.Fatalf("providers: %+v", got.Data)
 	}
-	if got[0]["id"] != e2eOIDCProviderID {
-		t.Fatalf("id %v", got[0]["id"])
+	if got.Data[0]["id"] != e2eOIDCProviderID {
+		t.Fatalf("id %v", got.Data[0]["id"])
 	}
-	if got[0]["name"] != "Mock IdP" {
-		t.Fatalf("name %v", got[0]["name"])
+	if got.Data[0]["name"] != "Mock IdP" {
+		t.Fatalf("name %v", got.Data[0]["name"])
 	}
-	if got[0]["kind"] != "generic" {
-		t.Fatalf("kind %v", got[0]["kind"])
+	if got.Data[0]["kind"] != "generic" {
+		t.Fatalf("kind %v", got.Data[0]["kind"])
 	}
 }
 

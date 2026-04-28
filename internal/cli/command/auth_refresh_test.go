@@ -55,7 +55,7 @@ func TestAuthRefreshCommand_Success(t *testing.T) {
 			return &http.Response{
 				StatusCode: http.StatusOK,
 				Header:     http.Header{"Content-Type": []string{"application/json"}},
-				Body:       io.NopCloser(strings.NewReader(`{"access_token":"new-access","access_expires_at":"2026-05-01T00:00:00Z","refresh_token":"new-refresh","refresh_expires_at":"2026-05-31T00:00:00Z","token_type":"Bearer"}`)),
+				Body:       io.NopCloser(strings.NewReader(`{"data":{"access_token":"new-access","access_expires_at":"2026-05-01T00:00:00Z","refresh_token":"new-refresh","refresh_expires_at":"2026-05-31T00:00:00Z","token_type":"Bearer"}}`)),
 			}, nil
 		}),
 	}
@@ -143,7 +143,7 @@ func TestAuthRefreshCommand_UsesSavedRequestedTTLsByDefault(t *testing.T) {
 			return &http.Response{
 				StatusCode: http.StatusOK,
 				Header:     http.Header{"Content-Type": []string{"application/json"}},
-				Body:       io.NopCloser(strings.NewReader(`{"access_token":"new-access","access_expires_at":"2026-05-01T00:00:00Z","refresh_token":"new-refresh","refresh_expires_at":"2026-05-31T00:00:00Z","token_type":"Bearer"}`)),
+				Body:       io.NopCloser(strings.NewReader(`{"data":{"access_token":"new-access","access_expires_at":"2026-05-01T00:00:00Z","refresh_token":"new-refresh","refresh_expires_at":"2026-05-31T00:00:00Z","token_type":"Bearer"}}`)),
 			}, nil
 		}),
 	}
@@ -196,7 +196,7 @@ func TestAuthRefreshCommand_UsesBuiltInRequestedTTLsWhenSavedAreMissing(t *testi
 			return &http.Response{
 				StatusCode: http.StatusOK,
 				Header:     http.Header{"Content-Type": []string{"application/json"}},
-				Body:       io.NopCloser(strings.NewReader(`{"access_token":"new-access","access_expires_at":"2026-05-01T00:00:00Z","refresh_token":"new-refresh","refresh_expires_at":"2026-05-31T00:00:00Z","token_type":"Bearer"}`)),
+				Body:       io.NopCloser(strings.NewReader(`{"data":{"access_token":"new-access","access_expires_at":"2026-05-01T00:00:00Z","refresh_token":"new-refresh","refresh_expires_at":"2026-05-31T00:00:00Z","token_type":"Bearer"}}`)),
 			}, nil
 		}),
 	}

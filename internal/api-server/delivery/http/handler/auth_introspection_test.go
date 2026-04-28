@@ -43,23 +43,25 @@ func TestAuthIntrospectionHandler_ListPermissions_includesConfiguredPermissions(
 		t.Fatalf("status %d body %s", resp.StatusCode, b)
 	}
 
-	var out []apiserver.PermissionDescriptor
+	var out struct {
+		Data []apiserver.PermissionDescriptor `json:"data"`
+	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		t.Fatal(err)
 	}
-	if len(out) == 0 {
+	if len(out.Data) == 0 {
 		t.Fatal("empty permission list")
 	}
 
 	foundBuiltIn := false
 	foundCustom := false
-	for i := range out {
-		if out[i].Id == permissions.Wildcard {
+	for i := range out.Data {
+		if out.Data[i].Id == permissions.Wildcard {
 			foundBuiltIn = true
 		}
-		if out[i].Id == "custom.permission" {
+		if out.Data[i].Id == "custom.permission" {
 			foundCustom = true
-			if strings.TrimSpace(out[i].Description) == "" {
+			if strings.TrimSpace(out.Data[i].Description) == "" {
 				t.Fatal("custom permission description is empty")
 			}
 		}
@@ -98,18 +100,20 @@ func TestAuthIntrospectionHandler_ListRoles_returnsDescriptors(t *testing.T) {
 		t.Fatalf("status %d body %s", resp.StatusCode, b)
 	}
 
-	var out []apiserver.RolePermissions
+	var out struct {
+		Data []apiserver.RolePermissions `json:"data"`
+	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		t.Fatal(err)
 	}
-	if len(out) == 0 {
+	if len(out.Data) == 0 {
 		t.Fatal("empty role list")
 	}
 
 	var custom *apiserver.RolePermissions
-	for i := range out {
-		if out[i].Role == "api:role:custom" {
-			custom = &out[i]
+	for i := range out.Data {
+		if out.Data[i].Role == "api:role:custom" {
+			custom = &out.Data[i]
 			break
 		}
 	}
