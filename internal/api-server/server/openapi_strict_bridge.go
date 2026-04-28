@@ -3,11 +3,14 @@ package server
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/merionyx/api-gateway/internal/api-server/container"
+	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/problem"
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
+	"github.com/merionyx/api-gateway/internal/api-server/version"
 )
 
 type strictFiberCtxKey struct{}
@@ -31,14 +34,14 @@ func fiberCtxFromStrictContext(ctx context.Context) (fiber.Ctx, error) {
 }
 
 // StrictOpenAPIServer implements generated StrictServerInterface and delegates execution
-// to the current OpenAPI handlers wired through ServerInterface implementation.
+// directly to concrete HTTP handlers in the DI container.
 type StrictOpenAPIServer struct {
-	legacy apiserver.ServerInterface
+	c *container.Container
 }
 
 func NewStrictOpenAPIServer(c *container.Container) apiserver.StrictServerInterface {
 	return &StrictOpenAPIServer{
-		legacy: NewOpenAPIServer(c),
+		c: c,
 	}
 }
 
@@ -47,7 +50,7 @@ func (s *StrictOpenAPIServer) GetJwksEdge(ctx context.Context, request apiserver
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.GetJwksEdge(c, request.Params)
+	return nil, s.c.JWTHandler.GetJWKSEdge(c)
 }
 
 func (s *StrictOpenAPIServer) GetJwks(ctx context.Context, request apiserver.GetJwksRequestObject) (apiserver.GetJwksResponseObject, error) {
@@ -55,7 +58,7 @@ func (s *StrictOpenAPIServer) GetJwks(ctx context.Context, request apiserver.Get
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.GetJwks(c, request.Params)
+	return nil, s.c.JWTHandler.GetJWKS(c)
 }
 
 func (s *StrictOpenAPIServer) GetHealth(ctx context.Context, _ apiserver.GetHealthRequestObject) (apiserver.GetHealthResponseObject, error) {
@@ -63,7 +66,7 @@ func (s *StrictOpenAPIServer) GetHealth(ctx context.Context, _ apiserver.GetHeal
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.GetHealth(c)
+	return nil, c.JSON(fiber.Map{"status": "ok"})
 }
 
 func (s *StrictOpenAPIServer) GetReady(ctx context.Context, _ apiserver.GetReadyRequestObject) (apiserver.GetReadyResponseObject, error) {
@@ -71,7 +74,7 @@ func (s *StrictOpenAPIServer) GetReady(ctx context.Context, _ apiserver.GetReady
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.GetReady(c)
+	return nil, s.c.RegistryHandler.GetReady(c)
 }
 
 func (s *StrictOpenAPIServer) AuthorizeOidc(ctx context.Context, request apiserver.AuthorizeOidcRequestObject) (apiserver.AuthorizeOidcResponseObject, error) {
@@ -79,7 +82,7 @@ func (s *StrictOpenAPIServer) AuthorizeOidc(ctx context.Context, request apiserv
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.AuthorizeOidc(c, request.Params)
+	return nil, s.c.OIDCLoginHandler.Authorize(c, request.Params)
 }
 
 func (s *StrictOpenAPIServer) CallbackOidc(ctx context.Context, request apiserver.CallbackOidcRequestObject) (apiserver.CallbackOidcResponseObject, error) {
@@ -87,7 +90,7 @@ func (s *StrictOpenAPIServer) CallbackOidc(ctx context.Context, request apiserve
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.CallbackOidc(c, request.Params)
+	return nil, s.c.OIDCCallbackHandler.Callback(c, request.Params)
 }
 
 func (s *StrictOpenAPIServer) ListOidcProviders(ctx context.Context, _ apiserver.ListOidcProvidersRequestObject) (apiserver.ListOidcProvidersResponseObject, error) {
@@ -95,7 +98,7 @@ func (s *StrictOpenAPIServer) ListOidcProviders(ctx context.Context, _ apiserver
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.ListOidcProviders(c)
+	return nil, s.c.OIDCLoginHandler.ListOidcProviders(c)
 }
 
 func (s *StrictOpenAPIServer) ListAuthPermissions(ctx context.Context, _ apiserver.ListAuthPermissionsRequestObject) (apiserver.ListAuthPermissionsResponseObject, error) {
@@ -103,7 +106,7 @@ func (s *StrictOpenAPIServer) ListAuthPermissions(ctx context.Context, _ apiserv
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.ListAuthPermissions(c)
+	return nil, s.c.AuthIntrospectionHandler.ListPermissions(c)
 }
 
 func (s *StrictOpenAPIServer) ListAuthRoles(ctx context.Context, _ apiserver.ListAuthRolesRequestObject) (apiserver.ListAuthRolesResponseObject, error) {
@@ -111,7 +114,7 @@ func (s *StrictOpenAPIServer) ListAuthRoles(ctx context.Context, _ apiserver.Lis
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.ListAuthRoles(c)
+	return nil, s.c.AuthIntrospectionHandler.ListRoles(c)
 }
 
 func (s *StrictOpenAPIServer) TokenOidc(ctx context.Context, _ apiserver.TokenOidcRequestObject) (apiserver.TokenOidcResponseObject, error) {
@@ -119,7 +122,15 @@ func (s *StrictOpenAPIServer) TokenOidc(ctx context.Context, _ apiserver.TokenOi
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.TokenOidc(c)
+	if s.c.OAuthTokenHandler == nil {
+		return nil, problem.Write(c, http.StatusNotImplemented, problem.WithCode(
+			http.StatusNotImplemented,
+			"FEATURE_NOT_IMPLEMENTED",
+			"Not Implemented",
+			"OAuth token endpoint requires auth.oidc_providers and auth.session_kek_base64.",
+		))
+	}
+	return nil, s.c.OAuthTokenHandler.Token(c)
 }
 
 func (s *StrictOpenAPIServer) InspectTokenPermissions(ctx context.Context, _ apiserver.InspectTokenPermissionsRequestObject) (apiserver.InspectTokenPermissionsResponseObject, error) {
@@ -127,7 +138,7 @@ func (s *StrictOpenAPIServer) InspectTokenPermissions(ctx context.Context, _ api
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.InspectTokenPermissions(c)
+	return nil, s.c.AuthIntrospectionHandler.InspectTokenPermissions(c)
 }
 
 func (s *StrictOpenAPIServer) ListBundleKeys(ctx context.Context, request apiserver.ListBundleKeysRequestObject) (apiserver.ListBundleKeysResponseObject, error) {
@@ -135,7 +146,7 @@ func (s *StrictOpenAPIServer) ListBundleKeys(ctx context.Context, request apiser
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.ListBundleKeys(c, request.Params)
+	return nil, s.c.RegistryHandler.ListBundleKeys(c, request.Params)
 }
 
 func (s *StrictOpenAPIServer) ListContractsInBundle(ctx context.Context, request apiserver.ListContractsInBundleRequestObject) (apiserver.ListContractsInBundleResponseObject, error) {
@@ -143,7 +154,7 @@ func (s *StrictOpenAPIServer) ListContractsInBundle(ctx context.Context, request
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.ListContractsInBundle(c, request.Params)
+	return nil, s.c.RegistryHandler.ListContractsInBundle(c, request.Params)
 }
 
 func (s *StrictOpenAPIServer) GetContractInBundle(ctx context.Context, request apiserver.GetContractInBundleRequestObject) (apiserver.GetContractInBundleResponseObject, error) {
@@ -151,7 +162,7 @@ func (s *StrictOpenAPIServer) GetContractInBundle(ctx context.Context, request a
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.GetContractInBundle(c, request.ContractName, request.Params)
+	return nil, s.c.RegistryHandler.GetContractInBundle(c, request.ContractName, request.Params)
 }
 
 func (s *StrictOpenAPIServer) SyncBundle(ctx context.Context, request apiserver.SyncBundleRequestObject) (apiserver.SyncBundleResponseObject, error) {
@@ -159,7 +170,7 @@ func (s *StrictOpenAPIServer) SyncBundle(ctx context.Context, request apiserver.
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.SyncBundle(c, request.Params)
+	return nil, s.c.RegistryHandler.SyncBundle(c, request.Params)
 }
 
 func (s *StrictOpenAPIServer) ExportContracts(ctx context.Context, _ apiserver.ExportContractsRequestObject) (apiserver.ExportContractsResponseObject, error) {
@@ -167,7 +178,7 @@ func (s *StrictOpenAPIServer) ExportContracts(ctx context.Context, _ apiserver.E
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.ExportContracts(c)
+	return nil, s.c.ContractsExportHandler.Export(c)
 }
 
 func (s *StrictOpenAPIServer) ListControllers(ctx context.Context, request apiserver.ListControllersRequestObject) (apiserver.ListControllersResponseObject, error) {
@@ -175,7 +186,7 @@ func (s *StrictOpenAPIServer) ListControllers(ctx context.Context, request apise
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.ListControllers(c, request.Params)
+	return nil, s.c.RegistryHandler.ListControllers(c, request.Params)
 }
 
 func (s *StrictOpenAPIServer) GetController(ctx context.Context, request apiserver.GetControllerRequestObject) (apiserver.GetControllerResponseObject, error) {
@@ -183,7 +194,7 @@ func (s *StrictOpenAPIServer) GetController(ctx context.Context, request apiserv
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.GetController(c, request.ControllerId, request.Params)
+	return nil, s.c.RegistryHandler.GetController(c, request.ControllerId, request.Params)
 }
 
 func (s *StrictOpenAPIServer) GetControllerHeartbeat(ctx context.Context, request apiserver.GetControllerHeartbeatRequestObject) (apiserver.GetControllerHeartbeatResponseObject, error) {
@@ -191,7 +202,7 @@ func (s *StrictOpenAPIServer) GetControllerHeartbeat(ctx context.Context, reques
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.GetControllerHeartbeat(c, request.ControllerId, request.Params)
+	return nil, s.c.RegistryHandler.GetControllerHeartbeat(c, request.ControllerId, request.Params)
 }
 
 func (s *StrictOpenAPIServer) ListSigningKeys(ctx context.Context, request apiserver.ListSigningKeysRequestObject) (apiserver.ListSigningKeysResponseObject, error) {
@@ -199,7 +210,7 @@ func (s *StrictOpenAPIServer) ListSigningKeys(ctx context.Context, request apise
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.ListSigningKeys(c, request.Params)
+	return nil, s.c.JWTHandler.GetSigningKeys(c)
 }
 
 func (s *StrictOpenAPIServer) GetStatus(ctx context.Context, request apiserver.GetStatusRequestObject) (apiserver.GetStatusResponseObject, error) {
@@ -207,7 +218,7 @@ func (s *StrictOpenAPIServer) GetStatus(ctx context.Context, request apiserver.G
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.GetStatus(c, request.Params)
+	return nil, s.c.RegistryHandler.GetStatus(c, request.Params)
 }
 
 func (s *StrictOpenAPIServer) ListTenants(ctx context.Context, request apiserver.ListTenantsRequestObject) (apiserver.ListTenantsResponseObject, error) {
@@ -215,7 +226,7 @@ func (s *StrictOpenAPIServer) ListTenants(ctx context.Context, request apiserver
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.ListTenants(c, request.Params)
+	return nil, s.c.RegistryHandler.ListTenants(c, request.Params)
 }
 
 func (s *StrictOpenAPIServer) ListBundlesByTenant(ctx context.Context, request apiserver.ListBundlesByTenantRequestObject) (apiserver.ListBundlesByTenantResponseObject, error) {
@@ -223,7 +234,7 @@ func (s *StrictOpenAPIServer) ListBundlesByTenant(ctx context.Context, request a
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.ListBundlesByTenant(c, request.Tenant, request.Params)
+	return nil, s.c.RegistryHandler.ListBundlesByTenant(c, request.Tenant, request.Params)
 }
 
 func (s *StrictOpenAPIServer) ListControllersByTenant(ctx context.Context, request apiserver.ListControllersByTenantRequestObject) (apiserver.ListControllersByTenantResponseObject, error) {
@@ -231,7 +242,7 @@ func (s *StrictOpenAPIServer) ListControllersByTenant(ctx context.Context, reque
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.ListControllersByTenant(c, request.Tenant, request.Params)
+	return nil, s.c.RegistryHandler.ListControllersByTenant(c, request.Tenant, request.Params)
 }
 
 func (s *StrictOpenAPIServer) ListEnvironmentsByTenant(ctx context.Context, request apiserver.ListEnvironmentsByTenantRequestObject) (apiserver.ListEnvironmentsByTenantResponseObject, error) {
@@ -239,7 +250,7 @@ func (s *StrictOpenAPIServer) ListEnvironmentsByTenant(ctx context.Context, requ
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.ListEnvironmentsByTenant(c, request.Tenant, request.Params)
+	return nil, s.c.RegistryHandler.ListEnvironmentsByTenant(c, request.Tenant, request.Params)
 }
 
 func (s *StrictOpenAPIServer) IssueApiAccessToken(ctx context.Context, _ apiserver.IssueApiAccessTokenRequestObject) (apiserver.IssueApiAccessTokenResponseObject, error) {
@@ -247,7 +258,7 @@ func (s *StrictOpenAPIServer) IssueApiAccessToken(ctx context.Context, _ apiserv
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.IssueApiAccessToken(c)
+	return nil, s.c.JWTHandler.IssueApiAccessToken(c)
 }
 
 func (s *StrictOpenAPIServer) IssueEdgeToken(ctx context.Context, _ apiserver.IssueEdgeTokenRequestObject) (apiserver.IssueEdgeTokenResponseObject, error) {
@@ -255,7 +266,7 @@ func (s *StrictOpenAPIServer) IssueEdgeToken(ctx context.Context, _ apiserver.Is
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.IssueEdgeToken(c)
+	return nil, s.c.JWTHandler.GenerateToken(c)
 }
 
 func (s *StrictOpenAPIServer) GetVersion(ctx context.Context, _ apiserver.GetVersionRequestObject) (apiserver.GetVersionResponseObject, error) {
@@ -263,7 +274,16 @@ func (s *StrictOpenAPIServer) GetVersion(ctx context.Context, _ apiserver.GetVer
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.legacy.GetVersion(c)
+	body := apiserver.VersionResponse{
+		ApiSchemaVersion: version.APISchemaVersion(),
+		GitRevision:      version.GitRevision,
+		BuildTime:        version.BuildTime,
+	}
+	if version.Release != "" {
+		r := version.Release
+		body.Release = &r
+	}
+	return nil, c.JSON(body)
 }
 
 var _ apiserver.StrictServerInterface = (*StrictOpenAPIServer)(nil)
