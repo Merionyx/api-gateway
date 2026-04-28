@@ -352,6 +352,12 @@ type HealthStatus struct {
 
 // IssueApiAccessTokenRequest Draft body for `POST /v1/tokens/api`. Final fields follow RBAC/CEL and M2M policy (**roadmap steps 22–23**).
 type IssueApiAccessTokenRequest struct {
+	// ExpiresAt Optional absolute expiration instant (UTC) for the issued API token.
+	// Must be in the future and must not exceed either:
+	// 1) server policy max for this endpoint;
+	// 2) caller Bearer token expiration.
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+
 	// Permissions Optional per-token delegated permissions; when accepted they are embedded into the issued API token claims (for this token only).
 	Permissions *[]string `json:"permissions,omitempty"`
 }

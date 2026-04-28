@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -106,14 +107,21 @@ func (h *JWTHandler) IssueApiAccessToken(c fiber.Ctx) error {
 	span := beginHandlerSpan(c, "IssueApiAccessToken")
 	defer span.End()
 
-	p, pOK := middleware.APIKeyPrincipalFromCtx(c)
 	mc, jOK := middleware.APIJWTClaimsFromCtx(c)
-	if !pOK && !jOK {
-		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultInternalError)
-		return problem.Write(c, http.StatusUnauthorized, problem.Unauthorized(
-			"AUTH_CONTEXT_MISSING",
+	if !jOK {
+		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultForbidden)
+		return problem.Write(c, http.StatusForbidden, problem.Forbidden(
+			"API_TOKEN_ISSUER_MUST_BE_HUMAN",
 			"",
-			"Authenticated context is required to issue API access tokens.",
+			"API access tokens can be issued only by an interactive human Bearer token.",
+		))
+	}
+	if !hasAnyRoleClaim(mc) {
+		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultForbidden)
+		return problem.Write(c, http.StatusForbidden, problem.Forbidden(
+			"API_TOKEN_ISSUER_MUST_BE_HUMAN",
+			"",
+			"API access tokens can be issued only by an interactive human Bearer token with role claims.",
 		))
 	}
 
@@ -128,6 +136,7 @@ func (h *JWTHandler) IssueApiAccessToken(c fiber.Ctx) error {
 	}
 
 	var requestedPermissions []string
+	var requestedExpiresAt *time.Time
 	if len(c.Body()) > 0 {
 		var body apiserver.IssueApiAccessTokenRequest
 		if err := c.Bind().Body(&body); err != nil {
@@ -136,6 +145,7 @@ func (h *JWTHandler) IssueApiAccessToken(c fiber.Ctx) error {
 			return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidJSONBody, "", problem.DetailInvalidJSONBody))
 		}
 		requestedPermissions = normalizeRequestedPermissions(body.Permissions)
+		requestedExpiresAt = body.ExpiresAt
 		if h.permissionEval != nil {
 			if denied, werr := h.permissionEval.RequireDelegatedPermissions(c, requestedPermissions); denied {
 				apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultForbidden)
@@ -144,29 +154,29 @@ func (h *JWTHandler) IssueApiAccessToken(c fiber.Ctx) error {
 		}
 	}
 
-	var subject string
-	var snap []byte
-	var err error
-	requestedAny := stringsToAny(requestedPermissions)
-	if pOK {
-		subject = "m2m:" + p.DigestHex
-		snap, err = snapshotForAPIAccess(requestedAny, nil)
-	} else {
-		subject = subjectFromAPIJWTClaims(mc)
-		if subject == "" {
-			apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationAppID)
-			return problem.Write(c, http.StatusBadRequest, problem.BadRequest("API_TOKEN_SUBJECT_MISSING", "", "Bearer token has no usable sub/email for API access issuance."))
-		}
-		basePermissions := permissionsFromAPIJWTClaims(mc)
-		snap, err = snapshotForAPIAccess(mergeAnyUnique(basePermissions, requestedAny), mc)
+	subject := subjectFromAPIJWTClaims(mc)
+	if subject == "" {
+		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationAppID)
+		return problem.Write(c, http.StatusBadRequest, problem.BadRequest("API_TOKEN_SUBJECT_MISSING", "", "Bearer token has no usable sub/email for API access issuance."))
 	}
+
+	now := time.Now().UTC()
+	ttl, err := resolveIssuedAPIAccessTTL(now, h.apiAccessTTL, mc, requestedExpiresAt)
+	if err != nil {
+		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationExpiresAt)
+		return problem.Write(c, http.StatusBadRequest, problem.BadRequest("API_TOKEN_EXPIRES_AT_INVALID", "", err.Error()))
+	}
+
+	requestedAny := stringsToAny(requestedPermissions)
+	basePermissions := permissionsFromAPIJWTClaims(mc)
+	snap, err := snapshotForAPIAccess(mergeAnyUnique(basePermissions, requestedAny), mc)
 	if err != nil {
 		telemetry.MarkError(span, err)
 		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultInternalError)
 		return problem.WriteInternal(c, err)
 	}
 
-	token, _, exp, err := h.jwtUseCase.MintInteractiveAPIAccessJWTFromSnapshot(c.Context(), subject, snap, h.apiAccessTTL)
+	token, _, exp, err := h.jwtUseCase.MintInteractiveAPIAccessJWTFromSnapshot(c.Context(), subject, snap, ttl)
 	if err != nil {
 		telemetry.MarkError(span, err)
 		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultInternalError)
@@ -179,6 +189,38 @@ func (h *JWTHandler) IssueApiAccessToken(c fiber.Ctx) error {
 		ExpiresAt:   exp,
 	}
 	return c.Status(fiber.StatusCreated).JSON(out)
+}
+
+func resolveIssuedAPIAccessTTL(now time.Time, policyTTL time.Duration, callerClaims map[string]any, requestedExpiresAt *time.Time) (time.Duration, error) {
+	callerExp, ok := numericUnixClaimToTime(callerClaims, "exp")
+	if !ok {
+		return 0, fmt.Errorf("caller token has no valid exp claim")
+	}
+	policyExp := now.Add(policyTTL)
+	maxExp := policyExp
+	if callerExp.Before(maxExp) {
+		maxExp = callerExp
+	}
+	if !maxExp.After(now) {
+		return 0, fmt.Errorf("caller token is too close to expiry")
+	}
+
+	targetExp := maxExp
+	if requestedExpiresAt != nil {
+		reqExp := requestedExpiresAt.UTC()
+		if !reqExp.After(now) {
+			return 0, fmt.Errorf("expires_at must be in the future")
+		}
+		if reqExp.After(maxExp) {
+			return 0, fmt.Errorf("expires_at exceeds caller or policy limits")
+		}
+		targetExp = reqExp
+	}
+	ttl := targetExp.Sub(now)
+	if ttl <= 0 {
+		return 0, fmt.Errorf("computed token ttl is non-positive")
+	}
+	return ttl, nil
 }
 
 func normalizeRequestedPermissions(in *[]string) []string {

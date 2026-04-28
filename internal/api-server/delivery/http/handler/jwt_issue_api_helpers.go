@@ -2,7 +2,9 @@ package handler
 
 import (
 	"encoding/json"
+	"math"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -19,6 +21,10 @@ func subjectFromAPIJWTClaims(mc jwt.MapClaims) string {
 
 func permissionsFromAPIJWTClaims(mc jwt.MapClaims) []any {
 	return mergeAnyUnique(claimSliceToAny(mc, "permissions"), claimSliceToAny(mc, "scopes"))
+}
+
+func hasAnyRoleClaim(mc jwt.MapClaims) bool {
+	return len(claimSliceToAny(mc, "roles")) > 0
 }
 
 func claimSliceToAny(mc jwt.MapClaims, key string) []any {
@@ -102,4 +108,24 @@ func snapshotForAPIAccess(permissions []any, mc jwt.MapClaims) ([]byte, error) {
 		}
 	}
 	return json.Marshal(m)
+}
+
+func numericUnixClaimToTime(mc jwt.MapClaims, key string) (time.Time, bool) {
+	v, ok := mc[key]
+	if !ok || v == nil {
+		return time.Time{}, false
+	}
+	switch x := v.(type) {
+	case float64:
+		if math.IsNaN(x) || math.IsInf(x, 0) {
+			return time.Time{}, false
+		}
+		return time.Unix(int64(x), 0).UTC(), true
+	case int64:
+		return time.Unix(x, 0).UTC(), true
+	case int:
+		return time.Unix(int64(x), 0).UTC(), true
+	default:
+		return time.Time{}, false
+	}
 }

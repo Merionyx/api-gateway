@@ -589,6 +589,14 @@ components:
           items:
             type: string
           description: Optional per-token delegated permissions; when accepted they are embedded into the issued API token claims (for this token only).
+        expires_at:
+          type: string
+          format: date-time
+          description: |
+            Optional absolute expiration instant (UTC) for the issued API token.
+            Must be in the future and must not exceed either:
+            1) server policy max for this endpoint;
+            2) caller Bearer token expiration.
 
     ApiAccessTokenIssued:
       type: object
@@ -1500,11 +1508,12 @@ paths:
       operationId: issueApiAccessToken
       security:
       - bearerAuth: []
-      - apiKey: []
       summary: Issue API profile access JWT
       description: |
         Mints a short-lived **API profile** JWT for calling this HTTP API. Request **`IssueApiAccessTokenRequest`** and **201** body **`ApiAccessTokenIssued`** are stable for codegen; semantics/RBAC land in **roadmap step 22**.
-        **RBAC (step 23):** requires role **`api:access_tokens:issue`** or admin role (**`api:role:admin`**) via JWT `roles` and/or API key `roles` in etcd.
+        Requires an interactive human Bearer token (API keys and delegated API tokens are not allowed as issuers).
+        The issued token cannot exceed caller permissions or caller expiration.
+        **RBAC (step 23):** requires role **`api:access_tokens:issue`** or admin role (**`api:role:admin`**) via JWT `roles`.
       requestBody:
         required: true
         content:
