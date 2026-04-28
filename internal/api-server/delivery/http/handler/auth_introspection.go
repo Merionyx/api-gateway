@@ -87,12 +87,12 @@ func (h *AuthIntrospectionHandler) InspectTokenPermissions(c fiber.Ctx) error {
 		return problem.WriteInternal(c, nil)
 	}
 
-	var req apiserver.TokenPermissionsRequest
+	var req apiserver.InspectTokenPermissionsJSONBody
 	if err := c.Bind().Body(&req); err != nil {
 		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidJSONBody, "", problem.DetailInvalidJSONBody))
 	}
 
-	rawToken := strings.TrimSpace(req.AccessToken)
+	rawToken := strings.TrimSpace(req.Data.AccessToken)
 	if rawToken == "" {
 		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(
 			"ACCESS_TOKEN_REQUIRED",
@@ -125,11 +125,11 @@ func (h *AuthIntrospectionHandler) InspectTokenPermissions(c fiber.Ctx) error {
 	}
 
 	permissionIDs := mapKeysSorted(effective)
-	return c.JSON(apiserver.TokenPermissionsResponse{
+	return c.JSON(apiserver.InspectTokenPermissions200JSONResponse{Data: apiserver.TokenPermissionsResponse{
 		Subject:     subject,
 		Roles:       tokenRoles,
 		Permissions: permissionDescriptorsFromIDs(permissionIDs),
-	})
+	}})
 }
 
 func permissionDescriptorsFromIDs(ids []string) []apiserver.PermissionDescriptor {

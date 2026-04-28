@@ -151,7 +151,7 @@ func TestAuthIntrospectionHandler_InspectTokenPermissions_success(t *testing.T) 
 	app := fiber.New()
 	app.Post("/v1/auth/token-permissions", h.InspectTokenPermissions)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/auth/token-permissions", strings.NewReader(`{"access_token":"`+tok+`"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/auth/token-permissions", strings.NewReader(`{"data":{"access_token":"`+tok+`"}}`))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	resp, err := app.Test(req)
 	if err != nil {
@@ -163,22 +163,24 @@ func TestAuthIntrospectionHandler_InspectTokenPermissions_success(t *testing.T) 
 		t.Fatalf("status %d body %s", resp.StatusCode, b)
 	}
 
-	var out apiserver.TokenPermissionsResponse
+	var out struct {
+		Data apiserver.TokenPermissionsResponse `json:"data"`
+	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		t.Fatal(err)
 	}
-	if out.Subject != "user-1" {
-		t.Fatalf("subject %q", out.Subject)
+	if out.Data.Subject != "user-1" {
+		t.Fatalf("subject %q", out.Data.Subject)
 	}
-	if len(out.Roles) != 1 || out.Roles[0] != roles.APIRoleViewer {
-		t.Fatalf("roles %#v", out.Roles)
+	if len(out.Data.Roles) != 1 || out.Data.Roles[0] != roles.APIRoleViewer {
+		t.Fatalf("roles %#v", out.Data.Roles)
 	}
 
-	ids := make([]string, 0, len(out.Permissions))
-	for i := range out.Permissions {
-		ids = append(ids, out.Permissions[i].Id)
-		if strings.TrimSpace(out.Permissions[i].Description) == "" {
-			t.Fatalf("permission %q has empty description", out.Permissions[i].Id)
+	ids := make([]string, 0, len(out.Data.Permissions))
+	for i := range out.Data.Permissions {
+		ids = append(ids, out.Data.Permissions[i].Id)
+		if strings.TrimSpace(out.Data.Permissions[i].Description) == "" {
+			t.Fatalf("permission %q has empty description", out.Data.Permissions[i].Id)
 		}
 	}
 	if !slices.Contains(ids, permissions.BundleRead) {
@@ -206,7 +208,7 @@ func TestAuthIntrospectionHandler_InspectTokenPermissions_validation(t *testing.
 	app.Post("/v1/auth/token-permissions", h.InspectTokenPermissions)
 
 	t.Run("missing_token", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/v1/auth/token-permissions", strings.NewReader(`{"access_token":""}`))
+		req := httptest.NewRequest(http.MethodPost, "/v1/auth/token-permissions", strings.NewReader(`{"data":{"access_token":""}}`))
 		req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 		resp, err := app.Test(req)
 		if err != nil {
@@ -220,7 +222,7 @@ func TestAuthIntrospectionHandler_InspectTokenPermissions_validation(t *testing.
 	})
 
 	t.Run("invalid_token", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/v1/auth/token-permissions", strings.NewReader(`{"access_token":"bad-token"}`))
+		req := httptest.NewRequest(http.MethodPost, "/v1/auth/token-permissions", strings.NewReader(`{"data":{"access_token":"bad-token"}}`))
 		req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 		resp, err := app.Test(req)
 		if err != nil {

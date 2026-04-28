@@ -43,7 +43,7 @@ func TestJWTHandler_IssueApiAccessToken_forbiddenViaAPIKey(t *testing.T) {
 	app.Use(middleware.APISecurity(uc, repo))
 	app.Post("/v1/tokens/api", h.IssueApiAccessToken)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/tokens/api", strings.NewReader(`{}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/tokens/api", strings.NewReader(`{"data":{}}`))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	req.Header.Set("X-API-Key", secret)
 	resp, err := app.Test(req)
@@ -71,7 +71,7 @@ func TestJWTHandler_IssueApiAccessToken_forbiddenWhenBearerHasNoRoles(t *testing
 	app.Use(middleware.APISecurity(uc, nil))
 	app.Post("/v1/tokens/api", h.IssueApiAccessToken)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/tokens/api", strings.NewReader(`{}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/tokens/api", strings.NewReader(`{"data":{}}`))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	req.Header.Set(fiber.HeaderAuthorization, "Bearer "+caller)
 	resp, err := app.Test(req)
@@ -98,7 +98,7 @@ func TestJWTHandler_IssueApiAccessToken_viaBearerHuman(t *testing.T) {
 	app.Use(middleware.APISecurity(uc, nil))
 	app.Post("/v1/tokens/api", h.IssueApiAccessToken)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/tokens/api", strings.NewReader(`{}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/tokens/api", strings.NewReader(`{"data":{}}`))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	req.Header.Set(fiber.HeaderAuthorization, "Bearer "+caller)
 	resp, err := app.Test(req)
@@ -110,11 +110,13 @@ func TestJWTHandler_IssueApiAccessToken_viaBearerHuman(t *testing.T) {
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("status %d body %s", resp.StatusCode, b)
 	}
-	var out apiserver.ApiAccessTokenIssued
+	var out struct {
+		Data apiserver.ApiAccessTokenIssued `json:"data"`
+	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		t.Fatal(err)
 	}
-	mc, err := uc.ParseAndValidateAPIProfileBearerToken(out.AccessToken)
+	mc, err := uc.ParseAndValidateAPIProfileBearerToken(out.Data.AccessToken)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +143,7 @@ func TestJWTHandler_IssueApiAccessToken_rejectsRequestedPermissionsOutsideCaller
 	app.Use(middleware.APISecurity(uc, nil))
 	app.Post("/v1/tokens/api", h.IssueApiAccessToken)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/tokens/api", strings.NewReader(`{"permissions":["api.token.edge.issue"]}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/tokens/api", strings.NewReader(`{"data":{"permissions":["api.token.edge.issue"]}}`))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	req.Header.Set(fiber.HeaderAuthorization, "Bearer "+caller)
 	resp, err := app.Test(req)
@@ -173,7 +175,7 @@ func TestJWTHandler_IssueApiAccessToken_embedsRequestedPermissionsInTokenClaims(
 	app.Use(middleware.APISecurity(uc, nil))
 	app.Post("/v1/tokens/api", h.IssueApiAccessToken)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/tokens/api", strings.NewReader(`{"permissions":["api.token.edge.issue"]}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/tokens/api", strings.NewReader(`{"data":{"permissions":["api.token.edge.issue"]}}`))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	req.Header.Set(fiber.HeaderAuthorization, "Bearer "+caller)
 	resp, err := app.Test(req)
@@ -185,11 +187,13 @@ func TestJWTHandler_IssueApiAccessToken_embedsRequestedPermissionsInTokenClaims(
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("status %d body %s", resp.StatusCode, b)
 	}
-	var out apiserver.ApiAccessTokenIssued
+	var out struct {
+		Data apiserver.ApiAccessTokenIssued `json:"data"`
+	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		t.Fatal(err)
 	}
-	mc, err := uc.ParseAndValidateAPIProfileBearerToken(out.AccessToken)
+	mc, err := uc.ParseAndValidateAPIProfileBearerToken(out.Data.AccessToken)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +213,7 @@ func TestJWTHandler_IssueApiAccessToken_expiresAtAcceptedWithinLimits(t *testing
 	}, 8*time.Minute)
 
 	requested := time.Now().UTC().Add(2 * time.Minute).Round(time.Second)
-	body := `{"expires_at":"` + requested.Format(time.RFC3339) + `"}`
+	body := `{"data":{"expires_at":"` + requested.Format(time.RFC3339) + `"}}`
 
 	app := fiber.New()
 	app.Use(middleware.APISecurity(uc, nil))
@@ -227,12 +231,14 @@ func TestJWTHandler_IssueApiAccessToken_expiresAtAcceptedWithinLimits(t *testing
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("status %d body %s", resp.StatusCode, b)
 	}
-	var out apiserver.ApiAccessTokenIssued
+	var out struct {
+		Data apiserver.ApiAccessTokenIssued `json:"data"`
+	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		t.Fatal(err)
 	}
-	if out.ExpiresAt.After(requested.Add(2 * time.Second)) {
-		t.Fatalf("expires_at too late: got %s want <= %s", out.ExpiresAt, requested)
+	if out.Data.ExpiresAt.After(requested.Add(2 * time.Second)) {
+		t.Fatalf("expires_at too late: got %s want <= %s", out.Data.ExpiresAt, requested)
 	}
 }
 
@@ -246,7 +252,7 @@ func TestJWTHandler_IssueApiAccessToken_expiresAtRejectedAbovePolicyTTL(t *testi
 	}, 10*time.Minute)
 
 	requested := time.Now().UTC().Add(5 * time.Minute).Round(time.Second)
-	body := `{"expires_at":"` + requested.Format(time.RFC3339) + `"}`
+	body := `{"data":{"expires_at":"` + requested.Format(time.RFC3339) + `"}}`
 
 	app := fiber.New()
 	app.Use(middleware.APISecurity(uc, nil))
@@ -276,7 +282,7 @@ func TestJWTHandler_IssueApiAccessToken_expiresAtRejectedAboveCallerExp(t *testi
 	}, 2*time.Minute)
 
 	requested := time.Now().UTC().Add(5 * time.Minute).Round(time.Second)
-	body := `{"expires_at":"` + requested.Format(time.RFC3339) + `"}`
+	body := `{"data":{"expires_at":"` + requested.Format(time.RFC3339) + `"}}`
 
 	app := fiber.New()
 	app.Use(middleware.APISecurity(uc, nil))

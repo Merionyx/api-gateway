@@ -90,11 +90,12 @@ func (h *RegistryHandler) ListBundleKeys(c fiber.Ctx, params apiserver.ListBundl
 func (h *RegistryHandler) SyncBundle(c fiber.Ctx, params apiserver.SyncBundleParams) error {
 	span := beginHandlerSpan(c, "SyncBundle")
 	defer span.End()
-	var req apiserver.BundleSyncRequest
-	if err := c.Bind().Body(&req); err != nil {
+	var body apiserver.SyncBundleJSONBody
+	if err := c.Bind().Body(&body); err != nil {
 		telemetry.MarkError(span, err)
 		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidJSONBody, "", problem.DetailInvalidJSONBody))
 	}
+	req := body.Data
 	if req.Repository == "" || req.Ref == "" || req.Bundle == "" {
 		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeSyncBundleParamsRequired, "", problem.DetailSyncBundleParamsRequired))
 	}
@@ -152,7 +153,9 @@ func (h *RegistryHandler) syncBundleHTTPResult(c fiber.Ctx, req *apiserver.Bundl
 		}
 		return &idempotency.HTTPResult{StatusCode: st, ContentType: problem.ContentType, Body: body}, nil
 	}
-	body, err := json.Marshal(apiserver.BundleSyncResponse{FromCache: fromCache, Snapshots: apiSnaps})
+	body, err := json.Marshal(apiserver.SyncBundle200JSONResponse{
+		Data: apiserver.BundleSyncResponse{FromCache: fromCache, Snapshots: apiSnaps},
+	})
 	if err != nil {
 		return nil, err
 	}

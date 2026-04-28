@@ -41,7 +41,7 @@ func TestJWTHandler_GenerateToken_ValidationAppID(t *testing.T) {
 	app := fiber.New()
 	app.Post("/tokens", h.GenerateToken)
 
-	req := httptest.NewRequest(fiber.MethodPost, "/tokens", strings.NewReader(`{"app_id":"","environments":["e"],"expires_at":"2099-01-01T00:00:00Z"}`))
+	req := httptest.NewRequest(fiber.MethodPost, "/tokens", strings.NewReader(`{"data":{"app_id":"","environments":["e"],"expires_at":"2099-01-01T00:00:00Z"}}`))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	resp, err := app.Test(req)
 	if err != nil {
@@ -59,7 +59,7 @@ func TestJWTHandler_GenerateToken_Created(t *testing.T) {
 	app := fiber.New()
 	app.Post("/tokens", h.GenerateToken)
 
-	body := `{"app_id":"a1","environments":["dev"],"expires_at":"` + time.Now().Add(time.Hour).Format(time.RFC3339Nano) + `"}`
+	body := `{"data":{"app_id":"a1","environments":["dev"],"expires_at":"` + time.Now().Add(time.Hour).Format(time.RFC3339Nano) + `"}}`
 	req := httptest.NewRequest(fiber.MethodPost, "/tokens", strings.NewReader(body))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	resp, err := app.Test(req)
@@ -84,7 +84,7 @@ func TestJWTHandler_GenerateToken_forbiddenWithoutPermission(t *testing.T) {
 	app := fiber.New()
 	app.Post("/tokens", h.GenerateToken)
 
-	req := httptest.NewRequest(http.MethodPost, "/tokens", strings.NewReader(`{"app_id":"a1","environments":["dev"],"expires_at":"2099-01-01T00:00:00Z"}`))
+	req := httptest.NewRequest(http.MethodPost, "/tokens", strings.NewReader(`{"data":{"app_id":"a1","environments":["dev"],"expires_at":"2099-01-01T00:00:00Z"}}`))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	resp, err := app.Test(req)
 	if err != nil {
@@ -114,7 +114,7 @@ func TestJWTHandler_GenerateToken_allowedByRolePermission(t *testing.T) {
 	})
 	app.Post("/tokens", h.GenerateToken)
 
-	req := httptest.NewRequest(http.MethodPost, "/tokens", strings.NewReader(`{"app_id":"a1","environments":["dev"],"expires_at":"2099-01-01T00:00:00Z"}`))
+	req := httptest.NewRequest(http.MethodPost, "/tokens", strings.NewReader(`{"data":{"app_id":"a1","environments":["dev"],"expires_at":"2099-01-01T00:00:00Z"}}`))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	resp, err := app.Test(req)
 	if err != nil {

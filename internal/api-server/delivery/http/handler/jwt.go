@@ -61,11 +61,16 @@ func (h *JWTHandler) GenerateToken(c fiber.Ctx) error {
 		}
 	}
 
-	var req models.GenerateTokenRequest
-	if err := c.Bind().Body(&req); err != nil {
+	var body apiserver.IssueEdgeTokenJSONBody
+	if err := c.Bind().Body(&body); err != nil {
 		telemetry.MarkError(span, err)
 		apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationBind)
 		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidJSONBody, "", problem.DetailInvalidJSONBody))
+	}
+	req := models.GenerateTokenRequest{
+		AppID:        body.Data.AppId,
+		Environments: body.Data.Environments,
+		ExpiresAt:    body.Data.ExpiresAt,
 	}
 
 	if req.AppID == "" {
@@ -98,7 +103,14 @@ func (h *JWTHandler) GenerateToken(c fiber.Ctx) error {
 	}
 
 	apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultCreated)
-	return c.Status(fiber.StatusCreated).JSON(token)
+	return c.Status(fiber.StatusCreated).JSON(apiserver.IssueEdgeToken201JSONResponse{Data: apiserver.GenerateTokenResponse{
+		Id:           token.ID,
+		Token:        token.Token,
+		AppId:        token.AppID,
+		Environments: token.Environments,
+		ExpiresAt:    token.ExpiresAt,
+		CreatedAt:    token.CreatedAt,
+	}})
 }
 
 // IssueApiAccessToken mints a short-lived API-profile JWT (POST /v1/tokens/api; roadmap ш. 22).
@@ -138,14 +150,14 @@ func (h *JWTHandler) IssueApiAccessToken(c fiber.Ctx) error {
 	var requestedPermissions []string
 	var requestedExpiresAt *time.Time
 	if len(c.Body()) > 0 {
-		var body apiserver.IssueApiAccessTokenRequest
+		var body apiserver.IssueApiAccessTokenJSONBody
 		if err := c.Bind().Body(&body); err != nil {
 			telemetry.MarkError(span, err)
 			apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultValidationBind)
 			return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidJSONBody, "", problem.DetailInvalidJSONBody))
 		}
-		requestedPermissions = normalizeRequestedPermissions(body.Permissions)
-		requestedExpiresAt = body.ExpiresAt
+		requestedPermissions = normalizeRequestedPermissions(body.Data.Permissions)
+		requestedExpiresAt = body.Data.ExpiresAt
 		if h.permissionEval != nil {
 			if denied, werr := h.permissionEval.RequireDelegatedPermissions(c, requestedPermissions); denied {
 				apimetrics.RecordTokenGenerate(h.metricsEnabled, apimetrics.TokenResultForbidden)
@@ -188,7 +200,7 @@ func (h *JWTHandler) IssueApiAccessToken(c fiber.Ctx) error {
 		AccessToken: token,
 		ExpiresAt:   exp,
 	}
-	return c.Status(fiber.StatusCreated).JSON(out)
+	return c.Status(fiber.StatusCreated).JSON(apiserver.IssueApiAccessToken201JSONResponse{Data: out})
 }
 
 func resolveIssuedAPIAccessTTL(now time.Time, policyTTL time.Duration, callerClaims map[string]any, requestedExpiresAt *time.Time) (time.Duration, error) {

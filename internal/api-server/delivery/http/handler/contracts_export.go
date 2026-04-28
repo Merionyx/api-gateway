@@ -10,6 +10,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/auth/roles"
 	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/authz"
 	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/problem"
+	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/bundle"
 	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
@@ -26,23 +27,6 @@ func NewContractsExportHandler(exportUC *bundle.ContractExportUseCase, permissio
 	}
 }
 
-type contractsExportRequest struct {
-	Repository   string `json:"repository"`
-	Ref          string `json:"ref"`
-	Path         string `json:"path"`
-	ContractName string `json:"contract_name"`
-}
-
-type contractsExportFileJSON struct {
-	ContractName  string `json:"contract_name"`
-	SourcePath    string `json:"source_path"`
-	ContentBase64 string `json:"content_base64"`
-}
-
-type contractsExportResponse struct {
-	Files []contractsExportFileJSON `json:"files"`
-}
-
 // Export POST /v1/contracts/export — forwards to Contract Syncer (no etcd).
 func (h *ContractsExportHandler) Export(c fiber.Ctx) error {
 	span := beginHandlerSpan(c, "Export")
@@ -54,25 +38,35 @@ func (h *ContractsExportHandler) Export(c fiber.Ctx) error {
 	} else if denied, werr := authz.RequireAnyHTTPRole(c, roles.APIContractsExport); denied {
 		return werr
 	}
-	var req contractsExportRequest
+	var req apiserver.ExportContractsJSONBody
 	if err := c.Bind().Body(&req); err != nil {
 		telemetry.MarkError(span, err)
 		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeInvalidJSONBody, "", problem.DetailInvalidJSONBody))
 	}
-	if req.Repository == "" || req.Ref == "" {
+	if req.Data.Repository == "" || req.Data.Ref == "" {
 		return problem.Write(c, http.StatusBadRequest, problem.BadRequest(problem.CodeExportRepositoryRefRequired, "", problem.DetailExportRepositoryRefRequired))
 	}
 
-	files, err := h.exportUC.Export(c.Context(), req.Repository, req.Ref, req.Path, req.ContractName)
+	path := ""
+	if req.Data.Path != nil {
+		path = *req.Data.Path
+	}
+	contractName := ""
+	if req.Data.ContractName != nil {
+		contractName = *req.Data.ContractName
+	}
+	files, err := h.exportUC.Export(c.Context(), req.Data.Repository, req.Data.Ref, path, contractName)
 	if err != nil {
 		telemetry.MarkError(span, err)
 		return problem.WriteContractSync(c, err)
 	}
 
-	resp := contractsExportResponse{Files: make([]contractsExportFileJSON, 0, len(files))}
+	resp := apiserver.ExportContracts200JSONResponse{Data: apiserver.ContractsExportResponse{
+		Files: make([]apiserver.ContractsExportFile, 0, len(files)),
+	}}
 	for i := range files {
 		f := files[i]
-		resp.Files = append(resp.Files, contractsExportFileJSON{
+		resp.Data.Files = append(resp.Data.Files, apiserver.ContractsExportFile{
 			ContractName:  f.ContractName,
 			SourcePath:    f.SourcePath,
 			ContentBase64: base64.StdEncoding.EncodeToString(f.Content),

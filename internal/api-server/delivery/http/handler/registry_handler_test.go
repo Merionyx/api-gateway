@@ -212,7 +212,7 @@ func TestRegistryHandler_SyncBundle_validation(t *testing.T) {
 		t.Fatalf("bad json: status %d", resp.StatusCode)
 	}
 
-	req2 := httptest.NewRequest(fiber.MethodPost, "/", strings.NewReader(`{"repository":"","ref":"r","bundle":"b"}`))
+	req2 := httptest.NewRequest(fiber.MethodPost, "/", strings.NewReader(`{"data":{"repository":"","ref":"r","bundle":"b"}}`))
 	req2.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	resp2, err := app.Test(req2)
 	if err != nil {
@@ -243,7 +243,7 @@ func TestRegistryHandler_SyncBundle_success(t *testing.T) {
 	app.Post("/", func(c fiber.Ctx) error {
 		return h.SyncBundle(c, apiserver.SyncBundleParams{})
 	})
-	body := `{"repository":"` + repo + `","ref":"` + ref + `","bundle":"` + bname + `"}`
+	body := `{"data":{"repository":"` + repo + `","ref":"` + ref + `","bundle":"` + bname + `"}}`
 	req := httptest.NewRequest(fiber.MethodPost, "/", strings.NewReader(body))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	resp, err := app.Test(req)
@@ -254,6 +254,15 @@ func TestRegistryHandler_SyncBundle_success(t *testing.T) {
 	if resp.StatusCode != fiber.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("status %d body %s", resp.StatusCode, b)
+	}
+	var out struct {
+		Data apiserver.BundleSyncResponse `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Data.Snapshots) == 0 {
+		t.Fatalf("expected snapshots in wrapped response, got %#v", out.Data)
 	}
 }
 
@@ -274,7 +283,7 @@ func TestRegistryHandler_SyncBundle_idempotencyConflict(t *testing.T) {
 		key := "0123456789abcdef0123456789abcdef"
 		return h.SyncBundle(c, apiserver.SyncBundleParams{IdempotencyKey: &key})
 	})
-	body := `{"repository":"r","ref":"main","bundle":"b"}`
+	body := `{"data":{"repository":"r","ref":"main","bundle":"b"}}`
 	req := httptest.NewRequest(fiber.MethodPost, "/", strings.NewReader(body))
 	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	resp, err := app.Test(req)
