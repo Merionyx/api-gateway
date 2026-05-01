@@ -47,6 +47,7 @@ type OIDCCallbackUseCase struct {
 	sealer          envelopeSealer
 	jwt             *JWTUseCase
 	hc              *http.Client
+	allowInsecure   bool
 	tokenTTLPolicy  TokenTTLPolicy
 	idpCache        *idpcache.Cache
 	idpOpaqueMaxTTL time.Duration
@@ -58,6 +59,7 @@ type OIDCCallbackResult struct {
 }
 
 // NewOIDCCallbackUseCase wires callback dependencies. hc nil uses http.DefaultClient.
+// allowInsecureEndpoints permits http:// OIDC discovery/token/jwks endpoints for local/dev environments.
 func NewOIDCCallbackUseCase(
 	providers []config.OIDCProviderConfig,
 	intents loginIntentReadDeleter,
@@ -65,6 +67,7 @@ func NewOIDCCallbackUseCase(
 	sealer envelopeSealer,
 	jwtUC *JWTUseCase,
 	hc *http.Client,
+	allowInsecureEndpoints bool,
 	tokenTTLPolicy TokenTTLPolicy,
 	idpCache *idpcache.Cache,
 	idpOpaqueMaxTTL time.Duration,
@@ -83,6 +86,7 @@ func NewOIDCCallbackUseCase(
 		sealer:          sealer,
 		jwt:             jwtUC,
 		hc:              hc,
+		allowInsecure:   allowInsecureEndpoints,
 		tokenTTLPolicy:  tokenTTLPolicy,
 		idpCache:        idpCache,
 		idpOpaqueMaxTTL: idpOpaqueMaxTTL,
@@ -121,12 +125,12 @@ func (u *OIDCCallbackUseCase) CompleteWithResult(ctx context.Context, code, stat
 	}
 
 	issuer := oidc.NormalizeIssuer(p.Issuer)
-	disc, err := oidc.FetchDiscovery(ctx, u.hc, issuer)
+	disc, err := oidc.FetchDiscovery(ctx, u.hc, issuer, u.allowInsecure)
 	if err != nil {
 		return out, fmt.Errorf("%w: %w", oidc.ErrDiscovery, err)
 	}
 
-	tr, err := oidc.ExchangeAuthorizationCode(ctx, u.hc, disc.TokenEndpoint, p.ClientID, p.ClientSecret, code, intent.RedirectURI, intent.PKCEVerifier)
+	tr, err := oidc.ExchangeAuthorizationCode(ctx, u.hc, disc.TokenEndpoint, p.ClientID, p.ClientSecret, code, intent.RedirectURI, intent.PKCEVerifier, u.allowInsecure)
 	if err != nil {
 		return out, err
 	}

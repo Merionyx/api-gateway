@@ -53,6 +53,7 @@ type OIDCRefreshUseCase struct {
 	sealer          *sessioncrypto.Keyring
 	jwt             *JWTUseCase
 	hc              *http.Client
+	allowInsecure   bool
 	tokenTTLPolicy  TokenTTLPolicy
 	metricsEnabled  bool
 	idpCache        *idpcache.Cache
@@ -60,12 +61,14 @@ type OIDCRefreshUseCase struct {
 }
 
 // NewOIDCRefreshUseCase wires refresh. hc nil uses http.DefaultClient.
+// allowInsecureEndpoints permits http:// OIDC discovery/token/jwks endpoints for local/dev environments.
 func NewOIDCRefreshUseCase(
 	providers []config.OIDCProviderConfig,
 	sessions refreshSessionStore,
 	sealer *sessioncrypto.Keyring,
 	jwtUC *JWTUseCase,
 	hc *http.Client,
+	allowInsecureEndpoints bool,
 	tokenTTLPolicy TokenTTLPolicy,
 	metricsEnabled bool,
 	idpCache *idpcache.Cache,
@@ -84,6 +87,7 @@ func NewOIDCRefreshUseCase(
 		sealer:          sealer,
 		jwt:             jwtUC,
 		hc:              hc,
+		allowInsecure:   allowInsecureEndpoints,
 		tokenTTLPolicy:  tokenTTLPolicy,
 		metricsEnabled:  metricsEnabled,
 		idpCache:        idpCache,
@@ -289,7 +293,7 @@ func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, req OIDCRefreshRequest
 	}
 
 	issuer := oidc.NormalizeIssuer(p.Issuer)
-	disc, dErr := oidc.FetchDiscovery(ctx, u.hc, issuer)
+	disc, dErr := oidc.FetchDiscovery(ctx, u.hc, issuer, u.allowInsecure)
 	if dErr != nil && oidc.ShouldDegradeRefresh(dErr) {
 		claimsSnap := sess.ClaimsSnapshot
 		subj, snapErr := subjectFromClaimsSnapshot(claimsSnap)
@@ -303,7 +307,7 @@ func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, req OIDCRefreshRequest
 		return out, dErr
 	}
 
-	tr, tErr := oidc.ExchangeRefreshToken(ctx, u.hc, disc.TokenEndpoint, p.ClientID, p.ClientSecret, idpRT)
+	tr, tErr := oidc.ExchangeRefreshToken(ctx, u.hc, disc.TokenEndpoint, p.ClientID, p.ClientSecret, idpRT, u.allowInsecure)
 	if tErr != nil && oidc.ShouldDegradeRefresh(tErr) {
 		claimsSnap := sess.ClaimsSnapshot
 		subj, snapErr := subjectFromClaimsSnapshot(claimsSnap)

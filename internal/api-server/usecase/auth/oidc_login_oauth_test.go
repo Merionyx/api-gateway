@@ -45,7 +45,7 @@ func TestOIDCLoginUseCase_Start_OAuthAuthorizeMode(t *testing.T) {
 		Issuer:               issuer,
 		ClientID:             "idp-client-id",
 		RedirectURIAllowlist: []string{"https://oauth.pstmn.io/v1/callback"},
-	}}, time.Minute, stub, hc)
+	}}, time.Minute, stub, hc, false)
 
 	_, err := uc.Start(t.Context(), OIDCLoginStartRequest{
 		RedirectURI:         "https://oauth.pstmn.io/v1/callback",

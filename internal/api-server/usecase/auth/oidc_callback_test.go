@@ -192,7 +192,7 @@ func TestOIDCCallbackUseCase_Complete_HappyPath(t *testing.T) {
 		ClientID:             clientID,
 		ClientSecret:         clientSecret,
 		RedirectURIAllowlist: []string{redirectURI},
-	}}, intents, sessions, kr, jwtUC, srv.Client(), TokenTTLPolicy{
+	}}, intents, sessions, kr, jwtUC, srv.Client(), true, TokenTTLPolicy{
 		DefaultAccessTTL:  5 * time.Minute,
 		MaxAccessTTL:      7 * 24 * time.Hour,
 		DefaultRefreshTTL: 7 * 24 * time.Hour,
@@ -252,7 +252,7 @@ func TestOIDCCallbackUseCase_Complete_UnknownIntent(t *testing.T) {
 		ClientID:             "c",
 		ClientSecret:         "s",
 		RedirectURIAllowlist: []string{"http://x"},
-	}}, &memIntentRepo{m: map[string]kvvalue.LoginIntentValue{}}, &memSessionRepo{}, kr, jwtUC, http.DefaultClient, TokenTTLPolicy{
+	}}, &memIntentRepo{m: map[string]kvvalue.LoginIntentValue{}}, &memSessionRepo{}, kr, jwtUC, http.DefaultClient, false, TokenTTLPolicy{
 		DefaultAccessTTL:  time.Minute,
 		MaxAccessTTL:      7 * 24 * time.Hour,
 		DefaultRefreshTTL: 7 * 24 * time.Hour,
@@ -397,7 +397,7 @@ func TestOIDCCallbackUseCase_Complete_GitHubFallbackWithoutIDToken(t *testing.T)
 		ClientSecret:         "sec",
 		RedirectURIAllowlist: []string{"http://127.0.0.1:21987/callback"},
 		GitHub:               &config.GitHubOIDCProviderConfig{},
-	}}, intents, sessions, kr, jwtUC, srv.Client(), TokenTTLPolicy{
+	}}, intents, sessions, kr, jwtUC, srv.Client(), true, TokenTTLPolicy{
 		DefaultAccessTTL:  time.Minute,
 		MaxAccessTTL:      7 * 24 * time.Hour,
 		DefaultRefreshTTL: 7 * 24 * time.Hour,

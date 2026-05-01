@@ -209,6 +209,7 @@ func (c *Container) initUseCases() error {
 		c.Config.Auth.LoginIntentLeaseTTL,
 		c.LoginIntentRepository,
 		&http.Client{Timeout: 12 * time.Second},
+		c.Config.Auth.OIDCAllowInsecureEndpoints,
 	)
 
 	c.OIDCCallbackUseCase = auth.NewOIDCCallbackUseCase(
@@ -218,6 +219,7 @@ func (c *Container) initUseCases() error {
 		c.SessionSealer,
 		c.JWTUseCase,
 		&http.Client{Timeout: 20 * time.Second},
+		c.Config.Auth.OIDCAllowInsecureEndpoints,
 		auth.TokenTTLPolicy{
 			DefaultAccessTTL:  config.EffectiveInteractiveAccessTokenTTL(c.Config.Auth.InteractiveAccessTokenTTL),
 			MaxAccessTTL:      config.EffectiveInteractiveAccessTokenMaxTTL(c.Config.Auth.InteractiveAccessTokenMaxTTL),
@@ -235,6 +237,7 @@ func (c *Container) initUseCases() error {
 			c.SessionSealer,
 			c.JWTUseCase,
 			&http.Client{Timeout: 25 * time.Second},
+			c.Config.Auth.OIDCAllowInsecureEndpoints,
 			auth.TokenTTLPolicy{
 				DefaultAccessTTL:  config.EffectiveInteractiveAccessTokenTTL(c.Config.Auth.InteractiveAccessTokenTTL),
 				MaxAccessTTL:      config.EffectiveInteractiveAccessTokenMaxTTL(c.Config.Auth.InteractiveAccessTokenMaxTTL),

@@ -27,7 +27,7 @@ func TestExchangeRefreshToken_ok(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	tr, err := ExchangeRefreshToken(context.Background(), srv.Client(), srv.URL, "cid", "sec", "rt")
+	tr, err := ExchangeRefreshToken(context.Background(), srv.Client(), srv.URL, "cid", "sec", "rt", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestExchangeRefreshToken_503_degradable(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, err := ExchangeRefreshToken(context.Background(), srv.Client(), srv.URL, "cid", "sec", "rt")
+	_, err := ExchangeRefreshToken(context.Background(), srv.Client(), srv.URL, "cid", "sec", "rt", true)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -65,5 +65,19 @@ func TestExchangeRefreshToken_503_degradable(t *testing.T) {
 	}
 	if !ShouldDegradeRefresh(err) {
 		t.Fatal("expected ShouldDegradeRefresh")
+	}
+}
+
+func TestExchangeRefreshToken_RejectsHTTPByDefault_NotDegradable(t *testing.T) {
+	t.Parallel()
+	_, err := ExchangeRefreshToken(context.Background(), http.DefaultClient, "http://idp.example/token", "cid", "sec", "rt", false)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !errors.Is(err, ErrTokenExchange) || !errors.Is(err, ErrInsecureEndpoint) {
+		t.Fatalf("got %v", err)
+	}
+	if ShouldDegradeRefresh(err) {
+		t.Fatal("insecure endpoint error must not trigger degraded refresh")
 	}
 }

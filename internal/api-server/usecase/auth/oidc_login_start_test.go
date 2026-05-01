@@ -37,7 +37,7 @@ func TestOIDCLoginUseCase_Start_RedirectNotAllowlisted(t *testing.T) {
 		Issuer:               "https://issuer.unused.example",
 		ClientID:             "c",
 		RedirectURIAllowlist: []string{"http://127.0.0.1:8080/cb"},
-	}}, time.Minute, stub, http.DefaultClient)
+	}}, time.Minute, stub, http.DefaultClient, false)
 	_, err := uc.Start(t.Context(), OIDCLoginStartRequest{
 		ProviderID:          "p1",
 		RedirectURI:         "http://127.0.0.1:9999/wrong",
@@ -76,7 +76,7 @@ func TestOIDCLoginUseCase_Start_HappyPath(t *testing.T) {
 		Issuer:               srv.URL,
 		ClientID:             "cid",
 		RedirectURIAllowlist: []string{"http://127.0.0.1:8080/cb"},
-	}}, time.Minute, stub, srv.Client())
+	}}, time.Minute, stub, srv.Client(), true)
 
 	loc, err := uc.Start(t.Context(), OIDCLoginStartRequest{
 		ProviderID:          "p1",

@@ -90,6 +90,8 @@ components:
         # External API base used to build upstream IdP callback URI:
         # {oidc_external_base_url}/v1/auth/callback (must match IdP app settings).
         oidc_external_base_url: "http://185.41.122.122:30100"
+        # Local-only override: allow http:// issuer/discovery/jwks/token endpoints.
+        oidc_allow_insecure_endpoints: true
 
         interactive_access_token_ttl: "5m"
         interactive_access_token_max_ttl: "168h"

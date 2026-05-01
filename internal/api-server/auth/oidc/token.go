@@ -27,9 +27,12 @@ type TokenResponse struct {
 
 // ExchangeAuthorizationCode calls the token endpoint (grant_type=authorization_code, client_secret in body).
 // codeVerifier is the PKCE code_verifier when using S256 (RFC 7636); pass empty if PKCE is not used.
-func ExchangeAuthorizationCode(ctx context.Context, hc *http.Client, tokenEndpoint, clientID, clientSecret, code, redirectURI, codeVerifier string) (*TokenResponse, error) {
+func ExchangeAuthorizationCode(ctx context.Context, hc *http.Client, tokenEndpoint, clientID, clientSecret, code, redirectURI, codeVerifier string, allowInsecureEndpoints bool) (*TokenResponse, error) {
 	if hc == nil {
 		hc = http.DefaultClient
+	}
+	if err := validateEndpointURL(tokenEndpoint, "token_endpoint", allowInsecureEndpoints); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrTokenExchange, err)
 	}
 	form := url.Values{}
 	form.Set("grant_type", "authorization_code")
@@ -73,9 +76,12 @@ func ExchangeAuthorizationCode(ctx context.Context, hc *http.Client, tokenEndpoi
 
 // ExchangeRefreshToken calls the token endpoint with grant_type=refresh_token (RFC 6749).
 // id_token in the response is optional; access_token is required.
-func ExchangeRefreshToken(ctx context.Context, hc *http.Client, tokenEndpoint, clientID, clientSecret, refreshToken string) (*TokenResponse, error) {
+func ExchangeRefreshToken(ctx context.Context, hc *http.Client, tokenEndpoint, clientID, clientSecret, refreshToken string, allowInsecureEndpoints bool) (*TokenResponse, error) {
 	if hc == nil {
 		hc = http.DefaultClient
+	}
+	if err := validateEndpointURL(tokenEndpoint, "token_endpoint", allowInsecureEndpoints); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrTokenExchange, err)
 	}
 	rt := strings.TrimSpace(refreshToken)
 	if rt == "" {

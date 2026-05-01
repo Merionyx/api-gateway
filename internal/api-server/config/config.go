@@ -121,6 +121,7 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("auth.etcd_key_prefix", "/api-gateway/api-server/auth/v1")
 	v.SetDefault("auth.environment", "development")
 	v.SetDefault("auth.allow_insecure_bootstrap", false)
+	v.SetDefault("auth.oidc_allow_insecure_endpoints", false)
 	v.SetDefault("auth.login_intent_lease_ttl", 15*time.Minute)
 	v.SetDefault("auth.interactive_access_token_ttl", DefaultInteractiveAccessTokenTTL)
 	v.SetDefault("auth.interactive_access_token_max_ttl", DefaultInteractiveAccessTokenMaxTTL)

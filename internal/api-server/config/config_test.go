@@ -59,6 +59,9 @@ func TestLoadConfig_FromRepoSample(t *testing.T) {
 	if len(cfg.Server.CORS.AllowOrigins) != 0 {
 		t.Fatalf("sample prod config should keep server.cors.allow_origins empty (operator-filled), got %#v", cfg.Server.CORS.AllowOrigins)
 	}
+	if cfg.Auth.OIDCAllowInsecureEndpoints {
+		t.Fatal("OIDCAllowInsecureEndpoints must default to false")
+	}
 }
 
 func TestLoadConfig_NoFile_Defaults(t *testing.T) {
@@ -89,5 +92,8 @@ func TestLoadConfig_NoFile_Defaults(t *testing.T) {
 	}
 	if len(cfg.Server.CORS.AllowOrigins) == 0 {
 		t.Fatal("no config file: expected default server.cors.allow_origins for browser dev")
+	}
+	if cfg.Auth.OIDCAllowInsecureEndpoints {
+		t.Fatal("auth.oidc_allow_insecure_endpoints should default to false")
 	}
 }

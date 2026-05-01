@@ -39,18 +39,21 @@ type OIDCLoginStartRequest struct {
 
 // OIDCLoginUseCase handles GET /v1/auth/authorize .
 type OIDCLoginUseCase struct {
-	byID     map[string]config.OIDCProviderConfig
-	leaseTTL time.Duration
-	intents  loginIntentStore
-	hc       *http.Client
+	byID                   map[string]config.OIDCProviderConfig
+	leaseTTL               time.Duration
+	intents                loginIntentStore
+	hc                     *http.Client
+	allowInsecureEndpoints bool
 }
 
 // NewOIDCLoginUseCase builds a use case. leaseTTL<=0 defaults to 15m; hc nil uses http.DefaultClient.
+// allowInsecureEndpoints permits http:// OIDC issuer/discovery endpoints for local/dev environments.
 func NewOIDCLoginUseCase(
 	providers []config.OIDCProviderConfig,
 	leaseTTL time.Duration,
 	intents loginIntentStore,
 	hc *http.Client,
+	allowInsecureEndpoints bool,
 ) *OIDCLoginUseCase {
 	by := make(map[string]config.OIDCProviderConfig, len(providers))
 	for _, p := range providers {
@@ -62,7 +65,13 @@ func NewOIDCLoginUseCase(
 	if hc == nil {
 		hc = http.DefaultClient
 	}
-	return &OIDCLoginUseCase{byID: by, leaseTTL: leaseTTL, intents: intents, hc: hc}
+	return &OIDCLoginUseCase{
+		byID:                   by,
+		leaseTTL:               leaseTTL,
+		intents:                intents,
+		hc:                     hc,
+		allowInsecureEndpoints: allowInsecureEndpoints,
+	}
 }
 
 // RedirectURIAllowlisted reports whether redirect matches one allowlisted entry (exact string match after TrimSpace).
@@ -107,7 +116,7 @@ func (u *OIDCLoginUseCase) Start(ctx context.Context, req OIDCLoginStartRequest)
 	}
 
 	issuer := oidc.NormalizeIssuer(p.Issuer)
-	disc, err := oidc.FetchDiscovery(ctx, u.hc, issuer)
+	disc, err := oidc.FetchDiscovery(ctx, u.hc, issuer, u.allowInsecureEndpoints)
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", oidc.ErrDiscovery, err)
 	}

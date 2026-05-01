@@ -65,11 +65,11 @@ func TestDiscovery_TokenExchange_ValidateIDToken(t *testing.T) {
 		case r.Method == http.MethodPost && r.URL.Path == "/token":
 			issuer := "http://" + r.Host
 			tok := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
-				"iss": issuer,
-				"sub": "subject-1",
-				"aud": clientID,
-				"exp": time.Now().Add(time.Hour).Unix(),
-				"iat": time.Now().Unix(),
+				"iss":   issuer,
+				"sub":   "subject-1",
+				"aud":   clientID,
+				"exp":   time.Now().Add(time.Hour).Unix(),
+				"iat":   time.Now().Unix(),
 				"nonce": nonce,
 			})
 			tok.Header["kid"] = kid
@@ -92,7 +92,7 @@ func TestDiscovery_TokenExchange_ValidateIDToken(t *testing.T) {
 	hc := srv.Client()
 	base := NormalizeIssuer(srv.URL)
 
-	disc, err := FetchDiscovery(t.Context(), hc, base)
+	disc, err := FetchDiscovery(t.Context(), hc, base, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestDiscovery_TokenExchange_ValidateIDToken(t *testing.T) {
 		t.Fatalf("discovery: %+v", disc)
 	}
 
-	tr, err := ExchangeAuthorizationCode(t.Context(), hc, disc.TokenEndpoint, clientID, clientSecret, authCode, redirectURI, "")
+	tr, err := ExchangeAuthorizationCode(t.Context(), hc, disc.TokenEndpoint, clientID, clientSecret, authCode, redirectURI, "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +130,7 @@ func TestExchangeAuthorizationCode_MissingIDToken(t *testing.T) {
 		})
 	}))
 	t.Cleanup(srv.Close)
-	got, err := ExchangeAuthorizationCode(context.Background(), srv.Client(), srv.URL+"/token", "cid", "sec", "code", "http://cb", "")
+	got, err := ExchangeAuthorizationCode(context.Background(), srv.Client(), srv.URL+"/token", "cid", "sec", "code", "http://cb", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +149,7 @@ func TestExchangeAuthorizationCode_OAuth2ErrorJSON(t *testing.T) {
 		})
 	}))
 	t.Cleanup(srv.Close)
-	_, err := ExchangeAuthorizationCode(context.Background(), srv.Client(), srv.URL+"/token", "cid", "sec", "code", "http://cb", "")
+	_, err := ExchangeAuthorizationCode(context.Background(), srv.Client(), srv.URL+"/token", "cid", "sec", "code", "http://cb", "", true)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -179,12 +179,23 @@ func TestExchangeAuthorizationCode_SendsPKCEVerifier(t *testing.T) {
 		})
 	}))
 	t.Cleanup(srv.Close)
-	_, err := ExchangeAuthorizationCode(context.Background(), srv.Client(), srv.URL+"/token", "cid", "sec", "code", "http://cb", "verifier-xyz")
+	_, err := ExchangeAuthorizationCode(context.Background(), srv.Client(), srv.URL+"/token", "cid", "sec", "code", "http://cb", "verifier-xyz", true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if gotVerifier != "verifier-xyz" {
 		t.Fatalf("code_verifier: got %q", gotVerifier)
+	}
+}
+
+func TestExchangeAuthorizationCode_RejectsHTTPByDefault(t *testing.T) {
+	t.Parallel()
+	_, err := ExchangeAuthorizationCode(context.Background(), http.DefaultClient, "http://idp.example/token", "cid", "sec", "code", "http://cb", "", false)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !errors.Is(err, ErrTokenExchange) || !errors.Is(err, ErrInsecureEndpoint) {
+		t.Fatalf("got %v", err)
 	}
 }
 
@@ -194,7 +205,7 @@ func TestFetchDiscovery_BadStatus(t *testing.T) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	t.Cleanup(srv.Close)
-	_, err := FetchDiscovery(context.Background(), srv.Client(), srv.URL)
+	_, err := FetchDiscovery(context.Background(), srv.Client(), srv.URL, true)
 	if err == nil || !errors.Is(err, ErrDiscovery) {
 		t.Fatalf("got %v", err)
 	}

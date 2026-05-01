@@ -13,6 +13,9 @@ var (
 	// ErrTokenExchange is a failure calling the token endpoint.
 	ErrTokenExchange = errors.New("oidc: token exchange failed")
 
+	// ErrInsecureEndpoint is returned when strict HTTPS endpoint validation rejects an insecure OIDC URL.
+	ErrInsecureEndpoint = errors.New("oidc: insecure endpoint URL")
+
 	// ErrMissingIDTokenInTokenResponse is returned when the token endpoint returns HTTP 200 JSON without id_token
 	// (authorization code flow). Some GitHub App user-token responses only include access_token.
 	ErrMissingIDTokenInTokenResponse = errors.New("oidc: token response missing id_token")
@@ -73,6 +76,9 @@ func (e *TokenExchangeFailure) Degradable() bool {
 
 // ShouldDegradeRefresh is true for discovery failures or token transport / HTTP 5xx (not 4xx client errors).
 func ShouldDegradeRefresh(err error) bool {
+	if errors.Is(err, ErrInsecureEndpoint) {
+		return false
+	}
 	if errors.Is(err, ErrDiscovery) {
 		return true
 	}

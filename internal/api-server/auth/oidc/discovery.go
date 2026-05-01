@@ -21,13 +21,16 @@ type Discovery struct {
 }
 
 // FetchDiscovery loads /.well-known/openid-configuration for issuerBase (scheme+host, no trailing slash).
-func FetchDiscovery(ctx context.Context, hc *http.Client, issuerBase string) (*Discovery, error) {
+func FetchDiscovery(ctx context.Context, hc *http.Client, issuerBase string, allowInsecureEndpoints bool) (*Discovery, error) {
 	if hc == nil {
 		hc = http.DefaultClient
 	}
 	base := strings.TrimSuffix(strings.TrimSpace(issuerBase), "/")
 	if base == "" {
 		return nil, fmt.Errorf("%w: empty issuer", ErrDiscovery)
+	}
+	if err := validateEndpointURL(base, "issuer", allowInsecureEndpoints); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrDiscovery, err)
 	}
 	u := base + "/.well-known/openid-configuration"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
@@ -53,6 +56,15 @@ func FetchDiscovery(ctx context.Context, hc *http.Client, issuerBase string) (*D
 	patchWellKnownIncomplete(&d)
 	if d.Issuer == "" || d.TokenEndpoint == "" || d.JWKSURI == "" {
 		return nil, fmt.Errorf("%w: missing required fields", ErrDiscovery)
+	}
+	if err := validateEndpointURL(d.Issuer, "discovery.issuer", allowInsecureEndpoints); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrDiscovery, err)
+	}
+	if err := validateEndpointURL(d.TokenEndpoint, "discovery.token_endpoint", allowInsecureEndpoints); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrDiscovery, err)
+	}
+	if err := validateEndpointURL(d.JWKSURI, "discovery.jwks_uri", allowInsecureEndpoints); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrDiscovery, err)
 	}
 	return &d, nil
 }

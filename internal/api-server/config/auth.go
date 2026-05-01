@@ -277,6 +277,9 @@ type AuthConfig struct {
 
 	// OIDCProviders configures OAuth 2.1 authorize flow (GET /v1/auth/authorize). Empty disables interactive login until configured.
 	OIDCProviders []OIDCProviderConfig `mapstructure:"oidc_providers" json:"oidc_providers"`
+	// OIDCAllowInsecureEndpoints allows non-HTTPS OIDC issuer/discovery/JWKS/token endpoints.
+	// Keep false in production; enable only for local/dev environments.
+	OIDCAllowInsecureEndpoints bool `mapstructure:"oidc_allow_insecure_endpoints" json:"oidc_allow_insecure_endpoints"`
 	// OIDCExternalBaseURL is the external public API base URL used to build the fixed callback URI for OIDC authorize flow:
 	// {oidc_external_base_url}/v1/auth/callback. It must not include path/query/fragment/userinfo.
 	// Required when oidc_providers is non-empty to avoid Host-header-derived callback URLs.

@@ -113,7 +113,7 @@ func TestOIDCRefreshResolveProvider_requiresProviderID(t *testing.T) {
 		Name:     "Provider",
 		Issuer:   "https://issuer.example",
 		ClientID: "cid",
-	}}, nil, nil, nil, nil, TokenTTLPolicy{}, false, nil, 0)
+	}}, nil, nil, nil, nil, false, TokenTTLPolicy{}, false, nil, 0)
 
 	_, err := uc.resolveProvider(kvvalue.SessionValue{})
 	if !errors.Is(err, apierrors.ErrInvalidInput) {
@@ -236,7 +236,7 @@ func TestOIDCRefresh_degraded_discovery503(t *testing.T) {
 		Issuer:       srv.URL,
 		ClientID:     "cid",
 		ClientSecret: "sec",
-	}}, st, kr, jwtUC, srv.Client(), TokenTTLPolicy{
+	}}, st, kr, jwtUC, srv.Client(), true, TokenTTLPolicy{
 		DefaultAccessTTL:  5 * time.Minute,
 		MaxAccessTTL:      7 * 24 * time.Hour,
 		DefaultRefreshTTL: 7 * 24 * time.Hour,
@@ -364,7 +364,7 @@ func TestOIDCRefresh_missingStoredIDPRefreshToken(t *testing.T) {
 		Kind:     "google",
 		Issuer:   "https://accounts.google.com",
 		ClientID: "cid",
-	}}, st, kr, jwtUC, http.DefaultClient, TokenTTLPolicy{
+	}}, st, kr, jwtUC, http.DefaultClient, false, TokenTTLPolicy{
 		DefaultAccessTTL:  5 * time.Minute,
 		MaxAccessTTL:      7 * 24 * time.Hour,
 		DefaultRefreshTTL: 7 * 24 * time.Hour,
@@ -440,7 +440,7 @@ func TestOIDCRefresh_expiredRefreshSession(t *testing.T) {
 		Name:     "Test Provider",
 		Issuer:   "https://issuer.example",
 		ClientID: "cid",
-	}}, st, kr, jwtUC, http.DefaultClient, TokenTTLPolicy{
+	}}, st, kr, jwtUC, http.DefaultClient, false, TokenTTLPolicy{
 		DefaultAccessTTL:  5 * time.Minute,
 		MaxAccessTTL:      7 * 24 * time.Hour,
 		DefaultRefreshTTL: 7 * 24 * time.Hour,
