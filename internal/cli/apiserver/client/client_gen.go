@@ -3991,7 +3991,7 @@ type IssueEdgeTokenResponse struct {
 		Data GenerateTokenResponse `json:"data"`
 	}
 	ApplicationproblemJSON400 *BadRequest
-	ApplicationproblemJSON401 *Unauthorized
+	ApplicationproblemJSON403 *Forbidden
 	ApplicationproblemJSON500 *InternalError
 }
 
@@ -5498,12 +5498,12 @@ func ParseIssueEdgeTokenResponse(rsp *http.Response) (*IssueEdgeTokenResponse, e
 		}
 		response.ApplicationproblemJSON400 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Unauthorized
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSON401 = &dest
+		response.ApplicationproblemJSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalError

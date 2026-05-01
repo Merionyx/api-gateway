@@ -1676,9 +1676,9 @@ func (s *StrictOpenAPIServer) IssueEdgeToken(ctx context.Context, request apiser
 		}, nil
 	}
 	if !hasPermission(have, permissions.EdgeTokenIssue) {
-		p := problem.Unauthorized(problem.CodeInsufficientPermissions, "", "The caller does not have any required permission for this operation.")
-		return apiserver.IssueEdgeToken401ApplicationProblemPlusJSONResponse{
-			UnauthorizedApplicationProblemPlusJSONResponse: apiserver.UnauthorizedApplicationProblemPlusJSONResponse(p),
+		p := problem.Forbidden(problem.CodeInsufficientPermissions, "", "The caller does not have any required permission for this operation.")
+		return apiserver.IssueEdgeToken403ApplicationProblemPlusJSONResponse{
+			ForbiddenApplicationProblemPlusJSONResponse: apiserver.ForbiddenApplicationProblemPlusJSONResponse(p),
 		}, nil
 	}
 

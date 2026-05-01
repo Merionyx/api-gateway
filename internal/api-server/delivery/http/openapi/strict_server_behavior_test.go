@@ -18,6 +18,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/container"
 	httpauthz "github.com/merionyx/api-gateway/internal/api-server/delivery/http/authz"
 	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/middleware"
+	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/problem"
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
 )
@@ -411,5 +412,50 @@ func TestStrictIssueApiAccessToken_SubjectFallsBackToEmailWhenSubMissing(t *test
 	}
 	if got, _ := issuedClaims["sub"].(string); got != "fallback@example.com" {
 		t.Fatalf("issued sub %q", got)
+	}
+}
+
+func TestStrictIssueEdgeToken_ReturnsForbiddenForInsufficientPermissions(t *testing.T) {
+	t.Parallel()
+
+	uc := testJWTUseCase(t)
+	cat, err := roles.NewCatalog(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cnt := &container.Container{
+		Config:              &config.Config{},
+		JWTUseCase:          uc,
+		RoleCatalog:         cat,
+		PermissionEvaluator: httpauthz.NewPermissionEvaluator(cat),
+	}
+
+	app := testStrictApp(cnt, func(c fiber.Ctx) error {
+		c.Locals(middleware.CtxKeyAPIJWTClaims, jwt.MapClaims{
+			"sub": "user-1",
+			"exp": float64(time.Now().Add(10 * time.Minute).Unix()),
+		})
+		return c.Next()
+	})
+
+	reqBody := `{"data":{"app_id":"app-1","environments":["dev"],"expires_at":"` + time.Now().Add(10*time.Minute).UTC().Format(time.RFC3339) + `"}}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/tokens/edge", strings.NewReader(reqBody))
+	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusForbidden {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status %d body %s", resp.StatusCode, b)
+	}
+
+	var p apiserver.Problem
+	if err := json.NewDecoder(resp.Body).Decode(&p); err != nil {
+		t.Fatal(err)
+	}
+	if p.Code == nil || *p.Code != problem.CodeInsufficientPermissions {
+		t.Fatalf("unexpected problem code %#v", p.Code)
 	}
 }
