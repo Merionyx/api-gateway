@@ -42,8 +42,11 @@ func ParseAPIKeyValueJSON(data []byte) (APIKeyValue, error) {
 		if v1.SchemaVersion != APIKeySchemaV1 {
 			return APIKeyValue{}, ErrMissingSchemaVersion
 		}
+		if v1.Algorithm == "" {
+			return APIKeyValue{}, errors.New("kvvalue: api-key v1 algorithm required")
+		}
 		if v1.RecordFormat == "" {
-			v1.RecordFormat = DefaultAPIKeyRecordFormat
+			return APIKeyValue{}, errors.New("kvvalue: api-key v1 record_format required")
 		}
 		return v1, nil
 	default:
@@ -56,9 +59,9 @@ func MarshalAPIKeyValueJSON(v APIKeyValue) ([]byte, error) {
 	if v.Algorithm == "" {
 		return nil, errors.New("kvvalue: api-key algorithm required")
 	}
-	v.SchemaVersion = APIKeySchemaV1
 	if v.RecordFormat == "" {
-		v.RecordFormat = DefaultAPIKeyRecordFormat
+		return nil, errors.New("kvvalue: api-key record_format required")
 	}
+	v.SchemaVersion = APIKeySchemaV1
 	return json.Marshal(v)
 }

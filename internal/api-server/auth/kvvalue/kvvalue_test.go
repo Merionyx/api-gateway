@@ -205,6 +205,7 @@ func TestAPIKeyV1RoundTrip(t *testing.T) {
 	raw := []byte(`{
 		"schema_version": 1,
 		"algorithm": "sha256",
+		"record_format": "digest_v1",
 		"roles": ["a"],
 		"scopes": ["b"],
 		"metadata": {"k":"v"}
@@ -229,6 +230,29 @@ func TestAPIKeyV1RoundTrip(t *testing.T) {
 	}
 	if got2.RecordFormat != DefaultAPIKeyRecordFormat {
 		t.Fatal(got2.RecordFormat)
+	}
+}
+
+func TestAPIKeyV1RejectsIncompletePayloads(t *testing.T) {
+	t.Parallel()
+	for _, raw := range [][]byte{
+		[]byte(`{"schema_version":1,"record_format":"digest_v1"}`),
+		[]byte(`{"schema_version":1,"algorithm":"sha256"}`),
+	} {
+		_, err := ParseAPIKeyValueJSON(raw)
+		if err == nil {
+			t.Fatalf("expected parse error for payload: %s", string(raw))
+		}
+	}
+}
+
+func TestAPIKeyMarshalRequiresRecordFormat(t *testing.T) {
+	t.Parallel()
+	_, err := MarshalAPIKeyValueJSON(APIKeyValue{
+		Algorithm: "sha256",
+	})
+	if err == nil {
+		t.Fatal("expected error")
 	}
 }
 

@@ -68,8 +68,9 @@ func TestBootstrapPutDevelopment_Disabled(t *testing.T) {
 func mustAPIKeyValue(t *testing.T) kvvalue.APIKeyValue {
 	t.Helper()
 	return kvvalue.APIKeyValue{
-		Algorithm: "sha256",
-		Roles:     []string{"ci"},
-		Scopes:    []string{"registry:read"},
+		Algorithm:    "sha256",
+		Roles:        []string{"ci"},
+		Scopes:       []string{"registry:read"},
+		RecordFormat: kvvalue.DefaultAPIKeyRecordFormat,
 	}
 }
