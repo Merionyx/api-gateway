@@ -15,9 +15,9 @@ const (
 	CodeControllerNotFound          = "CONTROLLER_NOT_FOUND"
 	CodeControllerHeartbeatNotFound = "CONTROLLER_HEARTBEAT_NOT_FOUND"
 
-	CodeTokenAppIDRequired        = "TOKEN_APP_ID_REQUIRED"
-	CodeTokenEnvironmentsRequired = "TOKEN_ENVIRONMENTS_REQUIRED"
-	CodeTokenEnvironmentEmpty     = "TOKEN_ENVIRONMENT_EMPTY"
+	CodeTokenAppIDRequired        = "TOKEN_APP_ID_REQUIRED"       // #nosec G101 -- stable machine-readable problem code, not a credential.
+	CodeTokenEnvironmentsRequired = "TOKEN_ENVIRONMENTS_REQUIRED" // #nosec G101 -- stable machine-readable problem code, not a credential.
+	CodeTokenEnvironmentEmpty     = "TOKEN_ENVIRONMENT_EMPTY"     // #nosec G101 -- stable machine-readable problem code, not a credential.
 	CodeTokenExpiresAtPast        = "TOKEN_EXPIRES_AT_PAST"
 
 	CodeExportRepositoryRefRequired    = "EXPORT_REPOSITORY_REF_REQUIRED"
@@ -53,9 +53,9 @@ const (
 	DetailControllerNotFound          = "No controller with this identifier exists."
 	DetailControllerHeartbeatNotFound = "No heartbeat record exists for this controller."
 
-	DetailTokenAppIDRequired        = "Field app_id is required."
-	DetailTokenEnvironmentsRequired = "At least one environment is required."
-	DetailTokenEnvironmentEmpty     = "Each environment must be a non-empty string."
+	DetailTokenAppIDRequired        = "Field app_id is required."                    // #nosec G101 -- validation text, not a credential.
+	DetailTokenEnvironmentsRequired = "At least one environment is required."        // #nosec G101 -- validation text, not a credential.
+	DetailTokenEnvironmentEmpty     = "Each environment must be a non-empty string." // #nosec G101 -- validation text, not a credential.
 	DetailTokenExpiresAtPast        = "expires_at must be in the future."
 
 	DetailExportRepositoryRefRequired = "Fields repository and ref are required."

@@ -164,8 +164,8 @@ func normalizeStrings(in ...[]string) []string {
 	out := make([]string, 0, n)
 	seen := make(map[string]struct{}, n)
 	for i := range in {
-		for j := range in[i] {
-			s := strings.TrimSpace(in[i][j])
+		for _, raw := range in[i] {
+			s := strings.TrimSpace(raw)
 			if s == "" {
 				continue
 			}

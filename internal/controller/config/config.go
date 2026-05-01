@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/merionyx/api-gateway/internal/shared/etcd"
@@ -222,15 +223,20 @@ func validateHAControllerID(c *Config) error {
 // patchViperKubernetesDiscoverySelectors fixes YAML where dotted label keys (e.g. gateway.merionyx.com/team)
 // were parsed as nested maps; viper/mapstructure then cannot decode into map[string]string.
 func patchViperKubernetesDiscoverySelectors(v *viper.Viper, configPath string) error {
-	data, err := os.ReadFile(configPath)
+	configDirRoot, err := os.OpenRoot(filepath.Dir(configPath))
 	if err != nil {
 		return err
 	}
-	var root map[string]interface{}
-	if err := yaml.Unmarshal(data, &root); err != nil {
+	defer func() { _ = configDirRoot.Close() }()
+	data, err := configDirRoot.ReadFile(filepath.Base(configPath))
+	if err != nil {
 		return err
 	}
-	kd, _ := root["kubernetes_discovery"].(map[string]interface{})
+	var configDoc map[string]interface{}
+	if err := yaml.Unmarshal(data, &configDoc); err != nil {
+		return err
+	}
+	kd, _ := configDoc["kubernetes_discovery"].(map[string]interface{})
 	if kd == nil {
 		return nil
 	}

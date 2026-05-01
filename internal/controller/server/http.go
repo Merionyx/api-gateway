@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/merionyx/api-gateway/internal/controller/container"
 	httpdelivery "github.com/merionyx/api-gateway/internal/controller/delivery/http"
@@ -18,8 +19,9 @@ func RunHTTPServer(ctx context.Context, container *container.Container) error {
 	handler := httpdelivery.NewMux()
 
 	srv := &http.Server{
-		Addr:    addr,
-		Handler: handler,
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 
 	slog.Info("HTTP probe server starting", "addr", addr)

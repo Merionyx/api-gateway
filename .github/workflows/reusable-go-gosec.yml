@@ -1,0 +1,21 @@
+name: Gosec
+
+on:
+  workflow_call:
+
+
+jobs:
+  gosec:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    env:
+      GO111MODULE: on
+      GOSECGOVERSION: go1.26.2
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Run Gosec Security Scanner
+      uses: securego/gosec@master
+      with:
+        args: -exclude-generated ./...

@@ -8,7 +8,7 @@ const (
 	APIRoleViewer = "api:role:viewer"
 
 	// APIEdgeTokensIssue allows POST /v1/tokens/edge.
-	APIEdgeTokensIssue = "api:edge_tokens:issue"
+	APIEdgeTokensIssue = "api:edge_tokens:issue" // #nosec G101 -- role identifier, not a credential.
 	// APIAccessTokensIssue allows POST /v1/tokens/api (M2M or delegated interactive).
 	APIAccessTokensIssue = "api:access_tokens:issue"
 	// APIContractsExport allows POST /v1/contracts/export.

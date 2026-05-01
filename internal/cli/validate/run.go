@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 // Options controls validation behaviour.
@@ -31,23 +32,31 @@ func Run(ctx context.Context, target string, opts Options) []FileResult {
 	var results []FileResult
 	for _, p := range paths {
 		res := FileResult{Path: p}
-		data, rerr := os.ReadFile(p)
+		dirRoot, rerr := os.OpenRoot(filepath.Dir(p))
 		if rerr != nil {
 			res.Issues = append(res.Issues, fmt.Sprintf("[read] %v", rerr))
 			res.Skipped = true
 			results = append(results, res)
 			continue
 		}
-		root, perr := ParseRoot(data)
+		data, rerr := dirRoot.ReadFile(filepath.Base(p))
+		_ = dirRoot.Close()
+		if rerr != nil {
+			res.Issues = append(res.Issues, fmt.Sprintf("[read] %v", rerr))
+			res.Skipped = true
+			results = append(results, res)
+			continue
+		}
+		doc, perr := ParseRoot(data)
 		if perr != nil {
 			res.Issues = append(res.Issues, fmt.Sprintf("[parse] %v", perr))
 			res.Skipped = true
 			results = append(results, res)
 			continue
 		}
-		res.Issues = append(res.Issues, ValidateXApiGateway(root)...)
+		res.Issues = append(res.Issues, ValidateXApiGateway(doc)...)
 		if opts.CheckContent {
-			res.Issues = append(res.Issues, RunContentChecks(ctx, p, data, root)...)
+			res.Issues = append(res.Issues, RunContentChecks(ctx, p, data, doc)...)
 		}
 		results = append(results, res)
 	}

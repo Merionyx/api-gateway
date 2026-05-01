@@ -7,8 +7,8 @@ const (
 	Wildcard = "*"
 
 	// Token and contract permissions used by protected API Server operations.
-	EdgeTokenIssue      = "api.token.edge.issue"
-	APIAccessTokenIssue = "api.token.api.issue"
+	EdgeTokenIssue      = "api.token.edge.issue" // #nosec G101 -- permission identifier, not a credential.
+	APIAccessTokenIssue = "api.token.api.issue"  // #nosec G101 -- permission identifier, not a credential.
 	ContractsExport     = "api.contracts.export"
 
 	// Read-only baseline permissions for viewer-style access.
@@ -21,7 +21,7 @@ const (
 
 const unknownPermissionDescription = "Custom permission from configuration or token claims."
 
-var descriptionsByID = map[string]string{
+var descriptionsByID = map[string]string{ // #nosec G101 -- static permission descriptions, not secrets.
 	Wildcard:            "Wildcard permission granting access to all operations.",
 	EdgeTokenIssue:      "Issue Edge-profile JWT tokens for data plane and ExtAuthz.",
 	APIAccessTokenIssue: "Issue API-profile access JWT tokens for calling API Server HTTP routes.",

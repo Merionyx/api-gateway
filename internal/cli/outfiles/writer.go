@@ -22,7 +22,7 @@ func sanitizeBase(name string) string {
 // WriteExported writes API response files into outDir.
 // If formatFlag is set, converts on disk to yaml or json; otherwise keeps extension from source_path.
 func WriteExported(files []apiclient.ExportFile, outDir, formatFlag string) error {
-	if err := os.MkdirAll(outDir, 0o755); err != nil {
+	if err := os.MkdirAll(outDir, 0o750); err != nil {
 		return err
 	}
 	for _, f := range files {
@@ -57,7 +57,7 @@ func WriteExported(files []apiclient.ExportFile, outDir, formatFlag string) erro
 		}
 		base := sanitizeBase(f.ContractName) + outExt
 		path := filepath.Join(outDir, base)
-		if err := os.WriteFile(path, data, 0o644); err != nil {
+		if err := os.WriteFile(path, data, 0o644); err != nil { // #nosec G306 -- exported contract files are intended to be readable in working copies/artifacts.
 			return fmt.Errorf("write %s: %w", path, err)
 		}
 	}

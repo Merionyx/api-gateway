@@ -401,10 +401,10 @@ func openBrowser(raw string) error {
 	}
 	switch runtime.GOOS {
 	case "darwin":
-		return exec.Command("open", raw).Start()
+		return exec.Command("open", raw).Start() // #nosec G204 -- command is fixed and URL is validated as http/https.
 	case "windows":
-		return exec.Command("rundll32", "url.dll,FileProtocolHandler", raw).Start()
+		return exec.Command("rundll32", "url.dll,FileProtocolHandler", raw).Start() // #nosec G204 -- command is fixed and URL is validated as http/https.
 	default:
-		return exec.Command("xdg-open", raw).Start()
+		return exec.Command("xdg-open", raw).Start() // #nosec G204 -- command is fixed and URL is validated as http/https.
 	}
 }

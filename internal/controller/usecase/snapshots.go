@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 
 	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
@@ -90,14 +91,36 @@ func (uc *snapshotsUseCase) GetSnapshotStatus(ctx context.Context, req *models.G
 	// Count resources
 	clustersCount := len(xdsSnapshot.GetResources(xdsResource.ClusterType))
 	routesCount := len(xdsSnapshot.GetResources(xdsResource.RouteType))
+	contractsCount, err := int32Count(len(env.Snapshots))
+	if err != nil {
+		telemetry.MarkError(span, err)
+		return nil, err
+	}
+	clustersCount32, err := int32Count(clustersCount)
+	if err != nil {
+		telemetry.MarkError(span, err)
+		return nil, err
+	}
+	routesCount32, err := int32Count(routesCount)
+	if err != nil {
+		telemetry.MarkError(span, err)
+		return nil, err
+	}
 
 	return &models.GetSnapshotStatusResponse{
 		Environment:    req.Environment,
 		Version:        xdsSnapshot.GetVersion(xdsResource.ClusterType),
-		ContractsCount: int32(len(env.Snapshots)),
-		ClustersCount:  int32(clustersCount),
-		RoutesCount:    int32(routesCount),
+		ContractsCount: contractsCount,
+		ClustersCount:  clustersCount32,
+		RoutesCount:    routesCount32,
 	}, nil
+}
+
+func int32Count(v int) (int32, error) {
+	if v < 0 || v > math.MaxInt32 {
+		return 0, fmt.Errorf("count %d exceeds int32 range", v)
+	}
+	return int32(v), nil
 }
 
 func (uc *snapshotsUseCase) rebuildSnapshot(ctx context.Context, envName string, env *models.Environment) error {

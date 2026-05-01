@@ -21,3 +21,7 @@ jobs:
   integration:
     uses: ./.github/workflows/reusable-go-integration.yml
     secrets: inherit
+
+  gosec:
+    uses: ./.github/workflows/reusable-go-gosec.yml
+    secrets: inherit
