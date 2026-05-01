@@ -18,9 +18,6 @@ import (
 	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 )
 
-// ErrContractSyncerRejected is re-exported for backward compatibility; prefer apierrors.ErrContractSyncerRejected.
-var ErrContractSyncerRejected = apierrors.ErrContractSyncerRejected
-
 type BundleSyncUseCase struct {
 	snapshotRepo   interfaces.SnapshotRepository
 	controllerRepo interfaces.ControllerRepository
