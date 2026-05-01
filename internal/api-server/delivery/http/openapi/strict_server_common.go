@@ -303,36 +303,6 @@ func claimString(mc jwt.MapClaims, key string) string {
 	}
 }
 
-func claimStrings(mc jwt.MapClaims, key string) []string {
-	v, ok := mc[key]
-	if !ok || v == nil {
-		return nil
-	}
-	switch x := v.(type) {
-	case []string:
-		return uniqueSortedStrings(x)
-	case []any:
-		out := make([]string, 0, len(x))
-		for i := range x {
-			s, _ := x[i].(string)
-			s = strings.TrimSpace(s)
-			if s == "" {
-				continue
-			}
-			out = append(out, s)
-		}
-		return uniqueSortedStrings(out)
-	case string:
-		s := strings.TrimSpace(x)
-		if s == "" {
-			return nil
-		}
-		return []string{s}
-	default:
-		return nil
-	}
-}
-
 func uniqueSortedStrings(in []string) []string {
 	if len(in) == 0 {
 		return []string{}
@@ -364,18 +334,6 @@ func mapKeysSorted(set map[string]struct{}) []string {
 	}
 	sort.Strings(out)
 	return out
-}
-
-func hasPermission(have map[string]struct{}, required string) bool {
-	required = strings.TrimSpace(required)
-	if required == "" {
-		return false
-	}
-	if _, ok := have[permissions.Wildcard]; ok {
-		return true
-	}
-	_, ok := have[required]
-	return ok
 }
 
 func durationFromOptionalFormSeconds(v *int) time.Duration {

@@ -9,6 +9,7 @@ import (
 	"net/url"
 
 	"github.com/merionyx/api-gateway/internal/api-server/auth/permissions"
+	httpauthz "github.com/merionyx/api-gateway/internal/api-server/delivery/http/authz"
 	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/problem"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
@@ -271,7 +272,7 @@ func (s *StrictOpenAPIServer) ExportContracts(ctx context.Context, request apise
 			InternalErrorApplicationProblemPlusJSONResponse: apiserver.InternalErrorApplicationProblemPlusJSONResponse(p),
 		}, nil
 	}
-	if !hasPermission(have, permissions.ContractsExport) {
+	if !httpauthz.HasPermission(have, permissions.ContractsExport) {
 		p := problem.Forbidden(problem.CodeInsufficientPermissions, "", "The caller does not have any required permission for this operation.")
 		return apiserver.ExportContracts403ApplicationProblemPlusJSONResponse{
 			ForbiddenApplicationProblemPlusJSONResponse: apiserver.ForbiddenApplicationProblemPlusJSONResponse(p),

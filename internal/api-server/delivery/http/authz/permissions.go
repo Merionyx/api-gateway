@@ -47,7 +47,7 @@ func (e *PermissionEvaluator) RequireAnyHTTPPermission(c fiber.Ctx, required ...
 		return true, err
 	}
 	for i := range required {
-		if hasPermission(have, required[i]) {
+		if HasPermission(have, required[i]) {
 			return false, nil
 		}
 	}
@@ -69,11 +69,11 @@ func (e *PermissionEvaluator) RequireDelegatedPermissions(c fiber.Ctx, delegated
 	if err != nil {
 		return true, problem.WriteInternal(c, err)
 	}
-	if hasPermission(have, permissions.Wildcard) {
+	if HasPermission(have, permissions.Wildcard) {
 		return false, nil
 	}
 	for i := range delegated {
-		if hasPermission(have, delegated[i]) {
+		if HasPermission(have, delegated[i]) {
 			continue
 		}
 		err := problem.Write(c, http.StatusForbidden, problem.Forbidden(
@@ -104,16 +104,17 @@ func (e *PermissionEvaluator) SubjectPermissions(c fiber.Ctx) (map[string]struct
 	if !ok {
 		return out, nil
 	}
-	for _, s := range normalizeStrings(claimStrings(mc, "permissions")) {
+	for _, s := range normalizeStrings(ClaimStrings(mc, "permissions")) {
 		out[s] = struct{}{}
 	}
-	for _, s := range normalizeStrings(claimStrings(mc, "scopes")) {
+	for _, s := range normalizeStrings(ClaimStrings(mc, "scopes")) {
 		out[s] = struct{}{}
 	}
 	return out, nil
 }
 
-func hasPermission(have map[string]struct{}, required string) bool {
+// HasPermission checks exact permission membership, honoring wildcard grants.
+func HasPermission(have map[string]struct{}, required string) bool {
 	required = strings.TrimSpace(required)
 	if required == "" {
 		return false
@@ -125,14 +126,15 @@ func hasPermission(have map[string]struct{}, required string) bool {
 	return ok
 }
 
-func claimStrings(mc jwt.MapClaims, key string) []string {
+// ClaimStrings extracts a string/slice claim as a normalized list of unique non-empty values.
+func ClaimStrings(mc jwt.MapClaims, key string) []string {
 	v, ok := mc[key]
 	if !ok || v == nil {
 		return nil
 	}
 	switch x := v.(type) {
 	case []string:
-		return x
+		return normalizeStrings(x)
 	case []any:
 		out := make([]string, 0, len(x))
 		for i := range x {
@@ -142,9 +144,13 @@ func claimStrings(mc jwt.MapClaims, key string) []string {
 				out = append(out, s)
 			}
 		}
-		return out
+		return normalizeStrings(out)
 	case string:
-		return []string{x}
+		s := strings.TrimSpace(x)
+		if s == "" {
+			return nil
+		}
+		return []string{s}
 	default:
 		return nil
 	}

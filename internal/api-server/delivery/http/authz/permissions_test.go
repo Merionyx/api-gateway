@@ -3,6 +3,7 @@ package authz
 import (
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	"github.com/gofiber/fiber/v3"
@@ -41,6 +42,66 @@ func TestPermissionEvaluatorRequireAnyHTTPPermission_viaRole(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusNoContent {
 		t.Fatalf("status %d", resp.StatusCode)
+	}
+}
+
+func TestClaimStrings(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		claim any
+		want  []string
+	}{
+		{
+			name:  "slice strings normalized",
+			claim: []string{" contracts:export ", "", "contracts:export", "edge:token:issue"},
+			want:  []string{"contracts:export", "edge:token:issue"},
+		},
+		{
+			name:  "slice any normalized",
+			claim: []any{" contracts:export ", "edge:token:issue", "contracts:export", 42},
+			want:  []string{"contracts:export", "edge:token:issue"},
+		},
+		{
+			name:  "single string normalized",
+			claim: " contracts:export ",
+			want:  []string{"contracts:export"},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := ClaimStrings(jwt.MapClaims{"permissions": tt.claim}, "permissions")
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("ClaimStrings() = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHasPermission(t *testing.T) {
+	t.Parallel()
+
+	have := map[string]struct{}{
+		permissions.ContractsExport: {},
+	}
+	if !HasPermission(have, " "+permissions.ContractsExport+" ") {
+		t.Fatalf("HasPermission must match trimmed required permission")
+	}
+
+	if HasPermission(have, " ") {
+		t.Fatalf("HasPermission must reject empty required permission")
+	}
+
+	if HasPermission(have, permissions.EdgeTokenIssue) {
+		t.Fatalf("HasPermission must reject missing permission")
+	}
+
+	if !HasPermission(map[string]struct{}{permissions.Wildcard: {}}, permissions.EdgeTokenIssue) {
+		t.Fatalf("HasPermission must allow wildcard permission")
 	}
 }
 

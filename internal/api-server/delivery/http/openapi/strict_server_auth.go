@@ -246,10 +246,10 @@ func (s *StrictOpenAPIServer) InspectTokenPermissions(ctx context.Context, reque
 
 	tokenRoles := uniqueSortedStrings(httpauthz.NormalizeRolesValue(claims["roles"]))
 	effective := s.c.RoleCatalog.ResolvePermissions(tokenRoles)
-	for _, permissionID := range claimStrings(claims, "permissions") {
+	for _, permissionID := range httpauthz.ClaimStrings(claims, "permissions") {
 		effective[permissionID] = struct{}{}
 	}
-	for _, permissionID := range claimStrings(claims, "scopes") {
+	for _, permissionID := range httpauthz.ClaimStrings(claims, "scopes") {
 		effective[permissionID] = struct{}{}
 	}
 
@@ -288,7 +288,7 @@ func (s *StrictOpenAPIServer) IssueApiAccessToken(ctx context.Context, request a
 			InternalErrorApplicationProblemPlusJSONResponse: apiserver.InternalErrorApplicationProblemPlusJSONResponse(p),
 		}, nil
 	}
-	if !hasPermission(have, permissions.APIAccessTokenIssue) {
+	if !httpauthz.HasPermission(have, permissions.APIAccessTokenIssue) {
 		p := problem.Forbidden(problem.CodeInsufficientPermissions, "", "The caller does not have any required permission for this operation.")
 		return apiserver.IssueApiAccessToken403ApplicationProblemPlusJSONResponse{
 			ForbiddenApplicationProblemPlusJSONResponse: apiserver.ForbiddenApplicationProblemPlusJSONResponse(p),
@@ -300,9 +300,9 @@ func (s *StrictOpenAPIServer) IssueApiAccessToken(ctx context.Context, request a
 	if request.Body != nil {
 		requestedPermissions = normalizeRequestedPermissions(request.Body.Data.Permissions)
 		requestedExpiresAt = request.Body.Data.ExpiresAt
-		if !hasPermission(have, permissions.Wildcard) {
+		if !httpauthz.HasPermission(have, permissions.Wildcard) {
 			for i := range requestedPermissions {
-				if hasPermission(have, requestedPermissions[i]) {
+				if httpauthz.HasPermission(have, requestedPermissions[i]) {
 					continue
 				}
 				p := problem.Forbidden(problem.CodeRequestedPermissionsNotAllowed, "", "The caller cannot delegate one or more requested permissions.")
@@ -376,7 +376,7 @@ func (s *StrictOpenAPIServer) IssueEdgeToken(ctx context.Context, request apiser
 			InternalErrorApplicationProblemPlusJSONResponse: apiserver.InternalErrorApplicationProblemPlusJSONResponse(p),
 		}, nil
 	}
-	if !hasPermission(have, permissions.EdgeTokenIssue) {
+	if !httpauthz.HasPermission(have, permissions.EdgeTokenIssue) {
 		p := problem.Forbidden(problem.CodeInsufficientPermissions, "", "The caller does not have any required permission for this operation.")
 		return apiserver.IssueEdgeToken403ApplicationProblemPlusJSONResponse{
 			ForbiddenApplicationProblemPlusJSONResponse: apiserver.ForbiddenApplicationProblemPlusJSONResponse(p),
