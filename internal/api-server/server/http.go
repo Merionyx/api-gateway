@@ -102,7 +102,11 @@ func setupRoutes(app *fiber.App, c *container.Container) error {
 
 	app.Use(httpTraceMiddleware())
 	app.Use(httpopenapi.BindFiberContextForStrictHandlers())
-	app.Use(httpxmw.APISecurity(c.JWTUseCase, c.APIKeyRepository))
+	apiSecurityContract, err := httpxmw.NewAPISecurityContract(swagger)
+	if err != nil {
+		return fmt.Errorf("build API security contract from OpenAPI: %w", err)
+	}
+	app.Use(httpxmw.APISecurity(c.JWTUseCase, c.APIKeyRepository, apiSecurityContract))
 	app.Use(oapimw.OapiRequestValidatorWithOptions(swagger, &oapimw.Options{
 		Options: openapi3filter.Options{
 			AuthenticationFunc: AuthenticationFunc,

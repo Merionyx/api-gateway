@@ -88,7 +88,7 @@ func TestAPISecurity_apiKeySetsLocals(t *testing.T) {
 		},
 	}
 	app := fiber.New()
-	app.Use(APISecurity(uc, repo))
+	app.Use(APISecurity(uc, repo, testAPISecurityContract(t)))
 	app.Get("/v1/status", func(c fiber.Ctx) error {
 		p, ok := APIKeyPrincipalFromCtx(c)
 		if !ok || p == nil || p.Roles[0] != "r1" {

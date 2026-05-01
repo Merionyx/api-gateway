@@ -65,7 +65,11 @@ func TestProtectedRouteBearerPassesOpenAPIValidation(t *testing.T) {
 	}
 
 	app := fiber.New()
-	app.Use(httpxmw.APISecurity(uc, nil))
+	apiSecurityContract, err := httpxmw.NewAPISecurityContract(swagger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	app.Use(httpxmw.APISecurity(uc, nil, apiSecurityContract))
 	app.Use(oapimw.OapiRequestValidatorWithOptions(swagger, &oapimw.Options{
 		Options: openapi3filter.Options{
 			AuthenticationFunc: AuthenticationFunc,

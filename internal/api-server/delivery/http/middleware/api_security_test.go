@@ -5,41 +5,64 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/merionyx/api-gateway/internal/api-server/config"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
+	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
 
 	"github.com/gofiber/fiber/v3"
 )
 
-func Test_requiresAPISecurity(t *testing.T) {
+func TestAPISecurityContract_MatchesOpenAPIPublicOperations(t *testing.T) {
 	t.Parallel()
-	if requiresAPISecurity(http.MethodGet, "/health") {
-		t.Fatal("health public")
+
+	swagger, err := apiserver.GetSwagger()
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !requiresAPISecurity(http.MethodGet, "/v1/status") {
-		t.Fatal("status protected")
+
+	contract, err := NewAPISecurityContract(swagger)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if requiresAPISecurity(http.MethodPost, "/v1/auth/token") {
-		t.Fatal("token endpoint public")
+
+	for path, pathItem := range swagger.Paths.Map() {
+		if pathItem == nil {
+			continue
+		}
+		for method, op := range pathItem.Operations() {
+			if op == nil {
+				continue
+			}
+			wantPublic := op.Security != nil && len(*op.Security) == 0
+			if gotPublic := contract.IsPublic(method, path); gotPublic != wantPublic {
+				t.Fatalf("%s %s public=%v want=%v", strings.ToUpper(method), path, gotPublic, wantPublic)
+			}
+		}
 	}
-	if requiresAPISecurity(http.MethodGet, "/v1/auth/callback") {
-		t.Fatal("oidc upstream callback public")
+}
+
+func TestAPISecurityContract_isMethodAware(t *testing.T) {
+	t.Parallel()
+
+	swagger, err := apiserver.GetSwagger()
+	if err != nil {
+		t.Fatal(err)
 	}
-	if requiresAPISecurity(http.MethodGet, "/v1/auth/oidc-providers") {
-		t.Fatal("oidc provider list public")
+	contract, err := NewAPISecurityContract(swagger)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if requiresAPISecurity(http.MethodGet, "/v1/auth/roles") {
-		t.Fatal("auth roles public")
+
+	if contract.RequiresAPISecurity(http.MethodPost, "/v1/auth/token") {
+		t.Fatal("POST /v1/auth/token should be public by OpenAPI contract")
 	}
-	if requiresAPISecurity(http.MethodGet, "/v1/auth/permissions") {
-		t.Fatal("auth permissions public")
-	}
-	if requiresAPISecurity(http.MethodPost, "/v1/auth/token-permissions") {
-		t.Fatal("token permissions endpoint public")
+	if !contract.RequiresAPISecurity(http.MethodGet, "/v1/auth/token") {
+		t.Fatal("GET /v1/auth/token should stay protected because no public GET operation is declared")
 	}
 }
 
@@ -47,7 +70,7 @@ func TestAPISecurity_allowsHealthWithoutAuth(t *testing.T) {
 	t.Parallel()
 	uc := testJWTUC(t)
 	app := fiber.New()
-	app.Use(APISecurity(uc, nil))
+	app.Use(APISecurity(uc, nil, testAPISecurityContract(t)))
 	app.Get("/health", func(c fiber.Ctx) error { return c.SendString("ok") })
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
@@ -65,7 +88,7 @@ func TestAPISecurity_blocksProtectedWithoutAuth(t *testing.T) {
 	t.Parallel()
 	uc := testJWTUC(t)
 	app := fiber.New()
-	app.Use(APISecurity(uc, nil))
+	app.Use(APISecurity(uc, nil, testAPISecurityContract(t)))
 	app.Get("/v1/status", func(c fiber.Ctx) error { return c.SendString("no") })
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/status", nil)
@@ -84,7 +107,7 @@ func TestAPISecurity_legacyAuthPathFallsThroughTo404(t *testing.T) {
 	t.Parallel()
 	uc := testJWTUC(t)
 	app := fiber.New()
-	app.Use(APISecurity(uc, nil))
+	app.Use(APISecurity(uc, nil, testAPISecurityContract(t)))
 	app.Get("/health", func(c fiber.Ctx) error { return c.SendString("ok") })
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/auth/callback", nil)
@@ -115,7 +138,7 @@ func TestAPISecurity_rejectsEdgeProfileBearer(t *testing.T) {
 	}
 
 	app := fiber.New()
-	app.Use(APISecurity(uc, nil))
+	app.Use(APISecurity(uc, nil, testAPISecurityContract(t)))
 	app.Get("/v1/status", func(c fiber.Ctx) error { return c.SendString("no") })
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/status", nil)
@@ -139,7 +162,7 @@ func TestAPISecurity_allowsBearerAPIJWT(t *testing.T) {
 		t.Fatal(err)
 	}
 	app := fiber.New()
-	app.Use(APISecurity(uc, nil))
+	app.Use(APISecurity(uc, nil, testAPISecurityContract(t)))
 	app.Get("/v1/status", func(c fiber.Ctx) error { return c.SendString("yes") })
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/status", nil)
@@ -183,4 +206,17 @@ func Test_parseBearer(t *testing.T) {
 	if parseBearer("Basic x") != "" {
 		t.Fatal("want empty")
 	}
+}
+
+func testAPISecurityContract(t *testing.T) *APISecurityContract {
+	t.Helper()
+	swagger, err := apiserver.GetSwagger()
+	if err != nil {
+		t.Fatal(err)
+	}
+	contract, err := NewAPISecurityContract(swagger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return contract
 }
