@@ -613,9 +613,6 @@ components:
         expires_at:
           type: string
           format: date-time
-        refresh_token:
-          type: string
-          description: Issued for interactive-style sessions when applicable (draft).
 
     ContractsExportRequest:
       type: object

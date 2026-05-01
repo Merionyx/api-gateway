@@ -126,9 +126,6 @@ type ApiAccessTokenIssued struct {
 	// AccessToken Short-lived **API profile** JWT for calling this HTTP API.
 	AccessToken string    `json:"access_token"`
 	ExpiresAt   time.Time `json:"expires_at"`
-
-	// RefreshToken Issued for interactive-style sessions when applicable (draft).
-	RefreshToken *string `json:"refresh_token,omitempty"`
 }
 
 // App defines model for App.
