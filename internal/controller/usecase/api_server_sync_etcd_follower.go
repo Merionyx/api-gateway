@@ -59,7 +59,7 @@ func (f *etcdFollowerWatch) start(ctx context.Context) {
 	}
 
 	go func() {
-		flushCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		flushCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 		defer cancel()
 		start := time.Now()
 		err := f.rebuildAllXDS(flushCtx)
@@ -90,7 +90,7 @@ func (f *etcdFollowerWatch) start(ctx context.Context) {
 			return
 		}
 
-		flushCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		flushCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 		defer cancel()
 		start := time.Now()
 		var err error
@@ -138,7 +138,7 @@ func (f *etcdFollowerWatch) start(ctx context.Context) {
 				if f.schemaCache != nil {
 					f.schemaCache.InvalidateBundleKey(eff.SchemaBundleKey)
 				}
-				envNames := f.environmentsForBundleKey(context.Background(), eff.SchemaBundleKey)
+				envNames := f.environmentsForBundleKey(ctx, eff.SchemaBundleKey)
 				if len(envNames) == 0 {
 					mu.Lock()
 					needFull = true
@@ -156,7 +156,7 @@ func (f *etcdFollowerWatch) start(ctx context.Context) {
 			if eff.Environment != "" {
 				batchTouched = true
 				if f.bundleEnvIndex != nil {
-					rctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+					rctx, cancel := context.WithTimeout(ctx, 120*time.Second)
 					f.bundleEnvIndex.Rebuild(rctx)
 					cancel()
 					ctrlmetrics.RecordBundleEnvIndexRebuild(en)

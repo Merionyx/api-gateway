@@ -84,7 +84,7 @@ func newFmtCmd() *cobra.Command {
 			var nwrite, nfail int
 			var needsFormat, okPaths, failedPaths []string
 			for _, p := range paths {
-				data, err := os.ReadFile(p)
+				data, err := readFileFromPath(p)
 				if err != nil {
 					logErr("%s: read: %v", p, err)
 					failedPaths = append(failedPaths, p)
@@ -108,7 +108,7 @@ func newFmtCmd() *cobra.Command {
 					continue
 				}
 				if write {
-					if err := os.WriteFile(p, formatted, 0o644); err != nil {
+					if err := os.WriteFile(p, formatted, 0o644); err != nil { // #nosec G306 G703 -- formatting preserves project-readable files chosen explicitly by operator.
 						logErr("%s: write: %v", p, err)
 						nfail++
 						continue
@@ -251,7 +251,7 @@ func newExportBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 			out, _ := cmd.Flags().GetString("out")
 			format, _ := cmd.Flags().GetString("format")
 
-			data, err := os.ReadFile(specPath)
+			data, err := readFileFromPath(specPath)
 			if err != nil {
 				return err
 			}
@@ -360,7 +360,7 @@ func newDiffBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 			}
 			specPath, _ := cmd.Flags().GetString("spec")
 			target, _ := cmd.Flags().GetString("target")
-			data, err := os.ReadFile(specPath)
+			data, err := readFileFromPath(specPath)
 			if err != nil {
 				return err
 			}
@@ -522,6 +522,15 @@ func parseBatchSpec(data []byte) ([]batchItem, error) {
 		}
 	}
 	return items, nil
+}
+
+func readFileFromPath(path string) ([]byte, error) {
+	root, err := os.OpenRoot(filepath.Dir(path))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = root.Close() }()
+	return root.ReadFile(filepath.Base(path))
 }
 
 func httpClientFromCmd(cmd *cobra.Command) (*http.Client, error) {

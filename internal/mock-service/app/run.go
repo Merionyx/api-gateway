@@ -97,7 +97,12 @@ func Run() error {
 	addr := ":" + port
 	slog.Info("starting mock service", "service", serviceName, "environment", environment, "addr", addr)
 
-	if err := http.ListenAndServe(addr, handler); err != nil {
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	if err := srv.ListenAndServe(); err != nil {
 		return fmt.Errorf("listen and serve: %w", err)
 	}
 	return nil

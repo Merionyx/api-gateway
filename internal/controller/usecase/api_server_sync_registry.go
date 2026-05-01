@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 
 	pb "github.com/merionyx/api-gateway/pkg/grpc/controller_registry/v1"
@@ -123,8 +124,16 @@ func (b *registryEnvironmentsBuilder) buildOneEnvironmentForAPIServer(
 			g := doc.Generation
 			em.EffectiveGeneration = &g
 			em.MaterializedUpdatedAt = proto.String(doc.UpdatedAt)
-			sv := int32(doc.SchemaVersion)
-			em.MaterializedSchemaVersion = &sv
+			if doc.SchemaVersion < 0 || doc.SchemaVersion > math.MaxInt32 {
+				report.addWarning(
+					RegistryBuildWarningMaterializedGet,
+					name,
+					fmt.Errorf("schema version out of int32 range: %d", doc.SchemaVersion),
+				)
+			} else {
+				sv := int32(doc.SchemaVersion)
+				em.MaterializedSchemaVersion = &sv
+			}
 			if doc.SourcesFingerprint != "" && doc.SourcesFingerprint != fp {
 				m := true
 				em.MaterializedMismatch = &m

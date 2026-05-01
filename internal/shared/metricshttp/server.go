@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -75,7 +76,11 @@ func ListenAndServeUntil(ctx context.Context, cfg Config) error {
 
 	addr := net.JoinHostPort(host, port)
 	slog.Info("metrics HTTP listening", "addr", addr, "path", path)
-	srv := &http.Server{Addr: addr, Handler: mux}
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
 	if err := serviceapp.RunHTTPServerUntil(ctx, srv, addr); err != nil {
 		return fmt.Errorf("metrics http %s: %w", addr, err)
 	}
