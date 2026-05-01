@@ -169,13 +169,14 @@ func e2eAPIConfig(t *testing.T, etcdEndpoints []string, idpIssuerURL, authKeyPre
 			BundleSyncTTL: 24 * time.Hour,
 		},
 		Auth: config.AuthConfig{
-			EtcdKeyPrefix:             authKeyPrefix,
-			Environment:               "development",
-			AllowInsecureBootstrap:    false,
-			LoginIntentLeaseTTL:       10 * time.Minute,
-			InteractiveAccessTokenTTL: 5 * time.Minute,
-			SessionKEKBase64:          base64.StdEncoding.EncodeToString(kek),
-			OIDCExternalBaseURL:       "http://127.0.0.1:8080",
+			EtcdKeyPrefix:              authKeyPrefix,
+			Environment:                "development",
+			AllowInsecureBootstrap:     false,
+			OIDCAllowInsecureEndpoints: true,
+			LoginIntentLeaseTTL:        10 * time.Minute,
+			InteractiveAccessTokenTTL:  5 * time.Minute,
+			SessionKEKBase64:           base64.StdEncoding.EncodeToString(kek),
+			OIDCExternalBaseURL:        "http://127.0.0.1:8080",
 			OIDCProviders: []config.OIDCProviderConfig{{
 				ID:                   e2eOIDCProviderID,
 				Name:                 "Mock IdP",
@@ -356,16 +357,17 @@ func performOIDCAuthorizeFlow(t *testing.T, app *fiber.App) (accessToken, refres
 		body, _ := io.ReadAll(tokenResp.Body)
 		t.Fatalf("token status %d body %s", tokenResp.StatusCode, string(body))
 	}
-	var envelope struct {
-		Data map[string]any `json:"data"`
-	}
-	if err := json.NewDecoder(tokenResp.Body).Decode(&envelope); err != nil {
+	var out apiserver.OAuthTokenResponse
+	if err := json.NewDecoder(tokenResp.Body).Decode(&out); err != nil {
 		t.Fatal(err)
 	}
-	at, _ := envelope.Data["access_token"].(string)
-	rt, _ := envelope.Data["refresh_token"].(string)
+	at := strings.TrimSpace(out.AccessToken)
+	rt := ""
+	if out.RefreshToken != nil {
+		rt = strings.TrimSpace(*out.RefreshToken)
+	}
 	if at == "" || rt == "" {
-		t.Fatalf("tokens: %+v", envelope.Data)
+		t.Fatalf("tokens: %+v", out)
 	}
 	return at, rt
 }
@@ -445,16 +447,17 @@ func TestE2E_OIDCRefresh_IdPUnavailable_Degraded(t *testing.T) {
 		body, _ := io.ReadAll(refreshResp.Body)
 		t.Fatalf("refresh status %d body %s", refreshResp.StatusCode, string(body))
 	}
-	var out struct {
-		Data map[string]any `json:"data"`
-	}
+	var out apiserver.OAuthTokenResponse
 	if err := json.NewDecoder(refreshResp.Body).Decode(&out); err != nil {
 		t.Fatal(err)
 	}
-	access2, _ := out.Data["access_token"].(string)
-	refresh2, _ := out.Data["refresh_token"].(string)
+	access2 := strings.TrimSpace(out.AccessToken)
+	refresh2 := ""
+	if out.RefreshToken != nil {
+		refresh2 = strings.TrimSpace(*out.RefreshToken)
+	}
 	if access2 == "" || refresh2 == "" {
-		t.Fatalf("refresh response: %+v", out.Data)
+		t.Fatalf("refresh response: %+v", out)
 	}
 	if access2 == access1 {
 		t.Fatal("expected new access_token after degraded refresh")
@@ -581,15 +584,16 @@ func TestE2E_OIDCRefresh_ReuseOldRefreshTokenAfterRotate_InvalidGrant(t *testing
 		b, _ := io.ReadAll(r1.Body)
 		t.Fatalf("first refresh status %d body %s", r1.StatusCode, string(b))
 	}
-	var first struct {
-		Data map[string]any `json:"data"`
-	}
+	var first apiserver.OAuthTokenResponse
 	if err := json.NewDecoder(r1.Body).Decode(&first); err != nil {
 		t.Fatal(err)
 	}
-	refresh2, _ := first.Data["refresh_token"].(string)
+	refresh2 := ""
+	if first.RefreshToken != nil {
+		refresh2 = strings.TrimSpace(*first.RefreshToken)
+	}
 	if refresh2 == "" || refresh2 == refresh1 {
-		t.Fatalf("expected new refresh_token, got %+v", first.Data)
+		t.Fatalf("expected new refresh_token, got %+v", first)
 	}
 
 	rReuse := doRefresh(refresh1)
