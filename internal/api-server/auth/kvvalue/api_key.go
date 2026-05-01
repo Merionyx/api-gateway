@@ -8,7 +8,6 @@ import (
 
 const (
 	APIKeySchemaV1 = 1
-	APIKeySchemaV2 = 2
 )
 
 // APIKeyValue is the canonical api-key record at api-keys/sha256/{digest_hex}.
@@ -22,32 +21,13 @@ type APIKeyValue struct {
 	Scopes   []string        `json:"scopes"`
 	Metadata json.RawMessage `json:"metadata,omitempty"`
 
-	// RecordFormat is v2+ (e.g. "digest_v1"); migrated v1 defaults to DefaultAPIKeyRecordFormat.
+	// RecordFormat marks how digest_hex in the key path was produced (e.g. "digest_v1").
 	RecordFormat string `json:"record_format"`
 }
 
 const DefaultAPIKeyRecordFormat = "digest_v1"
 
-type apiKeyValueV1Wire struct {
-	SchemaVersion int             `json:"schema_version"`
-	Algorithm     string          `json:"algorithm"`
-	Roles         []string        `json:"roles"`
-	Scopes        []string        `json:"scopes"`
-	Metadata      json.RawMessage `json:"metadata,omitempty"`
-}
-
-func migrateAPIKeyV1(v1 apiKeyValueV1Wire) APIKeyValue {
-	return APIKeyValue{
-		SchemaVersion: APIKeySchemaV2,
-		Algorithm:     v1.Algorithm,
-		Roles:         append([]string(nil), v1.Roles...),
-		Scopes:        append([]string(nil), v1.Scopes...),
-		Metadata:      cloneRaw(v1.Metadata),
-		RecordFormat:  DefaultAPIKeyRecordFormat,
-	}
-}
-
-// ParseAPIKeyValueJSON parses JSON and supports known api-key schema versions.
+// ParseAPIKeyValueJSON parses JSON and accepts only schema v1.
 func ParseAPIKeyValueJSON(data []byte) (APIKeyValue, error) {
 	ver, err := peekPositiveSchemaVersion(data)
 	if err != nil {
@@ -55,37 +35,28 @@ func ParseAPIKeyValueJSON(data []byte) (APIKeyValue, error) {
 	}
 	switch ver {
 	case APIKeySchemaV1:
-		var v1 apiKeyValueV1Wire
+		var v1 APIKeyValue
 		if err := json.Unmarshal(data, &v1); err != nil {
 			return APIKeyValue{}, fmt.Errorf("kvvalue: api-key v1: %w", err)
 		}
 		if v1.SchemaVersion != APIKeySchemaV1 {
 			return APIKeyValue{}, ErrMissingSchemaVersion
 		}
-		return migrateAPIKeyV1(v1), nil
-	case APIKeySchemaV2:
-		var v2 APIKeyValue
-		if err := json.Unmarshal(data, &v2); err != nil {
-			return APIKeyValue{}, fmt.Errorf("kvvalue: api-key v2: %w", err)
+		if v1.RecordFormat == "" {
+			v1.RecordFormat = DefaultAPIKeyRecordFormat
 		}
-		if v2.SchemaVersion != APIKeySchemaV2 {
-			return APIKeyValue{}, ErrMissingSchemaVersion
-		}
-		if v2.RecordFormat == "" {
-			v2.RecordFormat = DefaultAPIKeyRecordFormat
-		}
-		return v2, nil
+		return v1, nil
 	default:
 		return APIKeyValue{}, fmt.Errorf("%w: %d", ErrUnsupportedAPIKeySchema, ver)
 	}
 }
 
-// MarshalAPIKeyValueJSON serializes for etcd Put with schema_version=2.
+// MarshalAPIKeyValueJSON serializes for etcd Put with schema_version=1.
 func MarshalAPIKeyValueJSON(v APIKeyValue) ([]byte, error) {
 	if v.Algorithm == "" {
 		return nil, errors.New("kvvalue: api-key algorithm required")
 	}
-	v.SchemaVersion = APIKeySchemaV2
+	v.SchemaVersion = APIKeySchemaV1
 	if v.RecordFormat == "" {
 		v.RecordFormat = DefaultAPIKeyRecordFormat
 	}

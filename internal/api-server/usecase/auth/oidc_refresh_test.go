@@ -161,7 +161,7 @@ func TestOIDCRefresh_degraded_discovery503(t *testing.T) {
 	verifier := ourOpaqueRefreshVerifier(ourHex)
 
 	sess := kvvalue.SessionValue{
-		SchemaVersion:       kvvalue.SessionSchemaV3,
+		SchemaVersion:       kvvalue.SessionSchemaV1,
 		EncryptedIDPRefresh: json.RawMessage(envBytes),
 		ClaimsSnapshot:      claims,
 		RotationGeneration:  2,
@@ -238,7 +238,7 @@ func TestOIDCRefresh_degraded_discovery503(t *testing.T) {
 func TestSessionValue_providerID_roundTrip(t *testing.T) {
 	t.Parallel()
 	s := kvvalue.SessionValue{
-		SchemaVersion:       kvvalue.SessionSchemaV3,
+		SchemaVersion:       kvvalue.SessionSchemaV1,
 		EncryptedIDPRefresh: json.RawMessage(`{"v":1}`),
 		ProviderID:          "p1",
 		OurRefreshVerifier:  strings.Repeat("a", 64),
@@ -297,7 +297,7 @@ func TestOIDCRefresh_missingStoredIDPRefreshToken(t *testing.T) {
 	st := &memRefreshSessionStore{
 		sessionID: "sid-1",
 		sess: kvvalue.SessionValue{
-			SchemaVersion:       kvvalue.SessionSchemaV3,
+			SchemaVersion:       kvvalue.SessionSchemaV1,
 			EncryptedIDPRefresh: json.RawMessage(envBytes),
 			ClaimsSnapshot:      claims,
 			ProviderID:          "google",
@@ -374,7 +374,7 @@ func TestOIDCRefresh_expiredRefreshSession(t *testing.T) {
 	st := &memRefreshSessionStore{
 		sessionID: "sid-1",
 		sess: kvvalue.SessionValue{
-			SchemaVersion:       kvvalue.SessionSchemaV3,
+			SchemaVersion:       kvvalue.SessionSchemaV1,
 			EncryptedIDPRefresh: json.RawMessage(envBytes),
 			ClaimsSnapshot:      json.RawMessage(`{"email":"user@example.com"}`),
 			ProviderID:          "p1",

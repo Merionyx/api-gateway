@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	LoginIntentSchemaV4 = 4
+	LoginIntentSchemaV1 = 1
 )
 
 // LoginIntentValue is the canonical login-intent value at login-intents/{intent_id}.
@@ -39,36 +39,36 @@ type LoginIntentValue struct {
 
 const DefaultIntentProtocol = "oidc_v1"
 
-// ParseLoginIntentValueJSON parses JSON and accepts only schema v4.
+// ParseLoginIntentValueJSON parses JSON and accepts only schema v1.
 func ParseLoginIntentValueJSON(data []byte) (LoginIntentValue, error) {
 	ver, err := peekPositiveSchemaVersion(data)
 	if err != nil {
 		return LoginIntentValue{}, err
 	}
 	switch ver {
-	case LoginIntentSchemaV4:
-		var v4 LoginIntentValue
-		if err := json.Unmarshal(data, &v4); err != nil {
-			return LoginIntentValue{}, fmt.Errorf("kvvalue: login-intent v4: %w", err)
+	case LoginIntentSchemaV1:
+		var v1 LoginIntentValue
+		if err := json.Unmarshal(data, &v1); err != nil {
+			return LoginIntentValue{}, fmt.Errorf("kvvalue: login-intent v1: %w", err)
 		}
-		if v4.SchemaVersion != LoginIntentSchemaV4 {
+		if v1.SchemaVersion != LoginIntentSchemaV1 {
 			return LoginIntentValue{}, ErrMissingSchemaVersion
 		}
-		if v4.IntentProtocol == "" {
-			v4.IntentProtocol = DefaultIntentProtocol
+		if v1.IntentProtocol == "" {
+			v1.IntentProtocol = DefaultIntentProtocol
 		}
-		return v4, nil
+		return v1, nil
 	default:
 		return LoginIntentValue{}, fmt.Errorf("%w: %d", ErrUnsupportedLoginIntentSchema, ver)
 	}
 }
 
-// MarshalLoginIntentValueJSON serializes for etcd Put with schema_version=4.
+// MarshalLoginIntentValueJSON serializes for etcd Put with schema_version=1.
 func MarshalLoginIntentValueJSON(v LoginIntentValue) ([]byte, error) {
 	if v.ProviderID == "" || v.RedirectURI == "" || v.OAuthState == "" || v.PKCEVerifier == "" {
 		return nil, errors.New("kvvalue: login-intent required string fields missing")
 	}
-	v.SchemaVersion = LoginIntentSchemaV4
+	v.SchemaVersion = LoginIntentSchemaV1
 	if v.IntentProtocol == "" {
 		v.IntentProtocol = DefaultIntentProtocol
 	}

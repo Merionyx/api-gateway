@@ -9,10 +9,10 @@ import (
 
 // Session schema versions for etcd value at sessions/{session_id}.
 const (
-	SessionSchemaV3 = 3
+	SessionSchemaV1 = 1
 )
 
-// SessionValue is the canonical session value for schema v3.
+// SessionValue is the canonical session value for schema v1.
 // Field names are snake_case for JSON.
 type SessionValue struct {
 	SchemaVersion int `json:"schema_version"`
@@ -40,36 +40,36 @@ type SessionValue struct {
 	RefreshExpiresAt time.Time `json:"refresh_expires_at,omitempty"`
 }
 
-// ParseSessionValueJSON parses JSON from etcd and accepts only schema v3.
+// ParseSessionValueJSON parses JSON from etcd and accepts only schema v1.
 func ParseSessionValueJSON(data []byte) (SessionValue, error) {
 	ver, err := peekPositiveSchemaVersion(data)
 	if err != nil {
 		return SessionValue{}, err
 	}
 	switch ver {
-	case SessionSchemaV3:
-		var v3 SessionValue
-		if err := json.Unmarshal(data, &v3); err != nil {
-			return SessionValue{}, fmt.Errorf("kvvalue: session v3: %w", err)
+	case SessionSchemaV1:
+		var v1 SessionValue
+		if err := json.Unmarshal(data, &v1); err != nil {
+			return SessionValue{}, fmt.Errorf("kvvalue: session v1: %w", err)
 		}
-		if v3.SchemaVersion != SessionSchemaV3 {
+		if v1.SchemaVersion != SessionSchemaV1 {
 			return SessionValue{}, ErrMissingSchemaVersion
 		}
-		if len(v3.EncryptedIDPRefresh) == 0 {
-			return SessionValue{}, errors.New("kvvalue: session v3 encrypted_idp_refresh required")
+		if len(v1.EncryptedIDPRefresh) == 0 {
+			return SessionValue{}, errors.New("kvvalue: session v1 encrypted_idp_refresh required")
 		}
-		return v3, nil
+		return v1, nil
 	default:
 		return SessionValue{}, fmt.Errorf("%w: %d", ErrUnsupportedSessionSchema, ver)
 	}
 }
 
-// MarshalSessionValueJSON serializes for etcd Put with schema_version=3.
+// MarshalSessionValueJSON serializes for etcd Put with schema_version=1.
 func MarshalSessionValueJSON(s SessionValue) ([]byte, error) {
 	if len(s.EncryptedIDPRefresh) == 0 {
 		return nil, errors.New("kvvalue: session encrypted_idp_refresh required")
 	}
-	s.SchemaVersion = SessionSchemaV3
+	s.SchemaVersion = SessionSchemaV1
 	return json.Marshal(s)
 }
 

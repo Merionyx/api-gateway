@@ -57,7 +57,7 @@ func Test_tryAPIKeyPrincipal_ok(t *testing.T) {
 	repo := &stubAPIKeyRepo{
 		wantDigest: d,
 		rec: kvvalue.APIKeyValue{
-			SchemaVersion: kvvalue.APIKeySchemaV2,
+			SchemaVersion: kvvalue.APIKeySchemaV1,
 			Algorithm:     "sha256",
 			Roles:         []string{"ops"},
 			Scopes:        []string{"registry:read"},
@@ -81,7 +81,7 @@ func TestAPISecurity_apiKeySetsLocals(t *testing.T) {
 	repo := &stubAPIKeyRepo{
 		wantDigest: d,
 		rec: kvvalue.APIKeyValue{
-			SchemaVersion: kvvalue.APIKeySchemaV2,
+			SchemaVersion: kvvalue.APIKeySchemaV1,
 			Algorithm:     "sha256",
 			Roles:         []string{"r1"},
 			RecordFormat:  kvvalue.DefaultAPIKeyRecordFormat,

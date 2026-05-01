@@ -7,10 +7,10 @@ import (
 	"testing"
 )
 
-func TestSessionV3RoundTrip_FromRaw(t *testing.T) {
+func TestSessionV1RoundTrip_FromRaw(t *testing.T) {
 	t.Parallel()
 	raw := []byte(`{
-		"schema_version": 3,
+		"schema_version": 1,
 		"encrypted_idp_refresh": {"k":1},
 		"claims_snapshot": {"roles":["x"]},
 		"rotation_generation": 5,
@@ -23,8 +23,8 @@ func TestSessionV3RoundTrip_FromRaw(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.SchemaVersion != SessionSchemaV3 {
-		t.Fatalf("schema: want %d got %d", SessionSchemaV3, got.SchemaVersion)
+	if got.SchemaVersion != SessionSchemaV1 {
+		t.Fatalf("schema: want %d got %d", SessionSchemaV1, got.SchemaVersion)
 	}
 	if got.RotationGeneration != 5 || got.ProviderID != "p1" || got.OurRefreshVerifier != "opaque-verifier-handle" || got.RefreshExpiresAt.IsZero() {
 		t.Fatalf("session: %+v", got)
@@ -33,7 +33,7 @@ func TestSessionV3RoundTrip_FromRaw(t *testing.T) {
 
 func TestSessionRejectsLegacySchemas(t *testing.T) {
 	t.Parallel()
-	for _, ver := range []int{1, 2} {
+	for _, ver := range []int{2, 3, 4} {
 		raw := []byte(fmt.Sprintf(`{"schema_version":%d,"encrypted_idp_refresh":{}}`, ver))
 		_, err := ParseSessionValueJSON(raw)
 		if !errors.Is(err, ErrUnsupportedSessionSchema) {
@@ -42,10 +42,10 @@ func TestSessionRejectsLegacySchemas(t *testing.T) {
 	}
 }
 
-func TestSessionV3OptionalFieldsRoundTrip(t *testing.T) {
+func TestSessionV1OptionalFieldsRoundTrip(t *testing.T) {
 	t.Parallel()
 	s := SessionValue{
-		SchemaVersion:       SessionSchemaV3,
+		SchemaVersion:       SessionSchemaV1,
 		EncryptedIDPRefresh: json.RawMessage(`{"k":1}`),
 		RotationGeneration:  1,
 		LoginIntentID:       "6ba7b810-9dad-41d4-a716-446655440001",
@@ -64,10 +64,10 @@ func TestSessionV3OptionalFieldsRoundTrip(t *testing.T) {
 	}
 }
 
-func TestSessionV3RoundTrip(t *testing.T) {
+func TestSessionV1RoundTrip(t *testing.T) {
 	t.Parallel()
 	s := SessionValue{
-		SchemaVersion:       SessionSchemaV3,
+		SchemaVersion:       SessionSchemaV1,
 		EncryptedIDPRefresh: json.RawMessage(`{}`),
 		ClaimsSnapshot:      json.RawMessage(`[]`),
 		RotationGeneration:  3,
@@ -83,14 +83,14 @@ func TestSessionV3RoundTrip(t *testing.T) {
 	if got.RotationGeneration != 3 {
 		t.Fatalf("rotation: %d", got.RotationGeneration)
 	}
-	if got.SchemaVersion != SessionSchemaV3 {
+	if got.SchemaVersion != SessionSchemaV1 {
 		t.Fatal("schema")
 	}
 }
 
 func TestSessionMarshalRequiresEncryptedBlob(t *testing.T) {
 	t.Parallel()
-	_, err := MarshalSessionValueJSON(SessionValue{SchemaVersion: SessionSchemaV3})
+	_, err := MarshalSessionValueJSON(SessionValue{SchemaVersion: SessionSchemaV1})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -112,10 +112,10 @@ func TestSessionMissingSchema(t *testing.T) {
 	}
 }
 
-func TestLoginIntentV4RoundTrip(t *testing.T) {
+func TestLoginIntentV1RoundTrip(t *testing.T) {
 	t.Parallel()
 	raw := []byte(`{
-		"schema_version": 4,
+		"schema_version": 1,
 		"provider_id": "gitlab",
 		"redirect_uri": "https://cb",
 		"oauth_state": "st",
@@ -132,7 +132,7 @@ func TestLoginIntentV4RoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.SchemaVersion != LoginIntentSchemaV4 {
+	if got.SchemaVersion != LoginIntentSchemaV1 {
 		t.Fatal("schema")
 	}
 	if got.Nonce != "n1" {
@@ -145,7 +145,7 @@ func TestLoginIntentV4RoundTrip(t *testing.T) {
 
 func TestLoginIntentRejectsLegacySchemas(t *testing.T) {
 	t.Parallel()
-	for _, ver := range []int{1, 2, 3} {
+	for _, ver := range []int{2, 3, 4} {
 		raw := []byte(fmt.Sprintf(`{"schema_version":%d}`, ver))
 		_, err := ParseLoginIntentValueJSON(raw)
 		if !errors.Is(err, ErrUnsupportedLoginIntentSchema) {
@@ -157,7 +157,7 @@ func TestLoginIntentRejectsLegacySchemas(t *testing.T) {
 func TestLoginIntentMarshalRequiresFields(t *testing.T) {
 	t.Parallel()
 	_, err := MarshalLoginIntentValueJSON(LoginIntentValue{
-		SchemaVersion: LoginIntentSchemaV4,
+		SchemaVersion: LoginIntentSchemaV1,
 		ProviderID:    "x",
 	})
 	if err == nil {
@@ -168,7 +168,7 @@ func TestLoginIntentMarshalRequiresFields(t *testing.T) {
 func TestLoginIntentNonceRoundtrip(t *testing.T) {
 	t.Parallel()
 	v := LoginIntentValue{
-		SchemaVersion:                  LoginIntentSchemaV4,
+		SchemaVersion:                  LoginIntentSchemaV1,
 		ProviderID:                     "p",
 		RedirectURI:                    "https://a/cb",
 		OAuthState:                     "st",
@@ -200,7 +200,7 @@ func TestLoginIntentNonceRoundtrip(t *testing.T) {
 	}
 }
 
-func TestAPIKeyMigrateV1(t *testing.T) {
+func TestAPIKeyV1RoundTrip(t *testing.T) {
 	t.Parallel()
 	raw := []byte(`{
 		"schema_version": 1,
@@ -213,7 +213,7 @@ func TestAPIKeyMigrateV1(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.SchemaVersion != APIKeySchemaV2 {
+	if got.SchemaVersion != APIKeySchemaV1 {
 		t.Fatal("schema")
 	}
 	if got.RecordFormat != DefaultAPIKeyRecordFormat {
@@ -234,8 +234,10 @@ func TestAPIKeyMigrateV1(t *testing.T) {
 
 func TestAPIKeyUnsupportedVersion(t *testing.T) {
 	t.Parallel()
-	_, err := ParseAPIKeyValueJSON([]byte(`{"schema_version":5,"algorithm":"sha256"}`))
-	if !errors.Is(err, ErrUnsupportedAPIKeySchema) {
-		t.Fatalf("got %v", err)
+	for _, ver := range []int{2, 3, 5} {
+		_, err := ParseAPIKeyValueJSON([]byte(fmt.Sprintf(`{"schema_version":%d,"algorithm":"sha256"}`, ver)))
+		if !errors.Is(err, ErrUnsupportedAPIKeySchema) {
+			t.Fatalf("schema_version=%d: got %v", ver, err)
+		}
 	}
 }
