@@ -248,9 +248,6 @@ func (s *StrictOpenAPIServer) InspectTokenPermissions(ctx context.Context, reque
 	for _, permissionID := range httpauthz.ClaimStrings(claims, "permissions") {
 		effective[permissionID] = struct{}{}
 	}
-	for _, permissionID := range httpauthz.ClaimStrings(claims, "scopes") {
-		effective[permissionID] = struct{}{}
-	}
 
 	permissionIDs := mapKeysSorted(effective)
 	return apiserver.InspectTokenPermissions200JSONResponse{Data: apiserver.TokenPermissionsResponse{

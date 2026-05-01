@@ -550,7 +550,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PermissionDescriptor'
-          description: Effective permissions from role expansion plus direct `permissions` / `scopes` claims.
+          description: Effective permissions from role expansion plus direct `permissions` claim.
 
     IssueApiAccessTokenRequest:
       type: object
@@ -1301,7 +1301,7 @@ paths:
         Validates a provided API-profile JWT and returns effective permissions with descriptions.
         Effective permissions are resolved as:
         1) permissions inherited from `roles` via role catalog;
-        2) direct token claims `permissions` and `scopes`.
+        2) direct token claim `permissions`.
       requestBody:
         required: true
         content:

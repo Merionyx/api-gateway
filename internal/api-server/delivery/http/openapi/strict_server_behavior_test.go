@@ -106,6 +106,58 @@ func TestStrictInspectTokenPermissions_UsesDataWrapper(t *testing.T) {
 	}
 }
 
+func TestStrictInspectTokenPermissions_IgnoresLegacyScopesClaim(t *testing.T) {
+	t.Parallel()
+
+	uc := testJWTUseCase(t)
+	cat, err := roles.NewCatalog(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cnt := &container.Container{
+		Config:              &config.Config{},
+		JWTUseCase:          uc,
+		RoleCatalog:         cat,
+		PermissionEvaluator: httpauthz.NewPermissionEvaluator(cat),
+	}
+	app := testStrictApp(cnt, nil)
+
+	const legacyScopedPermission = "legacy.scope.permission"
+	tok, _, _, err := uc.MintInteractiveAPIAccessJWTFromSnapshot(
+		t.Context(),
+		"user-1",
+		[]byte(`{"roles":["api:role:viewer"],"scopes":["`+legacyScopedPermission+`"]}`),
+		time.Minute,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/auth/token-permissions", strings.NewReader(`{"data":{"access_token":"`+tok+`"}}`))
+	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status %d body %s", resp.StatusCode, b)
+	}
+
+	var out struct {
+		Data apiserver.TokenPermissionsResponse `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range out.Data.Permissions {
+		if d.Id == legacyScopedPermission {
+			t.Fatalf("legacy scopes claim must be ignored, found %q in effective permissions", legacyScopedPermission)
+		}
+	}
+}
+
 func TestStrictInspectTokenPermissions_SubjectClaimPriority(t *testing.T) {
 	t.Parallel()
 

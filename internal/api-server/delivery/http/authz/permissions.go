@@ -107,9 +107,6 @@ func (e *PermissionEvaluator) SubjectPermissions(c fiber.Ctx) (map[string]struct
 	for _, s := range normalizeStrings(ClaimStrings(mc, "permissions")) {
 		out[s] = struct{}{}
 	}
-	for _, s := range normalizeStrings(ClaimStrings(mc, "scopes")) {
-		out[s] = struct{}{}
-	}
 	return out, nil
 }
 

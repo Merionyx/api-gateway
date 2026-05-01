@@ -137,6 +137,38 @@ func TestPermissionEvaluatorRequireAnyHTTPPermission_viaTokenPermissionsClaim(t 
 	}
 }
 
+func TestPermissionEvaluatorRequireAnyHTTPPermission_IgnoresLegacyScopesClaim(t *testing.T) {
+	t.Parallel()
+	cat, err := roles.NewCatalog(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := NewPermissionEvaluator(cat)
+	app := fiber.New()
+	app.Use(func(c fiber.Ctx) error {
+		c.Locals(middleware.CtxKeyAPIJWTClaims, jwt.MapClaims{
+			"roles":  []string{roles.APIRoleViewer},
+			"scopes": []string{permissions.ContractsExport},
+		})
+		return c.Next()
+	})
+	app.Get("/", func(c fiber.Ctx) error {
+		denied, err := e.RequireAnyHTTPPermission(c, permissions.ContractsExport)
+		if denied {
+			return err
+		}
+		return c.SendStatus(http.StatusNoContent)
+	})
+	resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("status %d", resp.StatusCode)
+	}
+}
+
 func TestPermissionEvaluatorRequireDelegatedPermissions(t *testing.T) {
 	t.Parallel()
 	cat, err := roles.NewCatalog(nil)

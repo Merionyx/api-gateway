@@ -22,7 +22,7 @@ func subjectFromAPIJWTClaims(mc jwt.MapClaims) string {
 }
 
 func permissionsFromAPIJWTClaims(mc jwt.MapClaims) []any {
-	return mergeAnyUnique(claimSliceToAny(mc, "permissions"), claimSliceToAny(mc, "scopes"))
+	return claimSliceToAny(mc, "permissions")
 }
 
 func hasAnyRoleClaim(mc jwt.MapClaims) bool {

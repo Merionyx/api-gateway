@@ -581,7 +581,7 @@ type TokenPermissionsRequest struct {
 
 // TokenPermissionsResponse defines model for TokenPermissionsResponse.
 type TokenPermissionsResponse struct {
-	// Permissions Effective permissions from role expansion plus direct `permissions` / `scopes` claims.
+	// Permissions Effective permissions from role expansion plus direct `permissions` claim.
 	Permissions []PermissionDescriptor `json:"permissions"`
 
 	// Roles Role ids resolved from the token `roles` claim.
