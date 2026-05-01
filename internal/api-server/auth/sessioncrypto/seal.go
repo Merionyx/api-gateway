@@ -20,13 +20,13 @@ const (
 
 // Envelope is a versioned JSON blob suitable for embedding in an etcd session value (ш. 9).
 type Envelope struct {
-	V            int    `json:"v"`
-	Alg          string `json:"alg"`
-	KEKID        string `json:"kek_id"`
-	WrapNonce    []byte `json:"wrap_nonce"`
-	WrappedDEK   []byte `json:"wrapped_dek"`
-	DataNonce    []byte `json:"data_nonce"`
-	Ciphertext   []byte `json:"ciphertext"`
+	V          int    `json:"v"`
+	Alg        string `json:"alg"`
+	KEKID      string `json:"kek_id"`
+	WrapNonce  []byte `json:"wrap_nonce"`
+	WrappedDEK []byte `json:"wrapped_dek"`
+	DataNonce  []byte `json:"data_nonce"`
+	Ciphertext []byte `json:"ciphertext"`
 }
 
 // Seal encrypts plaintext with a fresh random DEK and wraps that DEK with the active KEK.

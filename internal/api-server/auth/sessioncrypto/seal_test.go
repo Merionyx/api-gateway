@@ -225,13 +225,13 @@ func TestUnsupportedEnvelopeVersion(t *testing.T) {
 	t.Cleanup(func() { kr.Close() })
 
 	env := Envelope{
-		V:            999,
-		Alg:          algV1,
-		KEKID:        active.ID,
-		WrapNonce:    make([]byte, gcmNonceSize),
-		WrappedDEK:   make([]byte, gcmTagSize),
-		DataNonce:    make([]byte, gcmNonceSize),
-		Ciphertext:   make([]byte, gcmTagSize),
+		V:          999,
+		Alg:        algV1,
+		KEKID:      active.ID,
+		WrapNonce:  make([]byte, gcmNonceSize),
+		WrappedDEK: make([]byte, gcmTagSize),
+		DataNonce:  make([]byte, gcmNonceSize),
+		Ciphertext: make([]byte, gcmTagSize),
 	}
 	_, err = kr.Open(env)
 	if !errors.Is(err, ErrUnsupportedEnvelopeVersion) {

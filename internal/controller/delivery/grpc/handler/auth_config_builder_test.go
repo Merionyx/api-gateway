@@ -20,9 +20,11 @@ func (t *testEnvRepo) GetEnvironment(ctx context.Context, name string) (*models.
 	}
 	return nil, errors.New("not found")
 }
-func (*testEnvRepo) SaveEnvironment(context.Context, *models.Environment) error   { return nil }
-func (*testEnvRepo) ListEnvironments(context.Context) (map[string]*models.Environment, error) { return nil, nil }
-func (*testEnvRepo) DeleteEnvironment(context.Context, string) error { return nil }
+func (*testEnvRepo) SaveEnvironment(context.Context, *models.Environment) error { return nil }
+func (*testEnvRepo) ListEnvironments(context.Context) (map[string]*models.Environment, error) {
+	return nil, nil
+}
+func (*testEnvRepo) DeleteEnvironment(context.Context, string) error      { return nil }
 func (*testEnvRepo) WatchEnvironments(context.Context) clientv3.WatchChan { return nil }
 
 var _ interfaces.EnvironmentRepository = (*testEnvRepo)(nil)

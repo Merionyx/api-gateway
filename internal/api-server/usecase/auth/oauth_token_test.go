@@ -79,15 +79,15 @@ func TestOAuthTokenUseCase_ExchangeAuthorizationCode_SuccessAndOneTimeCode(t *te
 
 	intentRepo := &oauthIntentRepoStub{m: map[string]kvvalue.LoginIntentValue{
 		code: {
-			ProviderID:                      "p1",
-			RedirectURI:                     "http://127.0.0.1:9999/v1/auth/callback",
-			OAuthState:                      code,
-			PKCEVerifier:                    "idp-pkce-verifier",
-			OAuthClientID:                   "postman",
-			OAuthClientRedirectURI:          "https://oauth.pstmn.io/v1/callback",
-			OAuthClientState:                "client-state-1",
-			OAuthClientCodeChallenge:        challenge,
-			OAuthClientCodeChallengeMethod:  "S256",
+			ProviderID:                     "p1",
+			RedirectURI:                    "http://127.0.0.1:9999/v1/auth/callback",
+			OAuthState:                     code,
+			PKCEVerifier:                   "idp-pkce-verifier",
+			OAuthClientID:                  "postman",
+			OAuthClientRedirectURI:         "https://oauth.pstmn.io/v1/callback",
+			OAuthClientState:               "client-state-1",
+			OAuthClientCodeChallenge:       challenge,
+			OAuthClientCodeChallengeMethod: "S256",
 		},
 	}}
 

@@ -7,12 +7,12 @@ import "strings"
 type Kind string
 
 const (
-	Controllers     Kind = "controllers"
-	Tenants         Kind = "tenants"
-	Environments    Kind = "environments"
-	Bundles         Kind = "bundles"
-	BundleKeys      Kind = "bundle-keys"
-	ContractNames   Kind = "contract-names"
+	Controllers   Kind = "controllers"
+	Tenants       Kind = "tenants"
+	Environments  Kind = "environments"
+	Bundles       Kind = "bundles"
+	BundleKeys    Kind = "bundle-keys"
+	ContractNames Kind = "contract-names"
 )
 
 // Entry describes one resource kind for `agwctl list`.

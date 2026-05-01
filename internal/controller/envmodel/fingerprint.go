@@ -109,8 +109,8 @@ func bundleKeyForFP(b bundleForFingerprint) string {
 }
 
 type staticFingerprintPayload struct {
-	Name     string               `json:"name"`
-	Type     string               `json:"type"`
+	Name     string                  `json:"name"`
+	Type     string                  `json:"type"`
 	Bundles  []bundleForFingerprint  `json:"bundles"`
 	Services []serviceForFingerprint `json:"services"`
 }

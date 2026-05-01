@@ -64,13 +64,13 @@ func TestCanonicalEnvironmentsForStorage_metaCopy(t *testing.T) {
 			Meta: &ServiceMeta{Provenance: &Provenance{ConfigSource: "k8s"}, K8sServiceRef: "x"},
 		}},
 		Meta: &EnvironmentMeta{
-			Provenance:            &Provenance{ConfigSource: "controller"},
-			EffectiveGeneration:   &gen,
-			SourcesFingerprint:    "fp",
-			EnvironmentType:       "t",
-			MaterializedUpdatedAt: "u",
+			Provenance:                &Provenance{ConfigSource: "controller"},
+			EffectiveGeneration:       &gen,
+			SourcesFingerprint:        "fp",
+			EnvironmentType:           "t",
+			MaterializedUpdatedAt:     "u",
 			MaterializedSchemaVersion: &sv,
-			MaterializedMismatch:  &mm,
+			MaterializedMismatch:      &mm,
 		},
 	}}
 	got := CanonicalEnvironmentsForStorage(in)

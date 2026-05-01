@@ -107,8 +107,8 @@ func TestEtcdStaticExtractors(t *testing.T) {
 func TestSharedToControllerSnapshot_minimal(t *testing.T) {
 	t.Parallel()
 	out := sharedToControllerSnapshot(sharedgit.ContractSnapshot{
-		Name:   "n",
-		Prefix: "/p",
+		Name:     "n",
+		Prefix:   "/p",
 		Upstream: sharedgit.ContractUpstream{Name: "u"},
 		Access:   sharedgit.Access{Secure: true, Apps: []sharedgit.App{{AppID: "a"}}},
 	})

@@ -105,7 +105,7 @@ func TestValidateXApiGateway_v1_fieldErrors(t *testing.T) {
 				"access": map[string]any{
 					"secure": true,
 					"apps": []any{map[string]any{
-						"app_id":        "a",
+						"app_id":       "a",
 						"environments": 1,
 					}},
 				},
@@ -121,7 +121,7 @@ func TestValidateXApiGateway_v1_fieldErrors(t *testing.T) {
 				"access": map[string]any{
 					"secure": true,
 					"apps": []any{map[string]any{
-						"app_id":        "a",
+						"app_id":       "a",
 						"environments": []any{1},
 					}},
 				},

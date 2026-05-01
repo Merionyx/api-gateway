@@ -5,12 +5,12 @@ import "testing"
 func TestValidateXApiGateway_v1_ok(t *testing.T) {
 	root := map[string]any{
 		"x-api-gateway": map[string]any{
-			"version":                 "v1",
-			"prefix":                  "/api/x/",
-			"allowUndefinedMethods":   false,
-			"contract":                map[string]any{"name": "c"},
-			"service":                 map[string]any{"name": "s"},
-			"access":                  map[string]any{"secure": true},
+			"version":               "v1",
+			"prefix":                "/api/x/",
+			"allowUndefinedMethods": false,
+			"contract":              map[string]any{"name": "c"},
+			"service":               map[string]any{"name": "s"},
+			"access":                map[string]any{"secure": true},
 		},
 	}
 	if issues := ValidateXApiGateway(root); len(issues) != 0 {

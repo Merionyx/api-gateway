@@ -196,10 +196,10 @@ func TestMergeInMemoryWithEtcd_sameBundleKey_dedupesToOne(t *testing.T) {
 
 func TestToAPIServerSkeleton_copiesAndClearsSnapshots(t *testing.T) {
 	src := &models.Environment{
-		Name:     "a",
-		Type:     "t",
-		Bundles:  &models.EnvironmentBundleConfig{Static: []models.StaticContractBundleConfig{{Name: "b", Repository: "r", Ref: "1", Path: "p"}}},
-		Services: &models.EnvironmentServiceConfig{Static: []models.StaticServiceConfig{{Name: "s", Upstream: "u"}}},
+		Name:      "a",
+		Type:      "t",
+		Bundles:   &models.EnvironmentBundleConfig{Static: []models.StaticContractBundleConfig{{Name: "b", Repository: "r", Ref: "1", Path: "p"}}},
+		Services:  &models.EnvironmentServiceConfig{Static: []models.StaticServiceConfig{{Name: "s", Upstream: "u"}}},
 		Snapshots: []models.ContractSnapshot{{Name: "keep"}},
 	}
 	s := ToAPIServerSkeleton(src)

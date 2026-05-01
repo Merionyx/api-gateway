@@ -10,7 +10,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/controller/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/controller/domain/models"
 	"github.com/merionyx/api-gateway/internal/controller/index/bundleenv"
-	ctrlmetrics 	"github.com/merionyx/api-gateway/internal/controller/metrics"
+	ctrlmetrics "github.com/merionyx/api-gateway/internal/controller/metrics"
 	"github.com/merionyx/api-gateway/internal/shared/election"
 	"github.com/merionyx/api-gateway/internal/shared/telemetry"
 
