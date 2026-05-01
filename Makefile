@@ -1,4 +1,4 @@
-.PHONY: build build-cli test test-unit test-coverage test-coverage-ci test-integration test-integration-oidc clean tidy deps fmt lint gosec docker-build docker-build-agwctl docker-push docker-up docker-down docker-up-dev docker-down-dev docker-up-dev-ha docker-down-dev-ha help proto-generate proto-install proto-lint proto-breaking generate-etcd-certs generate-ed25519-key generate-rsa-key controller-gen-bin generate-crds
+.PHONY: build build-cli test test-unit test-coverage test-coverage-ci test-integration test-integration-oidc clean tidy deps fmt lint gosec govulncheck docker-build docker-build-agwctl docker-push docker-up docker-down docker-up-dev docker-down-dev docker-up-dev-ha docker-down-dev-ha help proto-generate proto-install proto-lint proto-breaking generate-etcd-certs generate-ed25519-key generate-rsa-key controller-gen-bin generate-crds
 
 # Variables
 BUILD_DIR=./bin
@@ -73,6 +73,9 @@ lint: ## Lint code
 
 gosec: ## Security scan (ignore generated files; use stable writable cache for CI/sandbox)
 	env GOCACHE=/tmp/go-build gosec -exclude-generated ./...
+
+govulncheck: ## Security scan (ignore generated files; use stable writable cache for CI/sandbox)
+	env GOCACHE=/tmp/go-build govulncheck ./...
 
 # Docker commands
 docker-build: ## Build Docker images (default target: Alpine; set DOCKER_BUILD_TARGET=runtime-distroless for distroless)

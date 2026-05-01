@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+concurrency:
+  group: ci-pr-main-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -24,4 +27,8 @@ jobs:
 
   gosec:
     uses: ./.github/workflows/reusable-go-gosec.yml
+    secrets: inherit
+
+  govulncheck:
+    uses: ./.github/workflows/reusable-go-govulncheck.yml
     secrets: inherit
