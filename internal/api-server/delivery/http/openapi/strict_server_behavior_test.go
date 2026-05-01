@@ -479,6 +479,40 @@ func TestCallbackOIDCProblemResponse_StatusMapping(t *testing.T) {
 	}
 }
 
+func TestStrictAuthorizeOidc_InvalidExternalBaseURL(t *testing.T) {
+	t.Parallel()
+
+	cat, err := roles.NewCatalog(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := NewStrictOpenAPIServer(&container.Container{
+		Config: &config.Config{
+			Auth: config.AuthConfig{
+				OIDCExternalBaseURL: "https://api.example.com/path",
+			},
+		},
+		RoleCatalog:         cat,
+		PermissionEvaluator: httpauthz.NewPermissionEvaluator(cat),
+	})
+
+	response, err := srv.AuthorizeOidc(context.Background(), apiserver.AuthorizeOidcRequestObject{
+		Params: apiserver.AuthorizeOidcParams{
+			RedirectUri:         "https://client.example/callback",
+			ResponseType:        "code",
+			ClientId:            "client-1",
+			CodeChallenge:       "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~",
+			CodeChallengeMethod: "S256",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := response.(apiserver.AuthorizeOidc500ApplicationProblemPlusJSONResponse); !ok {
+		t.Fatalf("response type %T", response)
+	}
+}
+
 func TestStrictIssueApiAccessToken_UsesDefaultTTLAndOmitsRoles(t *testing.T) {
 	t.Parallel()
 

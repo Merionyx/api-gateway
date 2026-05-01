@@ -75,6 +75,9 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 	if err := config.ValidateOIDCProviders(cfg.Auth.OIDCProviders); err != nil {
 		return nil, err
 	}
+	if err := config.ValidateOIDCExternalBaseURL(cfg.Auth.OIDCExternalBaseURL, cfg.Auth.OIDCProviders); err != nil {
+		return nil, err
+	}
 	if err := config.ValidateInteractiveTokenTTLPolicy(
 		cfg.Auth.InteractiveAccessTokenTTL,
 		cfg.Auth.InteractiveAccessTokenMaxTTL,

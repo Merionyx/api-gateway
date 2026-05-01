@@ -247,6 +247,72 @@ func TestValidateOIDCProviders_GenericMustNotSetIdpBlocks(t *testing.T) {
 	}
 }
 
+func TestOIDCCallbackURIFromExternalBase(t *testing.T) {
+	t.Parallel()
+
+	got, err := OIDCCallbackURIFromExternalBase("https://api.example.com")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "https://api.example.com/v1/auth/callback" {
+		t.Fatalf("got %q", got)
+	}
+
+	got, err = OIDCCallbackURIFromExternalBase("http://127.0.0.1:8080/")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "http://127.0.0.1:8080/v1/auth/callback" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestOIDCCallbackURIFromExternalBase_Invalid(t *testing.T) {
+	t.Parallel()
+
+	cases := []string{
+		"",
+		"api.example.com",
+		"https://user:pass@api.example.com",
+		"https://api.example.com/path",
+		"https://api.example.com?x=1",
+		"ftp://api.example.com",
+	}
+
+	for _, in := range cases {
+		in := in
+		t.Run(in, func(t *testing.T) {
+			t.Parallel()
+			if _, err := OIDCCallbackURIFromExternalBase(in); err == nil {
+				t.Fatalf("expected error for %q", in)
+			}
+		})
+	}
+}
+
+func TestValidateOIDCExternalBaseURL(t *testing.T) {
+	t.Parallel()
+
+	providers := []OIDCProviderConfig{{
+		ID:                   "idp",
+		Name:                 "IDP",
+		Issuer:               "https://idp.example.com",
+		ClientID:             "client",
+		ClientSecret:         "secret",
+		RedirectURIAllowlist: []string{"http://127.0.0.1/callback"},
+	}}
+
+	if err := ValidateOIDCExternalBaseURL("", nil); err != nil {
+		t.Fatalf("empty providers should not require base URL: %v", err)
+	}
+	if err := ValidateOIDCExternalBaseURL("", providers); err == nil {
+		t.Fatal("expected error when providers are configured and external base URL is empty")
+	}
+	if err := ValidateOIDCExternalBaseURL("https://api.example.com", providers); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestValidateInteractiveTokenTTLPolicy(t *testing.T) {
 	t.Parallel()
 

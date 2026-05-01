@@ -20,10 +20,6 @@ import (
 )
 
 func (s *StrictOpenAPIServer) AuthorizeOidc(ctx context.Context, request apiserver.AuthorizeOidcRequestObject) (apiserver.AuthorizeOidcResponseObject, error) {
-	fc, err := fiberCtxFromStrictContext(ctx)
-	if err != nil {
-		return nil, err
-	}
 	tctx, cancel := context.WithTimeout(ctx, 25*time.Second)
 	defer cancel()
 
@@ -32,10 +28,18 @@ func (s *StrictOpenAPIServer) AuthorizeOidc(ctx context.Context, request apiserv
 		nonce = *request.Params.Nonce
 	}
 
+	serverCallbackURI, err := config.OIDCCallbackURIFromExternalBase(s.c.Config.Auth.OIDCExternalBaseURL)
+	if err != nil {
+		p := internalProblem()
+		return apiserver.AuthorizeOidc500ApplicationProblemPlusJSONResponse{
+			InternalErrorApplicationProblemPlusJSONResponse: apiserver.InternalErrorApplicationProblemPlusJSONResponse(p),
+		}, nil
+	}
+
 	loc, err := s.c.OIDCLoginUseCase.Start(tctx, auth.OIDCLoginStartRequest{
 		ProviderID:          stringOrEmpty(request.Params.ProviderId),
 		RedirectURI:         request.Params.RedirectUri,
-		ServerCallbackURI:   fc.BaseURL() + "/v1/auth/callback",
+		ServerCallbackURI:   serverCallbackURI,
 		Nonce:               nonce,
 		ResponseType:        string(request.Params.ResponseType),
 		ClientID:            request.Params.ClientId,

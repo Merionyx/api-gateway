@@ -87,6 +87,9 @@ components:
         edge_signing_kid: edge-server-key-2026-04-23
       auth:
         environment: development
+        # External API base used to build upstream IdP callback URI:
+        # {oidc_external_base_url}/v1/auth/callback (must match IdP app settings).
+        oidc_external_base_url: "http://185.41.122.122:30100"
 
         interactive_access_token_ttl: "5m"
         interactive_access_token_max_ttl: "168h"

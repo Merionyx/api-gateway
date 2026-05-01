@@ -68,6 +68,7 @@ auth:
   #   - api:role:admin
   #   - api:role:viewer
   # session_kek_base64: "<openssl rand -base64 32>"  # required when oidc_providers is set (32 bytes after decode)
+  # oidc_external_base_url: "https://api.example.com" # required when oidc_providers is set; callback URI becomes {base}/v1/auth/callback
   # oidc_providers:                 # OAuth2.1 GET /v1/auth/authorize; see docs/etcd-auth-paths.md
   #   - id: "dev-oidc"
   #     name: "Development OIDC"

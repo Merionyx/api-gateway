@@ -277,6 +277,10 @@ type AuthConfig struct {
 
 	// OIDCProviders configures OAuth 2.1 authorize flow (GET /v1/auth/authorize). Empty disables interactive login until configured.
 	OIDCProviders []OIDCProviderConfig `mapstructure:"oidc_providers" json:"oidc_providers"`
+	// OIDCExternalBaseURL is the external public API base URL used to build the fixed callback URI for OIDC authorize flow:
+	// {oidc_external_base_url}/v1/auth/callback. It must not include path/query/fragment/userinfo.
+	// Required when oidc_providers is non-empty to avoid Host-header-derived callback URLs.
+	OIDCExternalBaseURL string `mapstructure:"oidc_external_base_url" json:"oidc_external_base_url"`
 
 	// LoginIntentLeaseTTL is the etcd lease for login-intent keys (short-lived; default 15m).
 	LoginIntentLeaseTTL time.Duration `mapstructure:"login_intent_lease_ttl" json:"login_intent_lease_ttl"`
@@ -321,6 +325,48 @@ func EffectiveInteractiveAccessTokenTTL(ttl time.Duration) time.Duration {
 		return DefaultInteractiveAccessTokenTTL
 	}
 	return ttl
+}
+
+// OIDCCallbackURIFromExternalBase builds the callback URI used in OAuth/OIDC authorize requests:
+// {external_base_url}/v1/auth/callback.
+func OIDCCallbackURIFromExternalBase(externalBaseURL string) (string, error) {
+	base := strings.TrimSpace(externalBaseURL)
+	if base == "" {
+		return "", fmt.Errorf("auth.oidc_external_base_url is required")
+	}
+	u, err := url.Parse(base)
+	if err != nil || strings.TrimSpace(u.Scheme) == "" || strings.TrimSpace(u.Host) == "" {
+		return "", fmt.Errorf("auth.oidc_external_base_url must be an absolute URL with scheme and host")
+	}
+	scheme := strings.ToLower(strings.TrimSpace(u.Scheme))
+	if scheme != "https" && scheme != "http" {
+		return "", fmt.Errorf("auth.oidc_external_base_url scheme must be http or https")
+	}
+	if u.User != nil {
+		return "", fmt.Errorf("auth.oidc_external_base_url must not include userinfo")
+	}
+	path := strings.TrimSpace(u.Path)
+	if path != "" && path != "/" {
+		return "", fmt.Errorf("auth.oidc_external_base_url must not include path; set only scheme://host[:port]")
+	}
+	if strings.TrimSpace(u.RawQuery) != "" || strings.TrimSpace(u.Fragment) != "" {
+		return "", fmt.Errorf("auth.oidc_external_base_url must not include query or fragment")
+	}
+	u.Path = "/v1/auth/callback"
+	u.RawPath = ""
+	u.RawQuery = ""
+	u.Fragment = ""
+	return u.String(), nil
+}
+
+// ValidateOIDCExternalBaseURL validates callback URL source requirements.
+// The field is required only when oidc_providers is configured.
+func ValidateOIDCExternalBaseURL(externalBaseURL string, providers []OIDCProviderConfig) error {
+	if len(providers) == 0 {
+		return nil
+	}
+	_, err := OIDCCallbackURIFromExternalBase(externalBaseURL)
+	return err
 }
 
 func EffectiveInteractiveRefreshTokenTTL(ttl time.Duration) time.Duration {

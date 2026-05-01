@@ -175,6 +175,7 @@ func e2eAPIConfig(t *testing.T, etcdEndpoints []string, idpIssuerURL, authKeyPre
 			LoginIntentLeaseTTL:       10 * time.Minute,
 			InteractiveAccessTokenTTL: 5 * time.Minute,
 			SessionKEKBase64:          base64.StdEncoding.EncodeToString(kek),
+			OIDCExternalBaseURL:       "http://127.0.0.1:8080",
 			OIDCProviders: []config.OIDCProviderConfig{{
 				ID:                   e2eOIDCProviderID,
 				Name:                 "Mock IdP",
