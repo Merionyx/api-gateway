@@ -1,0 +1,291 @@
+package kvvalue
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"testing"
+)
+
+func TestSessionV1RoundTrip_FromRaw(t *testing.T) {
+	t.Parallel()
+	raw := []byte(`{
+		"schema_version": 1,
+		"encrypted_idp_refresh": {"k":1},
+		"claims_snapshot": {"roles":["x"]},
+		"rotation_generation": 5,
+		"login_intent_id": "6ba7b810-9dad-41d4-a716-446655440001",
+		"provider_id": "p1",
+		"our_refresh_verifier": "opaque-verifier-handle",
+		"refresh_expires_at": "2026-04-28T10:00:00Z"
+	}`)
+	got, err := ParseSessionValueJSON(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.SchemaVersion != SessionSchemaV1 {
+		t.Fatalf("schema: want %d got %d", SessionSchemaV1, got.SchemaVersion)
+	}
+	if got.RotationGeneration != 5 || got.ProviderID != "p1" || got.OurRefreshVerifier != "opaque-verifier-handle" || got.RefreshExpiresAt.IsZero() {
+		t.Fatalf("session: %+v", got)
+	}
+}
+
+func TestSessionRejectsLegacySchemas(t *testing.T) {
+	t.Parallel()
+	for _, ver := range []int{2, 3, 4} {
+		raw := []byte(fmt.Sprintf(`{"schema_version":%d,"encrypted_idp_refresh":{}}`, ver))
+		_, err := ParseSessionValueJSON(raw)
+		if !errors.Is(err, ErrUnsupportedSessionSchema) {
+			t.Fatalf("schema_version=%d: got %v", ver, err)
+		}
+	}
+}
+
+func TestSessionV1OptionalFieldsRoundTrip(t *testing.T) {
+	t.Parallel()
+	s := SessionValue{
+		SchemaVersion:       SessionSchemaV1,
+		EncryptedIDPRefresh: json.RawMessage(`{"k":1}`),
+		RotationGeneration:  1,
+		LoginIntentID:       "6ba7b810-9dad-41d4-a716-446655440001",
+		ProviderID:          "p1",
+		OurRefreshVerifier:  "opaque-verifier-handle",
+	}
+	b, err := MarshalSessionValueJSON(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := ParseSessionValueJSON(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.LoginIntentID != s.LoginIntentID || got.OurRefreshVerifier != s.OurRefreshVerifier {
+		t.Fatalf("optional fields lost: %+v", got)
+	}
+}
+
+func TestSessionV1RoundTrip(t *testing.T) {
+	t.Parallel()
+	s := SessionValue{
+		SchemaVersion:       SessionSchemaV1,
+		EncryptedIDPRefresh: json.RawMessage(`{}`),
+		ClaimsSnapshot:      json.RawMessage(`[]`),
+		RotationGeneration:  3,
+		ProviderID:          "p1",
+	}
+	b, err := MarshalSessionValueJSON(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := ParseSessionValueJSON(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.RotationGeneration != 3 {
+		t.Fatalf("rotation: %d", got.RotationGeneration)
+	}
+	if got.SchemaVersion != SessionSchemaV1 {
+		t.Fatal("schema")
+	}
+}
+
+func TestSessionMarshalRequiresEncryptedBlob(t *testing.T) {
+	t.Parallel()
+	_, err := MarshalSessionValueJSON(SessionValue{SchemaVersion: SessionSchemaV1})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestSessionUnsupportedVersion(t *testing.T) {
+	t.Parallel()
+	_, err := ParseSessionValueJSON([]byte(`{"schema_version":99,"encrypted_idp_refresh":{}}`))
+	if !errors.Is(err, ErrUnsupportedSessionSchema) {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestSessionMissingSchema(t *testing.T) {
+	t.Parallel()
+	_, err := ParseSessionValueJSON([]byte(`{}`))
+	if !errors.Is(err, ErrMissingSchemaVersion) {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestSessionV1RejectsMissingProviderID(t *testing.T) {
+	t.Parallel()
+	_, err := ParseSessionValueJSON([]byte(`{"schema_version":1,"encrypted_idp_refresh":{}}`))
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestLoginIntentV1RoundTrip(t *testing.T) {
+	t.Parallel()
+	raw := []byte(`{
+		"schema_version": 1,
+		"provider_id": "gitlab",
+		"redirect_uri": "https://cb",
+		"oauth_state": "st",
+		"pkce_verifier": "ver",
+		"intent_protocol": "oidc_v1",
+		"nonce": "n1",
+		"oauth_client_id": "postman",
+		"oauth_client_redirect_uri": "https://oauth.pstmn.io/v1/callback",
+		"oauth_client_state": "st2",
+		"oauth_client_code_challenge": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~",
+		"oauth_client_code_challenge_method": "S256"
+	}`)
+	got, err := ParseLoginIntentValueJSON(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.SchemaVersion != LoginIntentSchemaV1 {
+		t.Fatal("schema")
+	}
+	if got.Nonce != "n1" {
+		t.Fatalf("nonce %q", got.Nonce)
+	}
+	if got.OAuthClientID != "postman" {
+		t.Fatalf("oauth_client_id %q", got.OAuthClientID)
+	}
+}
+
+func TestLoginIntentRejectsLegacySchemas(t *testing.T) {
+	t.Parallel()
+	for _, ver := range []int{2, 3, 4} {
+		raw := []byte(fmt.Sprintf(`{"schema_version":%d}`, ver))
+		_, err := ParseLoginIntentValueJSON(raw)
+		if !errors.Is(err, ErrUnsupportedLoginIntentSchema) {
+			t.Fatalf("schema_version=%d: got %v", ver, err)
+		}
+	}
+}
+
+func TestLoginIntentMarshalRequiresFields(t *testing.T) {
+	t.Parallel()
+	_, err := MarshalLoginIntentValueJSON(LoginIntentValue{
+		SchemaVersion: LoginIntentSchemaV1,
+		ProviderID:    "x",
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestLoginIntentRejectsMissingIntentProtocol(t *testing.T) {
+	t.Parallel()
+	_, err := ParseLoginIntentValueJSON([]byte(`{
+		"schema_version": 1,
+		"provider_id": "gitlab",
+		"redirect_uri": "https://cb",
+		"oauth_state": "st",
+		"pkce_verifier": "ver"
+	}`))
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestLoginIntentNonceRoundtrip(t *testing.T) {
+	t.Parallel()
+	v := LoginIntentValue{
+		SchemaVersion:                  LoginIntentSchemaV1,
+		ProviderID:                     "p",
+		RedirectURI:                    "https://a/cb",
+		OAuthState:                     "st",
+		PKCEVerifier:                   "pv",
+		IntentProtocol:                 DefaultIntentProtocol,
+		Nonce:                          "n-1",
+		OAuthClientID:                  "postman",
+		OAuthClientRedirectURI:         "https://oauth.pstmn.io/v1/callback",
+		OAuthClientState:               "client-state-1",
+		OAuthClientCodeChallenge:       "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~",
+		OAuthClientCodeChallengeMethod: "S256",
+	}
+	raw, err := MarshalLoginIntentValueJSON(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := ParseLoginIntentValueJSON(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Nonce != "n-1" {
+		t.Fatalf("nonce %q", got.Nonce)
+	}
+	if got.OAuthClientID != "postman" || got.OAuthClientRedirectURI != "https://oauth.pstmn.io/v1/callback" {
+		t.Fatalf("oauth client fields %+v", got)
+	}
+	if got.OAuthClientCodeChallengeMethod != "S256" || got.OAuthClientCodeChallenge == "" {
+		t.Fatalf("oauth pkce fields %+v", got)
+	}
+}
+
+func TestAPIKeyV1RoundTrip(t *testing.T) {
+	t.Parallel()
+	raw := []byte(`{
+		"schema_version": 1,
+		"algorithm": "sha256",
+		"record_format": "digest_v1",
+		"roles": ["a"],
+		"scopes": ["b"],
+		"metadata": {"k":"v"}
+	}`)
+	got, err := ParseAPIKeyValueJSON(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.SchemaVersion != APIKeySchemaV1 {
+		t.Fatal("schema")
+	}
+	if got.RecordFormat != DefaultAPIKeyRecordFormat {
+		t.Fatal(got.RecordFormat)
+	}
+	b, err := MarshalAPIKeyValueJSON(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got2, err := ParseAPIKeyValueJSON(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got2.RecordFormat != DefaultAPIKeyRecordFormat {
+		t.Fatal(got2.RecordFormat)
+	}
+}
+
+func TestAPIKeyV1RejectsIncompletePayloads(t *testing.T) {
+	t.Parallel()
+	for _, raw := range [][]byte{
+		[]byte(`{"schema_version":1,"record_format":"digest_v1"}`),
+		[]byte(`{"schema_version":1,"algorithm":"sha256"}`),
+	} {
+		_, err := ParseAPIKeyValueJSON(raw)
+		if err == nil {
+			t.Fatalf("expected parse error for payload: %s", string(raw))
+		}
+	}
+}
+
+func TestAPIKeyMarshalRequiresRecordFormat(t *testing.T) {
+	t.Parallel()
+	_, err := MarshalAPIKeyValueJSON(APIKeyValue{
+		Algorithm: "sha256",
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestAPIKeyUnsupportedVersion(t *testing.T) {
+	t.Parallel()
+	for _, ver := range []int{2, 3, 5} {
+		_, err := ParseAPIKeyValueJSON([]byte(fmt.Sprintf(`{"schema_version":%d,"algorithm":"sha256"}`, ver)))
+		if !errors.Is(err, ErrUnsupportedAPIKeySchema) {
+			t.Fatalf("schema_version=%d: got %v", ver, err)
+		}
+	}
+}

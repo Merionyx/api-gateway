@@ -9,7 +9,10 @@
 // go generate runs each command with the working directory set to this package’s directory, so
 // -o oapi_gen.go in the directive always writes next to this file.
 //
-// Requires oapi-codegen with fiber-v3-server and strict-server support (e.g. go install from your fork).
+// Regeneration uses the **`oapi-codegen` binary on PATH** (Merionyx fork with Fiber v3 templates: `fiber-v3-server`,
+// `strict-server`, `embedded-spec`). Pin the tool to the fork revision you trust (e.g. commit
+// `9a73536be6cdbc2ad87c3baacb2c9e55f1aad8e9` — `oapi-codegen -version` should report a build from that tree). If
+// output is wrong or does not compile against Fiber v3, fix the fork; do not patch around generator bugs here.
 //
 // Source: apis/rest/api-server/openapi.yaml
 //

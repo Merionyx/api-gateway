@@ -13,7 +13,7 @@ import (
 
 func TestJWTUseCase_GetJWKS_GetSigningKeys_generated(t *testing.T) {
 	t.Parallel()
-	uc, err := NewJWTUseCase(t.TempDir(), "iss")
+	uc, err := NewJWTUseCase(jwtTestCfg(t, t.TempDir()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -23,6 +23,13 @@ func TestJWTUseCase_GetJWKS_GetSigningKeys_generated(t *testing.T) {
 	}
 	if jwks.Keys[0].Kty != "OKP" {
 		t.Fatalf("want EdDSA JWK, got %q", jwks.Keys[0].Kty)
+	}
+	edgeJWKS, err := uc.GetJWKSEdge(context.Background())
+	if err != nil || len(edgeJWKS.Keys) != 1 {
+		t.Fatalf("edge jwks: %v len=%d", err, len(edgeJWKS.Keys))
+	}
+	if edgeJWKS.Keys[0].Kid == jwks.Keys[0].Kid {
+		t.Fatalf("API and Edge JWKS should use different kids by default, both %q", jwks.Keys[0].Kid)
 	}
 	keys := uc.GetSigningKeys(context.Background())
 	if len(keys) != 1 || !keys[0].Active {
@@ -47,7 +54,7 @@ func TestJWTUseCase_GetJWKS_rsaKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uc, err := NewJWTUseCase(dir, "iss")
+	uc, err := NewJWTUseCase(jwtTestCfg(t, dir))
 	if err != nil {
 		t.Fatal(err)
 	}

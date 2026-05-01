@@ -1,0 +1,88 @@
+package auth
+
+import (
+	"net/url"
+	"testing"
+
+	"github.com/merionyx/api-gateway/internal/api-server/config"
+)
+
+func TestRedirectURIAllowlisted(t *testing.T) {
+	t.Parallel()
+	allow := []string{" https://app/cb ", "http://127.0.0.1:9/x "}
+	if !RedirectURIAllowlisted(allow, "https://app/cb") {
+		t.Fatal("expected match with trim")
+	}
+	if RedirectURIAllowlisted(allow, "https://app/cb/") {
+		t.Fatal("suffix must not match")
+	}
+	if RedirectURIAllowlisted(allow, "https://evil/cb") {
+		t.Fatal("host must not match loosely")
+	}
+}
+
+func TestMergeAuthorizeQuery(t *testing.T) {
+	t.Parallel()
+	add := url.Values{}
+	add.Set("a", "1")
+	add.Set("b", "2")
+	out, err := mergeAuthorizeQuery("https://idp.example/authorize?existing=x", add)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := url.Parse(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.Query().Get("existing") != "x" {
+		t.Fatalf("existing: %v", u.Query())
+	}
+	if u.Query().Get("a") != "1" || u.Query().Get("b") != "2" {
+		t.Fatalf("merged: %v", u.RawQuery)
+	}
+}
+
+func TestBuildOIDCScope(t *testing.T) {
+	t.Parallel()
+	s := buildOIDCScope(config.OIDCProviderConfig{
+		ExtraScopes: []string{" email ", "", "profile"},
+	})
+	if s != "openid email profile" {
+		t.Fatalf("got %q", s)
+	}
+	s2 := buildOIDCScope(config.OIDCProviderConfig{})
+	if s2 != "openid" {
+		t.Fatalf("got %q", s2)
+	}
+	s3 := buildOIDCScope(config.OIDCProviderConfig{Kind: "github"})
+	if s3 != "openid read:org" {
+		t.Fatalf("github scopes got %q", s3)
+	}
+	s4 := buildOIDCScope(config.OIDCProviderConfig{Kind: "GitHub", ExtraScopes: []string{"read:org", "read:user"}})
+	if s4 != "openid read:org read:user" {
+		t.Fatalf("github scopes with extras got %q", s4)
+	}
+	s4b := buildOIDCScope(config.OIDCProviderConfig{
+		Kind:   "github",
+		GitHub: &config.GitHubOIDCProviderConfig{AuthFlow: "github_app"},
+	})
+	if s4b != "" {
+		t.Fatalf("github app scopes got %q", s4b)
+	}
+	s5 := buildOIDCScope(config.OIDCProviderConfig{Kind: "gitlab"})
+	if s5 != "openid read_api email profile" {
+		t.Fatalf("gitlab scopes got %q", s5)
+	}
+	s6 := buildOIDCScope(config.OIDCProviderConfig{Kind: "google"})
+	if s6 != "openid email profile" {
+		t.Fatalf("google scopes got %q", s6)
+	}
+	s7 := buildOIDCScope(config.OIDCProviderConfig{Kind: "okta"})
+	if s7 != "openid groups" {
+		t.Fatalf("okta scopes got %q", s7)
+	}
+	s8 := buildOIDCScope(config.OIDCProviderConfig{Kind: "entra"})
+	if s8 != "openid email profile" {
+		t.Fatalf("entra scopes got %q", s8)
+	}
+}

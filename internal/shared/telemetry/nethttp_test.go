@@ -8,7 +8,7 @@ func TestSkipProbePath(t *testing.T) {
 		"/health":         true,
 		"/ready":          true,
 		"/v1/health":      true,
-		"/api/v1/ready":   true,
+		"/v1/ready":       true,
 		"/":               false,
 		"/v1/healthcheck": false, // must not match: path does not end with /health
 		"/v1/health/":     false,

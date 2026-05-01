@@ -13,7 +13,7 @@ connectivity:
   envoyNodeId: envoy-dyn-qa
   controllerGrpcAddress: local-cp-api-gateway-controller:19090
   controllerServerName: local-cp-api-gateway-controller.api-gateway.svc.cluster.local
-  jwksUrl: http://local-cp-api-gateway-api-server:8080/.well-known/jwks.json
+  jwksUrl: http://local-cp-api-gateway-api-server:8080/.well-known/jwks-edge.json
   environment: dyn-qa
   tenant: dev-cluster
   xdsHost: local-cp-api-gateway-controller

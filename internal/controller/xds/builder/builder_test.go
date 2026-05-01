@@ -31,7 +31,7 @@ func TestXDSBuilder_BuildAll_RealisticEnvironment(t *testing.T) {
 		Snapshots: []models.ContractSnapshot{
 			{
 				Name:   "api-v1",
-				Prefix: "/api/v1/",
+				Prefix: "/v1/",
 				Upstream: models.ContractUpstream{
 					Name: "be-svc",
 				},

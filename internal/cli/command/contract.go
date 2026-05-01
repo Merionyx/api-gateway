@@ -209,7 +209,7 @@ func newExportCmd(resolveServer func() (string, error)) *cobra.Command {
 			out, _ := cmd.Flags().GetString("out")
 			format, _ := cmd.Flags().GetString("format")
 
-			httpClient, err := httpClientFromCmd(cmd)
+			httpClient, err := authorizedHTTPClientFromCmd(cmd, server)
 			if err != nil {
 				return err
 			}
@@ -263,7 +263,7 @@ func newExportBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 				return err
 			}
 			logf := func(format string, a ...any) { fmt.Fprintf(os.Stderr, format+"\n", a...) }
-			httpClient, err := httpClientFromCmd(cmd)
+			httpClient, err := authorizedHTTPClientFromCmd(cmd, server)
 			if err != nil {
 				return err
 			}
@@ -321,7 +321,7 @@ func newDiffCmd(resolveServer func() (string, error)) *cobra.Command {
 			contract, _ := cmd.Flags().GetString("contract")
 			target, _ := cmd.Flags().GetString("target")
 
-			httpClient, err := httpClientFromCmd(cmd)
+			httpClient, err := authorizedHTTPClientFromCmd(cmd, server)
 			if err != nil {
 				return err
 			}
@@ -331,9 +331,9 @@ func newDiffCmd(resolveServer func() (string, error)) *cobra.Command {
 				Target:     target,
 				ServerURL:  server,
 				HTTPClient: httpClient,
-				Request: apiclient.NewExportRequest(repo, ref, path, contract),
-				Out:   out,
-				Color: color,
+				Request:    apiclient.NewExportRequest(repo, ref, path, contract),
+				Out:        out,
+				Color:      color,
 			})
 			return err
 		},
@@ -372,7 +372,7 @@ func newDiffBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 				return err
 			}
 			logf := func(format string, a ...any) { fmt.Fprintf(os.Stderr, format+"\n", a...) }
-			httpClient, err := httpClientFromCmd(cmd)
+			httpClient, err := authorizedHTTPClientFromCmd(cmd, server)
 			if err != nil {
 				return err
 			}
@@ -397,9 +397,9 @@ func newDiffBatchCmd(resolveServer func() (string, error)) *cobra.Command {
 					Target:     itemTarget,
 					ServerURL:  server,
 					HTTPClient: httpClient,
-					Request: apiclient.NewExportRequest(it.Repository, it.Ref, it.Path, batchItemExportContract(it)),
-					Out:   out,
-					Color: color,
+					Request:    apiclient.NewExportRequest(it.Repository, it.Ref, it.Path, batchItemExportContract(it)),
+					Out:        out,
+					Color:      color,
 				})
 				if err != nil {
 					if errors.Is(err, contractdiff.ErrChanges) {

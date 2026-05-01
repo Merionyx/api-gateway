@@ -15,8 +15,8 @@ func TestBuildConfig_FileEnables(t *testing.T) {
 func TestBuildConfig_FileOnlyNoEnv(t *testing.T) {
 	enabled := true
 	c := BuildConfig("api-server", FileBlock{
-		Enabled:     &enabled,
-		ServiceName: "from-yaml",
+		Enabled:      &enabled,
+		ServiceName:  "from-yaml",
 		OTLPEndpoint: "http://c:4317",
 	})
 	if c.ServiceName != "from-yaml" {

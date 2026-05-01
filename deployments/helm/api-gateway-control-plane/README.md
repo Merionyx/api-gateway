@@ -9,8 +9,9 @@ Helm chart for **Gateway Controller**, **API Server**, and **Contract Syncer**. 
 - **Same namespace**: all referenced Secrets (`etcd.tls.existingSecret`, JWT, contract syncer, TLS mounts) must exist in **the Helm release namespace** (`helm install -n ...`). Kubernetes does not mount Secrets from other namespaces; copy the Secret or sync it (e.g. `kubectl get secret ... -n other | sed … | kubectl apply -n api-gateway -f -`).
 - **TLS for gRPC**: either pre-create Secrets (see `tls.*` in `values.yaml`) or enable `certManager.createCertificates` and point `certManager.issuerRef` to a **ClusterIssuer** / **Issuer** that can issue both **server** and **client** certificates.
 - **Internal CA** Secret (`tls.internalCASecret`, default name `{{ release }}-grpc-internal-ca-tls`): trust anchor at `/etc/grpc-internal-ca`. If you use `certManager.createCertificates` **without** `certManager.useNamespaceCAChain`, this Secret is **not** created automatically — copy `ca.crt` from a leaf Secret into a new Secret as `tls.crt`, or enable **`certManager.useNamespaceCAChain: true`** (CA Certificate + namespaced CA Issuer + leaf certs, same idea as `deployments/dev/.../grpc-certificates.yaml`).
-- **JWT keys** for API Server: create a Secret (or set `components.apiServer.jwt.existingSecret`) with the expected key material under the mount path used by the application.
+- **JWT keys** for API Server: create **two** Secrets and set `components.apiServer.jwt.apiKeysSecret` and `jwt.edgeKeysSecret` (names must differ; if unset, chart expects `<release>-jwt-api-keys` and `<release>-jwt-edge-keys`). Chart mounts them read-only at `.../keys/jwt` and `.../keys/jwt-edge` and sets `jwt.edge_keys_dir` unless overridden. All `*.key` files in each mount appear in the matching JWKS; **`components.apiServer.config.jwt.api_signing_kid`** / **`edge_signing_kid`** choose which `kid` signs **new** tokens when several keys exist.
 - **Contract Syncer** Git credentials: either one Secret via `components.contractSyncer.envFromSecret` (keys become env vars, e.g. `GITHUB_ACCESS_TOKEN`), or per-repo Secrets via `components.contractSyncer.repositoryTokens` (`envName` / `secretName` / `secretKey` — `envName` must match `token_env` in `components.contractSyncer.config.repositories`); do not put token values in `values.yaml`.
+- **OIDC OAuth client id/secret** (API Server): keep `client_id` / `client_secret` out of ConfigMap and `values.yaml`. In API Server config, set them to empty strings (or omit) and map each `auth.oidc_providers[].id` to a Secret via `components.apiServer.oidcProviderCredentials` (see `values.yaml`). The chart injects `AGWCP_OIDC_<ID>_CLIENT_ID` / `AGWCP_OIDC_<ID>_CLIENT_SECRET` from that Secret; the API Server overlays them at startup (non-alphanumeric characters in `id` become `_` in the env var suffix).
 
 ## Install
 
@@ -20,7 +21,8 @@ Default namespace reference: `api-gateway` (use `helm install -n api-gateway --c
 helm install agw ./deployments/helm/api-gateway-control-plane -n api-gateway \
   --set 'etcd.endpoints[0]=https://etcd.example:2379' \
   --set etcd.tls.existingSecret=my-etcd-tls \
-  --set components.apiServer.jwt.existingSecret=my-jwt-secret
+  --set components.apiServer.jwt.apiKeysSecret=my-jwt-api-keys \
+  --set components.apiServer.jwt.edgeKeysSecret=my-jwt-edge-keys
 ```
 
 ## High availability

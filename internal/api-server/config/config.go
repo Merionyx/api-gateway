@@ -2,6 +2,7 @@ package config
 
 import (
 	"log/slog"
+	"strings"
 	"time"
 
 	sharedetcd "github.com/merionyx/api-gateway/internal/shared/etcd"
@@ -25,10 +26,12 @@ type Config struct {
 	// GRPCContractSyncerClient: TLS when dialing Contract Syncer.
 	GRPCContractSyncerClient grpcobs.ClientTLSConfig `mapstructure:"grpc_contract_syncer_client" json:"grpc_contract_syncer_client"`
 	MetricsHTTP              metricshttp.Config      `mapstructure:"metrics_http" json:"metrics_http"`
-	// Idempotency configures POST /api/v1/bundles/sync replay when Idempotency-Key is sent.
+	// Idempotency configures POST /v1/bundles/sync replay when Idempotency-Key is sent.
 	Idempotency IdempotencyConfig `mapstructure:"idempotency" json:"idempotency"`
 	// Telemetry: OpenTelemetry trace export (optional). Merged with env; see FileBlock in the telemetry package.
 	Telemetry telemetry.FileBlock `mapstructure:"telemetry" json:"telemetry"`
+	// Auth: etcd key layout for API keys (and future session material); insecure bootstrap is dev-only.
+	Auth AuthConfig `mapstructure:"auth" json:"auth"`
 }
 
 // IdempotencyConfig controls POST /bundles/sync idempotency (memory or etcd).
@@ -68,14 +71,26 @@ type ReadinessConfig struct {
 }
 
 type ServerConfig struct {
-	HTTPPort string `mapstructure:"http_port" validate:"required" json:"http_port"`
-	GRPCPort string `mapstructure:"grpc_port" validate:"required" json:"grpc_port"`
-	Host     string `mapstructure:"host" json:"host"`
+	HTTPPort string     `mapstructure:"http_port" validate:"required" json:"http_port"`
+	GRPCPort string     `mapstructure:"grpc_port" validate:"required" json:"grpc_port"`
+	Host     string     `mapstructure:"host" json:"host"`
+	CORS     CORSConfig `mapstructure:"cors" json:"cors"`
 }
 
 type JWTConfig struct {
 	KeysDir string `mapstructure:"keys_dir" validate:"required" json:"keys_dir"`
 	Issuer  string `mapstructure:"issuer" validate:"required" json:"issuer"`
+	// APIAudience is the JWT aud claim for interactive API access tokens (Edge≠API).
+	APIAudience string `mapstructure:"api_audience" json:"api_audience"`
+	// EdgeKeysDir holds Edge-profile signing keys. Empty means keys_dir/edge (see auth.NewJWTUseCase).
+	EdgeKeysDir string `mapstructure:"edge_keys_dir" json:"edge_keys_dir"`
+	// APISigningKid / EdgeSigningKid pin which loaded key signs new tokens when multiple *.key files exist (rotation).
+	// Empty means "newest private key by file mtime" within each directory.
+	APISigningKid  string `mapstructure:"api_signing_kid" json:"api_signing_kid"`
+	EdgeSigningKid string `mapstructure:"edge_signing_kid" json:"edge_signing_kid"`
+	// EdgeIssuer / EdgeAudience are iss/aud for POST /v1/tokens/edge (data-plane / ExtAuthz profile).
+	EdgeIssuer   string `mapstructure:"edge_issuer" json:"edge_issuer"`
+	EdgeAudience string `mapstructure:"edge_audience" json:"edge_audience"`
 }
 
 func LoadConfig(configFile ...string) (*Config, error) {
@@ -86,6 +101,9 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("etcd.dial_timeout", "5s")
 	v.SetDefault("jwt.keys_dir", "./secrets/keys/jwt")
 	v.SetDefault("jwt.issuer", "api-gateway-api-server")
+	v.SetDefault("jwt.api_audience", "api-gateway-api-http")
+	v.SetDefault("jwt.edge_issuer", "api-gateway-edge")
+	v.SetDefault("jwt.edge_audience", "api-gateway-edge-http")
 	v.SetDefault("leader_election.enabled", true)
 	v.SetDefault("leader_election.key_prefix", "/api-gateway/api-server/election/leader")
 	v.SetDefault("leader_election.session_ttl_seconds", 5)
@@ -100,9 +118,25 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("idempotency.bundle_sync_ttl", 24*time.Hour)
 	v.SetDefault("idempotency.etcd_key_prefix", "/api-gateway/api-server/idempotency/v1")
 	v.SetDefault("idempotency.cluster", "")
+	v.SetDefault("auth.etcd_key_prefix", "/api-gateway/api-server/auth/v1")
+	v.SetDefault("auth.environment", "development")
+	v.SetDefault("auth.allow_insecure_bootstrap", false)
+	v.SetDefault("auth.oidc_allow_insecure_endpoints", false)
+	v.SetDefault("auth.login_intent_lease_ttl", 15*time.Minute)
+	v.SetDefault("auth.interactive_access_token_ttl", DefaultInteractiveAccessTokenTTL)
+	v.SetDefault("auth.interactive_access_token_max_ttl", DefaultInteractiveAccessTokenMaxTTL)
+	v.SetDefault("auth.interactive_refresh_token_ttl", DefaultInteractiveRefreshTokenTTL)
+	v.SetDefault("auth.interactive_refresh_token_max_ttl", DefaultInteractiveRefreshTokenMaxTTL)
+	v.SetDefault("auth.idp_access_cache_opaque_max_ttl", 2*time.Minute)
+	// Browser CORS : explicit dev defaults — no "*" (prod Helm must list real UI origins).
+	v.SetDefault("server.cors.allow_origins", DevCORSAllowOrigins())
+	v.SetDefault("server.cors.insecure_allow_wildcard", false)
 
 	v.AutomaticEnv()
 	v.SetEnvPrefix("API_SERVER_")
+	// Without this, nested keys map to env names containing dots (e.g. API_SERVER_AUTH.SESSION_KEK_BASE64),
+	// which Kubernetes cannot set — Helm uses API_SERVER_AUTH_SESSION_KEK_BASE64 instead.
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	if len(configFile) > 0 && configFile[0] != "" {
 		slog.Info("Loading config from explicit path", "path", configFile[0])
@@ -128,6 +162,29 @@ func LoadConfig(configFile ...string) (*Config, error) {
 
 	var config Config
 	if err := v.Unmarshal(&config); err != nil {
+		return nil, err
+	}
+
+	ApplySessionKekFromEnv(&config)
+	ApplyOIDCProviderSecretsFromEnv(&config)
+
+	ApplyCORSDevDefaults(&config)
+
+	if err := ValidateServerCORS(config.Server.CORS, config.Auth.Environment); err != nil {
+		return nil, err
+	}
+	if err := ValidateInteractiveTokenTTLPolicy(
+		config.Auth.InteractiveAccessTokenTTL,
+		config.Auth.InteractiveAccessTokenMaxTTL,
+		config.Auth.InteractiveRefreshTokenTTL,
+		config.Auth.InteractiveRefreshTokenMaxTTL,
+	); err != nil {
+		return nil, err
+	}
+	if err := ValidateOIDCExternalBaseURL(config.Auth.OIDCExternalBaseURL, config.Auth.OIDCProviders); err != nil {
+		return nil, err
+	}
+	if err := ValidateAuthorizationConfig(config.Auth.Authorization); err != nil {
 		return nil, err
 	}
 

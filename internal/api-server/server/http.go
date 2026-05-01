@@ -2,16 +2,21 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
+	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/gofiber/fiber/v3/middleware/logger"
 	"github.com/gofiber/fiber/v3/middleware/recover"
 	oapimw "github.com/oapi-codegen/fiber-middleware/v2"
 
+	"github.com/merionyx/api-gateway/internal/api-server/config"
 	"github.com/merionyx/api-gateway/internal/api-server/container"
+	httpxmw "github.com/merionyx/api-gateway/internal/api-server/delivery/http/middleware"
+	httpopenapi "github.com/merionyx/api-gateway/internal/api-server/delivery/http/openapi"
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
 	apimetrics "github.com/merionyx/api-gateway/internal/api-server/metrics"
 )
@@ -35,14 +40,7 @@ func RunHTTPServer(ctx context.Context, c *container.Container) error {
 	app.Use(logger.New(logger.Config{
 		Format: "[${time}] ${status} - ${method} ${path} ${latency}\n",
 	}))
-	app.Use(cors.New(cors.Config{
-		AllowOrigins: []string{"*"},
-		AllowMethods: []string{"GET", "POST", "OPTIONS"},
-		AllowHeaders: []string{
-			"Origin", "Content-Type", "Accept", "Authorization",
-			"Traceparent", "Tracestate", // W3C TraceContext (CORS to browser/edge)
-		},
-	}))
+	installCORSMiddleware(app, c.Config)
 
 	app.Use(apimetrics.HTTPMiddleware(c.Config.MetricsHTTP.Enabled))
 	if err := setupRoutes(app, c); err != nil {
@@ -68,6 +66,32 @@ func RunHTTPServer(ctx context.Context, c *container.Container) error {
 	}
 }
 
+func installCORSMiddleware(app *fiber.App, cfg *config.Config) {
+	cc := cfg.Server.CORS
+	origins := config.NormalizeCORSAllowOrigins(cc.AllowOrigins)
+	wildcard := cc.InsecureAllowWildcard && len(origins) == 1 && origins[0] == "*"
+
+	corsBase := cors.Config{
+		AllowMethods: []string{"GET", "POST", "OPTIONS"},
+		AllowHeaders: []string{
+			"Origin", "Content-Type", "Accept", "Authorization", "X-API-Key",
+			"Traceparent", "Tracestate", // W3C TraceContext (CORS to browser/edge)
+		},
+	}
+
+	if wildcard {
+		corsBase.AllowOrigins = []string{"*"}
+		app.Use(cors.New(corsBase))
+		return
+	}
+	if len(origins) == 0 {
+		slog.Info("http: CORS disabled (server.cors.allow_origins empty); set explicit Origins for browser OIDC/SPA ")
+		return
+	}
+	corsBase.AllowOrigins = origins
+	app.Use(cors.New(corsBase))
+}
+
 func setupRoutes(app *fiber.App, c *container.Container) error {
 	swagger, err := apiserver.GetSwagger()
 	if err != nil {
@@ -77,7 +101,47 @@ func setupRoutes(app *fiber.App, c *container.Container) error {
 	swagger.Servers = nil
 
 	app.Use(httpTraceMiddleware())
-	app.Use(oapimw.OapiRequestValidator(swagger))
-	apiserver.RegisterHandlers(app, NewOpenAPIServer(c))
+	app.Use(httpopenapi.BindFiberContextForStrictHandlers())
+	apiSecurityContract, err := httpxmw.NewAPISecurityContract(swagger)
+	if err != nil {
+		return fmt.Errorf("build API security contract from OpenAPI: %w", err)
+	}
+	app.Use(httpxmw.APISecurity(c.JWTUseCase, c.APIKeyRepository, apiSecurityContract))
+	app.Use(oapimw.OapiRequestValidatorWithOptions(swagger, &oapimw.Options{
+		Options: openapi3filter.Options{
+			AuthenticationFunc: AuthenticationFunc,
+		},
+	}))
+	apiserver.RegisterHandlers(app, apiserver.NewStrictHandler(httpopenapi.NewStrictOpenAPIServer(c), nil))
 	return nil
+}
+
+func AuthenticationFunc(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
+	if input == nil {
+		return errors.New("missing authentication input")
+	}
+	c := oapimw.GetFiberContext(ctx)
+	if c == nil {
+		return input.NewError(errors.New("missing fiber context"))
+	}
+	return openAPISecuritySatisfied(c, input)
+}
+
+func openAPISecuritySatisfied(c fiber.Ctx, input *openapi3filter.AuthenticationInput) error {
+	if input == nil {
+		return errors.New("missing authentication input")
+	}
+	switch input.SecuritySchemeName {
+	case "bearerAuth":
+		if c.Locals(httpxmw.CtxKeyAPIJWTClaims) != nil {
+			return nil
+		}
+	case "apiKey":
+		if _, ok := httpxmw.APIKeyPrincipalFromCtx(c); ok {
+			return nil
+		}
+	default:
+		return input.NewError(fmt.Errorf("unsupported security scheme %q", input.SecuritySchemeName))
+	}
+	return input.NewError(errors.New("authentication required"))
 }

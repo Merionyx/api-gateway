@@ -16,17 +16,17 @@ import (
 )
 
 type Config struct {
-	Server              ServerConfig               `mapstructure:"server" validate:"required" json:"server"`
-	Etcd                etcd.EtcdConfig            `mapstructure:"etcd"`
-	Environments        []EnvironmentConfig        `mapstructure:"environments" json:"environments"`
-	Services            ServicesConfig             `mapstructure:"services" json:"services"`
-	APIServer           APIServerConfig            `mapstructure:"api_server" json:"api_server"`
-	Tenant              string                     `mapstructure:"tenant" json:"tenant"`
-	HA                  HAConfig                   `mapstructure:"ha" json:"ha"`
-	LeaderElection      LeaderElectionConfig       `mapstructure:"leader_election" json:"leader_election"`
+	Server         ServerConfig         `mapstructure:"server" validate:"required" json:"server"`
+	Etcd           etcd.EtcdConfig      `mapstructure:"etcd"`
+	Environments   []EnvironmentConfig  `mapstructure:"environments" json:"environments"`
+	Services       ServicesConfig       `mapstructure:"services" json:"services"`
+	APIServer      APIServerConfig      `mapstructure:"api_server" json:"api_server"`
+	Tenant         string               `mapstructure:"tenant" json:"tenant"`
+	HA             HAConfig             `mapstructure:"ha" json:"ha"`
+	LeaderElection LeaderElectionConfig `mapstructure:"leader_election" json:"leader_election"`
 	// EffectiveMaterialized: write merged effective (static) to etcd for observability (ADR 0001, phase 2). Leader only.
 	EffectiveMaterialized EffectiveMaterializedConfig `mapstructure:"effective_materialized" json:"effective_materialized"`
-	KubernetesDiscovery *KubernetesDiscoveryConfig  `mapstructure:"kubernetes_discovery" json:"kubernetes_discovery"`
+	KubernetesDiscovery   *KubernetesDiscoveryConfig  `mapstructure:"kubernetes_discovery" json:"kubernetes_discovery"`
 	// GRPCControlPlane: TLS and observability for the management gRPC API (snapshots, environments, schemas, auth).
 	GRPCControlPlane GRPCServerSection `mapstructure:"grpc_control_plane" json:"grpc_control_plane"`
 	// GRPCXDS: TLS and observability for the Envoy xDS gRPC server.

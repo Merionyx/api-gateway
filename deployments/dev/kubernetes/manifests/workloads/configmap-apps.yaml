@@ -104,6 +104,7 @@ data:
 
     jwt:
       keys_dir: "/api-server/secrets/api-server/keys/jwt"
+      edge_keys_dir: "/api-server/secrets/api-server/keys/jwt-edge"
       issuer: "api-gateway-api-server"
 
     contract_syncer:
@@ -179,7 +180,9 @@ data:
       environment: "dev"
 
     jwt:
-      jwks_url: "http://gateway-api-server:8080/.well-known/jwks.json"
+      jwks_url: "http://gateway-api-server:8080/.well-known/jwks-edge.json"
+      expected_issuer: "api-gateway-edge"
+      expected_audience: "api-gateway-edge-http"
 
     # ext_authz remains plaintext: cluster to sidecar is set via xDS without TLS in this repository.
     grpc_ext_authz:

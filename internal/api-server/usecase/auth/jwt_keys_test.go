@@ -13,7 +13,7 @@ func TestJWTUseCase_loadKeys_skipsInvalidThenGenerates(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "garbage.key"), []byte("not valid pem"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	uc, err := NewJWTUseCase(dir, "iss")
+	uc, err := NewJWTUseCase(jwtTestCfg(t, dir))
 	if err != nil {
 		t.Fatal(err)
 	}

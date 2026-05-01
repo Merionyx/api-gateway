@@ -13,5 +13,6 @@ Contract Syncer Service: {{ include "agwcp.svc.contractSyncer" . }}.{{ .Release.
 Prerequisites:
 - etcd endpoints and (if TLS) Secret referenced by etcd.tls.existingSecret
 - TLS Secrets for gRPC / internal CA (or enable certManager.createCertificates with a ClusterIssuer)
-- JWT keys Secret for API Server (components.apiServer.jwt.existingSecret)
+- Two JWT Secrets for API Server (components.apiServer.jwt.apiKeysSecret + jwt.edgeKeysSecret; chart defaults use release fullname if names are left empty)
+- When using interactive OIDC (auth.oidc_providers): Secret with session KEK (components.apiServer.sessionKek.existingSecret); value = standard base64 of 32 raw bytes (see docs/operator-api-server-auth.md)
 - Optional: Secret for contract syncer token (components.contractSyncer.envFromSecret)

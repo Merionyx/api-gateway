@@ -52,4 +52,5 @@ func init() {
 	rootCmd.AddCommand(command.NewValidateCommand())
 	rootCmd.AddCommand(command.NewListCommand(resolveServer))
 	rootCmd.AddCommand(command.NewDescribeCommand(resolveServer))
+	rootCmd.AddCommand(command.NewAuthCommand(resolveServer))
 }

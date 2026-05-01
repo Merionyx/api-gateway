@@ -20,7 +20,7 @@ services:
       - CONFIG_PATH=./configs/sidecar/config.dev.yaml
       - SIDECAR_CONTROLLER_ADDRESS=gateway-controller-dev:19090
       - SIDECAR_CONTROLLER_ENVIRONMENT=dev
-      - SIDECAR_JWT_JWKS_URL=http://api-server:8080/.well-known/jwks.json
+      - SIDECAR_JWT_JWKS_URL=http://api-server:8080/.well-known/jwks-edge.json
     networks:
       default:
       dev-network:
@@ -44,7 +44,7 @@ services:
       - CONFIG_PATH=./configs/sidecar/config.prod.yaml
       - SIDECAR_CONTROLLER_ADDRESS=gateway-controller-prod:19090
       - SIDECAR_CONTROLLER_ENVIRONMENT=dev
-      - SIDECAR_JWT_JWKS_URL=http://api-server:8080/.well-known/jwks.json
+      - SIDECAR_JWT_JWKS_URL=http://api-server:8080/.well-known/jwks-edge.json
     networks:
       default:
       prod-network:

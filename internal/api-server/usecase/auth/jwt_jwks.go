@@ -12,24 +12,36 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 	"github.com/merionyx/api-gateway/internal/shared/telemetry"
+	"go.opentelemetry.io/otel/trace"
 )
 
-// GetJWKS returns a JSON Web Key Set with all public keys.
+// GetJWKS returns the API-profile JSON Web Key Set (HTTP API / interactive access verification).
 func (uc *JWTUseCase) GetJWKS(ctx context.Context) (*models.JWKS, error) {
 	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseAuthPkg, "GetJWKS"))
 	defer span.End()
+	return uc.buildJWKS(span, uc.apiSigningKeys)
+}
+
+// GetJWKSEdge returns the Edge-profile JWKS (data plane / ExtAuthz; POST /v1/tokens/edge).
+func (uc *JWTUseCase) GetJWKSEdge(ctx context.Context) (*models.JWKS, error) {
+	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseAuthPkg, "GetJWKSEdge"))
+	defer span.End()
+	return uc.buildJWKS(span, uc.edgeSigningKeys)
+}
+
+func (uc *JWTUseCase) buildJWKS(span trace.Span, signing map[string]*KeyPair) (*models.JWKS, error) {
 	jwks := &models.JWKS{
 		Keys: make([]models.JWK, 0),
 	}
 
-	kids := make([]string, 0, len(uc.signingKeys))
-	for kid := range uc.signingKeys {
+	kids := make([]string, 0, len(signing))
+	for kid := range signing {
 		kids = append(kids, kid)
 	}
 	sort.Strings(kids)
 
 	for _, kid := range kids {
-		keyPair := uc.signingKeys[kid]
+		keyPair := signing[kid]
 
 		jwk, err := jwtPublicKeyToJWK(keyPair)
 		if err != nil {
@@ -44,17 +56,17 @@ func (uc *JWTUseCase) GetJWKS(ctx context.Context) (*models.JWKS, error) {
 	return jwks, nil
 }
 
-// GetSigningKeys returns a list of signing keys.
+// GetSigningKeys returns API-profile signing key metadata (GET /v1/keys).
 func (uc *JWTUseCase) GetSigningKeys(ctx context.Context) []models.SigningKey {
 	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseAuthPkg, "GetSigningKeys"))
 	defer span.End()
-	keys := make([]models.SigningKey, 0, len(uc.signingKeys))
+	keys := make([]models.SigningKey, 0, len(uc.apiSigningKeys))
 
-	for kid, keyPair := range uc.signingKeys {
+	for kid, keyPair := range uc.apiSigningKeys {
 		keys = append(keys, models.SigningKey{
 			Kid:       kid,
 			Algorithm: keyPair.Algorithm,
-			Active:    kid == uc.activeKeyID,
+			Active:    kid == uc.apiActiveKeyID,
 			CreatedAt: keyPair.CreatedAt,
 		})
 	}

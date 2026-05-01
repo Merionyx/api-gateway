@@ -114,7 +114,7 @@ func newServerReadyCmd(resolveServer func() (string, error), output *string) *co
 func newServerVersionCmd(resolveServer func() (string, error), output *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
-		Short: "Server build metadata: GET /api/v1/version",
+		Short: "Server build metadata: GET /v1/version",
 		Long:  "Shows git revision, build time, API schema version, and optional release tag for the API Server binary (not agwctl’s own version).",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			server, err := resolveServer()
@@ -191,14 +191,14 @@ func newServerKeysJwksCmd(resolveServer func() (string, error), output *string) 
 func newServerStatusCmd(resolveServer func() (string, error), output *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "status",
-		Short: "Dependency snapshot: GET /api/v1/status",
+		Short: "Dependency snapshot: GET /v1/status",
 		Long:  "Rich status for operators (not a Kubernetes probe — use `server ready` for that).",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			server, err := resolveServer()
 			if err != nil {
 				return err
 			}
-			httpClient, err := httpClientFromCmd(cmd)
+			httpClient, err := authorizedHTTPClientFromCmd(cmd, server)
 			if err != nil {
 				return err
 			}
@@ -321,7 +321,7 @@ func strPtr(p *string) string {
 func printServerStatusTable(w io.Writer, color bool, serverURL string, st *apiserverclient.StatusResponse) {
 	_, _ = fmt.Fprintln(w)
 	_, _ = fmt.Fprintf(w, "%s\n\n", style.S(color, style.Bold, "Dependency status"))
-	_, _ = fmt.Fprintf(w, "%s\n", style.S(color, style.Dim, serverURL+"/api/v1/status")+"\n")
+	_, _ = fmt.Fprintf(w, "%s\n", style.S(color, style.Dim, serverURL+"/v1/status")+"\n")
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	_, _ = fmt.Fprintf(tw, "%s\t%s\n", "api_server:", depWordColor(color, st.ApiServer))
 	_, _ = fmt.Fprintf(tw, "%s\t%s\n", "etcd:", depPtrColor(color, st.Etcd))

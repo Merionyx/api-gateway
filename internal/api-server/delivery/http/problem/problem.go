@@ -9,6 +9,7 @@ import (
 
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
 	apimetrics "github.com/merionyx/api-gateway/internal/api-server/metrics"
+	"github.com/merionyx/api-gateway/internal/api-server/safelog"
 )
 
 // ContentType is the media type for Problem Details (RFC 7807).
@@ -41,6 +42,10 @@ func defaultHTTPtitle(st int) string {
 	switch st {
 	case http.StatusBadRequest:
 		return "Bad Request"
+	case http.StatusUnauthorized:
+		return "Unauthorized"
+	case http.StatusForbidden:
+		return "Forbidden"
 	case http.StatusNotFound:
 		return "Not Found"
 	case http.StatusBadGateway:
@@ -76,6 +81,16 @@ func BadGateway(code, title, detail string) apiserver.Problem {
 	return WithCode(http.StatusBadGateway, code, title, detail)
 }
 
+// Unauthorized builds a 401 Problem with stable code.
+func Unauthorized(code, title, detail string) apiserver.Problem {
+	return WithCode(http.StatusUnauthorized, code, title, detail)
+}
+
+// Forbidden builds a 403 Problem with stable code (authorization / RBAC).
+func Forbidden(code, title, detail string) apiserver.Problem {
+	return WithCode(http.StatusForbidden, code, title, detail)
+}
+
 // Conflict builds a 409 Problem with stable code.
 func Conflict(code, title, detail string) apiserver.Problem {
 	return WithCode(http.StatusConflict, code, title, detail)
@@ -105,12 +120,20 @@ func logProblemResponse(st int, p *apiserver.Problem, err error) {
 	if p != nil && p.Code != nil {
 		code = *p.Code
 	}
-	slog.Error("http problem response", "status", st, "code", code, "err", err)
+	msg := ""
+	if err != nil {
+		msg = safelog.Redact(err.Error())
+	}
+	slog.Error("http problem response", "status", st, "code", code, "err", msg)
 }
 
 // WriteInternal writes 500 with a stable code; logs the full error server-side only.
 func WriteInternal(c fiber.Ctx, err error) error {
-	slog.Error("http internal error", "err", err)
+	msg := ""
+	if err != nil {
+		msg = safelog.Redact(err.Error())
+	}
+	slog.Error("http internal error", "err", msg)
 	p := WithCode(http.StatusInternalServerError, CodeInternalError, "", DetailInternalError)
 	return Write(c, http.StatusInternalServerError, p)
 }

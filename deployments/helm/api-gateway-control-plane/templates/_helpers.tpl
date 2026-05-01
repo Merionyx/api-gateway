@@ -130,12 +130,16 @@ app.kubernetes.io/name: {{ include "agwcp.fullname" $root }}-{{ $slug }}
 {{- end -}}
 {{- end }}
 
-{{- define "agwcp.secret.jwtKeys" -}}
-{{- if .Values.components.apiServer.jwt.existingSecret -}}
-{{- .Values.components.apiServer.jwt.existingSecret -}}
-{{- else -}}
-{{- printf "%s-jwt-keys" (include "agwcp.fullname" .) -}}
-{{- end -}}
+{{/* API profile JWT signing keys (*.key PEM). */}}
+{{- define "agwcp.secret.jwtApiKeys" -}}
+{{- $a := trim (.Values.components.apiServer.jwt.apiKeysSecret | default "") -}}
+{{- if ne $a "" -}}{{- $a -}}{{- else -}}{{- printf "%s-jwt-api-keys" (include "agwcp.fullname" .) -}}{{- end -}}
+{{- end }}
+
+{{/* Edge profile JWT signing keys (*.key PEM). */}}
+{{- define "agwcp.secret.jwtEdgeKeys" -}}
+{{- $e := trim (.Values.components.apiServer.jwt.edgeKeysSecret | default "") -}}
+{{- if ne $e "" -}}{{- $e -}}{{- else -}}{{- printf "%s-jwt-edge-keys" (include "agwcp.fullname" .) -}}{{- end -}}
 {{- end }}
 
 {{- define "agwcp.defaultAntiAffinity" -}}
@@ -241,6 +245,8 @@ server:
   http_port: "8080"
   grpc_port: "19093"
   host: "0.0.0.0"
+  cors:
+    allow_origins: []
 etcd:
   endpoints:
 {{- range .Values.etcd.endpoints }}
@@ -289,6 +295,10 @@ idempotency:
   bundle_sync_ttl: "24h"
   etcd_key_prefix: "/api-gateway/api-server/idempotency/v1"
   cluster: ""
+auth:
+  etcd_key_prefix: "/api-gateway/api-server/auth/v1"
+  environment: "production"
+  allow_insecure_bootstrap: false
 {{- end }}
 
 {{- define "agwcp.contractSyncer.config.defaults" -}}
@@ -340,7 +350,15 @@ api_server:
 {{- $tel := fromYaml (include "agwcp.telemetry.merged" (list . "apiServer")) -}}
 {{- $withTel := mergeOverwrite $def (dict "telemetry" $tel) -}}
 {{- $usr := .Values.components.apiServer.config | default dict -}}
-{{- toYaml (mergeOverwrite $withTel $usr) -}}
+{{- $merged := mergeOverwrite $withTel $usr -}}
+{{- $usrJwt := index $usr "jwt" | default dict -}}
+{{- $explicitEdgeDir := trim (toString (index $usrJwt "edge_keys_dir" | default "")) -}}
+{{- $jwtAutoEdge := "/api-server/secrets/api-server/keys/jwt-edge" -}}
+{{- $jwtNow := index $merged "jwt" | default dict -}}
+{{- if eq $explicitEdgeDir "" -}}
+{{- $merged = mergeOverwrite $merged (dict "jwt" (mergeOverwrite $jwtNow (dict "edge_keys_dir" $jwtAutoEdge))) -}}
+{{- end -}}
+{{- toYaml $merged -}}
 {{- end }}
 
 {{- define "agwcp.contractSyncer.config.merged" -}}
@@ -349,4 +367,13 @@ api_server:
 {{- $withTel := mergeOverwrite $def (dict "telemetry" $tel) -}}
 {{- $usr := .Values.components.contractSyncer.config | default dict -}}
 {{- toYaml (mergeOverwrite $withTel $usr) -}}
+{{- end }}
+
+{{/*
+  OIDC provider id → env suffix for AGWCP_OIDC_<SUFFIX>_CLIENT_ID (must match internal/api-server/config/auth_oidc_env.go).
+*/}}
+{{- define "agwcp.oidcEnvSuffix" -}}
+{{- $id := toString . -}}
+{{- $s := regexReplaceAll "[^a-zA-Z0-9]+" $id "_" -}}
+{{- upper (trimAll "_" $s) -}}
 {{- end }}

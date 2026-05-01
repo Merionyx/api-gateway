@@ -32,6 +32,24 @@ type HeartbeatInfo struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
+func validateControllerInfo(info models.ControllerInfo) error {
+	if err := models.ValidateControllerServiceScopes(info); err != nil {
+		return fmt.Errorf("%w: %s", apierrors.ErrInvalidInput, err.Error())
+	}
+	return nil
+}
+
+func parseControllerInfoValue(raw []byte) (models.ControllerInfo, error) {
+	var parsed models.ControllerInfo
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return models.ControllerInfo{}, fmt.Errorf("unmarshal controller info: %w", err)
+	}
+	if err := validateControllerInfo(parsed); err != nil {
+		return models.ControllerInfo{}, err
+	}
+	return parsed, nil
+}
+
 func (r *ControllerRepository) RegisterController(ctx context.Context, info models.ControllerInfo) (err error) {
 	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanAPIEtcdPkg, "RegisterController"))
 	defer func() {
@@ -43,6 +61,9 @@ func (r *ControllerRepository) RegisterController(ctx context.Context, info mode
 	key := fmt.Sprintf("%s%s", controllerPrefix, info.ControllerID)
 
 	info.Environments = models.CanonicalEnvironmentsForStorage(info.Environments)
+	if err := validateControllerInfo(info); err != nil {
+		return err
+	}
 
 	data, err := json.Marshal(info)
 	if err != nil {
@@ -88,9 +109,9 @@ func (r *ControllerRepository) GetController(ctx context.Context, controllerID s
 		return nil, fmt.Errorf("%w", apierrors.ErrNotFound)
 	}
 
-	var parsed models.ControllerInfo
-	if err := json.Unmarshal(resp.Kvs[0].Value, &parsed); err != nil {
-		return nil, apierrors.JoinStore("unmarshal controller info", err)
+	parsed, err := parseControllerInfoValue(resp.Kvs[0].Value)
+	if err != nil {
+		return nil, apierrors.JoinStore("parse controller info", err)
 	}
 
 	return &parsed, nil
@@ -112,10 +133,9 @@ func (r *ControllerRepository) ListControllers(ctx context.Context) (out []model
 			continue
 		}
 
-		var row models.ControllerInfo
-		if err := json.Unmarshal(kv.Value, &row); err != nil {
-			slog.Error("Failed to unmarshal controller info", "key", string(kv.Key), "error", err)
-			continue
+		row, err := parseControllerInfoValue(kv.Value)
+		if err != nil {
+			return nil, apierrors.JoinStore("parse controller info", fmt.Errorf("key %q: %w", string(kv.Key), err))
 		}
 		out = append(out, row)
 	}
@@ -186,14 +206,17 @@ func (r *ControllerRepository) UpdateControllerHeartbeat(ctx context.Context, co
 		return false, fmt.Errorf("%w", apierrors.ErrNotFound)
 	}
 
-	var info models.ControllerInfo
-	if err := json.Unmarshal(resp.Kvs[0].Value, &info); err != nil {
-		return false, apierrors.JoinStore("unmarshal controller info", err)
+	info, err := parseControllerInfoValue(resp.Kvs[0].Value)
+	if err != nil {
+		return false, apierrors.JoinStore("parse controller info", err)
 	}
 
 	info.Environments = models.CanonicalEnvironmentsForStorage(environments)
 	if registryPayloadVersion > 0 {
 		info.RegistryPayloadVersion = registryPayloadVersion
+	}
+	if err := validateControllerInfo(info); err != nil {
+		return false, err
 	}
 
 	data, err := json.Marshal(info)

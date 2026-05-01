@@ -31,7 +31,7 @@ func Ready(ctx context.Context, httpClient *http.Client, serverURL string) (*api
 		return nil, 0, fmt.Errorf("request failed: %w", err)
 	}
 	if resp.JSON200 != nil {
-		return resp.JSON200, http.StatusOK, nil
+		return &resp.JSON200.Data, http.StatusOK, nil
 	}
 	if resp.JSON503 != nil {
 		return resp.JSON503, http.StatusServiceUnavailable, nil
@@ -42,7 +42,7 @@ func Ready(ctx context.Context, httpClient *http.Client, serverURL string) (*api
 	return nil, resp.StatusCode(), fmt.Errorf("HTTP %d: %s", resp.StatusCode(), trimBody(resp.Body))
 }
 
-// ServerVersion calls GET /api/v1/version.
+// ServerVersion calls GET /v1/version.
 func ServerVersion(ctx context.Context, httpClient *http.Client, serverURL string) (*apiserverclient.VersionResponse, error) {
 	ctx, cancel := withServerTimeout(ctx)
 	defer cancel()
@@ -55,7 +55,7 @@ func ServerVersion(ctx context.Context, httpClient *http.Client, serverURL strin
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	if resp.JSON200 != nil {
-		return resp.JSON200, nil
+		return &resp.JSON200.Data, nil
 	}
 	if resp.ApplicationproblemJSON500 != nil {
 		return nil, fmt.Errorf("api: %s", problemString(resp.ApplicationproblemJSON500))
@@ -88,7 +88,7 @@ func ServerJWKS(ctx context.Context, httpClient *http.Client, serverURL string) 
 	return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode(), trimBody(resp.Body))
 }
 
-// ServerStatus calls GET /api/v1/status.
+// ServerStatus calls GET /v1/status.
 func ServerStatus(ctx context.Context, httpClient *http.Client, serverURL string) (*apiserverclient.StatusResponse, error) {
 	ctx, cancel := withServerTimeout(ctx)
 	defer cancel()
@@ -102,7 +102,7 @@ func ServerStatus(ctx context.Context, httpClient *http.Client, serverURL string
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	if resp.JSON200 != nil {
-		return resp.JSON200, nil
+		return &resp.JSON200.Data, nil
 	}
 	if resp.ApplicationproblemJSON400 != nil {
 		return nil, fmt.Errorf("api: %s", problemString(resp.ApplicationproblemJSON400))

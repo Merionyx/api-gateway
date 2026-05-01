@@ -102,6 +102,24 @@ func DomainRules() []Rule {
 			ProblemCode: CodeContractSyncerUnavailable,
 			Detail:      staticDetail(DetailContractSyncerUnavailable),
 		},
+		{
+			Name:        "SessionRefreshConflict",
+			Sample:      fmt.Errorf("%w", apierrors.ErrSessionRefreshConflict),
+			Match:       func(e error) bool { return errors.Is(e, apierrors.ErrSessionRefreshConflict) },
+			HTTPStatus:  http.StatusConflict,
+			GRPC:        codes.Aborted,
+			ProblemCode: CodeSessionRefreshConflict,
+			Detail:      staticDetail(DetailSessionRefreshConflict),
+		},
+		{
+			Name:        "SessionAuthFailed",
+			Sample:      fmt.Errorf("%w", apierrors.ErrSessionAuthFailed),
+			Match:       func(e error) bool { return errors.Is(e, apierrors.ErrSessionAuthFailed) },
+			HTTPStatus:  http.StatusUnauthorized,
+			GRPC:        codes.Unauthenticated,
+			ProblemCode: CodeSessionAuthFailed,
+			Detail:      staticDetail(DetailSessionAuthFailed),
+		},
 	}
 }
 

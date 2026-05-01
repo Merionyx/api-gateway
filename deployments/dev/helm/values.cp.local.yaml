@@ -13,7 +13,10 @@
 #   | kubectl apply -f -
 # (substitute etcd with the namespace where the original Secret is located)
 #
-# Also in api-gateway must be: api-gateway-jwt-keys, api-gateway-contract-syncer (if used below).
+# Also in api-gateway must be: api-gateway-jwt-api-keys, api-gateway-jwt-edge-keys, api-gateway-session-kek, api-gateway-contract-syncer (if used below).
+#
+# OIDC + session KEK: see deployments/dev/kubernetes/examples/cp-local-oidc-secrets.md
+# OAuth client_id / client_secret: prefer Kubernetes Secret → components.apiServer.oidcProviderCredentials (see examples).
 
 namespace: api-gateway
 
@@ -48,8 +51,110 @@ components:
     image:
       pullPolicy: IfNotPresent
     jwt:
-      # Secret with JWKS keys (create before install or rename):
-      existingSecret: api-gateway-jwt-keys
+      # Two Secrets (API vs Edge signing keys). See deployments/dev/kubernetes/examples/generate-edge-jwt-key.sh and cp-local-oidc-secrets.md.
+      apiKeysSecret: api-gateway-jwt-api-keys
+      edgeKeysSecret: api-gateway-jwt-edge-keys
+    # Session KEK: 32 raw bytes as standard base64 in Secret key `kek` (never commit real value in git).
+    sessionKek:
+      existingSecret: api-gateway-session-kek
+      secretKey: kek
+    # OIDC OAuth credentials from Secret (env AGWCP_OIDC_*); keys must match auth.oidc_providers[].id below.
+    oidcProviderCredentials:
+      github:
+        secretName: api-gateway-oidc-oauth
+        clientIdKey: github_client_id
+        clientSecretKey: github_client_secret
+      gitlab:
+        secretName: api-gateway-oidc-oauth
+        clientIdKey: gitlab_client_id
+        clientSecretKey: gitlab_client_secret
+      google:
+        secretName: api-gateway-oidc-oauth
+        clientIdKey: google_client_id
+        clientSecretKey: google_client_secret
+    # Merged into API Server config (snake_case). client_id / client_secret may be empty when using oidcProviderCredentials.
+    # Public HTTP base (NodePort / LB): used in CORS + OIDC redirect_uri_allowlist for browser / Postman.
+    config:
+      server:
+        cors:
+          allow_origins:
+          - "http://185.41.122.122:30100"
+          - "http://127.0.0.1:21987"
+          - "http://localhost:21987"
+      jwt:
+        # kid = basename of *.key without extension; pin which key signs when several exist (rotation).
+        api_signing_kid: api-server-key-2026-04-23
+        edge_signing_kid: edge-server-key-2026-04-23
+      auth:
+        environment: development
+        # External API base used to build upstream IdP callback URI:
+        # {oidc_external_base_url}/v1/auth/callback (must match IdP app settings).
+        oidc_external_base_url: "http://185.41.122.122:30100"
+        # Local-only override: allow http:// issuer/discovery/jwks/token endpoints.
+        oidc_allow_insecure_endpoints: true
+
+        interactive_access_token_ttl: "5m"
+        interactive_access_token_max_ttl: "168h"
+        interactive_refresh_token_ttl: "168h"
+        interactive_refresh_token_max_ttl: "720h"
+
+        oidc_providers:
+        - id: github
+          name: GitHub
+          kind: github
+          issuer: https://github.com/login/oauth
+          client_id: ""
+          client_secret: ""
+          redirect_uri_allowlist:
+          # agwctl default
+          - "http://127.0.0.1:21987/callback"
+          # Browser / Postman: IdP redirects here with ?code=&state= (must match GitHub/Google/GitLab app settings)
+          - "http://185.41.122.122:30100/v1/auth/callback"
+          - "http://elg.mikhailminaev.com:30100/v1/auth/callback"
+          # Postman OAuth 2.0 (Get New Access Token) helper
+          - "https://oauth.pstmn.io/v1/callback"
+          github:
+            auth_flow: "oauth_app"
+          claim_mapping:
+            rules:
+            - name: "github-org-required"
+              when: "!provider.github.org_logins.exists(o, o == 'merionyx')"
+              deny: true
+              deny_code: "GITHUB_ORG_REQUIRED"
+              deny_message: "User must be in GitHub organization merionyx."
+            - name: "github-maintainers-admin"
+              when: "provider.github.teams.exists(t, t.org_login == 'merionyx' && t.slug == 'maintainers')"
+              add_roles:
+              - "api:role:admin"
+        - id: gitlab
+          name: GitLab
+          kind: gitlab
+          # Self-managed: set issuer to https://gitlab.example.com (no path after host)
+          issuer: https://gitlab.com
+          client_id: ""
+          client_secret: ""
+          redirect_uri_allowlist:
+          - "http://127.0.0.1:21987/callback"
+          - "http://185.41.122.122:30100/v1/auth/callback"
+          - "http://elg.mikhailminaev.com:30100/v1/auth/callback"
+          - "https://oauth.pstmn.io/v1/callback"
+        - id: google
+          name: Google
+          kind: google
+          issuer: https://accounts.google.com
+          client_id: ""
+          client_secret: ""
+          redirect_uri_allowlist:
+          - "http://127.0.0.1:21987/callback"
+          - "http://185.41.122.122:30100/v1/auth/callback"
+          - "http://elg.mikhailminaev.com:30100/v1/auth/callback"
+          - "https://oauth.pstmn.io/v1/callback"
+          # Optional CEL mapping example:
+          # claim_mapping:
+          #   rules:
+          #   - name: "google-workspace-only"
+          #     when: "id_token.hd != 'yourcompany.com'"
+          #     deny: true
 
   contractSyncer:
     image:

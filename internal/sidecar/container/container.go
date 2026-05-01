@@ -40,7 +40,11 @@ func (c *Container) initStorage() {
 }
 
 func (c *Container) initJWTValidator() {
-	c.JWTValidator = jwt.NewJWTValidator(c.Config.JWT.JWKSURL)
+	c.JWTValidator = jwt.NewJWTValidator(
+		c.Config.JWT.JWKSURL,
+		c.Config.JWT.ExpectedIssuer,
+		c.Config.JWT.ExpectedAudience,
+	)
 	slog.Info("JWT validator initialized")
 }
 

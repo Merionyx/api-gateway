@@ -31,6 +31,12 @@ func TestLoadConfig_FromRepoDev(t *testing.T) {
 	if cfg.JWT.JWKSURL == "" {
 		t.Fatal("JWT.JWKSURL empty")
 	}
+	if cfg.JWT.ExpectedIssuer == "" {
+		t.Fatal("JWT.ExpectedIssuer empty (defaults should apply)")
+	}
+	if cfg.JWT.ExpectedAudience == "" {
+		t.Fatal("JWT.ExpectedAudience empty (defaults should apply)")
+	}
 }
 
 func TestLoadConfig_NoFile_Defaults(t *testing.T) {
@@ -40,5 +46,8 @@ func TestLoadConfig_NoFile_Defaults(t *testing.T) {
 	}
 	if cfg.JWT.JWKSURL == "" {
 		t.Fatal("expected default JWKS URL")
+	}
+	if cfg.JWT.ExpectedIssuer != "api-gateway-edge" || cfg.JWT.ExpectedAudience != "api-gateway-edge-http" {
+		t.Fatalf("expected Edge claim defaults, got iss=%q aud=%q", cfg.JWT.ExpectedIssuer, cfg.JWT.ExpectedAudience)
 	}
 }

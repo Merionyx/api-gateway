@@ -2,6 +2,10 @@ server:
   http_port: "8080"
   grpc_port: "19093"
   host: "0.0.0.0"
+  # Browser CORS: list every Origin (scheme+host+port) allowed to call this API from the browser.
+  # Production/staging must not use "*". Leave empty to disable CORS until UIs are known.
+  cors:
+    allow_origins: []
 
 etcd:
   endpoints:
@@ -17,7 +21,10 @@ etcd:
 
 jwt:
   keys_dir: "./secrets/api-server/keys/jwt"
+  # edge_keys_dir: ""  # omit = <keys_dir>/edge (on K8s read-only mounts use a second path; see Helm README)
+  # api_signing_kid / edge_signing_kid: optional fixed kid when multiple *.key files exist (else newest by mtime)
   issuer: "api-gateway-api-server"
+  # api_audience, edge_issuer, edge_audience: see config defaults (API_SERVER_JWT_*)
 
 contract_syncer:
   address: "gateway-contract-syncer:19092"
@@ -34,17 +41,141 @@ leader_election:
   identity: ""
   session_ttl_seconds: 5
 
-# Idempotency-Key on POST /api/v1/bundles/sync: memory (default) or etcd (HA).
+# Idempotency-Key on POST /v1/bundles/sync: memory (default) or etcd (HA).
 idempotency:
   backend: "memory"
   bundle_sync_ttl: "24h"
   etcd_key_prefix: "/api-gateway/api-server/idempotency/v1"
   cluster: ""
 
-# OpenTelemetry: optional; can be overridden (e.g. TELEMETRY_ENABLED) via environment.
-# telemetry:
-#   enabled: false
-#   service_name: "api-server"
-#   otlp_endpoint: "http://jaeger:4317"
-#   otlp_insecure: true
-#   otlp_protocol: "grpc"
+# Auth etcd layout (API keys, future sessions). Bootstrap is dev-only — see docs/operator-api-server-auth.md
+auth:
+  etcd_key_prefix: "/api-gateway/api-server/auth/v1"
+  environment: "production"
+  allow_insecure_bootstrap: false
+  # login_intent_lease_ttl: "15m"   # default if omitted
+  # interactive_access_token_ttl: "5m"        # default API access JWT lifetime when the client does not request another value
+  # interactive_access_token_max_ttl: "168h"  # default upper bound for client-requested access TTL
+  # interactive_refresh_token_ttl: "168h"     # default refresh-chain lifetime when the client does not request another value
+  # interactive_refresh_token_max_ttl: "720h" # default upper bound for client-requested refresh TTL; still clamped to provider refresh TTL
+  # authorization:
+  #   roles:
+  #     - id: "api:role:token-generator"
+  #       permissions: ["api.token.edge.issue"]
+  #     - id: "api:role:contract-exporter"
+  #       permissions: ["api.contracts.export"]
+  # Immutable built-ins (cannot be overridden in config):
+  #   - api:role:admin
+  #   - api:role:viewer
+  # session_kek_base64: "<openssl rand -base64 32>"  # required when oidc_providers is set (32 bytes after decode)
+  # oidc_external_base_url: "https://api.example.com" # required when oidc_providers is set; callback URI becomes {base}/v1/auth/callback
+  # oidc_allow_insecure_endpoints: false # strict by default; set true only for local/dev HTTP IdP endpoints
+  # oidc_providers:                 # OAuth2.1 GET /v1/auth/authorize; see docs/etcd-auth-paths.md
+  #   - id: "dev-oidc"
+  #     name: "Development OIDC"
+  #     issuer: "https://your-idp.example"
+  #     client_id: "your-client-id"
+  #     client_secret: "from-secret-manager"
+  #     redirect_uri_allowlist:
+  #       - "http://127.0.0.1:21987/callback"
+  #     extra_scopes: ["email"]
+  # CEL claim mapping: each rule evaluates against:
+  #   - id_token.* (validated upstream token claims)
+  #   - provider.*  (provider metadata and fetched provider API data for kind-specific providers)
+  #
+  # GitHub (issuer must be https://github.com/login/oauth ; kind: github)
+  #   - id: "github"
+  #     name: "GitHub"
+  #     kind: "github"
+  #     issuer: "https://github.com/login/oauth"
+  #     client_id: "…"
+  #     client_secret: "…"
+  #     redirect_uri_allowlist: ["http://127.0.0.1:21987/callback"]
+  #     github:
+  #       auth_flow: "oauth_app"   # or "github_app" for GitHub App user-to-server tokens (no OAuth scopes in authorize URL)
+  #     claim_mapping:
+  #       rules:
+  #         - name: "deny-non-org"
+  #           when: "!provider.github.org_logins.exists(o, o == 'my-org')"
+  #           deny: true
+  #           deny_code: "GITHUB_ORG_REQUIRED"
+  #           deny_message: "User must be in my-org"
+  #         - name: "platform-admins"
+  #           when: "provider.github.teams.exists(t, t.org_login == 'my-org' && t.slug == 'admins')"
+  #           add_roles: ["api:role:admin"]
+  #           add_permissions: ["api.token.edge.issue"]
+  #
+  # GitLab (issuer = https://gitlab.com or self-managed origin; kind: gitlab)
+  #   - id: "gitlab"
+  #     name: "GitLab"
+  #     kind: "gitlab"
+  #     issuer: "https://gitlab.com"
+  #     client_id: "…"
+  #     client_secret: "…"
+  #     redirect_uri_allowlist: ["http://127.0.0.1:21987/callback"]
+  #     claim_mapping:
+  #       rules:
+  #         - name: "gitlab-root-check"
+  #           when: "provider.gitlab.group_full_paths.exists(g, g == 'my-root-group' || g.startsWith('my-root-group/'))"
+  #           add_roles: ["api:role:viewer"]
+  #         - name: "gitlab-admin"
+  #           when: "provider.gitlab.group_full_paths.exists(g, g == 'my-root-group/admins')"
+  #           add_roles: ["api:role:admin"]
+  #
+  # Google (issuer must be https://accounts.google.com ; kind: google)
+  #   - id: "google"
+  #     name: "Google"
+  #     kind: "google"
+  #     issuer: "https://accounts.google.com"
+  #     client_id: "….apps.googleusercontent.com"
+  #     client_secret: "…"
+  #     redirect_uri_allowlist: ["http://127.0.0.1:21987/callback"]
+  #     claim_mapping:
+  #       rules:
+  #         - name: "google-workspace-only"
+  #           when: "id_token.hd != 'example.com'"
+  #           deny: true
+  #           deny_code: "GOOGLE_HD_REQUIRED"
+  #         - name: "google-admins"
+  #           when: "id_token.hd == 'example.com'"
+  #           add_roles: ["api:role:admin"]
+  #
+  # Okta (issuer = Authorization Server URL (https); kind: okta)
+  #   - id: "okta"
+  #     name: "Okta"
+  #     kind: "okta"
+  #     issuer: "https://dev-12345.okta.com/oauth2/default"
+  #     client_id: "…"
+  #     client_secret: "…"
+  #     redirect_uri_allowlist: ["http://127.0.0.1:21987/callback"]
+  #     claim_mapping:
+  #       rules:
+  #         - name: "okta-groups"
+  #           when: "id_token.groups.exists(g, g == 'API Gateway Admins')"
+  #           add_roles: ["api:role:admin"]
+  #
+  # Entra ID (issuer = v2.0 metadata URL (https); kind: entra)
+  #   - id: "entra"
+  #     name: "Microsoft Entra ID"
+  #     kind: "entra"
+  #     issuer: "https://login.microsoftonline.com/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/v2.0"
+  #     client_id: "…"
+  #     client_secret: "…"
+  #     redirect_uri_allowlist: ["http://127.0.0.1:21987/callback"]
+  #     claim_mapping:
+  #       rules:
+  #         - name: "entra-tenant-check"
+  #           when: "id_token.tid != 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'"
+  #           deny: true
+  #           deny_code: "ENTRA_TENANT_DENIED"
+  #         - name: "entra-admin-group"
+  #           when: "id_token.groups.exists(g, g == '<group object id as in id_token>')"
+  #           add_roles: ["api:role:admin"]
+
+  # OpenTelemetry: optional.
+  # telemetry:
+  #   enabled: false
+  #   service_name: "api-server"
+  #   otlp_endpoint: "http://jaeger:4317"
+  #   otlp_insecure: true
+  #   otlp_protocol: "grpc"

@@ -40,3 +40,45 @@ var (
 	// ErrSigningOperationFailed wraps crypto/signing failures after key selection (HTTP 500, gRPC Internal).
 	ErrSigningOperationFailed = errors.New("signing operation failed")
 )
+
+// OIDC login (HTTP)
+var (
+	// ErrOIDCNotConfigured means no OIDC providers are configured (HTTP 400).
+	ErrOIDCNotConfigured = errors.New("oidc login not configured")
+
+	// ErrOIDCUnknownProvider means provider_id does not match a configured provider (HTTP 400).
+	ErrOIDCUnknownProvider = errors.New("unknown oidc provider_id")
+
+	// ErrOIDCRedirectNotAllowlisted means redirect_uri is not on the provider allowlist (HTTP 400).
+	ErrOIDCRedirectNotAllowlisted = errors.New("redirect_uri not allowlisted")
+
+	// ErrSessionRefreshConflict means etcd CAS lost during refresh (HTTP 409, ADR 0001).
+	ErrSessionRefreshConflict = errors.New("session refresh state conflict")
+
+	// ErrSessionAuthFailed means invalid or unknown refresh / session (HTTP 401).
+	ErrSessionAuthFailed = errors.New("session authentication failed")
+
+	// ErrSessionRefreshExpired means the interactive refresh chain exceeded its lifetime or lacks expiry metadata.
+	ErrSessionRefreshExpired = errors.New("session refresh expired")
+
+	// ErrGitHubLoginDenied means the user failed GitHub org/team policy at callback (HTTP 403).
+	ErrGitHubLoginDenied = errors.New("github login denied by org or team policy")
+
+	// ErrGitLabLoginDenied means the user failed GitLab group policy at callback (HTTP 403).
+	ErrGitLabLoginDenied = errors.New("gitlab login denied by group policy")
+
+	// ErrGoogleLoginDenied means the user failed Google hd/email domain policy at callback (HTTP 403).
+	ErrGoogleLoginDenied = errors.New("google login denied by hosted domain or email policy")
+
+	// ErrOktaLoginDenied means the user failed Okta id_token groups policy at callback (HTTP 403).
+	ErrOktaLoginDenied = errors.New("okta login denied by id_token groups policy")
+
+	// ErrEntraLoginDenied means the user failed Microsoft Entra id_token tid/groups policy at callback (HTTP 403).
+	ErrEntraLoginDenied = errors.New("entra login denied by tenant or id_token groups policy")
+
+	// ErrOIDCClaimMappingDenied means CEL claim-mapping policy rejected the authenticated user (HTTP 403).
+	ErrOIDCClaimMappingDenied = errors.New("oidc claim mapping denied")
+
+	// ErrOIDCClaimMappingRuntime means CEL claim-mapping could not be evaluated due to runtime/config issues (HTTP 500).
+	ErrOIDCClaimMappingRuntime = errors.New("oidc claim mapping runtime failure")
+)

@@ -11,7 +11,7 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
-// StatusReadUseCase aggregates dependency health for GET /api/v1/status.
+// StatusReadUseCase aggregates dependency health for GET /v1/status.
 type StatusReadUseCase struct {
 	etcdClient         *clientv3.Client
 	contractSyncerPing interfaces.ContractSyncerReachability

@@ -44,6 +44,24 @@ func TestLoadConfig_FromRepoSample(t *testing.T) {
 	if cfg.Readiness.RequireContractSyncer {
 		t.Fatal("Readiness.RequireContractSyncer expected false from sample config")
 	}
+	if cfg.Auth.InteractiveAccessTokenTTL != DefaultInteractiveAccessTokenTTL {
+		t.Fatalf("InteractiveAccessTokenTTL: got %s", cfg.Auth.InteractiveAccessTokenTTL)
+	}
+	if cfg.Auth.InteractiveAccessTokenMaxTTL != DefaultInteractiveAccessTokenMaxTTL {
+		t.Fatalf("InteractiveAccessTokenMaxTTL: got %s", cfg.Auth.InteractiveAccessTokenMaxTTL)
+	}
+	if cfg.Auth.InteractiveRefreshTokenTTL != DefaultInteractiveRefreshTokenTTL {
+		t.Fatalf("InteractiveRefreshTokenTTL: got %s", cfg.Auth.InteractiveRefreshTokenTTL)
+	}
+	if cfg.Auth.InteractiveRefreshTokenMaxTTL != DefaultInteractiveRefreshTokenMaxTTL {
+		t.Fatalf("InteractiveRefreshTokenMaxTTL: got %s", cfg.Auth.InteractiveRefreshTokenMaxTTL)
+	}
+	if len(cfg.Server.CORS.AllowOrigins) != 0 {
+		t.Fatalf("sample prod config should keep server.cors.allow_origins empty (operator-filled), got %#v", cfg.Server.CORS.AllowOrigins)
+	}
+	if cfg.Auth.OIDCAllowInsecureEndpoints {
+		t.Fatal("OIDCAllowInsecureEndpoints must default to false")
+	}
 }
 
 func TestLoadConfig_NoFile_Defaults(t *testing.T) {
@@ -57,10 +75,25 @@ func TestLoadConfig_NoFile_Defaults(t *testing.T) {
 	if cfg.JWT.Issuer != "api-gateway-api-server" {
 		t.Fatalf("JWT default issuer: %q", cfg.JWT.Issuer)
 	}
+	if cfg.Auth.InteractiveAccessTokenMaxTTL != DefaultInteractiveAccessTokenMaxTTL {
+		t.Fatalf("access max ttl default: %s", cfg.Auth.InteractiveAccessTokenMaxTTL)
+	}
+	if cfg.Auth.InteractiveRefreshTokenTTL != DefaultInteractiveRefreshTokenTTL {
+		t.Fatalf("refresh ttl default: %s", cfg.Auth.InteractiveRefreshTokenTTL)
+	}
+	if cfg.Auth.InteractiveRefreshTokenMaxTTL != DefaultInteractiveRefreshTokenMaxTTL {
+		t.Fatalf("refresh max ttl default: %s", cfg.Auth.InteractiveRefreshTokenMaxTTL)
+	}
 	if !cfg.LeaderElection.Enabled {
 		t.Fatal("leader election should default to enabled")
 	}
 	if cfg.Readiness.RequireContractSyncer {
 		t.Fatal("readiness.require_contract_syncer should default to false")
+	}
+	if len(cfg.Server.CORS.AllowOrigins) == 0 {
+		t.Fatal("no config file: expected default server.cors.allow_origins for browser dev")
+	}
+	if cfg.Auth.OIDCAllowInsecureEndpoints {
+		t.Fatal("auth.oidc_allow_insecure_endpoints should default to false")
 	}
 }

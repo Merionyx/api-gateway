@@ -35,7 +35,7 @@ func TestAfterRegisterAndStreamSession(t *testing.T) {
 			name:    "context done wins over nil session",
 			ctx:     canceledCtx,
 			sessErr: nil,
-			exp: afterSessionExpect{endLoop: true, sessionEnd: metrics.SessionReasonCanceled, checkCtxErr: true},
+			exp:     afterSessionExpect{endLoop: true, sessionEnd: metrics.SessionReasonCanceled, checkCtxErr: true},
 		},
 		{
 			name:    "clean exit no metric",

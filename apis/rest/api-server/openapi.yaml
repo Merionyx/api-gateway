@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: API Gateway — API Server HTTP API
-  version: 1.3.0
+  version: 1.0.0
   description: |
     HTTP API for the **API Server** control plane: authentication material (JWT, JWKS), contract export,
     registry views backed by **etcd** (controllers, tenants, bundles), and operational endpoints.
@@ -10,12 +10,6 @@ info:
     lifecycle is owned by the **Gateway Controller**; this API does not expose CRUD for environments.
 
     **JSON naming:** request and response bodies use **snake_case** field names unless noted.
-
-    **v1.1.0** added optional `config_source` on static bundles, `sources_fingerprint` and `effective_generation` on
-    environments. **v1.2.0** added `environment_config_source`, `services` (static upstreams with per-line
-    `config_source`). **v1.3.0** nests that observability in **`meta`** on each entity (`provenance.config_source`, plus
-    `effective_generation` / `sources_fingerprint` only on environment `meta`); flat `config_source` fields on bundles
-    and services are removed in favor of `meta.provenance`.
 
     **Errors:** all failed requests use **`application/problem+json`** (RFC 9457 / RFC 7807 Problem Details).
   contact:
@@ -34,9 +28,11 @@ servers:
 
 tags:
 - name: System
-  description: Liveness (`/health`), readiness (`/ready`), build metadata (`/api/v1/version`), and aggregate status (`/api/v1/status`)
+  description: Liveness (`/health`), readiness (`/ready`), build metadata (`/v1/version`), and aggregate status (`/v1/status`)
 - name: Authentication
   description: JWT issuance, JWKS, signing keys
+- name: OIDC
+  description: Interactive OAuth2/OIDC authorize, callback, and token endpoints
 - name: Contracts
   description: Contract export from Git via Contract Syncer
 - name: Registry
@@ -46,8 +42,6 @@ tags:
 - name: Operations
   description: Sync and maintenance actions
 
-security: []
-
 components:
   securitySchemes:
     bearerAuth:
@@ -55,7 +49,13 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: |
-        Reserved for future use. The current API Server revision does not validate Bearer tokens on these routes.
+        **API profile** access JWT (`iss` / `aud` / `kid` for API Server HTTP routes). Not interchangeable with Edge tokens.
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        Opaque M2M / CI API key (never logged or returned after creation). Constant-time lookup server-side.
 
   parameters:
     Limit:
@@ -345,6 +345,247 @@ components:
           type: string
           format: date-time
 
+    AuthRefreshRequest:
+      type: object
+      required:
+      - refresh_token
+      properties:
+        refresh_token:
+          type: string
+          description: Our refresh token from the last login or refresh response (server must not log this value).
+        access_ttl:
+          type: integer
+          minimum: 1
+          description: Optional requested access token lifetime in seconds. The server clamps this to policy.
+        refresh_ttl:
+          type: integer
+          minimum: 1
+          description: Optional requested refresh-chain lifetime in seconds. The server clamps this to policy and provider refresh limits.
+
+    AuthSessionTokensResponse:
+      type: object
+      required:
+      - access_token
+      - access_expires_at
+      - refresh_token
+      - refresh_expires_at
+      properties:
+        access_token:
+          type: string
+          description: New **API profile** access JWT.
+        access_expires_at:
+          type: string
+          format: date-time
+          description: Actual expiry instant of `access_token` after server policy clamping.
+        refresh_token:
+          type: string
+          description: Rotated our refresh token; clients must discard the previous pair.
+        refresh_expires_at:
+          type: string
+          format: date-time
+          description: Actual expiry instant of `refresh_token` after server policy and provider-limit clamping.
+        token_type:
+          type: string
+          description: Token type for `access_token` (e.g. Bearer).
+          default: Bearer
+
+    OAuthTokenRequestForm:
+      type: object
+      required:
+      - grant_type
+      properties:
+        grant_type:
+          type: string
+          enum: [ authorization_code, refresh_token ]
+        code:
+          type: string
+          description: Required for `authorization_code` grant.
+        redirect_uri:
+          type: string
+          format: uri
+          description: Required for `authorization_code` grant; must match authorize request.
+        client_id:
+          type: string
+          description: |
+            Required for `authorization_code` grant. Must be sent in form body; `Authorization: Basic` client authentication is not supported.
+        code_verifier:
+          type: string
+          description: Required for `authorization_code` grant (`S256` PKCE).
+        refresh_token:
+          type: string
+          description: Required for `refresh_token` grant.
+        access_ttl:
+          type: integer
+          minimum: 1
+          description: "Optional extension: requested access token lifetime in seconds (server clamps to policy)."
+        refresh_ttl:
+          type: integer
+          minimum: 1
+          description: "Optional extension: requested refresh token lifetime in seconds (server clamps to policy and provider limits)."
+
+    OAuthTokenResponse:
+      type: object
+      required:
+      - access_token
+      - token_type
+      - expires_in
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          description: OAuth token type (always Bearer).
+          default: Bearer
+        expires_in:
+          type: integer
+          minimum: 1
+          description: Access token lifetime in seconds from now.
+        refresh_token:
+          type: string
+          description: Present for both `authorization_code` and `refresh_token` grants.
+        refresh_expires_in:
+          type: integer
+          minimum: 1
+          description: Refresh token remaining lifetime in seconds from now.
+        access_expires_at:
+          type: string
+          format: date-time
+          description: Extension for explicit access token expiry timestamp.
+        refresh_expires_at:
+          type: string
+          format: date-time
+          description: Extension for explicit refresh token expiry timestamp.
+
+    OAuthTokenError:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: string
+          description: OAuth 2.1 error code (`invalid_request`, `invalid_grant`, `temporarily_unavailable`, `server_error`).
+        error_description:
+          type: string
+          description: Human-readable detail for diagnostics.
+
+    OidcProviderDescriptor:
+      type: object
+      description: |
+        Public metadata for one configured `auth.oidc_providers[]` entry. Safe for browser UIs and CLI; excludes client secrets and redirect allowlists.
+      required:
+      - id
+      - name
+      - kind
+      - issuer
+      properties:
+        id:
+          type: string
+          description: Same as `provider_id` for `GET /v1/auth/authorize`.
+        name:
+          type: string
+          description: User-facing provider label configured in `auth.oidc_providers[].name`.
+        kind:
+          type: string
+          description: |
+            Normalized provider kind for labels/icons: `generic` when unset in config, otherwise `github`, `gitlab`, `google`, `okta`, or `entra` (lowercase).
+        issuer:
+          type: string
+          format: uri
+          description: OIDC issuer URL configured for this provider.
+
+    PermissionDescriptor:
+      type: object
+      description: One API permission and its human-readable description.
+      required:
+      - id
+      - description
+      properties:
+        id:
+          type: string
+          description: Stable machine-readable permission identifier.
+        description:
+          type: string
+          description: Human-readable explanation of what this permission grants.
+
+    RolePermissions:
+      type: object
+      description: One role with its effective permission set.
+      required:
+      - role
+      - permissions
+      properties:
+        role:
+          type: string
+          description: Role identifier (built-in or configured).
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PermissionDescriptor'
+
+    TokenPermissionsRequest:
+      type: object
+      required:
+      - access_token
+      properties:
+        access_token:
+          type: string
+          description: API-profile JWT to inspect.
+
+    TokenPermissionsResponse:
+      type: object
+      required:
+      - subject
+      - roles
+      - permissions
+      properties:
+        subject:
+          type: string
+          description: 'Token subject (claim priority: `email`, then `preferred_username`, then `sub`).'
+        roles:
+          type: array
+          items:
+            type: string
+          description: Role ids resolved from the token `roles` claim.
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PermissionDescriptor'
+          description: Effective permissions from role expansion plus direct `permissions` claim.
+
+    IssueApiAccessTokenRequest:
+      type: object
+      description: |
+        Draft body for `POST /v1/tokens/api`. Final fields follow RBAC/CEL and M2M policy.
+      properties:
+        permissions:
+          type: array
+          items:
+            type: string
+          description: Optional per-token delegated permissions; when accepted they are embedded into the issued API token claims (for this token only).
+        expires_at:
+          type: string
+          format: date-time
+          description: |
+            Optional absolute expiration instant (UTC) for the issued API token.
+            Must be in the future and must not exceed either:
+            1) server policy max for this endpoint;
+            2) caller Bearer token expiration.
+
+    ApiAccessTokenIssued:
+      type: object
+      description: |
+        JSON body for **201** from `POST /v1/tokens/api` (name avoids clashing with client codegen type `IssueApiAccessTokenResponse`).
+      required:
+      - access_token
+      - expires_at
+      properties:
+        access_token:
+          type: string
+          description: Short-lived **API profile** JWT for calling this HTTP API.
+        expires_at:
+          type: string
+          format: date-time
+
     ContractsExportRequest:
       type: object
       required:
@@ -466,9 +707,9 @@ components:
       type: string
       description: Whether a service line belongs to the per-environment static merge or the controller root pool.
       enum:
-        - environment
-        - controller_root
-        - unspecified
+      - environment
+      - controller_root
+      - unspecified
 
     ServiceMeta:
       type: object
@@ -775,12 +1016,43 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
+    Unauthorized:
+      description: Authentication failed or credentials are missing.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: Authenticated but not authorized (e.g. missing required role for the operation).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Conflict:
+      description: Request conflicts with current state (e.g. lost etcd CAS / concurrent refresh).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    BadGateway:
+      description: Bad gateway — upstream IdP or dependency error.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ServiceUnavailable:
+      description: Service temporarily unavailable (e.g. persistence).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
 
 paths:
   /health:
     get:
       tags: [ System ]
       operationId: getHealth
+      security: []
       summary: Liveness
       description: |
         **Liveness only:** returns `{ "status": "ok" }` when the process accepts HTTP — does **not** verify etcd or Contract Syncer.
@@ -791,7 +1063,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HealthStatus'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/HealthStatus'
+                required:
+                - data
         '400':
           $ref: '#/components/responses/BadRequest'
 
@@ -799,6 +1076,7 @@ paths:
     get:
       tags: [ System ]
       operationId: getReady
+      security: []
       summary: Readiness
       description: |
         **Readiness probe:** verifies **etcd** (required). **Contract Syncer** is included only when the server is configured
@@ -810,7 +1088,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ReadinessStatus'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ReadinessStatus'
+                required:
+                - data
         '503':
           description: Not ready (required dependency check failed)
           content:
@@ -820,10 +1103,11 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
-  /api/v1/version:
+  /v1/version:
     get:
       tags: [ System ]
       operationId: getVersion
+      security: []
       summary: Build and API schema version
       description: |
         Returns git revision, build time, embedded OpenAPI `info.version`, and optional release tag — useful to see **which binary** answers in multi-replica setups.
@@ -833,7 +1117,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VersionResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/VersionResponse'
+                required:
+                - data
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -841,9 +1130,10 @@ paths:
     get:
       tags: [ Authentication ]
       operationId: getJwks
-      summary: JSON Web Key Set (JWKS)
+      security: []
+      summary: JSON Web Key Set (JWKS) — API profile
       description: |
-        Public keys for verifying JWTs issued by this API Server (`/.well-known/jwks.json`). Supports conditional requests via `ETag` / `If-None-Match` to avoid re-downloading when keys are unchanged.
+        Public keys for verifying **API profile** JWTs minted for HTTP calls to this API Server (`iss` / `aud` / `kid` for the API surface). Supports conditional requests via `ETag` / `If-None-Match`. **Not** for Edge / data-plane tokens — use `/.well-known/jwks-edge.json`.
       parameters:
       - $ref: '#/components/parameters/IfNoneMatch'
       responses:
@@ -863,10 +1153,38 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/keys:
+  /.well-known/jwks-edge.json:
+    get:
+      tags: [ Authentication ]
+      operationId: getJwksEdge
+      security: []
+      summary: JSON Web Key Set (JWKS) — Edge profile
+      description: |
+        Public keys for verifying **Edge profile** JWTs consumed by Envoy / ExtAuthz and data plane (**not** valid as `Authorization` on this HTTP API). Same caching semantics as the API JWKS.
+      parameters:
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: JWKS document (Edge signing keys)
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Jwks'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/keys:
     get:
       tags: [ Authentication ]
       operationId: listSigningKeys
+      security: []
       summary: List JWT signing keys (metadata)
       description: |
         Returns metadata about configured signing keys (`kid`, algorithm, active flag, creation time). Does not expose private key material. Cache-friendly with `ETag` / `If-None-Match`.
@@ -881,9 +1199,14 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/SigningKey'
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SigningKey'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '400':
@@ -891,53 +1214,408 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/tokens:
-    post:
-      tags: [ Authentication ]
-      operationId: createToken
-      summary: Issue application JWT
+  /v1/auth/oidc-providers:
+    get:
+      tags: [ OIDC ]
+      operationId: listOidcProviders
+      security: []
+      summary: List configured OIDC login providers
       description: |
-        Mints an application JWT bound to `app_id` and allowed `environments`. The raw token string is returned only in this response (`201`); store it securely. `expires_at` must be in the future.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenerateTokenRequest'
+        Returns the set of `auth.oidc_providers` entries exposed for interactive login (`provider_id`, name, kind, issuer).
+        Does not include secrets. When OIDC is not configured, returns `{ "data": [] }` (**200**).
       responses:
-        '201':
-          description: Token created
+        '200':
+          description: Providers available for `GET /v1/auth/authorize` (possibly empty).
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GenerateTokenResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OidcProviderDescriptor'
+                required:
+                - data
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/contracts/export:
-    post:
-      tags: [ Contracts ]
-      operationId: exportContracts
-      summary: Export contract files from Git (via Contract Syncer)
+  /v1/auth/roles:
+    get:
+      tags: [ Authentication ]
+      operationId: listAuthRoles
+      security: []
+      summary: List roles with effective permissions
       description: |
-        Fetches contract YAML/JSON from a Git repository via the Contract Syncer service (not from etcd). Specify `repository` and `ref`; optionally narrow by `path` and/or a single `contract_name`. Response files carry base64-encoded content.
+        Returns the role catalog used by API authorization (built-in and configured roles), with each role expanded to its effective permissions.
+      responses:
+        '200':
+          description: Role catalog with permission descriptors.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RolePermissions'
+                required:
+                - data
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/auth/permissions:
+    get:
+      tags: [ Authentication ]
+      operationId: listAuthPermissions
+      security: []
+      summary: List documented permissions
+      description: |
+        Returns all available permission identifiers and descriptions:
+        built-in permissions plus custom permissions referenced by configured roles.
+      responses:
+        '200':
+          description: Permission catalog.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PermissionDescriptor'
+                required:
+                - data
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/auth/token-permissions:
+    post:
+      tags: [ Authentication ]
+      operationId: inspectTokenPermissions
+      security: []
+      summary: Inspect permissions from an API access token
+      description: |
+        Validates a provided API-profile JWT and returns effective permissions with descriptions.
+        Effective permissions are resolved as:
+        1) permissions inherited from `roles` via role catalog;
+        2) direct token claim `permissions`.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ContractsExportRequest'
+              type: object
+              properties:
+                data:
+                  $ref: '#/components/schemas/TokenPermissionsRequest'
+              required:
+              - data
+      responses:
+        '200':
+          description: Effective permissions for the provided token.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/TokenPermissionsResponse'
+                required:
+                - data
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/auth/authorize:
+    get:
+      tags: [ OIDC ]
+      operationId: authorizeOidc
+      security: []
+      summary: OAuth 2.1 authorize endpoint (upstream OIDC-backed)
+      description: |
+        Starts the interactive OAuth authorization flow.
+        The API Server acts as an OAuth 2.1 authorization server for clients (for example Postman), while delegating user authentication to configured upstream OIDC providers.
+      parameters:
+      - name: provider_id
+        in: query
+        required: false
+        description: Registered IdP configuration identifier. Optional when exactly one provider is configured.
+        schema:
+          type: string
+      - name: redirect_uri
+        in: query
+        required: true
+        description: Downstream client callback URL (must be allowlisted for selected provider).
+        schema:
+          type: string
+          format: uri
+      - name: response_type
+        in: query
+        required: true
+        description: OAuth response type (`code`).
+        schema:
+          type: string
+          enum: [ code ]
+      - name: client_id
+        in: query
+        required: true
+        description: OAuth client identifier (opaque for this server, validated round-trip with token endpoint).
+        schema:
+          type: string
+      - name: state
+        in: query
+        required: false
+        description: Opaque client state echoed back to `redirect_uri`.
+        schema:
+          type: string
+      - name: code_challenge
+        in: query
+        required: true
+        description: PKCE code challenge.
+        schema:
+          type: string
+      - name: code_challenge_method
+        in: query
+        required: true
+        description: PKCE method. OAuth 2.1 requires `S256`.
+        schema:
+          type: string
+          enum: [ S256 ]
+      - name: nonce
+        in: query
+        required: false
+        description: Optional OIDC `nonce` (replay protection); echoed into the authorization request when set.
+        schema:
+          type: string
+      responses:
+        '302':
+          description: Redirect to the upstream IdP authorization endpoint.
+          headers:
+            Location:
+              description: IdP authorization URL including `state` and PKCE challenge.
+              schema:
+                type: string
+                format: uri
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/auth/callback:
+    get:
+      tags: [ OIDC ]
+      operationId: callbackOidc
+      security: []
+      summary: OIDC callback from upstream IdP
+      description: |
+        Browser redirect target after upstream IdP login.
+        Always redirects (**302**) to downstream OAuth client `redirect_uri` with local authorization `code` and optional `state`.
+      parameters:
+      - name: code
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: state
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        '302':
+          description: "OAuth mode: redirect to downstream client `redirect_uri` with authorization code."
+          headers:
+            Location:
+              description: Downstream callback URL containing `code` and optional `state`.
+              schema:
+                type: string
+                format: uri
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/auth/token:
+    post:
+      tags: [ OIDC ]
+      operationId: tokenOidc
+      security: []
+      summary: OAuth 2.1 token endpoint
+      description: |
+        Exchanges OAuth `authorization_code` + PKCE for API tokens, and supports `refresh_token` grant.
+        Uses `application/x-www-form-urlencoded` request body per OAuth 2.1 conventions.
+        `client_id` must be provided in the form body (for `authorization_code` grant); `Authorization: Basic` is rejected.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OAuthTokenRequestForm'
+      responses:
+        '200':
+          description: OAuth token response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthTokenResponse'
+        '400':
+          description: OAuth client/request/grant error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthTokenError'
+        '503':
+          description: Token endpoint temporarily unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthTokenError'
+        '500':
+          description: Internal token endpoint error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthTokenError'
+
+  /v1/tokens/edge:
+    post:
+      tags: [ Authentication ]
+      operationId: issueEdgeToken
+      security:
+      - bearerAuth: []
+      - apiKey: []
+      summary: Issue Edge profile JWT (data plane / ExtAuthz)
+      description: |
+        Mints an **Edge profile** JWT (distinct `iss` / `aud` / JWKS from API tokens). Request/response use **`GenerateTokenRequest`** / **`GenerateTokenResponse`** (same shape as pre-v1.5.0 application tokens).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  $ref: '#/components/schemas/GenerateTokenRequest'
+              required:
+              - data
+      responses:
+        '201':
+          description: Edge token created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/GenerateTokenResponse'
+                required:
+                - data
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/tokens/api:
+    post:
+      tags: [ Authentication ]
+      operationId: issueApiAccessToken
+      security:
+      - bearerAuth: []
+      summary: Issue API profile access JWT
+      description: |
+        Mints a short-lived **API profile** JWT for calling this HTTP API. Request **`IssueApiAccessTokenRequest`** and **201** body **`ApiAccessTokenIssued`** are stable for codegen.
+        Requires an interactive human Bearer token (API keys and delegated API tokens are not allowed as issuers).
+        The issued token cannot exceed caller permissions or caller expiration.
+        **RBAC (step 23):** requires role **`api:access_tokens:issue`** or admin role (**`api:role:admin`**) via JWT `roles`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  $ref: '#/components/schemas/IssueApiAccessTokenRequest'
+              required:
+              - data
+      responses:
+        '201':
+          description: API access token created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ApiAccessTokenIssued'
+                required:
+                - data
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/contracts/export:
+    post:
+      tags: [ Contracts ]
+      operationId: exportContracts
+      security:
+      - bearerAuth: []
+      - apiKey: []
+      summary: Export contract files from Git (via Contract Syncer)
+      description: |
+        Fetches contract YAML/JSON from a Git repository via the Contract Syncer service (not from etcd). Specify `repository` and `ref`; optionally narrow by `path` and/or a single `contract_name`. Response files carry base64-encoded content.
+        **RBAC:** requires **`api:contracts:export`** or admin role (**`api:role:admin`**).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  $ref: '#/components/schemas/ContractsExportRequest'
+              required:
+              - data
       responses:
         '200':
           description: Exported files
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ContractsExportResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ContractsExportResponse'
+                required:
+                - data
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '502':
           description: Bad gateway (e.g. Contract Syncer unavailable)
           content:
@@ -947,10 +1625,13 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/controllers:
+  /v1/controllers:
     get:
       tags: [ Registry ]
       operationId: listControllers
+      security:
+      - bearerAuth: []
+      - apiKey: []
       summary: List registered controllers
       description: |
         Lists Gateway Controllers registered in etcd (`controller_id`, `tenant`, declared environments and static bundles). Paginated with `limit` / `cursor`. Use `If-None-Match` with the previous `ETag` to obtain `304` when nothing changed.
@@ -967,7 +1648,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ControllerListResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ControllerListResponse'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '400':
@@ -975,10 +1661,13 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/controllers/{controller_id}:
+  /v1/controllers/{controller_id}:
     get:
       tags: [ Registry ]
       operationId: getController
+      security:
+      - bearerAuth: []
+      - apiKey: []
       summary: Get controller by ID
       description: |
         Returns one controller record by `controller_id`. Supports conditional GET via `If-None-Match` / `ETag`. `404` if the controller is unknown.
@@ -994,7 +1683,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Controller'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Controller'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '404':
@@ -1002,10 +1696,13 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/controllers/{controller_id}/heartbeat:
+  /v1/controllers/{controller_id}/heartbeat:
     get:
       tags: [ Registry ]
       operationId: getControllerHeartbeat
+      security:
+      - bearerAuth: []
+      - apiKey: []
       summary: Get last heartbeat for a controller
       description: |
         Returns the last heartbeat timestamp stored for the controller (operator visibility). Not the same payload as full controller registration; use when you only need freshness. `404` if the controller does not exist.
@@ -1021,7 +1718,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ControllerHeartbeat'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ControllerHeartbeat'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '404':
@@ -1029,10 +1731,13 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/tenants:
+  /v1/tenants:
     get:
       tags: [ Registry ]
       operationId: listTenants
+      security:
+      - bearerAuth: []
+      - apiKey: []
       summary: List distinct tenants
       description: |
         Returns distinct `tenant` values observed across registered controllers. Cursor-paginated; combine with registry list endpoints to drill down.
@@ -1049,7 +1754,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TenantListResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/TenantListResponse'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '400':
@@ -1057,13 +1767,16 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/tenants/{tenant}/controllers:
+  /v1/tenants/{tenant}/controllers:
     get:
       tags: [ Registry ]
       operationId: listControllersByTenant
+      security:
+      - bearerAuth: []
+      - apiKey: []
       summary: List controllers for a tenant
       description: |
-        Lists controllers whose `tenant` path parameter matches. Same response shape as `GET /api/v1/controllers` but scoped to one tenant.
+        Lists controllers whose `tenant` path parameter matches. Same response shape as `GET /v1/controllers` but scoped to one tenant.
       parameters:
       - $ref: '#/components/parameters/Tenant'
       - $ref: '#/components/parameters/Limit'
@@ -1078,7 +1791,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ControllerListResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ControllerListResponse'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '400':
@@ -1086,10 +1804,13 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/tenants/{tenant}/environments:
+  /v1/tenants/{tenant}/environments:
     get:
       tags: [ Registry ]
       operationId: listEnvironmentsByTenant
+      security:
+      - bearerAuth: []
+      - apiKey: []
       summary: Aggregated environments observed for a tenant (read-only snapshot)
       description: |
         Read-only aggregated view of environments (and their static bundles) as reported for this tenant. Environment lifecycle is owned by the Gateway Controller; this endpoint does not mutate configuration.
@@ -1107,7 +1828,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EnvironmentListResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EnvironmentListResponse'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '400':
@@ -1115,10 +1841,13 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/tenants/{tenant}/bundles:
+  /v1/tenants/{tenant}/bundles:
     get:
       tags: [ Registry ]
       operationId: listBundlesByTenant
+      security:
+      - bearerAuth: []
+      - apiKey: []
       summary: Static bundles aggregated across environments for a tenant
       description: |
         Flattens static bundle descriptors (`name`, `repository`, `ref`, `path`) across environments for the tenant. Useful for overview UIs; not a substitute for etcd bundle-key APIs.
@@ -1136,7 +1865,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BundleRefListResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BundleRefListResponse'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '400':
@@ -1144,10 +1878,13 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/bundles:
+  /v1/bundles:
     get:
       tags: [ Bundles ]
       operationId: listBundleKeys
+      security:
+      - bearerAuth: []
+      - apiKey: []
       summary: List bundles present in etcd
       description: |
         Lists bundles that exist under the API Server’s contract snapshot prefix in etcd (`repository`, `ref`, `path`, canonical `key`). Paginated; the `key` may require percent-encoding when used as path segments elsewhere.
@@ -1164,7 +1901,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BundleRefListResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BundleRefListResponse'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '400':
@@ -1172,10 +1914,13 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/bundles/contracts:
+  /v1/bundles/contracts:
     get:
       tags: [ Bundles ]
       operationId: listContractsInBundle
+      security:
+      - bearerAuth: []
+      - apiKey: []
       summary: List contract names for a bundle key
       description: |
         Returns logical contract names stored for the bundle in etcd. Identify the bundle either with
@@ -1199,7 +1944,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ContractNameListResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ContractNameListResponse'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '400':
@@ -1209,10 +1959,13 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/bundles/contracts/{contract_name}:
+  /v1/bundles/contracts/{contract_name}:
     get:
       tags: [ Bundles ]
       operationId: getContractInBundle
+      security:
+      - bearerAuth: []
+      - apiKey: []
       summary: Get a single contract document for a bundle
       description: |
         Returns one contract document from etcd-backed storage for the bundle (JSON object; YAML sources may be normalized to JSON). Identify the bundle with `bundle_key` **or** `repo` + `ref` (+ optional `path`) query parameters, same as `listContractsInBundle`. Supports `If-None-Match` for caching. `404` if the bundle or contract is missing.
@@ -1232,7 +1985,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ContractDocument'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ContractDocument'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '404':
@@ -1240,10 +1998,13 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/bundles/sync:
+  /v1/bundles/sync:
     post:
       tags: [ Operations ]
       operationId: syncBundle
+      security:
+      - bearerAuth: []
+      - apiKey: []
       summary: Trigger contract bundle synchronization (Schemas / bundle sync pipeline)
       description: |
         Triggers synchronization of a contract bundle from Git into etcd (same conceptual fields as `SyncContractBundle`: `repository`, `ref`, `bundle`, optional `force`). Idempotent retries may send the same `Idempotency-Key`. `502` indicates upstream/sync pipeline failure.
@@ -1254,14 +2015,24 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/BundleSyncRequest'
+              type: object
+              properties:
+                data:
+                  $ref: '#/components/schemas/BundleSyncRequest'
+              required:
+              - data
       responses:
         '200':
           description: Sync completed
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BundleSyncResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BundleSyncResponse'
+                required:
+                - data
         '400':
           $ref: '#/components/responses/BadRequest'
         '409':
@@ -1279,10 +2050,13 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/v1/status:
+  /v1/status:
     get:
       tags: [ System ]
       operationId: getStatus
+      security:
+      - bearerAuth: []
+      - apiKey: []
       summary: Dependency status for operators
       description: |
         Rich snapshot for dashboards and alerting (API Server self-check, etcd, Contract Syncer). **Not** a Kubernetes probe — use `GET /ready` for orchestrator readiness. Exact fields may evolve. Conditional GET via `ETag` / `If-None-Match`.
@@ -1297,7 +2071,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/StatusResponse'
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/StatusResponse'
+                required:
+                - data
         '304':
           $ref: '#/components/responses/NotModified'
         '400':

@@ -41,6 +41,9 @@ type ControllerConfig struct {
 
 type JWTConfig struct {
 	JWKSURL string `mapstructure:"jwks_url" validate:"required" json:"jwks_url"`
+	// ExpectedIssuer / ExpectedAudience must match API Server Edge JWT claims .
+	ExpectedIssuer   string `mapstructure:"expected_issuer" json:"expected_issuer"`
+	ExpectedAudience string `mapstructure:"expected_audience" json:"expected_audience"`
 }
 
 func LoadConfig(configFile ...string) (*Config, error) {
@@ -48,7 +51,9 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v := viper.New()
 	v.SetDefault("server.http_port", "8080")
 	v.SetDefault("server.host", "localhost")
-	v.SetDefault("jwt.jwks_url", "http://api-server:8080/.well-known/jwks.json")
+	v.SetDefault("jwt.jwks_url", "http://api-server:8080/.well-known/jwks-edge.json")
+	v.SetDefault("jwt.expected_issuer", "api-gateway-edge")
+	v.SetDefault("jwt.expected_audience", "api-gateway-edge-http")
 	v.SetDefault("grpc_ext_authz.observability.reflection_enabled", true)
 	v.SetDefault("grpc_ext_authz.observability.log_requests", false)
 	v.SetDefault("metrics_http.enabled", false)

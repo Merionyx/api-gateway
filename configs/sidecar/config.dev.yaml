@@ -7,7 +7,8 @@ controller:
   environment: "dev"
 
 jwt:
-  jwks_url: "http://gateway-ha-lb:8080/.well-known/jwks.json"
+  jwks_url: "http://gateway-ha-lb:8080/.well-known/jwks-edge.json"
+  # expected_issuer / expected_audience: defaults match API Server jwt.edge_* (override if you customize Edge iss/aud).
 
 # OpenTelemetry (optional)
 # telemetry:

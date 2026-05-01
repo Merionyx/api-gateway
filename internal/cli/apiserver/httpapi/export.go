@@ -10,18 +10,18 @@ import (
 	apiserverclient "github.com/merionyx/api-gateway/internal/cli/apiserver/client"
 )
 
-// ExportContracts calls POST /api/v1/contracts/export and returns file entries on success.
+// ExportContracts calls POST /v1/contracts/export and returns file entries on success.
 func ExportContracts(ctx context.Context, httpClient *http.Client, serverURL string, req apiclient.ExportRequest) ([]apiclient.ExportFile, error) {
 	c, err := newClientWithResponses(serverURL, httpClient)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.ExportContractsWithResponse(ctx, req)
+	resp, err := c.ExportContractsWithResponse(ctx, apiserverclient.ExportContractsJSONRequestBody{Data: req})
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 	if resp.JSON200 != nil {
-		return resp.JSON200.Files, nil
+		return resp.JSON200.Data.Files, nil
 	}
 	return nil, exportError(resp)
 }

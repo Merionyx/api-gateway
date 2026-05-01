@@ -12,13 +12,14 @@ const (
 	TokenResultValidationEnvironments = "validation_missing_environments"
 	TokenResultValidationEmptyEnv     = "validation_empty_environment"
 	TokenResultValidationExpiresAt    = "validation_expires_at"
+	TokenResultForbidden              = "forbidden"
 	TokenResultInternalError          = "internal_error"
 )
 
 var tokenGenerateTotal = promauto.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "api_server_token_generate_total",
-		Help: "JWT token issuance outcomes for POST /api/v1/tokens.",
+		Help: "JWT token issuance outcomes for token minting routes (e.g. POST /v1/tokens/edge).",
 	},
 	[]string{"result"},
 )

@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"math/big"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,11 +24,13 @@ type CachedToken struct {
 }
 
 type JWTValidator struct {
-	jwksURL    string
-	publicKeys map[string]crypto.PublicKey // kid -> public key
-	tokenCache sync.Map                    // map[string]CachedToken - cache of validated tokens
-	mu         sync.RWMutex
-	httpClient *http.Client
+	jwksURL          string
+	expectedIssuer   string
+	expectedAudience string
+	publicKeys       map[string]crypto.PublicKey // kid -> public key
+	tokenCache       sync.Map                    // map[string]CachedToken - cache of validated tokens
+	mu               sync.RWMutex
+	httpClient       *http.Client
 }
 
 type JWKS struct {
@@ -45,11 +48,15 @@ type JWK struct {
 	E   string `json:"e,omitempty"`
 }
 
-func NewJWTValidator(jwksURL string) *JWTValidator {
+// NewJWTValidator loads Edge JWKS from jwksURL and enforces expectedIssuer / expectedAudience
+// on every validated token (API-profile JWTs must not pass even if mis-signed into the same JWKS).
+func NewJWTValidator(jwksURL, expectedIssuer, expectedAudience string) *JWTValidator {
 	validator := &JWTValidator{
-		jwksURL:    jwksURL,
-		publicKeys: make(map[string]crypto.PublicKey),
-		httpClient: &http.Client{Timeout: 10 * time.Second},
+		jwksURL:          jwksURL,
+		expectedIssuer:   strings.TrimSpace(expectedIssuer),
+		expectedAudience: strings.TrimSpace(expectedAudience),
+		publicKeys:       make(map[string]crypto.PublicKey),
+		httpClient:       &http.Client{Timeout: 10 * time.Second},
 	}
 
 	// Load keys on startup with retry
@@ -155,10 +162,57 @@ func (v *JWTValidator) validateTokenInternal(tokenString string) (jwt.MapClaims,
 	}
 
 	if claims, ok := parsedToken.Claims.(jwt.MapClaims); ok && parsedToken.Valid {
+		if err := v.validateEdgeProfileClaims(claims); err != nil {
+			return nil, err
+		}
 		return claims, nil
 	}
 
 	return nil, fmt.Errorf("invalid token")
+}
+
+// validateEdgeProfileClaims rejects tokens that are not issued for the Edge data-plane profile.
+func (v *JWTValidator) validateEdgeProfileClaims(claims jwt.MapClaims) error {
+	if v.expectedIssuer != "" {
+		iss, ok := claims["iss"].(string)
+		if !ok || strings.TrimSpace(iss) != v.expectedIssuer {
+			return fmt.Errorf("jwt iss does not match expected Edge issuer")
+		}
+	}
+	if v.expectedAudience != "" {
+		if !audienceMatchesExpected(claims, v.expectedAudience) {
+			return fmt.Errorf("jwt aud does not match expected Edge audience")
+		}
+	}
+	return nil
+}
+
+func audienceMatchesExpected(claims jwt.MapClaims, want string) bool {
+	raw, ok := claims["aud"]
+	if !ok || raw == nil {
+		return false
+	}
+	switch t := raw.(type) {
+	case string:
+		return strings.TrimSpace(t) == want
+	case []any:
+		for _, e := range t {
+			s, ok := e.(string)
+			if ok && s == want {
+				return true
+			}
+		}
+		return false
+	case []string:
+		for _, s := range t {
+			if s == want {
+				return true
+			}
+		}
+		return false
+	default:
+		return false
+	}
 }
 
 // RefreshKeys updates the public keys from the JWKS endpoint

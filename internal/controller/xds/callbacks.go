@@ -17,8 +17,8 @@ const spanXDSPkg = "internal/controller/xds"
 
 // Callbacks implements go-control-plane server callbacks with Prometheus metrics.
 type Callbacks struct {
-	enabled      bool
-	traceXDS     bool
+	enabled  bool
+	traceXDS bool
 }
 
 func NewCallbacks(metricsEnabled bool, xdsTraceCallbacks bool) *Callbacks {
