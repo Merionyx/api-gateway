@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/golang-jwt/jwt/v5"
@@ -32,6 +33,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/config"
 	"github.com/merionyx/api-gateway/internal/api-server/container"
 	httpxmw "github.com/merionyx/api-gateway/internal/api-server/delivery/http/middleware"
+	httpopenapi "github.com/merionyx/api-gateway/internal/api-server/delivery/http/openapi"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
 	"github.com/merionyx/api-gateway/internal/api-server/server"
@@ -42,7 +44,7 @@ import (
 )
 
 // Roadmap ш. 28–31: OIDC E2E against real etcd (httptest mock IdP).
-// ш. 28 — login + callback; ш. 29 — refresh при 503 (degraded); ш. 30 — конкурентный refresh → 409 (CAS); ш. 31 — reuse старого our refresh после ротации → 401.
+// ш. 28 — login + callback; ш. 29 — refresh при 503 (degraded); ш. 30 — конкурентный refresh → 409 (CAS); ш. 31 — reuse старого our refresh после ротации → OAuth invalid_grant.
 
 const (
 	e2eOIDCProviderID = "mock-idp"
@@ -198,9 +200,18 @@ func fiberAppFromContainer(t *testing.T, c *container.Container) *fiber.App {
 	}
 	swagger.Servers = nil
 	app.Use(recover.New())
-	app.Use(oapimw.OapiRequestValidator(swagger))
-	app.Use(httpxmw.APISecurity(c.JWTUseCase, c.APIKeyRepository))
-	apiserver.RegisterHandlers(app, server.NewOpenAPIServer(c))
+	app.Use(httpopenapi.BindFiberContextForStrictHandlers())
+	contract, err := httpxmw.NewAPISecurityContract(swagger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	app.Use(httpxmw.APISecurity(c.JWTUseCase, c.APIKeyRepository, contract))
+	app.Use(oapimw.OapiRequestValidatorWithOptions(swagger, &oapimw.Options{
+		Options: openapi3filter.Options{
+			AuthenticationFunc: server.AuthenticationFunc,
+		},
+	}))
+	apiserver.RegisterHandlers(app, apiserver.NewStrictHandler(httpopenapi.NewStrictOpenAPIServer(c), nil))
 	return app
 }
 
@@ -347,14 +358,16 @@ func performOIDCAuthorizeFlow(t *testing.T, app *fiber.App) (accessToken, refres
 		body, _ := io.ReadAll(tokenResp.Body)
 		t.Fatalf("token status %d body %s", tokenResp.StatusCode, string(body))
 	}
-	var tokens map[string]any
-	if err := json.NewDecoder(tokenResp.Body).Decode(&tokens); err != nil {
+	var envelope struct {
+		Data map[string]any `json:"data"`
+	}
+	if err := json.NewDecoder(tokenResp.Body).Decode(&envelope); err != nil {
 		t.Fatal(err)
 	}
-	at, _ := tokens["access_token"].(string)
-	rt, _ := tokens["refresh_token"].(string)
+	at, _ := envelope.Data["access_token"].(string)
+	rt, _ := envelope.Data["refresh_token"].(string)
 	if at == "" || rt == "" {
-		t.Fatalf("tokens: %+v", tokens)
+		t.Fatalf("tokens: %+v", envelope.Data)
 	}
 	return at, rt
 }
@@ -434,14 +447,16 @@ func TestE2E_OIDCRefresh_IdPUnavailable_Degraded(t *testing.T) {
 		body, _ := io.ReadAll(refreshResp.Body)
 		t.Fatalf("refresh status %d body %s", refreshResp.StatusCode, string(body))
 	}
-	var out map[string]any
+	var out struct {
+		Data map[string]any `json:"data"`
+	}
 	if err := json.NewDecoder(refreshResp.Body).Decode(&out); err != nil {
 		t.Fatal(err)
 	}
-	access2, _ := out["access_token"].(string)
-	refresh2, _ := out["refresh_token"].(string)
+	access2, _ := out.Data["access_token"].(string)
+	refresh2, _ := out.Data["refresh_token"].(string)
 	if access2 == "" || refresh2 == "" {
-		t.Fatalf("refresh response: %+v", out)
+		t.Fatalf("refresh response: %+v", out.Data)
 	}
 	if access2 == access1 {
 		t.Fatal("expected new access_token after degraded refresh")
@@ -518,7 +533,7 @@ func TestE2E_OIDCRefresh_ConcurrentSameRefreshToken_One409(t *testing.T) {
 	}
 }
 
-func TestE2E_OIDCRefresh_ReuseOldRefreshTokenAfterRotate_401(t *testing.T) {
+func TestE2E_OIDCRefresh_ReuseOldRefreshTokenAfterRotate_InvalidGrant(t *testing.T) {
 	t.Parallel()
 
 	etcdCli := NewEtcdClient(t)
@@ -568,27 +583,29 @@ func TestE2E_OIDCRefresh_ReuseOldRefreshTokenAfterRotate_401(t *testing.T) {
 		b, _ := io.ReadAll(r1.Body)
 		t.Fatalf("first refresh status %d body %s", r1.StatusCode, string(b))
 	}
-	var first map[string]any
+	var first struct {
+		Data map[string]any `json:"data"`
+	}
 	if err := json.NewDecoder(r1.Body).Decode(&first); err != nil {
 		t.Fatal(err)
 	}
-	refresh2, _ := first["refresh_token"].(string)
+	refresh2, _ := first.Data["refresh_token"].(string)
 	if refresh2 == "" || refresh2 == refresh1 {
-		t.Fatalf("expected new refresh_token, got %+v", first)
+		t.Fatalf("expected new refresh_token, got %+v", first.Data)
 	}
 
 	rReuse := doRefresh(refresh1)
 	defer func() { _ = rReuse.Body.Close() }()
-	if rReuse.StatusCode != http.StatusUnauthorized {
+	if rReuse.StatusCode != http.StatusBadRequest {
 		b, _ := io.ReadAll(rReuse.Body)
-		t.Fatalf("reuse old refresh: status %d want 401 body %s", rReuse.StatusCode, string(b))
+		t.Fatalf("reuse old refresh: status %d want 400 body %s", rReuse.StatusCode, string(b))
 	}
-	var prob map[string]any
-	if err := json.NewDecoder(rReuse.Body).Decode(&prob); err != nil {
+	var oauthErr map[string]any
+	if err := json.NewDecoder(rReuse.Body).Decode(&oauthErr); err != nil {
 		t.Fatal(err)
 	}
-	if prob["code"] != "SESSION_AUTH_FAILED" {
-		t.Fatalf("problem code: want SESSION_AUTH_FAILED got %v", prob["code"])
+	if oauthErr["error"] != "invalid_grant" {
+		t.Fatalf("oauth error: want invalid_grant got %v", oauthErr["error"])
 	}
 
 	r2 := doRefresh(refresh2)
