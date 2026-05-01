@@ -7,42 +7,17 @@ import (
 	"testing"
 )
 
-func TestSessionMigrateV1ToLatestOnRead(t *testing.T) {
+func TestSessionLatestRoundTrip_FromRaw(t *testing.T) {
 	t.Parallel()
 	raw := []byte(`{
-		"schema_version": 1,
-		"encrypted_idp_refresh": {"v":1,"alg":"AES-256-GCM-envelope-v1"},
-		"claims_snapshot": {"roles":["x"]}
-	}`)
-	got, err := ParseSessionValueJSON(raw)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.SchemaVersion != SessionSchemaLatest {
-		t.Fatalf("schema: want %d got %d", SessionSchemaLatest, got.SchemaVersion)
-	}
-	if got.RotationGeneration != 0 {
-		t.Fatalf("rotation_generation: want 0 after migrate, got %d", got.RotationGeneration)
-	}
-	var env map[string]any
-	if err := json.Unmarshal(got.EncryptedIDPRefresh, &env); err != nil {
-		t.Fatal(err)
-	}
-	if env["v"].(float64) != 1 {
-		t.Fatalf("encrypted blob: %v", env)
-	}
-}
-
-func TestSessionMigrateV2ToLatestOnRead(t *testing.T) {
-	t.Parallel()
-	raw := []byte(`{
-		"schema_version": 2,
+		"schema_version": 3,
 		"encrypted_idp_refresh": {"k":1},
 		"claims_snapshot": {"roles":["x"]},
 		"rotation_generation": 5,
 		"login_intent_id": "6ba7b810-9dad-41d4-a716-446655440001",
 		"provider_id": "p1",
-		"our_refresh_verifier": "opaque-verifier-handle"
+		"our_refresh_verifier": "opaque-verifier-handle",
+		"refresh_expires_at": "2026-04-28T10:00:00Z"
 	}`)
 	got, err := ParseSessionValueJSON(raw)
 	if err != nil {
@@ -51,11 +26,19 @@ func TestSessionMigrateV2ToLatestOnRead(t *testing.T) {
 	if got.SchemaVersion != SessionSchemaLatest {
 		t.Fatalf("schema: want %d got %d", SessionSchemaLatest, got.SchemaVersion)
 	}
-	if got.RotationGeneration != 5 || got.ProviderID != "p1" || got.OurRefreshVerifier != "opaque-verifier-handle" {
-		t.Fatalf("migrated session: %+v", got)
+	if got.RotationGeneration != 5 || got.ProviderID != "p1" || got.OurRefreshVerifier != "opaque-verifier-handle" || got.RefreshExpiresAt.IsZero() {
+		t.Fatalf("session: %+v", got)
 	}
-	if !got.RefreshExpiresAt.IsZero() {
-		t.Fatalf("legacy v2 must not invent refresh expiry: %s", got.RefreshExpiresAt)
+}
+
+func TestSessionRejectsLegacySchemas(t *testing.T) {
+	t.Parallel()
+	for _, ver := range []int{1, 2} {
+		raw := []byte(fmt.Sprintf(`{"schema_version":%d,"encrypted_idp_refresh":{}}`, ver))
+		_, err := ParseSessionValueJSON(raw)
+		if !errors.Is(err, ErrUnsupportedSessionSchema) {
+			t.Fatalf("schema_version=%d: got %v", ver, err)
+		}
 	}
 }
 
@@ -107,7 +90,7 @@ func TestSessionLatestRoundTrip(t *testing.T) {
 
 func TestSessionMarshalRequiresEncryptedBlob(t *testing.T) {
 	t.Parallel()
-	_, err := MarshalSessionValueJSON(SessionValue{SchemaVersion: 2})
+	_, err := MarshalSessionValueJSON(SessionValue{SchemaVersion: SessionSchemaLatest})
 	if err == nil {
 		t.Fatal("expected error")
 	}
