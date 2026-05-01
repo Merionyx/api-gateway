@@ -1,6 +1,7 @@
 package openapi
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -297,6 +298,45 @@ func TestStrictTokenOidc_RejectsBasicAuthorizationClientAuthentication(t *testin
 		t.Fatalf("error %q", out.Error)
 	}
 	if out.ErrorDescription == nil || !strings.Contains(*out.ErrorDescription, "Authorization: Basic is not supported") {
+		t.Fatalf("error_description %#v", out.ErrorDescription)
+	}
+}
+
+func TestStrictTokenOidc_UsesTypedRequestBodyWithoutFiberFormFallback(t *testing.T) {
+	t.Parallel()
+
+	cat, err := roles.NewCatalog(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cnt := &container.Container{
+		Config:              &config.Config{},
+		RoleCatalog:         cat,
+		PermissionEvaluator: httpauthz.NewPermissionEvaluator(cat),
+		OAuthTokenUseCase:   auth.NewOAuthTokenUseCase(nil, nil, nil, nil, auth.TokenTTLPolicy{}),
+	}
+	srv := NewStrictOpenAPIServer(cnt)
+
+	refreshGrant := apiserver.OAuthTokenRequestFormGrantType("refresh_token")
+	refreshToken := "refresh-token-1"
+	resp, err := srv.TokenOidc(context.Background(), apiserver.TokenOidcRequestObject{
+		Body: &apiserver.TokenOidcFormdataRequestBody{
+			GrantType:    refreshGrant,
+			RefreshToken: &refreshToken,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, ok := resp.(apiserver.TokenOidc400JSONResponse)
+	if !ok {
+		t.Fatalf("response type %T", resp)
+	}
+	if out.Error != "invalid_request" {
+		t.Fatalf("error %q", out.Error)
+	}
+	if out.ErrorDescription == nil || !strings.Contains(*out.ErrorDescription, "refresh use case not configured") {
 		t.Fatalf("error_description %#v", out.ErrorDescription)
 	}
 }

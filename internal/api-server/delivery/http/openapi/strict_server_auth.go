@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -174,30 +173,22 @@ func (s *StrictOpenAPIServer) TokenOidc(ctx context.Context, request apiserver.T
 	}
 
 	fc, _ := fiberCtxFromStrictContext(ctx)
-	grantType := tokenFormString(fc, "grant_type")
 	if fc != nil && usesBasicAuthorizationHeader(fc.Get(fiber.HeaderAuthorization)) {
 		return apiserver.TokenOidc400JSONResponse{
 			Error:            "invalid_request",
 			ErrorDescription: stringPtr("Authorization: Basic is not supported on this endpoint; provide client_id in form body."),
 		}, nil
 	}
-	clientID := tokenFormString(fc, "client_id")
-	code := tokenFormString(fc, "code")
-	redirectURI := tokenFormString(fc, "redirect_uri")
-	codeVerifier := tokenFormString(fc, "code_verifier")
-	refreshToken := tokenFormString(fc, "refresh_token")
-	accessTTLSeconds := tokenFormInt(fc, "access_ttl")
-	refreshTTLSeconds := tokenFormInt(fc, "refresh_ttl")
 
 	req := auth.OAuthTokenRequest{
-		GrantType:    grantType,
-		Code:         code,
-		RedirectURI:  redirectURI,
-		ClientID:     clientID,
-		CodeVerifier: codeVerifier,
-		RefreshToken: refreshToken,
-		AccessTTL:    durationFromOptionalFormSeconds(accessTTLSeconds),
-		RefreshTTL:   durationFromOptionalFormSeconds(refreshTTLSeconds),
+		GrantType:    strings.TrimSpace(string(body.GrantType)),
+		Code:         stringOrEmpty(body.Code),
+		RedirectURI:  stringOrEmpty(body.RedirectUri),
+		ClientID:     stringOrEmpty(body.ClientId),
+		CodeVerifier: stringOrEmpty(body.CodeVerifier),
+		RefreshToken: stringOrEmpty(body.RefreshToken),
+		AccessTTL:    durationFromOptionalFormSeconds(body.AccessTtl),
+		RefreshTTL:   durationFromOptionalFormSeconds(body.RefreshTtl),
 	}
 
 	tctx, cancel := context.WithTimeout(ctx, 35*time.Second)
@@ -217,28 +208,6 @@ func (s *StrictOpenAPIServer) TokenOidc(ctx context.Context, request apiserver.T
 	}
 
 	return apiserver.TokenOidc200JSONResponse(out), nil
-}
-
-func tokenFormString(fc fiber.Ctx, key string) string {
-	if fc == nil {
-		return ""
-	}
-	return strings.TrimSpace(string(fc.Request().PostArgs().Peek(key)))
-}
-
-func tokenFormInt(fc fiber.Ctx, key string) *int {
-	if fc == nil {
-		return nil
-	}
-	raw := strings.TrimSpace(string(fc.Request().PostArgs().Peek(key)))
-	if raw == "" {
-		return nil
-	}
-	v, err := strconv.Atoi(raw)
-	if err != nil {
-		return nil
-	}
-	return &v
 }
 
 func (s *StrictOpenAPIServer) InspectTokenPermissions(ctx context.Context, request apiserver.InspectTokenPermissionsRequestObject) (apiserver.InspectTokenPermissionsResponseObject, error) {
