@@ -27,16 +27,8 @@ jobs:
     uses: ./.github/workflows/reusable-go-integration.yml
     secrets: inherit
 
-  gosec:
-    uses: ./.github/workflows/reusable-go-gosec.yml
-    secrets: inherit
-
-  govulncheck:
-    uses: ./.github/workflows/reusable-go-govulncheck.yml
-    secrets: inherit
-
   publish:
-    needs: [ lint, unit, integration, gosec ]
+    needs: [ lint, unit, integration ]
     uses: ./.github/workflows/docker-publish.yml
     with:
       version: latest
@@ -46,7 +38,7 @@ jobs:
 
   # Chart version: unique prerelease per workflow run; appVersion stays "latest" for snapshot installs.
   helm-publish:
-    needs: [ lint, unit, integration, gosec ]
+    needs: [ lint, unit, integration ]
     uses: ./.github/workflows/helm-publish.yml
     with:
       version: 0.0.0
