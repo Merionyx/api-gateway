@@ -15,6 +15,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/auth/roles"
 	"github.com/merionyx/api-gateway/internal/api-server/config"
 	"github.com/merionyx/api-gateway/internal/api-server/container"
+	httpauthz "github.com/merionyx/api-gateway/internal/api-server/delivery/http/authz"
 	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/middleware"
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
 	"github.com/merionyx/api-gateway/internal/api-server/usecase/auth"
@@ -56,9 +57,10 @@ func TestStrictInspectTokenPermissions_UsesDataWrapper(t *testing.T) {
 		t.Fatal(err)
 	}
 	cnt := &container.Container{
-		Config:      &config.Config{},
-		JWTUseCase:  uc,
-		RoleCatalog: cat,
+		Config:              &config.Config{},
+		JWTUseCase:          uc,
+		RoleCatalog:         cat,
+		PermissionEvaluator: httpauthz.NewPermissionEvaluator(cat),
 	}
 	app := testStrictApp(cnt, nil)
 
@@ -110,9 +112,10 @@ func TestStrictInspectTokenPermissions_RejectsFlatBodyWithoutData(t *testing.T) 
 		t.Fatal(err)
 	}
 	cnt := &container.Container{
-		Config:      &config.Config{},
-		JWTUseCase:  uc,
-		RoleCatalog: cat,
+		Config:              &config.Config{},
+		JWTUseCase:          uc,
+		RoleCatalog:         cat,
+		PermissionEvaluator: httpauthz.NewPermissionEvaluator(cat),
 	}
 	app := testStrictApp(cnt, nil)
 
@@ -146,9 +149,10 @@ func TestStrictIssueApiAccessToken_UsesDefaultTTLAndOmitsRoles(t *testing.T) {
 		t.Fatal(err)
 	}
 	cnt := &container.Container{
-		Config:      &config.Config{},
-		JWTUseCase:  uc,
-		RoleCatalog: cat,
+		Config:              &config.Config{},
+		JWTUseCase:          uc,
+		RoleCatalog:         cat,
+		PermissionEvaluator: httpauthz.NewPermissionEvaluator(cat),
 	}
 
 	callerToken, _, _, err := uc.MintInteractiveAPIAccessJWTFromSnapshot(

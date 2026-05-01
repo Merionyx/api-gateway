@@ -122,7 +122,9 @@ func NewContainer(cfg *config.Config) (*Container, error) {
 	if err := c.initUseCases(); err != nil {
 		return nil, err
 	}
-	c.initHandlers()
+	if err := c.initHandlers(); err != nil {
+		return nil, err
+	}
 
 	ok = true
 	return c, nil
@@ -285,7 +287,7 @@ func (c *Container) initUseCases() error {
 	return nil
 }
 
-func (c *Container) initHandlers() {
+func (c *Container) initHandlers() error {
 	switch strings.ToLower(strings.TrimSpace(c.Config.Idempotency.Backend)) {
 	case "etcd":
 		pfx := idempotency.ResolveKeyPrefix(c.Config.Idempotency.EtcdKeyPrefix, c.Config.Idempotency.Cluster)
@@ -296,9 +298,13 @@ func (c *Container) initHandlers() {
 		slog.Info("idempotency backend=memory")
 	}
 	c.PermissionEvaluator = httpauthz.NewPermissionEvaluator(c.RoleCatalog)
+	if c.PermissionEvaluator == nil {
+		return fmt.Errorf("permission evaluator is required")
+	}
 	c.ControllerRegistryHandler = grpchandler.NewControllerRegistryHandler(c.ControllerRegistryUseCase, c.Config.MetricsHTTP.Enabled)
 
 	slog.Info("delivery adapters initialized")
+	return nil
 }
 
 // StartBackgroundWork runs etcd watch and bundle sync until ctx is cancelled.

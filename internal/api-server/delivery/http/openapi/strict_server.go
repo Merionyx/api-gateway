@@ -18,7 +18,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/merionyx/api-gateway/internal/api-server/auth/permissions"
-	authroles "github.com/merionyx/api-gateway/internal/api-server/auth/roles"
 	"github.com/merionyx/api-gateway/internal/api-server/config"
 	httpauthz "github.com/merionyx/api-gateway/internal/api-server/delivery/http/authz"
 	"github.com/merionyx/api-gateway/internal/api-server/delivery/http/middleware"
@@ -392,20 +391,6 @@ func hasPermission(have map[string]struct{}, required string) bool {
 	return ok
 }
 
-func hasAnyRoleOrAdmin(have []string, required string) bool {
-	req := strings.TrimSpace(required)
-	for i := range have {
-		r := strings.TrimSpace(have[i])
-		if r == "" {
-			continue
-		}
-		if r == authroles.APIRoleAdmin || r == req {
-			return true
-		}
-	}
-	return false
-}
-
 func durationFromOptionalFormSeconds(v *int) time.Duration {
 	if v == nil {
 		return 0
@@ -680,6 +665,12 @@ type StrictOpenAPIServer struct {
 }
 
 func NewStrictOpenAPIServer(c *container.Container) apiserver.StrictServerInterface {
+	if c == nil {
+		panic("strict openapi server requires container")
+	}
+	if c.PermissionEvaluator == nil {
+		panic("strict openapi server requires permission evaluator")
+	}
 	return &StrictOpenAPIServer{c: c}
 }
 
@@ -1251,27 +1242,18 @@ func (s *StrictOpenAPIServer) ExportContracts(ctx context.Context, request apise
 	if err != nil {
 		return nil, err
 	}
-	if s.c.PermissionEvaluator != nil {
-		have, perr := s.c.PermissionEvaluator.SubjectPermissions(fc)
-		if perr != nil {
-			p := internalProblem()
-			return apiserver.ExportContracts500ApplicationProblemPlusJSONResponse{
-				InternalErrorApplicationProblemPlusJSONResponse: apiserver.InternalErrorApplicationProblemPlusJSONResponse(p),
-			}, nil
-		}
-		if !hasPermission(have, permissions.ContractsExport) {
-			p := problem.Forbidden(problem.CodeInsufficientPermissions, "", "The caller does not have any required permission for this operation.")
-			return apiserver.ExportContracts403ApplicationProblemPlusJSONResponse{
-				ForbiddenApplicationProblemPlusJSONResponse: apiserver.ForbiddenApplicationProblemPlusJSONResponse(p),
-			}, nil
-		}
-	} else {
-		if !hasAnyRoleOrAdmin(httpauthz.SubjectRoles(fc), authroles.APIContractsExport) {
-			p := problem.Forbidden("INSUFFICIENT_ROLES", "", "The caller does not have any of the roles required for this operation.")
-			return apiserver.ExportContracts403ApplicationProblemPlusJSONResponse{
-				ForbiddenApplicationProblemPlusJSONResponse: apiserver.ForbiddenApplicationProblemPlusJSONResponse(p),
-			}, nil
-		}
+	have, perr := s.c.PermissionEvaluator.SubjectPermissions(fc)
+	if perr != nil {
+		p := internalProblem()
+		return apiserver.ExportContracts500ApplicationProblemPlusJSONResponse{
+			InternalErrorApplicationProblemPlusJSONResponse: apiserver.InternalErrorApplicationProblemPlusJSONResponse(p),
+		}, nil
+	}
+	if !hasPermission(have, permissions.ContractsExport) {
+		p := problem.Forbidden(problem.CodeInsufficientPermissions, "", "The caller does not have any required permission for this operation.")
+		return apiserver.ExportContracts403ApplicationProblemPlusJSONResponse{
+			ForbiddenApplicationProblemPlusJSONResponse: apiserver.ForbiddenApplicationProblemPlusJSONResponse(p),
+		}, nil
 	}
 
 	req := request.Body.Data
@@ -1609,27 +1591,18 @@ func (s *StrictOpenAPIServer) IssueApiAccessToken(ctx context.Context, request a
 		}, nil
 	}
 
-	if s.c.PermissionEvaluator != nil {
-		have, perr := s.c.PermissionEvaluator.SubjectPermissions(fc)
-		if perr != nil {
-			p := internalProblem()
-			return apiserver.IssueApiAccessToken500ApplicationProblemPlusJSONResponse{
-				InternalErrorApplicationProblemPlusJSONResponse: apiserver.InternalErrorApplicationProblemPlusJSONResponse(p),
-			}, nil
-		}
-		if !hasPermission(have, permissions.APIAccessTokenIssue) {
-			p := problem.Forbidden(problem.CodeInsufficientPermissions, "", "The caller does not have any required permission for this operation.")
-			return apiserver.IssueApiAccessToken403ApplicationProblemPlusJSONResponse{
-				ForbiddenApplicationProblemPlusJSONResponse: apiserver.ForbiddenApplicationProblemPlusJSONResponse(p),
-			}, nil
-		}
-	} else {
-		if !hasAnyRoleOrAdmin(httpauthz.SubjectRoles(fc), authroles.APIAccessTokensIssue) {
-			p := problem.Forbidden("INSUFFICIENT_ROLES", "", "The caller does not have any of the roles required for this operation.")
-			return apiserver.IssueApiAccessToken403ApplicationProblemPlusJSONResponse{
-				ForbiddenApplicationProblemPlusJSONResponse: apiserver.ForbiddenApplicationProblemPlusJSONResponse(p),
-			}, nil
-		}
+	have, perr := s.c.PermissionEvaluator.SubjectPermissions(fc)
+	if perr != nil {
+		p := internalProblem()
+		return apiserver.IssueApiAccessToken500ApplicationProblemPlusJSONResponse{
+			InternalErrorApplicationProblemPlusJSONResponse: apiserver.InternalErrorApplicationProblemPlusJSONResponse(p),
+		}, nil
+	}
+	if !hasPermission(have, permissions.APIAccessTokenIssue) {
+		p := problem.Forbidden(problem.CodeInsufficientPermissions, "", "The caller does not have any required permission for this operation.")
+		return apiserver.IssueApiAccessToken403ApplicationProblemPlusJSONResponse{
+			ForbiddenApplicationProblemPlusJSONResponse: apiserver.ForbiddenApplicationProblemPlusJSONResponse(p),
+		}, nil
 	}
 
 	var requestedPermissions []string
@@ -1637,24 +1610,15 @@ func (s *StrictOpenAPIServer) IssueApiAccessToken(ctx context.Context, request a
 	if request.Body != nil {
 		requestedPermissions = normalizeRequestedPermissions(request.Body.Data.Permissions)
 		requestedExpiresAt = request.Body.Data.ExpiresAt
-		if s.c.PermissionEvaluator != nil {
-			have, perr := s.c.PermissionEvaluator.SubjectPermissions(fc)
-			if perr != nil {
-				p := internalProblem()
-				return apiserver.IssueApiAccessToken500ApplicationProblemPlusJSONResponse{
-					InternalErrorApplicationProblemPlusJSONResponse: apiserver.InternalErrorApplicationProblemPlusJSONResponse(p),
-				}, nil
-			}
-			if !hasPermission(have, permissions.Wildcard) {
-				for i := range requestedPermissions {
-					if hasPermission(have, requestedPermissions[i]) {
-						continue
-					}
-					p := problem.Forbidden(problem.CodeRequestedPermissionsNotAllowed, "", "The caller cannot delegate one or more requested permissions.")
-					return apiserver.IssueApiAccessToken403ApplicationProblemPlusJSONResponse{
-						ForbiddenApplicationProblemPlusJSONResponse: apiserver.ForbiddenApplicationProblemPlusJSONResponse(p),
-					}, nil
+		if !hasPermission(have, permissions.Wildcard) {
+			for i := range requestedPermissions {
+				if hasPermission(have, requestedPermissions[i]) {
+					continue
 				}
+				p := problem.Forbidden(problem.CodeRequestedPermissionsNotAllowed, "", "The caller cannot delegate one or more requested permissions.")
+				return apiserver.IssueApiAccessToken403ApplicationProblemPlusJSONResponse{
+					ForbiddenApplicationProblemPlusJSONResponse: apiserver.ForbiddenApplicationProblemPlusJSONResponse(p),
+				}, nil
 			}
 		}
 	}
@@ -1715,27 +1679,18 @@ func (s *StrictOpenAPIServer) IssueEdgeToken(ctx context.Context, request apiser
 		return nil, err
 	}
 
-	if s.c.PermissionEvaluator != nil {
-		have, perr := s.c.PermissionEvaluator.SubjectPermissions(fc)
-		if perr != nil {
-			p := internalProblem()
-			return apiserver.IssueEdgeToken500ApplicationProblemPlusJSONResponse{
-				InternalErrorApplicationProblemPlusJSONResponse: apiserver.InternalErrorApplicationProblemPlusJSONResponse(p),
-			}, nil
-		}
-		if !hasPermission(have, permissions.EdgeTokenIssue) {
-			p := problem.Unauthorized(problem.CodeInsufficientPermissions, "", "The caller does not have any required permission for this operation.")
-			return apiserver.IssueEdgeToken401ApplicationProblemPlusJSONResponse{
-				UnauthorizedApplicationProblemPlusJSONResponse: apiserver.UnauthorizedApplicationProblemPlusJSONResponse(p),
-			}, nil
-		}
-	} else {
-		if !hasAnyRoleOrAdmin(httpauthz.SubjectRoles(fc), authroles.APIEdgeTokensIssue) {
-			p := problem.Unauthorized("INSUFFICIENT_ROLES", "", "The caller does not have any of the roles required for this operation.")
-			return apiserver.IssueEdgeToken401ApplicationProblemPlusJSONResponse{
-				UnauthorizedApplicationProblemPlusJSONResponse: apiserver.UnauthorizedApplicationProblemPlusJSONResponse(p),
-			}, nil
-		}
+	have, perr := s.c.PermissionEvaluator.SubjectPermissions(fc)
+	if perr != nil {
+		p := internalProblem()
+		return apiserver.IssueEdgeToken500ApplicationProblemPlusJSONResponse{
+			InternalErrorApplicationProblemPlusJSONResponse: apiserver.InternalErrorApplicationProblemPlusJSONResponse(p),
+		}, nil
+	}
+	if !hasPermission(have, permissions.EdgeTokenIssue) {
+		p := problem.Unauthorized(problem.CodeInsufficientPermissions, "", "The caller does not have any required permission for this operation.")
+		return apiserver.IssueEdgeToken401ApplicationProblemPlusJSONResponse{
+			UnauthorizedApplicationProblemPlusJSONResponse: apiserver.UnauthorizedApplicationProblemPlusJSONResponse(p),
+		}, nil
 	}
 
 	req := models.GenerateTokenRequest{
