@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: API Gateway — API Server HTTP API
-  version: 1.5.7
+  version: 1.0.0
   description: |
     HTTP API for the **API Server** control plane: authentication material (JWT, JWKS), contract export,
     registry views backed by **etcd** (controllers, tenants, bundles), and operational endpoints.
@@ -10,34 +10,6 @@ info:
     lifecycle is owned by the **Gateway Controller**; this API does not expose CRUD for environments.
 
     **JSON naming:** request and response bodies use **snake_case** field names unless noted.
-
-    **v1.5.7:** adds auth introspection endpoints: role catalog with permissions, permission catalog with descriptions, and token-permissions inspection by provided API access token.
-
-    **v1.5.6:** interactive OAuth token exchange / refresh may request token lifetimes per client (`access_ttl`, `refresh_ttl`), while the server clamps them to configured maxima and provider refresh limits; session responses include actual `access_expires_at` / `refresh_expires_at`.
-
-    **v1.5.5:** OIDC providers now include mandatory user-facing `name` in config and in **`GET /v1/auth/oidc-providers`** for UIs and **`agwctl auth login`**.
-
-    **v1.5.4:** **`GET /v1/auth/oidc-providers`** — public list of configured browser OIDC providers (`id`, `kind`, `issuer`) for UIs and **`agwctl auth login`** (no secrets).
-
-    **v1.5.3:** RBAC on selected operations (roadmap step **23**): role constants (e.g. `api:contracts:export`, `api:access_tokens:issue`, baseline `api:role:viewer`, wildcard `api:role:admin`); **403** `INSUFFICIENT_ROLES` when authenticated but not authorized.
-
-    **v1.5.2:** HTTP **APISecurity** middleware (roadmap step 20): deny-by-default on secured routes; API-profile Bearer JWT and/or `X-API-Key`.
-
-    **v1.5.1 (roadmap step 13):** optional `nonce` query on **`GET /v1/auth/authorize`** (stored with the login-intent for callback **ш. 14**).
-
-    **v1.5.0 (roadmap step 5):** removes deprecated `POST /v1/tokens`; **Edge** issuance is **`POST /v1/tokens/edge`**
-    only. **API**-profile issuance remains **`POST /v1/tokens/api`** (contract stabilized for codegen; handler **ш. 22**).
-
-    **v1.4.0 (roadmap step 4 — OpenAPI draft):** per-operation `security` (public vs `bearerAuth` **or** `apiKey`);
-    split **Edge** vs **API** JWKS and token issuance paths; OIDC **login** / **callback** / **refresh** (draft contracts —
-    handlers land in roadmap steps 13–14, 17–18). **Step 20 (implemented):** Fiber middleware `APISecurity` enforces
-    API-profile `Authorization: Bearer` and/or `X-API-Key` on all routes except those marked public in the spec.
-
-    **v1.1.0** added optional `config_source` on static bundles, `sources_fingerprint` and `effective_generation` on
-    environments. **v1.2.0** added `environment_config_source`, `services` (static upstreams with per-line
-    `config_source`). **v1.3.0** nests that observability in **`meta`** on each entity (`provenance.config_source`, plus
-    `effective_generation` / `sources_fingerprint` only on environment `meta`); flat `config_source` fields on bundles
-    and services are removed in favor of `meta.provenance`.
 
     **Errors:** all failed requests use **`application/problem+json`** (RFC 9457 / RFC 7807 Problem Details).
   contact:
@@ -583,7 +555,7 @@ components:
     IssueApiAccessTokenRequest:
       type: object
       description: |
-        Draft body for `POST /v1/tokens/api`. Final fields follow RBAC/CEL and M2M policy (**roadmap steps 22–23**).
+        Draft body for `POST /v1/tokens/api`. Final fields follow RBAC/CEL and M2M policy.
       properties:
         permissions:
           type: array
@@ -1525,7 +1497,7 @@ paths:
       - apiKey: []
       summary: Issue Edge profile JWT (data plane / ExtAuthz)
       description: |
-        Mints an **Edge profile** JWT (distinct `iss` / `aud` / JWKS from API tokens). Request/response use **`GenerateTokenRequest`** / **`GenerateTokenResponse`** (same shape as pre-v1.5.0 application tokens; narrowing is **ш. 22**).
+        Mints an **Edge profile** JWT (distinct `iss` / `aud` / JWKS from API tokens). Request/response use **`GenerateTokenRequest`** / **`GenerateTokenResponse`** (same shape as pre-v1.5.0 application tokens).
       requestBody:
         required: true
         content:
@@ -1564,7 +1536,7 @@ paths:
       - bearerAuth: []
       summary: Issue API profile access JWT
       description: |
-        Mints a short-lived **API profile** JWT for calling this HTTP API. Request **`IssueApiAccessTokenRequest`** and **201** body **`ApiAccessTokenIssued`** are stable for codegen; semantics/RBAC land in **roadmap step 22**.
+        Mints a short-lived **API profile** JWT for calling this HTTP API. Request **`IssueApiAccessTokenRequest`** and **201** body **`ApiAccessTokenIssued`** are stable for codegen.
         Requires an interactive human Bearer token (API keys and delegated API tokens are not allowed as issuers).
         The issued token cannot exceed caller permissions or caller expiration.
         **RBAC (step 23):** requires role **`api:access_tokens:issue`** or admin role (**`api:role:admin`**) via JWT `roles`.
@@ -1610,7 +1582,7 @@ paths:
       summary: Export contract files from Git (via Contract Syncer)
       description: |
         Fetches contract YAML/JSON from a Git repository via the Contract Syncer service (not from etcd). Specify `repository` and `ref`; optionally narrow by `path` and/or a single `contract_name`. Response files carry base64-encoded content.
-        **RBAC (roadmap step 23):** requires **`api:contracts:export`** or admin role (**`api:role:admin`**).
+        **RBAC:** requires **`api:contracts:export`** or admin role (**`api:role:admin`**).
       requestBody:
         required: true
         content:

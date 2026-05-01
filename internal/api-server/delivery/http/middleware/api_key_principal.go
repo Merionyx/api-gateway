@@ -12,7 +12,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 )
 
-// CtxKeyAPIKeyPrincipal is the Fiber Locals key for M2M auth via X-API-Key (roadmap ш. 21).
+// CtxKeyAPIKeyPrincipal is the Fiber Locals key for M2M auth via X-API-Key .
 const CtxKeyAPIKeyPrincipal = "merionyx.auth.api_key_principal"
 
 // APIKeyRecordGetter loads API key metadata by SHA-256 hex digest of the secret (etcd path segment).

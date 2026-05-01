@@ -1,4 +1,4 @@
-// Package credentials stores per-context OIDC tokens for agwctl (roadmap ш. 32).
+// Package credentials stores per-context OIDC tokens for agwctl .
 package credentials
 
 import (

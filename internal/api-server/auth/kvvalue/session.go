@@ -14,7 +14,7 @@ const (
 )
 
 // SessionValue is the canonical session value (latest schema) after ParseSessionValueJSON.
-// Field names are snake_case for JSON (roadmap).
+// Field names are snake_case for JSON.
 type SessionValue struct {
 	SchemaVersion int `json:"schema_version"`
 
@@ -27,14 +27,14 @@ type SessionValue struct {
 	// RotationGeneration increments on each refresh rotation.
 	RotationGeneration int64 `json:"rotation_generation"`
 
-	// LoginIntentID links to login-intents/{intent_id} established this session (roadmap ш. 13–14).
+	// LoginIntentID links to login-intents/{intent_id} established this session.
 	LoginIntentID string `json:"login_intent_id,omitempty"`
 
-	// ProviderID is the configured OIDC provider used for this session (IdP token refresh; roadmap ш. 17).
+	// ProviderID is the configured OIDC provider used for this session (IdP token refresh;).
 	ProviderID string `json:"provider_id,omitempty"`
 
 	// OurRefreshVerifier is an opaque verifier for the current our-refresh chain (hash/HMAC handle);
-	// plaintext our refresh must not appear in etcd (roadmap п. 13).
+	// plaintext our refresh must not appear in etcd.
 	OurRefreshVerifier string `json:"our_refresh_verifier,omitempty"`
 
 	// RefreshExpiresAt is the absolute deadline for our refresh chain.

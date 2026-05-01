@@ -41,7 +41,7 @@ type ControllerConfig struct {
 
 type JWTConfig struct {
 	JWKSURL string `mapstructure:"jwks_url" validate:"required" json:"jwks_url"`
-	// ExpectedIssuer / ExpectedAudience must match API Server Edge JWT claims (roadmap ш. 16).
+	// ExpectedIssuer / ExpectedAudience must match API Server Edge JWT claims .
 	ExpectedIssuer   string `mapstructure:"expected_issuer" json:"expected_issuer"`
 	ExpectedAudience string `mapstructure:"expected_audience" json:"expected_audience"`
 }

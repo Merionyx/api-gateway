@@ -1,6 +1,6 @@
 // Package server hosts API Server HTTP (Fiber) and gRPC (controller registry).
 //
-// MVP split (roadmap п.8, ш.27): interactive JWT, API keys, and OIDC callbacks are HTTP-only
+// MVP split: interactive JWT, API keys, and OIDC callbacks are HTTP-only
 // (see RunHTTPServer). RunGRPCServer uses transport TLS/mTLS from grpc_registry plus grpcobs
 // metrics/logging only—no per-RPC Bearer or API-key middleware unless explicitly redesigned.
 package server

@@ -28,7 +28,7 @@ func ApplyCORSDevDefaults(cfg *Config) {
 	}
 }
 
-// CORSConfig controls browser cross-origin access (roadmap ш. 24).
+// CORSConfig controls browser cross-origin access .
 // AllowOrigins is an exact-match list for the `Origin` request header (scheme + host + optional port).
 // Use InsecureAllowWildcard only in local/dev; never in production or staging.
 type CORSConfig struct {

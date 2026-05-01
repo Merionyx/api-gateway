@@ -66,7 +66,7 @@ func (e *OAuth2TokenError) Error() string {
 // Unwrap returns ErrTokenExchange so errors.Is(err, ErrTokenExchange) matches.
 func (e *OAuth2TokenError) Unwrap() error { return ErrTokenExchange }
 
-// Degradable reports whether the API Server may use degraded refresh (IdP unreachable; roadmap ш. 18).
+// Degradable reports whether the API Server may use degraded refresh (IdP unreachable;).
 func (e *TokenExchangeFailure) Degradable() bool {
 	return e.HTTPStatus == 0 || e.HTTPStatus >= 500
 }

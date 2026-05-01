@@ -5,7 +5,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-// IdP access cache event labels (ADR 0002 §5, roadmap ш. 25). Low cardinality only — never tokens or session_id.
+// IdP access cache event labels (ADR 0002 §5). Low cardinality only — never tokens or session_id.
 const (
 	IdpAccessCacheHit        = "hit"
 	IdpAccessCacheMiss       = "miss"

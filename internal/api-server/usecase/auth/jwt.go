@@ -16,7 +16,7 @@ const (
 	AlgorithmRS256 = "RS256"
 )
 
-// JWTUseCase issues Edge vs API JWT profiles with separate key directories (roadmap ш. 15).
+// JWTUseCase issues Edge vs API JWT profiles with separate key directories .
 type JWTUseCase struct {
 	apiKeysDir   string
 	edgeKeysDir  string
@@ -73,12 +73,12 @@ func NewJWTUseCase(cfg *config.JWTConfig) (*JWTUseCase, error) {
 	}
 
 	uc := &JWTUseCase{
-		apiKeysDir:    apiDir,
-		edgeKeysDir:   edgeDir,
-		apiIssuer:     apiIss,
-		apiAudience:   apiAud,
-		edgeIssuer:    edgeIss,
-		edgeAudience:  edgeAud,
+		apiKeysDir:      apiDir,
+		edgeKeysDir:     edgeDir,
+		apiIssuer:       apiIss,
+		apiAudience:     apiAud,
+		edgeIssuer:      edgeIss,
+		edgeAudience:    edgeAud,
 		apiSigningKeys:  make(map[string]*KeyPair),
 		edgeSigningKeys: make(map[string]*KeyPair),
 	}

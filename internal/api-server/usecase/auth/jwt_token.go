@@ -135,12 +135,12 @@ func parseInteractiveSnapshotForJWT(snapshot json.RawMessage) interactiveSnapsho
 	return out
 }
 
-// MintInteractiveAPIAccessJWT issues a short-lived API-profile access JWT after browser OIDC (roadmap ш. 14–15).
+// MintInteractiveAPIAccessJWT issues a short-lived API-profile access JWT after browser OIDC.
 func (uc *JWTUseCase) MintInteractiveAPIAccessJWT(ctx context.Context, subject string, ttl time.Duration) (tokenStr, jti string, exp time.Time, err error) {
 	return uc.MintInteractiveAPIAccessJWTFromSnapshot(ctx, subject, nil, ttl)
 }
 
-// MintInteractiveAPIAccessJWTFromSnapshot mints an API access JWT using session claims_snapshot for roles / idp_* (degraded refresh, roadmap ш. 18).
+// MintInteractiveAPIAccessJWTFromSnapshot mints an API access JWT using session claims_snapshot for roles / idp_* (degraded refresh).
 func (uc *JWTUseCase) MintInteractiveAPIAccessJWTFromSnapshot(ctx context.Context, subject string, snapshot json.RawMessage, ttl time.Duration) (tokenStr, jti string, exp time.Time, err error) {
 	_, span := telemetry.Start(ctx, telemetry.SpanName(spanUsecaseAuthPkg, "MintInteractiveAPIAccessJWTFromSnapshot"))
 	defer span.End()

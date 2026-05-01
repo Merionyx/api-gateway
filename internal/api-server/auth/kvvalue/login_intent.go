@@ -23,7 +23,7 @@ type LoginIntentValue struct {
 	// IntentProtocol is the login intent protocol marker (e.g. "oidc_v1").
 	IntentProtocol string `json:"intent_protocol"`
 
-	// Nonce is optional OIDC nonce for id_token validation at callback (roadmap ш. 13–14).
+	// Nonce is optional OIDC nonce for id_token validation at callback.
 	Nonce string `json:"nonce,omitempty"`
 
 	// OAuthClientID is the downstream OAuth client_id from GET /v1/auth/authorize.

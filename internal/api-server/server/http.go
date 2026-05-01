@@ -85,7 +85,7 @@ func installCORSMiddleware(app *fiber.App, cfg *config.Config) {
 		return
 	}
 	if len(origins) == 0 {
-		slog.Info("http: CORS disabled (server.cors.allow_origins empty); set explicit Origins for browser OIDC/SPA (roadmap ш. 24)")
+		slog.Info("http: CORS disabled (server.cors.allow_origins empty); set explicit Origins for browser OIDC/SPA ")
 		return
 	}
 	corsBase.AllowOrigins = origins

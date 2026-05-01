@@ -9,7 +9,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// ParseAndValidateAPIProfileBearerToken parses a Bearer JWT and verifies it against API signing keys, issuer, and audience (roadmap ш. 20).
+// ParseAndValidateAPIProfileBearerToken parses a Bearer JWT and verifies it against API signing keys, issuer, and audience .
 // Edge-profile tokens fail (unknown kid / wrong iss / wrong aud).
 func (uc *JWTUseCase) ParseAndValidateAPIProfileBearerToken(tokenString string) (jwt.MapClaims, error) {
 	tokenString = strings.TrimSpace(tokenString)

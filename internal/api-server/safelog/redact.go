@@ -1,4 +1,4 @@
-// Package safelog provides string redaction for logs (roadmap ш. 1, 25): avoid raw JWTs and Bearer material in slog output.
+// Package safelog provides string redaction for logs: avoid raw JWTs and Bearer material in slog output.
 package safelog
 
 import "regexp"

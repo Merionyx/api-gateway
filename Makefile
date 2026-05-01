@@ -51,9 +51,6 @@ test-coverage-ci: ## Unit tests + coverage gate (see .coverage-min; without meri
 test-integration: ## Run integration tests (starts etcd in Docker via scripts/dev/run-integration-tests.sh)
 	bash scripts/dev/run-integration-tests.sh
 
-test-integration-oidc: ## OIDC E2E subset (Docker etcd; roadmap ш. 28–31)
-	bash scripts/dev/run-integration-tests.sh -run 'TestE2E_OIDC.*'
-
 clean: ## Clean build artifacts
 	rm -rf $(BUILD_DIR)
 	rm -f coverage.out coverage.html

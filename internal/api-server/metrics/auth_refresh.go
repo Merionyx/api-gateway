@@ -6,9 +6,9 @@ import (
 )
 
 const (
-	// AuthRefreshIDPUp is a successful refresh using the IdP token endpoint (roadmap ш. 17).
+	// AuthRefreshIDPUp is a successful refresh using the IdP token endpoint .
 	AuthRefreshIDPUp = "idp_up"
-	// AuthRefreshDegraded is a successful refresh without IdP (roadmap ш. 18).
+	// AuthRefreshDegraded is a successful refresh without IdP .
 	AuthRefreshDegraded = "degraded"
 )
 
@@ -20,7 +20,7 @@ var authRefreshTotal = promauto.NewCounterVec(
 	[]string{"result"},
 )
 
-// RecordAuthRefresh increments refresh outcome when metrics are enabled (roadmap ш. 18, 25).
+// RecordAuthRefresh increments refresh outcome when metrics are enabled.
 func RecordAuthRefresh(enabled bool, result string) {
 	if !enabled {
 		return

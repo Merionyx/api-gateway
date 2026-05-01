@@ -1,4 +1,4 @@
-// Package gitlabapi calls GitLab REST API v4 for OIDC follow-up (group membership; roadmap ш. 36).
+// Package gitlabapi calls GitLab REST API v4 for OIDC follow-up (group membership).
 package gitlabapi
 
 import (

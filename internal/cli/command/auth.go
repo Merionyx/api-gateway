@@ -4,7 +4,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// NewAuthCommand builds `agwctl auth ...` (interactive OIDC login; roadmap ш. 32).
+// NewAuthCommand builds `agwctl auth ...` (interactive OIDC login).
 func NewAuthCommand(resolveServer func() (string, error)) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "auth",

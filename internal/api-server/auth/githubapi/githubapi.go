@@ -1,4 +1,4 @@
-// Package githubapi calls GitHub REST for interactive OIDC follow-up (orgs, teams; roadmap ш. 35).
+// Package githubapi calls GitHub REST for interactive OIDC follow-up (orgs, teams).
 package githubapi
 
 import (

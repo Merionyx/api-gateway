@@ -6,7 +6,7 @@ import (
 )
 
 // ServerOptions returns grpc.ServerOption slice: TLS (if any), chained interceptors
-// (metrics, optional request logging). It does not add JWT, API key, or OIDC auth (roadmap ш.27).
+// (metrics, optional request logging). It does not add JWT, API key, or OIDC auth .
 // recordPrometheus should match metrics_http.enabled so gRPC counters match the scrape endpoint.
 func ServerOptions(tlsCfg *ServerTLSConfig, obs ObservabilityConfig, recordPrometheus bool) ([]grpc.ServerOption, error) {
 	var out []grpc.ServerOption

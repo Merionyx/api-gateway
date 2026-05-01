@@ -2,7 +2,7 @@ server:
   http_port: "8080"
   grpc_port: "19093"
   host: "0.0.0.0"
-  # Browser CORS (roadmap ш. 24): list every Origin (scheme+host+port) allowed to call this API from the browser.
+  # Browser CORS: list every Origin (scheme+host+port) allowed to call this API from the browser.
   # Production/staging must not use "*". Leave empty to disable CORS until UIs are known.
   cors:
     allow_origins: []
@@ -77,7 +77,7 @@ auth:
   #     redirect_uri_allowlist:
   #       - "http://127.0.0.1:21987/callback"
   #     extra_scopes: ["email"]
-  # CEL claim mapping (roadmap ш.41+): each rule evaluates against:
+  # CEL claim mapping: each rule evaluates against:
   #   - id_token.* (validated upstream token claims)
   #   - provider.*  (provider metadata and fetched provider API data for kind-specific providers)
   #
@@ -170,7 +170,7 @@ auth:
   #           when: "id_token.groups.exists(g, g == '<group object id as in id_token>')"
   #           add_roles: ["api:role:admin"]
 
-  # OpenTelemetry: optional; can be overridden (e.g. TELEMETRY_ENABLED) via environment.
+  # OpenTelemetry: optional.
   # telemetry:
   #   enabled: false
   #   service_name: "api-server"

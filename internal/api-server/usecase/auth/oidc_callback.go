@@ -39,7 +39,7 @@ type envelopeSealer interface {
 	Seal(plaintext []byte) (sessioncrypto.Envelope, error)
 }
 
-// OIDCCallbackUseCase completes GET /v1/auth/callback (roadmap ш. 14).
+// OIDCCallbackUseCase completes GET /v1/auth/callback .
 type OIDCCallbackUseCase struct {
 	byID            map[string]config.OIDCProviderConfig
 	intents         loginIntentReadDeleter

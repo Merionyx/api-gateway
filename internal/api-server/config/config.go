@@ -80,7 +80,7 @@ type ServerConfig struct {
 type JWTConfig struct {
 	KeysDir string `mapstructure:"keys_dir" validate:"required" json:"keys_dir"`
 	Issuer  string `mapstructure:"issuer" validate:"required" json:"issuer"`
-	// APIAudience is the JWT aud claim for interactive API access tokens (Edge≠API; roadmap ш. 15).
+	// APIAudience is the JWT aud claim for interactive API access tokens (Edge≠API).
 	APIAudience string `mapstructure:"api_audience" json:"api_audience"`
 	// EdgeKeysDir holds Edge-profile signing keys. Empty means keys_dir/edge (see auth.NewJWTUseCase).
 	EdgeKeysDir string `mapstructure:"edge_keys_dir" json:"edge_keys_dir"`
@@ -127,7 +127,7 @@ func LoadConfig(configFile ...string) (*Config, error) {
 	v.SetDefault("auth.interactive_refresh_token_ttl", DefaultInteractiveRefreshTokenTTL)
 	v.SetDefault("auth.interactive_refresh_token_max_ttl", DefaultInteractiveRefreshTokenMaxTTL)
 	v.SetDefault("auth.idp_access_cache_opaque_max_ttl", 2*time.Minute)
-	// Browser CORS (roadmap ш. 24): explicit dev defaults — no "*" (prod Helm must list real UI origins).
+	// Browser CORS : explicit dev defaults — no "*" (prod Helm must list real UI origins).
 	v.SetDefault("server.cors.allow_origins", DevCORSAllowOrigins())
 	v.SetDefault("server.cors.insecure_allow_wildcard", false)
 

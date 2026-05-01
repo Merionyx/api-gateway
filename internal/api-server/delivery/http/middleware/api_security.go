@@ -116,8 +116,8 @@ func pathSegments(raw string) []string {
 	return segments
 }
 
-// APISecurity enforces OpenAPI security for routes that are not explicitly public (roadmap ш. 20).
-// Accepts either a valid API-profile Bearer JWT or a known X-API-Key (SHA-256 digest lookup; principal in Locals, roadmap ш. 21).
+// APISecurity enforces OpenAPI security for routes that are not explicitly public .
+// Accepts either a valid API-profile Bearer JWT or a known X-API-Key (SHA-256 digest lookup; principal in Locals).
 func APISecurity(jwtUC *auth.JWTUseCase, apiKeys APIKeyRecordGetter, contract *APISecurityContract) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		if c.Method() == http.MethodOptions {

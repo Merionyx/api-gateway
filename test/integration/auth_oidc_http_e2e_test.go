@@ -43,9 +43,6 @@ import (
 	"github.com/merionyx/api-gateway/internal/shared/metricshttp"
 )
 
-// Roadmap ш. 28–31: OIDC E2E against real etcd (httptest mock IdP).
-// ш. 28 — login + callback; ш. 29 — refresh при 503 (degraded); ш. 30 — конкурентный refresh → 409 (CAS); ш. 31 — reuse старого our refresh после ротации → OAuth invalid_grant.
-
 const (
 	e2eOIDCProviderID = "mock-idp"
 	e2eAuthCode       = "e2e-good-code"

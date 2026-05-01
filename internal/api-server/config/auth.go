@@ -20,7 +20,7 @@ const (
 	DefaultInteractiveRefreshTokenMaxTTL = 30 * 24 * time.Hour
 )
 
-// OIDCProviderConfig describes one generic OIDC IdP for browser login (roadmap ш. 12–13).
+// OIDCProviderConfig describes one generic OIDC IdP for browser login.
 type OIDCProviderConfig struct {
 	// ID matches the login query parameter provider_id (opaque string, not a path segment).
 	ID string `mapstructure:"id" json:"id"`
@@ -38,7 +38,7 @@ type OIDCProviderConfig struct {
 	ExtraScopes []string `mapstructure:"extra_scopes" json:"extra_scopes"`
 	// ClaimMapping configures CEL-based mapping from provider responses into our snapshot/JWT contract.
 	ClaimMapping *OIDCClaimMappingConfig `mapstructure:"claim_mapping" json:"claim_mapping,omitempty"`
-	// Kind selects IdP-specific behavior. Empty or "generic" keeps standard OIDC only. "github" enables org/team checks (roadmap ш. 35). "gitlab" enables group checks (ш. 36). "google" uses id_token hd/email (ш. 37). "okta" uses id_token groups (ш. 38). "entra" uses id_token tid/groups (ш. 39).
+	// Kind selects IdP-specific behavior. Empty or "generic" keeps standard OIDC only. "github" enables org/team checks . "gitlab" enables group checks (ш. 36). "google" uses id_token hd/email (ш. 37). "okta" uses id_token groups (ш. 38). "entra" uses id_token tid/groups (ш. 39).
 	Kind string `mapstructure:"kind" json:"kind,omitempty"`
 	// GitHub is read when Kind is "github" (allowed orgs, team→role bindings). Optional; nil means no extra restrictions beyond GitHub OAuth.
 	GitHub *GitHubOIDCProviderConfig `mapstructure:"github" json:"github,omitempty"`
@@ -260,7 +260,7 @@ func GitLabAPIV4BaseFromIssuer(issuer string) (string, error) {
 	return strings.TrimSuffix(u.String(), "/") + "/api/v4", nil
 }
 
-// AuthConfig controls auth-related etcd keys and dev-only bootstrap (roadmap п. 20).
+// AuthConfig controls auth-related etcd keys and dev-only bootstrap.
 type AuthConfig struct {
 	// EtcdKeyPrefix is the auth root (default /api-gateway/api-server/auth/v1). Trailing slashes are ignored.
 	EtcdKeyPrefix string `mapstructure:"etcd_key_prefix" json:"etcd_key_prefix"`
@@ -282,10 +282,10 @@ type AuthConfig struct {
 	LoginIntentLeaseTTL time.Duration `mapstructure:"login_intent_lease_ttl" json:"login_intent_lease_ttl"`
 
 	// SessionKEKBase64 is standard base64 of 32 bytes (AES-256) used to seal IdP refresh material in session values.
-	// Required when oidc_providers is non-empty (roadmap ш. 8–11, ш. 14).
+	// Required when oidc_providers is non-empty.
 	SessionKEKBase64 string `mapstructure:"session_kek_base64" json:"session_kek_base64"`
 
-	// InteractiveAccessTokenTTL is the default API-profile access JWT lifetime after OIDC login (default 5m; roadmap).
+	// InteractiveAccessTokenTTL is the default API-profile access JWT lifetime after OIDC login (default 5m).
 	InteractiveAccessTokenTTL time.Duration `mapstructure:"interactive_access_token_ttl" json:"interactive_access_token_ttl"`
 
 	// InteractiveAccessTokenMaxTTL is the maximum API-profile access JWT lifetime a client may request.
@@ -298,7 +298,7 @@ type AuthConfig struct {
 	// When the IdP discloses a shorter refresh lifetime, our session is clamped to that shorter deadline.
 	InteractiveRefreshTokenMaxTTL time.Duration `mapstructure:"interactive_refresh_token_max_ttl" json:"interactive_refresh_token_max_ttl"`
 
-	// IdpAccessCacheOpaqueMaxTTL caps inferred IdP access lifetime for opaque tokens without expires_in/JWT exp (ADR 0002, roadmap ш. 19). Zero uses idpcache.DefaultOpaqueMaxTTL for that branch only.
+	// IdpAccessCacheOpaqueMaxTTL caps inferred IdP access lifetime for opaque tokens without expires_in/JWT exp (ADR 0002). Zero uses idpcache.DefaultOpaqueMaxTTL for that branch only.
 	IdpAccessCacheOpaqueMaxTTL time.Duration `mapstructure:"idp_access_cache_opaque_max_ttl" json:"idp_access_cache_opaque_max_ttl"`
 
 	// Authorization defines role->permission bindings for server-side authorization evaluation.
@@ -670,7 +670,7 @@ func validateOIDCClaimMapping(providerID string, m *OIDCClaimMappingConfig) erro
 	return nil
 }
 
-// BootstrapAPIKeyAllowed reports whether the insecure bootstrap path may run (roadmap step 10).
+// BootstrapAPIKeyAllowed reports whether the insecure bootstrap path may run.
 func (a AuthConfig) BootstrapAPIKeyAllowed() bool {
 	if !a.AllowInsecureBootstrap {
 		return false

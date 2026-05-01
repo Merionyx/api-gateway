@@ -46,7 +46,7 @@ type SessionTokenPair struct {
 	TokenType        string
 }
 
-// OIDCRefreshUseCase handles interactive refresh rotation (IdP up + degraded, roadmap ш. 17–18).
+// OIDCRefreshUseCase handles interactive refresh rotation (IdP up + degraded).
 type OIDCRefreshUseCase struct {
 	byID            map[string]config.OIDCProviderConfig
 	sessions        refreshSessionStore
@@ -233,7 +233,7 @@ func missingIDPRefreshTokenDetail(p config.OIDCProviderConfig) string {
 	}
 }
 
-// Refresh rotates our refresh; updates IdP material when the IdP is reachable, otherwise degraded refresh (roadmap ш. 17–18).
+// Refresh rotates our refresh; updates IdP material when the IdP is reachable, otherwise degraded refresh.
 func (u *OIDCRefreshUseCase) Refresh(ctx context.Context, req OIDCRefreshRequest) (SessionTokenPair, error) {
 	var out SessionTokenPair
 	if len(u.byID) == 0 {

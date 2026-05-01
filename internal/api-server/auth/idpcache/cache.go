@@ -1,4 +1,4 @@
-// Package idpcache implements an in-process IdP access token cache (ADR 0002, roadmap ш. 19).
+// Package idpcache implements an in-process IdP access token cache (ADR 0002,).
 package idpcache
 
 import (
@@ -26,7 +26,7 @@ type Cache struct {
 	m   map[string]entry
 	now func() time.Time
 
-	// Optional hooks (set once at startup; roadmap ш. 25). Must not log token material.
+	// Optional hooks (set once at startup;). Must not log token material.
 	onGet        func(hit bool)
 	onPut        func()
 	onInvalidate func()

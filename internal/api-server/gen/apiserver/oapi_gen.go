@@ -350,7 +350,7 @@ type HealthStatus struct {
 	Status string `json:"status"`
 }
 
-// IssueApiAccessTokenRequest Draft body for `POST /v1/tokens/api`. Final fields follow RBAC/CEL and M2M policy (**roadmap steps 22–23**).
+// IssueApiAccessTokenRequest Draft body for `POST /v1/tokens/api`. Final fields follow RBAC/CEL and M2M policy.
 type IssueApiAccessTokenRequest struct {
 	// ExpiresAt Optional absolute expiration instant (UTC) for the issued API token.
 	// Must be in the future and must not exceed either:
@@ -953,7 +953,7 @@ type ListEnvironmentsByTenantParams struct {
 
 // IssueApiAccessTokenJSONBody defines parameters for IssueApiAccessToken.
 type IssueApiAccessTokenJSONBody struct {
-	// Data Draft body for `POST /v1/tokens/api`. Final fields follow RBAC/CEL and M2M policy (**roadmap steps 22–23**).
+	// Data Draft body for `POST /v1/tokens/api`. Final fields follow RBAC/CEL and M2M policy.
 	Data IssueApiAccessTokenRequest `json:"data"`
 }
 
