@@ -119,6 +119,9 @@ func TestOIDCLoginUseCase_Start_HappyPath(t *testing.T) {
 	if stub.last.OAuthClientID != "postman" || stub.last.OAuthClientRedirectURI != "http://127.0.0.1:8080/cb" {
 		t.Fatalf("oauth client intent %+v", stub.last)
 	}
+	if stub.last.IntentProtocol != kvvalue.DefaultIntentProtocol {
+		t.Fatalf("intent_protocol %q", stub.last.IntentProtocol)
+	}
 }
 
 func TestApplyProviderAuthorizeParams_googleAddsOfflineRefreshParams(t *testing.T) {

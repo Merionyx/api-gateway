@@ -49,6 +49,7 @@ func TestSessionV1OptionalFieldsRoundTrip(t *testing.T) {
 		EncryptedIDPRefresh: json.RawMessage(`{"k":1}`),
 		RotationGeneration:  1,
 		LoginIntentID:       "6ba7b810-9dad-41d4-a716-446655440001",
+		ProviderID:          "p1",
 		OurRefreshVerifier:  "opaque-verifier-handle",
 	}
 	b, err := MarshalSessionValueJSON(s)
@@ -71,6 +72,7 @@ func TestSessionV1RoundTrip(t *testing.T) {
 		EncryptedIDPRefresh: json.RawMessage(`{}`),
 		ClaimsSnapshot:      json.RawMessage(`[]`),
 		RotationGeneration:  3,
+		ProviderID:          "p1",
 	}
 	b, err := MarshalSessionValueJSON(s)
 	if err != nil {
@@ -109,6 +111,14 @@ func TestSessionMissingSchema(t *testing.T) {
 	_, err := ParseSessionValueJSON([]byte(`{}`))
 	if !errors.Is(err, ErrMissingSchemaVersion) {
 		t.Fatalf("got %v", err)
+	}
+}
+
+func TestSessionV1RejectsMissingProviderID(t *testing.T) {
+	t.Parallel()
+	_, err := ParseSessionValueJSON([]byte(`{"schema_version":1,"encrypted_idp_refresh":{}}`))
+	if err == nil {
+		t.Fatal("expected error")
 	}
 }
 
@@ -160,6 +170,20 @@ func TestLoginIntentMarshalRequiresFields(t *testing.T) {
 		SchemaVersion: LoginIntentSchemaV1,
 		ProviderID:    "x",
 	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestLoginIntentRejectsMissingIntentProtocol(t *testing.T) {
+	t.Parallel()
+	_, err := ParseLoginIntentValueJSON([]byte(`{
+		"schema_version": 1,
+		"provider_id": "gitlab",
+		"redirect_uri": "https://cb",
+		"oauth_state": "st",
+		"pkce_verifier": "ver"
+	}`))
 	if err == nil {
 		t.Fatal("expected error")
 	}

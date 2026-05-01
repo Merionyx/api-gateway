@@ -164,12 +164,6 @@ func (u *OIDCRefreshUseCase) completeSessionRefresh(
 		OurRefreshVerifier:  newVerifier,
 		RefreshExpiresAt:    refreshExpiresAt,
 	}
-	if newSess.ProviderID == "" && len(u.byID) == 1 {
-		for id := range u.byID {
-			newSess.ProviderID = id
-			break
-		}
-	}
 
 	if err := u.sessions.ReplaceCASWithRefreshIndex(ctx, sessionID, oldVerifier, newVerifier, newSess, modRev); err != nil {
 		if errors.Is(err, etcd.ErrSessionCASConflict) {
@@ -203,19 +197,14 @@ func (u *OIDCRefreshUseCase) completeSessionRefresh(
 
 func (u *OIDCRefreshUseCase) resolveProvider(sess kvvalue.SessionValue) (config.OIDCProviderConfig, error) {
 	pid := strings.TrimSpace(sess.ProviderID)
-	if pid != "" {
-		p, ok := u.byID[pid]
-		if !ok {
-			return config.OIDCProviderConfig{}, apierrors.ErrOIDCUnknownProvider
-		}
-		return p, nil
+	if pid == "" {
+		return config.OIDCProviderConfig{}, fmt.Errorf("%w: session missing provider_id", apierrors.ErrInvalidInput)
 	}
-	if len(u.byID) == 1 {
-		for _, p := range u.byID {
-			return p, nil
-		}
+	p, ok := u.byID[pid]
+	if !ok {
+		return config.OIDCProviderConfig{}, apierrors.ErrOIDCUnknownProvider
 	}
-	return config.OIDCProviderConfig{}, fmt.Errorf("%w: session missing provider_id", apierrors.ErrInvalidInput)
+	return p, nil
 }
 
 func missingIDPRefreshTokenDetail(p config.OIDCProviderConfig) string {

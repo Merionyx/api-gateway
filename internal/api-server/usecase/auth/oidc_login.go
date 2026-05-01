@@ -130,6 +130,7 @@ func (u *OIDCLoginUseCase) Start(ctx context.Context, req OIDCLoginStartRequest)
 		RedirectURI:                    idpRedirectURI,
 		OAuthState:                     state,
 		PKCEVerifier:                   ver,
+		IntentProtocol:                 kvvalue.DefaultIntentProtocol,
 		Nonce:                          strings.TrimSpace(req.Nonce),
 		OAuthClientID:                  strings.TrimSpace(req.ClientID),
 		OAuthClientRedirectURI:         clientRedirectURI,

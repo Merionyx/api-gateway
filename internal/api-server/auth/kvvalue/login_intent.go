@@ -54,8 +54,11 @@ func ParseLoginIntentValueJSON(data []byte) (LoginIntentValue, error) {
 		if v1.SchemaVersion != LoginIntentSchemaV1 {
 			return LoginIntentValue{}, ErrMissingSchemaVersion
 		}
+		if v1.ProviderID == "" || v1.RedirectURI == "" || v1.OAuthState == "" || v1.PKCEVerifier == "" {
+			return LoginIntentValue{}, errors.New("kvvalue: login-intent required string fields missing")
+		}
 		if v1.IntentProtocol == "" {
-			v1.IntentProtocol = DefaultIntentProtocol
+			return LoginIntentValue{}, errors.New("kvvalue: login-intent intent_protocol required")
 		}
 		return v1, nil
 	default:
@@ -68,9 +71,9 @@ func MarshalLoginIntentValueJSON(v LoginIntentValue) ([]byte, error) {
 	if v.ProviderID == "" || v.RedirectURI == "" || v.OAuthState == "" || v.PKCEVerifier == "" {
 		return nil, errors.New("kvvalue: login-intent required string fields missing")
 	}
-	v.SchemaVersion = LoginIntentSchemaV1
 	if v.IntentProtocol == "" {
-		v.IntentProtocol = DefaultIntentProtocol
+		return nil, errors.New("kvvalue: login-intent intent_protocol required")
 	}
+	v.SchemaVersion = LoginIntentSchemaV1
 	return json.Marshal(v)
 }

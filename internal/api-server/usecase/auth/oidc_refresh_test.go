@@ -71,6 +71,21 @@ func TestSubjectFromClaimsSnapshot_empty(t *testing.T) {
 	}
 }
 
+func TestOIDCRefreshResolveProvider_requiresProviderID(t *testing.T) {
+	t.Parallel()
+	uc := NewOIDCRefreshUseCase([]config.OIDCProviderConfig{{
+		ID:       "p1",
+		Name:     "Provider",
+		Issuer:   "https://issuer.example",
+		ClientID: "cid",
+	}}, nil, nil, nil, nil, TokenTTLPolicy{}, false, nil, 0)
+
+	_, err := uc.resolveProvider(kvvalue.SessionValue{})
+	if !errors.Is(err, apierrors.ErrInvalidInput) {
+		t.Fatalf("got %v", err)
+	}
+}
+
 type memRefreshSessionStore struct {
 	mu        sync.Mutex
 	sessionID string

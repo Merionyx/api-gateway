@@ -29,8 +29,8 @@ type SessionValue struct {
 	// LoginIntentID links to login-intents/{intent_id} established this session.
 	LoginIntentID string `json:"login_intent_id,omitempty"`
 
-	// ProviderID is the configured OIDC provider used for this session (IdP token refresh;).
-	ProviderID string `json:"provider_id,omitempty"`
+	// ProviderID is the configured OIDC provider used for this session (IdP token refresh).
+	ProviderID string `json:"provider_id"`
 
 	// OurRefreshVerifier is an opaque verifier for the current our-refresh chain (hash/HMAC handle);
 	// plaintext our refresh must not appear in etcd.
@@ -58,6 +58,9 @@ func ParseSessionValueJSON(data []byte) (SessionValue, error) {
 		if len(v1.EncryptedIDPRefresh) == 0 {
 			return SessionValue{}, errors.New("kvvalue: session v1 encrypted_idp_refresh required")
 		}
+		if v1.ProviderID == "" {
+			return SessionValue{}, errors.New("kvvalue: session v1 provider_id required")
+		}
 		return v1, nil
 	default:
 		return SessionValue{}, fmt.Errorf("%w: %d", ErrUnsupportedSessionSchema, ver)
@@ -68,6 +71,9 @@ func ParseSessionValueJSON(data []byte) (SessionValue, error) {
 func MarshalSessionValueJSON(s SessionValue) ([]byte, error) {
 	if len(s.EncryptedIDPRefresh) == 0 {
 		return nil, errors.New("kvvalue: session encrypted_idp_refresh required")
+	}
+	if s.ProviderID == "" {
+		return nil, errors.New("kvvalue: session provider_id required")
 	}
 	s.SchemaVersion = SessionSchemaV1
 	return json.Marshal(s)
