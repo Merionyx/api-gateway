@@ -212,6 +212,49 @@ func TestStrictInspectTokenPermissions_RejectsFlatBodyWithoutData(t *testing.T) 
 	}
 }
 
+func TestStrictTokenOidc_GrantTypeIsReadOnlyFromFormBody(t *testing.T) {
+	t.Parallel()
+
+	cat, err := roles.NewCatalog(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cnt := &container.Container{
+		Config:              &config.Config{},
+		RoleCatalog:         cat,
+		PermissionEvaluator: httpauthz.NewPermissionEvaluator(cat),
+		OAuthTokenUseCase:   auth.NewOAuthTokenUseCase(nil, nil, nil, nil, auth.TokenTTLPolicy{}),
+	}
+	app := testStrictApp(cnt, nil)
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/auth/token?grant_type=authorization_code",
+		strings.NewReader("code=code-1&redirect_uri=https%3A%2F%2Fclient.example%2Fcb&client_id=client-1&code_verifier=verifier-1"),
+	)
+	req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationForm)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("status %d body %s", resp.StatusCode, b)
+	}
+
+	var out apiserver.OAuthTokenError
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out.Error != "invalid_request" {
+		t.Fatalf("error %q", out.Error)
+	}
+	if out.ErrorDescription == nil || !strings.Contains(*out.ErrorDescription, "unsupported grant_type") {
+		t.Fatalf("error_description %#v", out.ErrorDescription)
+	}
+}
+
 func TestStrictIssueApiAccessToken_UsesDefaultTTLAndOmitsRoles(t *testing.T) {
 	t.Parallel()
 

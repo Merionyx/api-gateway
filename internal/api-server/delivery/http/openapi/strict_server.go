@@ -905,9 +905,6 @@ func (s *StrictOpenAPIServer) TokenOidc(ctx context.Context, request apiserver.T
 	if clientID == "" {
 		if fc, err := fiberCtxFromStrictContext(ctx); err == nil {
 			clientID = clientIDFromBasicAuth(fc.Get(fiber.HeaderAuthorization))
-			if grantType == "" {
-				grantType = strings.TrimSpace(fc.Query("grant_type"))
-			}
 		}
 	}
 
