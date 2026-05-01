@@ -116,11 +116,11 @@ func modelJWKSToAPI(in *models.JWKS) (apiserver.Jwks, error) {
 }
 
 func subjectFromAPIJWTClaims(mc jwt.MapClaims) string {
-	if e, _ := mc["email"].(string); strings.TrimSpace(e) != "" {
-		return strings.TrimSpace(e)
-	}
 	if s, _ := mc["sub"].(string); strings.TrimSpace(s) != "" {
 		return strings.TrimSpace(s)
+	}
+	if e, _ := mc["email"].(string); strings.TrimSpace(e) != "" {
+		return strings.TrimSpace(e)
 	}
 	return ""
 }
@@ -972,10 +972,7 @@ func (s *StrictOpenAPIServer) InspectTokenPermissions(ctx context.Context, reque
 		}, nil
 	}
 
-	subject := claimString(claims, "sub")
-	if subject == "" {
-		subject = claimString(claims, "email")
-	}
+	subject := subjectFromAPIJWTClaims(claims)
 
 	tokenRoles := uniqueSortedStrings(httpauthz.NormalizeRolesValue(claims["roles"]))
 	effective := s.c.RoleCatalog.ResolvePermissions(tokenRoles)
