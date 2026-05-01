@@ -17,7 +17,6 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/config"
 	grpchandler "github.com/merionyx/api-gateway/internal/api-server/delivery/grpc/handler"
 	httpauthz "github.com/merionyx/api-gateway/internal/api-server/delivery/http/authz"
-	httphandler "github.com/merionyx/api-gateway/internal/api-server/delivery/http/handler"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/api-server/idempotency"
 	"github.com/merionyx/api-gateway/internal/api-server/metrics"
@@ -58,18 +57,6 @@ type Container struct {
 	ControllerRegistryUseCase interfaces.ControllerRegistryUseCase
 	BundleSyncUseCase         interfaces.BundleSyncUseCase
 	PermissionEvaluator       *httpauthz.PermissionEvaluator
-
-	JWTHandler *httphandler.JWTHandler
-
-	OIDCLoginHandler *httphandler.OIDCLoginHandler
-
-	OIDCCallbackHandler      *httphandler.OIDCCallbackHandler
-	OAuthTokenHandler        *httphandler.OAuthTokenHandler
-	AuthIntrospectionHandler *httphandler.AuthIntrospectionHandler
-
-	ContractsExportHandler *httphandler.ContractsExportHandler
-
-	RegistryHandler *httphandler.RegistryHandler
 
 	BundleReadUseCase     *bundle.BundleReadUseCase
 	ControllerReadUseCase *registry.ControllerReadUseCase
@@ -309,32 +296,9 @@ func (c *Container) initHandlers() {
 		slog.Info("idempotency backend=memory")
 	}
 	c.PermissionEvaluator = httpauthz.NewPermissionEvaluator(c.RoleCatalog)
-	c.JWTHandler = httphandler.NewJWTHandler(
-		c.JWTUseCase,
-		c.Config.MetricsHTTP.Enabled,
-		c.Config.Auth.InteractiveAccessTokenTTL,
-		c.PermissionEvaluator,
-	)
-	c.OIDCLoginHandler = httphandler.NewOIDCLoginHandler(c.OIDCLoginUseCase)
-	c.OIDCCallbackHandler = httphandler.NewOIDCCallbackHandler(c.OIDCCallbackUseCase)
-	if c.OAuthTokenUseCase != nil {
-		c.OAuthTokenHandler = httphandler.NewOAuthTokenHandler(c.OAuthTokenUseCase)
-	}
-	c.AuthIntrospectionHandler = httphandler.NewAuthIntrospectionHandler(c.JWTUseCase, c.RoleCatalog)
-	exportUC := bundle.NewContractExportUseCase(c.ContractSyncerGRPC)
-	c.ContractsExportHandler = httphandler.NewContractsExportHandler(exportUC, c.PermissionEvaluator)
-	c.RegistryHandler = httphandler.NewRegistryHandler(
-		c.BundleReadUseCase,
-		c.ControllerReadUseCase,
-		c.TenantReadUseCase,
-		c.BundleHTTPSyncUseCase,
-		c.StatusReadUseCase,
-		c.Config.Readiness.RequireContractSyncer,
-		c.BundleSyncIdempotency,
-	)
 	c.ControllerRegistryHandler = grpchandler.NewControllerRegistryHandler(c.ControllerRegistryUseCase, c.Config.MetricsHTTP.Enabled)
 
-	slog.Info("handlers initialized")
+	slog.Info("delivery adapters initialized")
 }
 
 // StartBackgroundWork runs etcd watch and bundle sync until ctx is cancelled.

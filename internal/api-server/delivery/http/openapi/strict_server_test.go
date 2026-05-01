@@ -1,4 +1,4 @@
-package server
+package openapi
 
 import (
 	"context"
@@ -21,7 +21,7 @@ func TestBindFiberContextForStrictHandlers_setsContextValue(t *testing.T) {
 	t.Parallel()
 
 	app := fiber.New()
-	app.Use(bindFiberContextForStrictHandlers())
+	app.Use(BindFiberContextForStrictHandlers())
 	app.Get("/", func(c fiber.Ctx) error {
 		fc, err := fiberCtxFromStrictContext(c.Context())
 		if err != nil {

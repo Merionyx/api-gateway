@@ -16,6 +16,7 @@ import (
 	"github.com/merionyx/api-gateway/internal/api-server/config"
 	"github.com/merionyx/api-gateway/internal/api-server/container"
 	httpxmw "github.com/merionyx/api-gateway/internal/api-server/delivery/http/middleware"
+	httpopenapi "github.com/merionyx/api-gateway/internal/api-server/delivery/http/openapi"
 	"github.com/merionyx/api-gateway/internal/api-server/gen/apiserver"
 	apimetrics "github.com/merionyx/api-gateway/internal/api-server/metrics"
 )
@@ -100,14 +101,14 @@ func setupRoutes(app *fiber.App, c *container.Container) error {
 	swagger.Servers = nil
 
 	app.Use(httpTraceMiddleware())
-	app.Use(bindFiberContextForStrictHandlers())
+	app.Use(httpopenapi.BindFiberContextForStrictHandlers())
 	app.Use(httpxmw.APISecurity(c.JWTUseCase, c.APIKeyRepository))
 	app.Use(oapimw.OapiRequestValidatorWithOptions(swagger, &oapimw.Options{
 		Options: openapi3filter.Options{
 			AuthenticationFunc: AuthenticationFunc,
 		},
 	}))
-	apiserver.RegisterHandlers(app, apiserver.NewStrictHandler(NewStrictOpenAPIServer(c), nil))
+	apiserver.RegisterHandlers(app, apiserver.NewStrictHandler(httpopenapi.NewStrictOpenAPIServer(c), nil))
 	return nil
 }
 
