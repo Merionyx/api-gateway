@@ -7,12 +7,14 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	commonv1 "github.com/merionyx/api-gateway/pkg/grpc/common/v1"
 	pb "github.com/merionyx/api-gateway/pkg/grpc/controller_registry/v1"
 
 	"github.com/merionyx/api-gateway/internal/api-server/delivery/grpc/grpcerr"
+	"github.com/merionyx/api-gateway/internal/api-server/domain/apierrors"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/interfaces"
 	"github.com/merionyx/api-gateway/internal/api-server/domain/models"
 	sharedgit "github.com/merionyx/api-gateway/internal/shared/git"
@@ -131,19 +133,26 @@ func bundleFromPB(b *pb.BundleInfo) models.BundleInfo {
 	return bi
 }
 
-func serviceLineScopeFromPB(s pb.ServiceLineScope) string {
-	switch s {
+func serviceLineScopeFromPB(s *pb.ServiceLineScope) (string, error) {
+	if s == nil {
+		return "", fmt.Errorf("scope is required")
+	}
+	switch *s {
 	case pb.ServiceLineScope_SERVICE_LINE_SCOPE_ENVIRONMENT:
-		return "environment"
+		return models.ServiceScopeEnvironment, nil
 	case pb.ServiceLineScope_SERVICE_LINE_SCOPE_CONTROLLER_ROOT:
-		return "controller_root"
+		return models.ServiceScopeControllerRoot, nil
 	default:
-		return ""
+		return "", fmt.Errorf("unknown scope enum value %d", *s)
 	}
 }
 
-func serviceFromPB(s *pb.ServiceInfo) models.ServiceInfo {
-	si := models.ServiceInfo{Name: s.Name, Upstream: s.Upstream, Scope: serviceLineScopeFromPB(s.GetScope())}
+func serviceFromPB(s *pb.ServiceInfo) (models.ServiceInfo, error) {
+	scope, err := serviceLineScopeFromPB(s.Scope)
+	if err != nil {
+		return models.ServiceInfo{}, err
+	}
+	si := models.ServiceInfo{Name: s.Name, Upstream: s.Upstream, Scope: scope}
 	if m := s.GetMeta(); m != nil {
 		if p := provenanceFromPB(m.GetProvenance()); p != nil || m.GetK8SServiceRef() != "" {
 			sm := &models.ServiceMeta{}
@@ -158,24 +167,28 @@ func serviceFromPB(s *pb.ServiceInfo) models.ServiceInfo {
 			}
 		}
 	}
-	return si
+	return si, nil
 }
 
-func environmentFromPB(e *pb.EnvironmentInfo) models.EnvironmentInfo {
+func environmentFromPB(e *pb.EnvironmentInfo) (models.EnvironmentInfo, error) {
 	var bundles []models.BundleInfo
 	for _, b := range e.Bundles {
 		bundles = append(bundles, bundleFromPB(b))
 	}
 	var services []models.ServiceInfo
 	for _, s := range e.Services {
-		services = append(services, serviceFromPB(s))
+		service, err := serviceFromPB(s)
+		if err != nil {
+			return models.EnvironmentInfo{}, err
+		}
+		services = append(services, service)
 	}
 	return models.EnvironmentInfo{
 		Name:     e.Name,
 		Bundles:  bundles,
 		Services: services,
 		Meta:     environmentMetaFromPB(e.GetMeta()),
-	}
+	}, nil
 }
 
 func (h *ControllerRegistryHandler) RegisterController(ctx context.Context, req *pb.RegisterControllerRequest) (*pb.RegisterControllerResponse, error) {
@@ -185,8 +198,14 @@ func (h *ControllerRegistryHandler) RegisterController(ctx context.Context, req 
 	slog.Info("Received register controller request", "controller_id", req.ControllerId, "tenant", req.Tenant)
 
 	environments := make([]models.EnvironmentInfo, 0, len(req.Environments))
-	for _, pbEnv := range req.Environments {
-		environments = append(environments, environmentFromPB(pbEnv))
+	for idx, pbEnv := range req.Environments {
+		env, err := environmentFromPB(pbEnv)
+		if err != nil {
+			validationErr := fmt.Errorf("%w: environments[%d] invalid service scope: %s", apierrors.ErrInvalidInput, idx, err.Error())
+			telemetry.MarkError(span, validationErr)
+			return nil, grpcerr.Status(h.metricsEnabled, validationErr)
+		}
+		environments = append(environments, env)
 	}
 
 	info := models.ControllerInfo{
@@ -265,8 +284,14 @@ func (h *ControllerRegistryHandler) Heartbeat(ctx context.Context, req *pb.Heart
 	slog.Debug("Received heartbeat", "controller_id", req.ControllerId)
 
 	environments := make([]models.EnvironmentInfo, 0, len(req.Environments))
-	for _, pbEnv := range req.Environments {
-		environments = append(environments, environmentFromPB(pbEnv))
+	for idx, pbEnv := range req.Environments {
+		env, err := environmentFromPB(pbEnv)
+		if err != nil {
+			validationErr := fmt.Errorf("%w: environments[%d] invalid service scope: %s", apierrors.ErrInvalidInput, idx, err.Error())
+			telemetry.MarkError(span, validationErr)
+			return nil, grpcerr.Status(h.metricsEnabled, validationErr)
+		}
+		environments = append(environments, env)
 	}
 
 	if err := h.registryUseCase.Heartbeat(ctx, req.ControllerId, environments, req.RegistryPayloadVersion); err != nil {
