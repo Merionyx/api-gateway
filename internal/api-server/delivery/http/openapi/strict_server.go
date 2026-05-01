@@ -401,21 +401,18 @@ func durationFromOptionalFormSeconds(v *int) time.Duration {
 	return time.Duration(*v) * time.Second
 }
 
-func clientIDFromBasicAuth(h string) string {
+func usesBasicAuthorizationHeader(h string) bool {
 	raw := strings.TrimSpace(h)
-	if len(raw) < len("Basic ") || !strings.EqualFold(raw[:len("Basic ")], "Basic ") {
-		return ""
+	if raw == "" {
+		return false
 	}
-	payload := strings.TrimSpace(raw[len("Basic "):])
-	b, err := base64.StdEncoding.DecodeString(payload)
-	if err != nil {
-		return ""
+	if strings.EqualFold(raw, "Basic") {
+		return true
 	}
-	parts := strings.SplitN(string(b), ":", 2)
-	if len(parts) == 0 {
-		return ""
+	if len(raw) < len("Basic ")+1 {
+		return false
 	}
-	return strings.TrimSpace(parts[0])
+	return strings.EqualFold(raw[:len("Basic ")], "Basic ")
 }
 
 func controllerToAPI(c models.ControllerInfo) apiserver.Controller {
@@ -898,15 +895,13 @@ func (s *StrictOpenAPIServer) TokenOidc(ctx context.Context, request apiserver.T
 	}
 
 	grantType := strings.TrimSpace(string(body.GrantType))
-	clientID := ""
-	if body.ClientId != nil {
-		clientID = strings.TrimSpace(*body.ClientId)
+	if fc, err := fiberCtxFromStrictContext(ctx); err == nil && usesBasicAuthorizationHeader(fc.Get(fiber.HeaderAuthorization)) {
+		return apiserver.TokenOidc400JSONResponse{
+			Error:            "invalid_request",
+			ErrorDescription: stringPtr("Authorization: Basic is not supported on this endpoint; provide client_id in form body."),
+		}, nil
 	}
-	if clientID == "" {
-		if fc, err := fiberCtxFromStrictContext(ctx); err == nil {
-			clientID = clientIDFromBasicAuth(fc.Get(fiber.HeaderAuthorization))
-		}
-	}
+	clientID := stringOrEmpty(body.ClientId)
 
 	req := auth.OAuthTokenRequest{
 		GrantType:    grantType,

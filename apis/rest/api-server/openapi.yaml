@@ -434,7 +434,8 @@ components:
           description: Required for `authorization_code` grant; must match authorize request.
         client_id:
           type: string
-          description: OAuth client id passed in authorize request.
+          description: |
+            Required for `authorization_code` grant. Must be sent in form body; `Authorization: Basic` client authentication is not supported.
         code_verifier:
           type: string
           description: Required for `authorization_code` grant (`S256` PKCE).
@@ -1485,6 +1486,7 @@ paths:
       description: |
         Exchanges OAuth `authorization_code` + PKCE for API tokens, and supports `refresh_token` grant.
         Uses `application/x-www-form-urlencoded` request body per OAuth 2.1 conventions.
+        `client_id` must be provided in the form body (for `authorization_code` grant); `Authorization: Basic` is rejected.
       requestBody:
         required: true
         content:

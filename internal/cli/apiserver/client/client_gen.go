@@ -393,7 +393,7 @@ type OAuthTokenRequestForm struct {
 	// AccessTtl Optional extension: requested access token lifetime in seconds (server clamps to policy).
 	AccessTtl *int `json:"access_ttl,omitempty"`
 
-	// ClientId OAuth client id passed in authorize request.
+	// ClientId Required for `authorization_code` grant. Must be sent in form body; `Authorization: Basic` client authentication is not supported.
 	ClientId *string `json:"client_id,omitempty"`
 
 	// Code Required for `authorization_code` grant.
