@@ -49,7 +49,15 @@ func Load() (*File, error) {
 	if err != nil {
 		return nil, err
 	}
-	data, err := os.ReadFile(p)
+	root, err := os.OpenRoot(filepath.Dir(p))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return &File{Contexts: map[string]Entry{}}, nil
+		}
+		return nil, fmt.Errorf("open credentials dir: %w", err)
+	}
+	defer func() { _ = root.Close() }()
+	data, err := root.ReadFile(filepath.Base(p))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return &File{Contexts: map[string]Entry{}}, nil
@@ -112,7 +120,7 @@ func PutContext(contextName string, e Entry) error {
 		return err
 	}
 	dir := filepath.Dir(p)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("mkdir %s: %w", dir, err)
 	}
 	data, err := yaml.Marshal(f)

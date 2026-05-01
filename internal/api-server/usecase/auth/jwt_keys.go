@@ -20,7 +20,12 @@ import (
 
 // readKeyPairFromFile loads a single PEM private key and builds a KeyPair (kid from basename without .key).
 func readKeyPairFromFile(keyPath string) (*KeyPair, error) {
-	keyData, err := os.ReadFile(keyPath)
+	root, err := os.OpenRoot(filepath.Dir(keyPath))
+	if err != nil {
+		return nil, fmt.Errorf("%w: open key directory: %w", apierrors.ErrInvalidInput, err)
+	}
+	defer func() { _ = root.Close() }()
+	keyData, err := root.ReadFile(filepath.Base(keyPath))
 	if err != nil {
 		return nil, fmt.Errorf("%w: read key file: %w", apierrors.ErrInvalidInput, err)
 	}

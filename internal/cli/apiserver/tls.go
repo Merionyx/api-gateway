@@ -38,7 +38,7 @@ func NewHTTPClient(opts TLSOptions) (*http.Client, error) {
 	if opts.Insecure {
 		t.TLSClientConfig = &tls.Config{
 			MinVersion:         tls.VersionTLS12,
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: true, // #nosec G402 -- explicit opt-in via --insecure for local/dev endpoints.
 		}
 		return &http.Client{Transport: t, Timeout: timeout}, nil
 	}

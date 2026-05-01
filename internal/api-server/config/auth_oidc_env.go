@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-const oidcCredEnvPrefix = "AGWCP_OIDC_"
+const oidcCredEnvPrefix = "AGWCP_OIDC_" // #nosec G101 -- environment-variable prefix, not a credential.
 
 var oidcEnvSuffixSanitizer = regexp.MustCompile(`[^a-zA-Z0-9]+`)
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -329,23 +330,34 @@ func syncLocalGitWorktree(w *gogit.Worktree, clientOpts []gitclient.Option, name
 
 func (rm *RepositoryManager) getSnapshotsFromLocalDir(basePath, subPath string) ([]ContractSnapshot, error) {
 	fullPath := filepath.Join(basePath, subPath)
+	root, err := os.OpenRoot(fullPath)
+	if err != nil {
+		return nil, fmt.Errorf("open root %s: %w", fullPath, err)
+	}
+	defer func() { _ = root.Close() }()
+
 	var files []RepositoryFile
 
-	err := filepath.Walk(fullPath, func(p string, info os.FileInfo, walkErr error) error {
+	err = filepath.WalkDir(fullPath, func(p string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
 
-		if !info.IsDir() && isSchemaFile(p) {
-			content, rerr := os.ReadFile(p)
-			if rerr != nil {
-				return rerr
-			}
-			files = append(files, RepositoryFile{
-				Path:    p,
-				Content: content,
-			})
+		if d.IsDir() || !isSchemaFile(p) {
+			return nil
 		}
+		rel, rerr := filepath.Rel(fullPath, p)
+		if rerr != nil {
+			return fmt.Errorf("rel path %s: %w", p, rerr)
+		}
+		content, rerr := root.ReadFile(rel)
+		if rerr != nil {
+			return rerr
+		}
+		files = append(files, RepositoryFile{
+			Path:    p,
+			Content: content,
+		})
 		return nil
 	})
 

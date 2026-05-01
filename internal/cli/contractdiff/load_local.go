@@ -3,6 +3,7 @@ package contractdiff
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/merionyx/api-gateway/internal/cli/validate"
 )
@@ -23,7 +24,12 @@ func LoadLocal(root string) (map[string]LocalContract, error) {
 	}
 	out := make(map[string]LocalContract)
 	for _, p := range paths {
-		raw, err := os.ReadFile(p)
+		root, err := os.OpenRoot(filepath.Dir(p))
+		if err != nil {
+			return nil, fmt.Errorf("open %s: %w", p, err)
+		}
+		raw, err := root.ReadFile(filepath.Base(p))
+		_ = root.Close()
 		if err != nil {
 			return nil, fmt.Errorf("read %s: %w", p, err)
 		}

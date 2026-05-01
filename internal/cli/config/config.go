@@ -42,7 +42,15 @@ func Load() (*File, error) {
 	if err != nil {
 		return nil, err
 	}
-	data, err := os.ReadFile(p)
+	root, err := os.OpenRoot(filepath.Dir(p))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return &File{Contexts: map[string]ContextConfig{}}, nil
+		}
+		return nil, fmt.Errorf("open config dir: %w", err)
+	}
+	defer func() { _ = root.Close() }()
+	data, err := root.ReadFile(filepath.Base(p))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return &File{Contexts: map[string]ContextConfig{}}, nil
@@ -59,7 +67,7 @@ func Load() (*File, error) {
 	return &c, nil
 }
 
-// Save writes the config file atomically (0644 on file, 0755 on parent dirs). Creates ~/.config/agwctl if needed.
+// Save writes the config file atomically (0644 on file, 0700 on parent dirs). Creates ~/.config/agwctl if needed.
 func Save(f *File) error {
 	if f == nil {
 		return fmt.Errorf("config: nil file")
@@ -72,7 +80,7 @@ func Save(f *File) error {
 		return err
 	}
 	dir := filepath.Dir(p)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("mkdir %s: %w", dir, err)
 	}
 	data, err := yaml.Marshal(f)
