@@ -3,6 +3,7 @@ package kvvalue
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 )
 
@@ -128,48 +129,21 @@ func TestSessionMissingSchema(t *testing.T) {
 	}
 }
 
-func TestLoginIntentMigrateV1(t *testing.T) {
+func TestLoginIntentLatestRoundTrip(t *testing.T) {
 	t.Parallel()
 	raw := []byte(`{
-		"schema_version": 1,
-		"provider_id": "gitlab",
-		"redirect_uri": "https://cb",
-		"oauth_state": "st",
-		"pkce_verifier": "ver"
-	}`)
-	got, err := ParseLoginIntentValueJSON(raw)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.SchemaVersion != LoginIntentSchemaLatest {
-		t.Fatal("schema")
-	}
-	if got.IntentProtocol != DefaultIntentProtocol {
-		t.Fatalf("intent_protocol: %q", got.IntentProtocol)
-	}
-	b, err := MarshalLoginIntentValueJSON(got)
-	if err != nil {
-		t.Fatal(err)
-	}
-	got2, err := ParseLoginIntentValueJSON(b)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got2.IntentProtocol != DefaultIntentProtocol {
-		t.Fatal(got2.IntentProtocol)
-	}
-}
-
-func TestLoginIntentMigrateV2ToLatest(t *testing.T) {
-	t.Parallel()
-	raw := []byte(`{
-		"schema_version": 2,
+		"schema_version": 4,
 		"provider_id": "gitlab",
 		"redirect_uri": "https://cb",
 		"oauth_state": "st",
 		"pkce_verifier": "ver",
 		"intent_protocol": "oidc_v1",
-		"nonce": "n1"
+		"nonce": "n1",
+		"oauth_client_id": "postman",
+		"oauth_client_redirect_uri": "https://oauth.pstmn.io/v1/callback",
+		"oauth_client_state": "st2",
+		"oauth_client_code_challenge": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~",
+		"oauth_client_code_challenge_method": "S256"
 	}`)
 	got, err := ParseLoginIntentValueJSON(raw)
 	if err != nil {
@@ -181,12 +155,26 @@ func TestLoginIntentMigrateV2ToLatest(t *testing.T) {
 	if got.Nonce != "n1" {
 		t.Fatalf("nonce %q", got.Nonce)
 	}
+	if got.OAuthClientID != "postman" {
+		t.Fatalf("oauth_client_id %q", got.OAuthClientID)
+	}
+}
+
+func TestLoginIntentRejectsLegacySchemas(t *testing.T) {
+	t.Parallel()
+	for _, ver := range []int{1, 2, 3} {
+		raw := []byte(fmt.Sprintf(`{"schema_version":%d}`, ver))
+		_, err := ParseLoginIntentValueJSON(raw)
+		if !errors.Is(err, ErrUnsupportedLoginIntentSchema) {
+			t.Fatalf("schema_version=%d: got %v", ver, err)
+		}
+	}
 }
 
 func TestLoginIntentMarshalRequiresFields(t *testing.T) {
 	t.Parallel()
 	_, err := MarshalLoginIntentValueJSON(LoginIntentValue{
-		SchemaVersion: 2,
+		SchemaVersion: LoginIntentSchemaLatest,
 		ProviderID:    "x",
 	})
 	if err == nil {

@@ -7,9 +7,6 @@ import (
 )
 
 const (
-	LoginIntentSchemaV1     = 1
-	LoginIntentSchemaV2     = 2
-	LoginIntentSchemaV3     = 3
 	LoginIntentSchemaV4     = 4
 	LoginIntentSchemaLatest = LoginIntentSchemaV4
 )
@@ -23,7 +20,7 @@ type LoginIntentValue struct {
 	OAuthState   string `json:"oauth_state"`
 	PKCEVerifier string `json:"pkce_verifier"`
 
-	// IntentProtocol is v2+ (e.g. "oidc_v1"); migrated v1 defaults to DefaultIntentProtocol.
+	// IntentProtocol is the login intent protocol marker (e.g. "oidc_v1").
 	IntentProtocol string `json:"intent_protocol"`
 
 	// Nonce is optional OIDC nonce for id_token validation at callback (roadmap ш. 13–14).
@@ -43,92 +40,13 @@ type LoginIntentValue struct {
 
 const DefaultIntentProtocol = "oidc_v1"
 
-type loginIntentV1Wire struct {
-	SchemaVersion int    `json:"schema_version"`
-	ProviderID    string `json:"provider_id"`
-	RedirectURI   string `json:"redirect_uri"`
-	OAuthState    string `json:"oauth_state"`
-	PKCEVerifier  string `json:"pkce_verifier"`
-}
-
-func migrateLoginIntentV1(v1 loginIntentV1Wire) LoginIntentValue {
-	return LoginIntentValue{
-		SchemaVersion:  LoginIntentSchemaLatest,
-		ProviderID:     v1.ProviderID,
-		RedirectURI:    v1.RedirectURI,
-		OAuthState:     v1.OAuthState,
-		PKCEVerifier:   v1.PKCEVerifier,
-		IntentProtocol: DefaultIntentProtocol,
-	}
-}
-
-type loginIntentV2Wire struct {
-	SchemaVersion  int    `json:"schema_version"`
-	ProviderID     string `json:"provider_id"`
-	RedirectURI    string `json:"redirect_uri"`
-	OAuthState     string `json:"oauth_state"`
-	PKCEVerifier   string `json:"pkce_verifier"`
-	IntentProtocol string `json:"intent_protocol"`
-	Nonce          string `json:"nonce,omitempty"`
-}
-
-func migrateLoginIntentV2(v2 loginIntentV2Wire) LoginIntentValue {
-	return LoginIntentValue{
-		SchemaVersion:  LoginIntentSchemaLatest,
-		ProviderID:     v2.ProviderID,
-		RedirectURI:    v2.RedirectURI,
-		OAuthState:     v2.OAuthState,
-		PKCEVerifier:   v2.PKCEVerifier,
-		IntentProtocol: v2.IntentProtocol,
-		Nonce:          v2.Nonce,
-	}
-}
-
-func migrateLoginIntentV3(v3 LoginIntentValue) LoginIntentValue {
-	v3.SchemaVersion = LoginIntentSchemaLatest
-	return v3
-}
-
-// ParseLoginIntentValueJSON parses JSON and migrates v1 → latest on read.
+// ParseLoginIntentValueJSON parses JSON and accepts only the latest schema.
 func ParseLoginIntentValueJSON(data []byte) (LoginIntentValue, error) {
 	ver, err := peekPositiveSchemaVersion(data)
 	if err != nil {
 		return LoginIntentValue{}, err
 	}
 	switch ver {
-	case LoginIntentSchemaV1:
-		var v1 loginIntentV1Wire
-		if err := json.Unmarshal(data, &v1); err != nil {
-			return LoginIntentValue{}, fmt.Errorf("kvvalue: login-intent v1: %w", err)
-		}
-		if v1.SchemaVersion != LoginIntentSchemaV1 {
-			return LoginIntentValue{}, ErrMissingSchemaVersion
-		}
-		return migrateLoginIntentV1(v1), nil
-	case LoginIntentSchemaV2:
-		var v2 loginIntentV2Wire
-		if err := json.Unmarshal(data, &v2); err != nil {
-			return LoginIntentValue{}, fmt.Errorf("kvvalue: login-intent v2: %w", err)
-		}
-		if v2.SchemaVersion != LoginIntentSchemaV2 {
-			return LoginIntentValue{}, ErrMissingSchemaVersion
-		}
-		if v2.IntentProtocol == "" {
-			v2.IntentProtocol = DefaultIntentProtocol
-		}
-		return migrateLoginIntentV2(v2), nil
-	case LoginIntentSchemaV3:
-		var v3 LoginIntentValue
-		if err := json.Unmarshal(data, &v3); err != nil {
-			return LoginIntentValue{}, fmt.Errorf("kvvalue: login-intent v3: %w", err)
-		}
-		if v3.SchemaVersion != LoginIntentSchemaV3 {
-			return LoginIntentValue{}, ErrMissingSchemaVersion
-		}
-		if v3.IntentProtocol == "" {
-			v3.IntentProtocol = DefaultIntentProtocol
-		}
-		return migrateLoginIntentV3(v3), nil
 	case LoginIntentSchemaV4:
 		var v4 LoginIntentValue
 		if err := json.Unmarshal(data, &v4); err != nil {
