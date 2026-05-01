@@ -79,23 +79,7 @@ func (s *StrictOpenAPIServer) CallbackOidc(ctx context.Context, request apiserve
 	out, err := s.c.OIDCCallbackUseCase.CompleteWithResult(tctx, request.Params.Code, request.Params.State)
 	if err != nil {
 		st, code, detail := auth.MapCallbackError(err)
-		switch st {
-		case http.StatusBadRequest:
-			p := problem.WithCode(st, code, "", detail)
-			return apiserver.CallbackOidc400ApplicationProblemPlusJSONResponse{
-				BadRequestApplicationProblemPlusJSONResponse: apiserver.BadRequestApplicationProblemPlusJSONResponse(p),
-			}, nil
-		case http.StatusUnauthorized:
-			p := problem.WithCode(st, code, "", detail)
-			return apiserver.CallbackOidc401ApplicationProblemPlusJSONResponse{
-				UnauthorizedApplicationProblemPlusJSONResponse: apiserver.UnauthorizedApplicationProblemPlusJSONResponse(p),
-			}, nil
-		default:
-			p := internalProblem()
-			return apiserver.CallbackOidc500ApplicationProblemPlusJSONResponse{
-				InternalErrorApplicationProblemPlusJSONResponse: apiserver.InternalErrorApplicationProblemPlusJSONResponse(p),
-			}, nil
-		}
+		return callbackOIDCProblemResponse(st, code, detail), nil
 	}
 
 	if out.RedirectURL == "" {
@@ -106,6 +90,37 @@ func (s *StrictOpenAPIServer) CallbackOidc(ctx context.Context, request apiserve
 	}
 
 	return apiserver.CallbackOidc302Response{Headers: apiserver.CallbackOidc302ResponseHeaders{Location: out.RedirectURL}}, nil
+}
+
+func callbackOIDCProblemResponse(status int, code, detail string) apiserver.CallbackOidcResponseObject {
+	p := problem.WithCode(status, code, "", detail)
+	switch status {
+	case http.StatusBadRequest:
+		return apiserver.CallbackOidc400ApplicationProblemPlusJSONResponse{
+			BadRequestApplicationProblemPlusJSONResponse: apiserver.BadRequestApplicationProblemPlusJSONResponse(p),
+		}
+	case http.StatusUnauthorized:
+		return apiserver.CallbackOidc401ApplicationProblemPlusJSONResponse{
+			UnauthorizedApplicationProblemPlusJSONResponse: apiserver.UnauthorizedApplicationProblemPlusJSONResponse(p),
+		}
+	case http.StatusForbidden:
+		return apiserver.CallbackOidc403ApplicationProblemPlusJSONResponse{
+			ForbiddenApplicationProblemPlusJSONResponse: apiserver.ForbiddenApplicationProblemPlusJSONResponse(p),
+		}
+	case http.StatusBadGateway:
+		return apiserver.CallbackOidc502ApplicationProblemPlusJSONResponse{
+			BadGatewayApplicationProblemPlusJSONResponse: apiserver.BadGatewayApplicationProblemPlusJSONResponse(p),
+		}
+	case http.StatusServiceUnavailable:
+		return apiserver.CallbackOidc503ApplicationProblemPlusJSONResponse{
+			ServiceUnavailableApplicationProblemPlusJSONResponse: apiserver.ServiceUnavailableApplicationProblemPlusJSONResponse(p),
+		}
+	default:
+		ip := internalProblem()
+		return apiserver.CallbackOidc500ApplicationProblemPlusJSONResponse{
+			InternalErrorApplicationProblemPlusJSONResponse: apiserver.InternalErrorApplicationProblemPlusJSONResponse(ip),
+		}
+	}
 }
 
 func (s *StrictOpenAPIServer) ListOidcProviders(ctx context.Context, request apiserver.ListOidcProvidersRequestObject) (apiserver.ListOidcProvidersResponseObject, error) {

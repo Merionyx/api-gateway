@@ -399,6 +399,86 @@ func TestStrictTokenOidc_UsesTypedRequestBodyWithoutFiberFormFallback(t *testing
 	}
 }
 
+func TestCallbackOIDCProblemResponse_StatusMapping(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		status int
+		assert func(t *testing.T, resp apiserver.CallbackOidcResponseObject)
+	}{
+		{
+			name:   "bad_request",
+			status: http.StatusBadRequest,
+			assert: func(t *testing.T, resp apiserver.CallbackOidcResponseObject) {
+				t.Helper()
+				if _, ok := resp.(apiserver.CallbackOidc400ApplicationProblemPlusJSONResponse); !ok {
+					t.Fatalf("response type %T", resp)
+				}
+			},
+		},
+		{
+			name:   "unauthorized",
+			status: http.StatusUnauthorized,
+			assert: func(t *testing.T, resp apiserver.CallbackOidcResponseObject) {
+				t.Helper()
+				if _, ok := resp.(apiserver.CallbackOidc401ApplicationProblemPlusJSONResponse); !ok {
+					t.Fatalf("response type %T", resp)
+				}
+			},
+		},
+		{
+			name:   "forbidden",
+			status: http.StatusForbidden,
+			assert: func(t *testing.T, resp apiserver.CallbackOidcResponseObject) {
+				t.Helper()
+				if _, ok := resp.(apiserver.CallbackOidc403ApplicationProblemPlusJSONResponse); !ok {
+					t.Fatalf("response type %T", resp)
+				}
+			},
+		},
+		{
+			name:   "bad_gateway",
+			status: http.StatusBadGateway,
+			assert: func(t *testing.T, resp apiserver.CallbackOidcResponseObject) {
+				t.Helper()
+				if _, ok := resp.(apiserver.CallbackOidc502ApplicationProblemPlusJSONResponse); !ok {
+					t.Fatalf("response type %T", resp)
+				}
+			},
+		},
+		{
+			name:   "service_unavailable",
+			status: http.StatusServiceUnavailable,
+			assert: func(t *testing.T, resp apiserver.CallbackOidcResponseObject) {
+				t.Helper()
+				if _, ok := resp.(apiserver.CallbackOidc503ApplicationProblemPlusJSONResponse); !ok {
+					t.Fatalf("response type %T", resp)
+				}
+			},
+		},
+		{
+			name:   "fallback_internal",
+			status: http.StatusTeapot,
+			assert: func(t *testing.T, resp apiserver.CallbackOidcResponseObject) {
+				t.Helper()
+				if _, ok := resp.(apiserver.CallbackOidc500ApplicationProblemPlusJSONResponse); !ok {
+					t.Fatalf("response type %T", resp)
+				}
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			resp := callbackOIDCProblemResponse(tc.status, "TEST_CODE", "test detail")
+			tc.assert(t, resp)
+		})
+	}
+}
+
 func TestStrictIssueApiAccessToken_UsesDefaultTTLAndOmitsRoles(t *testing.T) {
 	t.Parallel()
 
