@@ -378,7 +378,7 @@ func MapRefreshError(err error) (status int, code, detail string) {
 	case errors.Is(err, apierrors.ErrSessionAuthFailed):
 		return http.StatusUnauthorized, "SESSION_AUTH_FAILED", "Refresh token is invalid, expired, or revoked."
 	case errors.Is(err, apierrors.ErrSessionRefreshConflict):
-		return http.StatusConflict, "REFRESH_STATE_CONFLICT", "Session state changed concurrently; retry with backoff or use the latest token pair from a successful refresh."
+		return http.StatusConflict, "REFRESH_STATE_CONFLICT", "Session state changed concurrently; retry with backoff or use the token pair from a successful refresh."
 	case errors.Is(err, oidc.ErrMissingRefreshTokenInTokenResponse):
 		return http.StatusUnauthorized, "OIDC_REFRESH_TOKEN_UNAVAILABLE", strings.TrimSpace(strings.TrimPrefix(err.Error(), oidc.ErrMissingRefreshTokenInTokenResponse.Error()+":"))
 	case errors.Is(err, oidc.ErrDiscovery):

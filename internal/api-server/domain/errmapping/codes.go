@@ -28,8 +28,8 @@ const (
 	DetailSigningOperationFailed      = "Signing the token failed."
 	DetailStoreUnavailable            = "Required storage is temporarily unavailable."
 	DetailContractSyncerUnavailable   = "The contract sync service is temporarily unavailable."
-	DetailSessionRefreshConflict        = "Session state changed concurrently; retry with backoff or use the latest token pair from a successful refresh."
-	DetailSessionAuthFailed             = "Refresh token is invalid, expired, or revoked."
+	DetailSessionRefreshConflict      = "Session state changed concurrently; retry with backoff or use the token pair from a successful refresh."
+	DetailSessionAuthFailed           = "Refresh token is invalid, expired, or revoked."
 	DetailInternalError               = "An unexpected error occurred."
 	DetailContractSyncPipelineFailed  = "The contract sync request could not be completed."
 )

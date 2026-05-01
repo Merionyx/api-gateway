@@ -96,7 +96,7 @@ func (r *SessionRepository) Get(ctx context.Context, sessionID string) (kvvalue.
 	return rec, kv.ModRevision, nil
 }
 
-// Put overwrites the session record (operator / migration).
+// Put overwrites the session record (operator/manual repair).
 func (r *SessionRepository) Put(ctx context.Context, sessionID string, v kvvalue.SessionValue) error {
 	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanSessionRepo, "Put"))
 	var err error

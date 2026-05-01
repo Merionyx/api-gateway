@@ -129,7 +129,7 @@ func (r *APIKeyRepository) Get(ctx context.Context, digestHex string) (kvvalue.A
 	return rec, kv.ModRevision, nil
 }
 
-// Put writes or overwrites the api-key record (operator / migration use). Prefer BootstrapPutDevelopment for first key in dev.
+// Put writes or overwrites the api-key record (operator/manual repair use). Prefer BootstrapPutDevelopment for first key in dev.
 func (r *APIKeyRepository) Put(ctx context.Context, digestHex string, rec kvvalue.APIKeyValue) error {
 	ctx, span := telemetry.Start(ctx, telemetry.SpanName(spanAPIKeyRepo, "Put"))
 	var err error
