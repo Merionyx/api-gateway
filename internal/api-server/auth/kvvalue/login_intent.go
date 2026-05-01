@@ -7,8 +7,7 @@ import (
 )
 
 const (
-	LoginIntentSchemaV4     = 4
-	LoginIntentSchemaLatest = LoginIntentSchemaV4
+	LoginIntentSchemaV4 = 4
 )
 
 // LoginIntentValue is the canonical login-intent value at login-intents/{intent_id}.
@@ -40,7 +39,7 @@ type LoginIntentValue struct {
 
 const DefaultIntentProtocol = "oidc_v1"
 
-// ParseLoginIntentValueJSON parses JSON and accepts only the latest schema.
+// ParseLoginIntentValueJSON parses JSON and accepts only schema v4.
 func ParseLoginIntentValueJSON(data []byte) (LoginIntentValue, error) {
 	ver, err := peekPositiveSchemaVersion(data)
 	if err != nil {
@@ -64,12 +63,12 @@ func ParseLoginIntentValueJSON(data []byte) (LoginIntentValue, error) {
 	}
 }
 
-// MarshalLoginIntentValueJSON serializes for etcd Put (always latest schema_version).
+// MarshalLoginIntentValueJSON serializes for etcd Put with schema_version=4.
 func MarshalLoginIntentValueJSON(v LoginIntentValue) ([]byte, error) {
 	if v.ProviderID == "" || v.RedirectURI == "" || v.OAuthState == "" || v.PKCEVerifier == "" {
 		return nil, errors.New("kvvalue: login-intent required string fields missing")
 	}
-	v.SchemaVersion = LoginIntentSchemaLatest
+	v.SchemaVersion = LoginIntentSchemaV4
 	if v.IntentProtocol == "" {
 		v.IntentProtocol = DefaultIntentProtocol
 	}

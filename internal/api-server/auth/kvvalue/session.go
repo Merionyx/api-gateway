@@ -9,11 +9,10 @@ import (
 
 // Session schema versions for etcd value at sessions/{session_id}.
 const (
-	SessionSchemaV3     = 3
-	SessionSchemaLatest = SessionSchemaV3
+	SessionSchemaV3 = 3
 )
 
-// SessionValue is the canonical session value (latest schema) after ParseSessionValueJSON.
+// SessionValue is the canonical session value for schema v3.
 // Field names are snake_case for JSON.
 type SessionValue struct {
 	SchemaVersion int `json:"schema_version"`
@@ -41,7 +40,7 @@ type SessionValue struct {
 	RefreshExpiresAt time.Time `json:"refresh_expires_at,omitempty"`
 }
 
-// ParseSessionValueJSON parses JSON from etcd and accepts only the latest schema.
+// ParseSessionValueJSON parses JSON from etcd and accepts only schema v3.
 func ParseSessionValueJSON(data []byte) (SessionValue, error) {
 	ver, err := peekPositiveSchemaVersion(data)
 	if err != nil {
@@ -65,12 +64,12 @@ func ParseSessionValueJSON(data []byte) (SessionValue, error) {
 	}
 }
 
-// MarshalSessionValueJSON serializes for etcd Put (always latest schema_version).
+// MarshalSessionValueJSON serializes for etcd Put with schema_version=3.
 func MarshalSessionValueJSON(s SessionValue) ([]byte, error) {
 	if len(s.EncryptedIDPRefresh) == 0 {
 		return nil, errors.New("kvvalue: session encrypted_idp_refresh required")
 	}
-	s.SchemaVersion = SessionSchemaLatest
+	s.SchemaVersion = SessionSchemaV3
 	return json.Marshal(s)
 }
 

@@ -7,9 +7,8 @@ import (
 )
 
 const (
-	APIKeySchemaV1     = 1
-	APIKeySchemaV2     = 2
-	APIKeySchemaLatest = APIKeySchemaV2
+	APIKeySchemaV1 = 1
+	APIKeySchemaV2 = 2
 )
 
 // APIKeyValue is the canonical api-key record at api-keys/sha256/{digest_hex}.
@@ -19,8 +18,8 @@ type APIKeyValue struct {
 	// Algorithm documents how digest_hex in the key path was produced (e.g. "sha256").
 	Algorithm string `json:"algorithm"`
 
-	Roles    []string `json:"roles"`
-	Scopes   []string `json:"scopes"`
+	Roles    []string        `json:"roles"`
+	Scopes   []string        `json:"scopes"`
 	Metadata json.RawMessage `json:"metadata,omitempty"`
 
 	// RecordFormat is v2+ (e.g. "digest_v1"); migrated v1 defaults to DefaultAPIKeyRecordFormat.
@@ -39,7 +38,7 @@ type apiKeyValueV1Wire struct {
 
 func migrateAPIKeyV1(v1 apiKeyValueV1Wire) APIKeyValue {
 	return APIKeyValue{
-		SchemaVersion: APIKeySchemaLatest,
+		SchemaVersion: APIKeySchemaV2,
 		Algorithm:     v1.Algorithm,
 		Roles:         append([]string(nil), v1.Roles...),
 		Scopes:        append([]string(nil), v1.Scopes...),
@@ -48,7 +47,7 @@ func migrateAPIKeyV1(v1 apiKeyValueV1Wire) APIKeyValue {
 	}
 }
 
-// ParseAPIKeyValueJSON parses JSON and migrates v1 → latest on read.
+// ParseAPIKeyValueJSON parses JSON and supports known api-key schema versions.
 func ParseAPIKeyValueJSON(data []byte) (APIKeyValue, error) {
 	ver, err := peekPositiveSchemaVersion(data)
 	if err != nil {
@@ -81,12 +80,12 @@ func ParseAPIKeyValueJSON(data []byte) (APIKeyValue, error) {
 	}
 }
 
-// MarshalAPIKeyValueJSON serializes for etcd Put (always latest schema_version).
+// MarshalAPIKeyValueJSON serializes for etcd Put with schema_version=2.
 func MarshalAPIKeyValueJSON(v APIKeyValue) ([]byte, error) {
 	if v.Algorithm == "" {
 		return nil, errors.New("kvvalue: api-key algorithm required")
 	}
-	v.SchemaVersion = APIKeySchemaLatest
+	v.SchemaVersion = APIKeySchemaV2
 	if v.RecordFormat == "" {
 		v.RecordFormat = DefaultAPIKeyRecordFormat
 	}

@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestSessionLatestRoundTrip_FromRaw(t *testing.T) {
+func TestSessionV3RoundTrip_FromRaw(t *testing.T) {
 	t.Parallel()
 	raw := []byte(`{
 		"schema_version": 3,
@@ -23,8 +23,8 @@ func TestSessionLatestRoundTrip_FromRaw(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.SchemaVersion != SessionSchemaLatest {
-		t.Fatalf("schema: want %d got %d", SessionSchemaLatest, got.SchemaVersion)
+	if got.SchemaVersion != SessionSchemaV3 {
+		t.Fatalf("schema: want %d got %d", SessionSchemaV3, got.SchemaVersion)
 	}
 	if got.RotationGeneration != 5 || got.ProviderID != "p1" || got.OurRefreshVerifier != "opaque-verifier-handle" || got.RefreshExpiresAt.IsZero() {
 		t.Fatalf("session: %+v", got)
@@ -42,10 +42,10 @@ func TestSessionRejectsLegacySchemas(t *testing.T) {
 	}
 }
 
-func TestSessionLatestOptionalFieldsRoundTrip(t *testing.T) {
+func TestSessionV3OptionalFieldsRoundTrip(t *testing.T) {
 	t.Parallel()
 	s := SessionValue{
-		SchemaVersion:       SessionSchemaLatest,
+		SchemaVersion:       SessionSchemaV3,
 		EncryptedIDPRefresh: json.RawMessage(`{"k":1}`),
 		RotationGeneration:  1,
 		LoginIntentID:       "6ba7b810-9dad-41d4-a716-446655440001",
@@ -64,10 +64,10 @@ func TestSessionLatestOptionalFieldsRoundTrip(t *testing.T) {
 	}
 }
 
-func TestSessionLatestRoundTrip(t *testing.T) {
+func TestSessionV3RoundTrip(t *testing.T) {
 	t.Parallel()
 	s := SessionValue{
-		SchemaVersion:       SessionSchemaLatest,
+		SchemaVersion:       SessionSchemaV3,
 		EncryptedIDPRefresh: json.RawMessage(`{}`),
 		ClaimsSnapshot:      json.RawMessage(`[]`),
 		RotationGeneration:  3,
@@ -83,14 +83,14 @@ func TestSessionLatestRoundTrip(t *testing.T) {
 	if got.RotationGeneration != 3 {
 		t.Fatalf("rotation: %d", got.RotationGeneration)
 	}
-	if got.SchemaVersion != SessionSchemaLatest {
+	if got.SchemaVersion != SessionSchemaV3 {
 		t.Fatal("schema")
 	}
 }
 
 func TestSessionMarshalRequiresEncryptedBlob(t *testing.T) {
 	t.Parallel()
-	_, err := MarshalSessionValueJSON(SessionValue{SchemaVersion: SessionSchemaLatest})
+	_, err := MarshalSessionValueJSON(SessionValue{SchemaVersion: SessionSchemaV3})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -112,7 +112,7 @@ func TestSessionMissingSchema(t *testing.T) {
 	}
 }
 
-func TestLoginIntentLatestRoundTrip(t *testing.T) {
+func TestLoginIntentV4RoundTrip(t *testing.T) {
 	t.Parallel()
 	raw := []byte(`{
 		"schema_version": 4,
@@ -132,7 +132,7 @@ func TestLoginIntentLatestRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.SchemaVersion != LoginIntentSchemaLatest {
+	if got.SchemaVersion != LoginIntentSchemaV4 {
 		t.Fatal("schema")
 	}
 	if got.Nonce != "n1" {
@@ -157,7 +157,7 @@ func TestLoginIntentRejectsLegacySchemas(t *testing.T) {
 func TestLoginIntentMarshalRequiresFields(t *testing.T) {
 	t.Parallel()
 	_, err := MarshalLoginIntentValueJSON(LoginIntentValue{
-		SchemaVersion: LoginIntentSchemaLatest,
+		SchemaVersion: LoginIntentSchemaV4,
 		ProviderID:    "x",
 	})
 	if err == nil {
@@ -168,7 +168,7 @@ func TestLoginIntentMarshalRequiresFields(t *testing.T) {
 func TestLoginIntentNonceRoundtrip(t *testing.T) {
 	t.Parallel()
 	v := LoginIntentValue{
-		SchemaVersion:                  LoginIntentSchemaLatest,
+		SchemaVersion:                  LoginIntentSchemaV4,
 		ProviderID:                     "p",
 		RedirectURI:                    "https://a/cb",
 		OAuthState:                     "st",
@@ -213,7 +213,7 @@ func TestAPIKeyMigrateV1(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.SchemaVersion != APIKeySchemaLatest {
+	if got.SchemaVersion != APIKeySchemaV2 {
 		t.Fatal("schema")
 	}
 	if got.RecordFormat != DefaultAPIKeyRecordFormat {

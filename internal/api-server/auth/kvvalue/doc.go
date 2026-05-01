@@ -1,8 +1,8 @@
 // Package kvvalue defines JSON value shapes for auth etcd keys (sessions, login-intents, api-keys)
 // under /api-gateway/api-server/auth/v1/… — see docs/etcd-auth-paths.md.
 //
-// Every value carries schema_version. Parse* functions apply on-read migration from v1 to v2;
-// Marshal* always writes the latest schema (currently 2) for new writes.
+// Every value carries explicit schema_version. Parse* functions require known versions and reject
+// missing/unsupported contracts. Marshal* always writes the explicit write-schema of each value type.
 //
 // This package does not perform etcd I/O (types + (de)serialization only).
 package kvvalue
