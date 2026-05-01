@@ -282,33 +282,33 @@ func runAuthLogin(
 	}
 
 	tok := tokenResp.JSON200
-	tt := strings.TrimSpace(tok.Data.TokenType)
+	tt := strings.TrimSpace(tok.TokenType)
 	if tt == "" {
 		tt = "Bearer"
 	}
 	refreshToken := ""
-	if tok.Data.RefreshToken != nil {
-		refreshToken = strings.TrimSpace(*tok.Data.RefreshToken)
+	if tok.RefreshToken != nil {
+		refreshToken = strings.TrimSpace(*tok.RefreshToken)
 	}
 	if refreshToken == "" {
 		return fmt.Errorf("token endpoint: refresh_token is missing")
 	}
-	accessExpiresAt := time.Now().UTC().Add(time.Duration(tok.Data.ExpiresIn) * time.Second)
-	if tok.Data.AccessExpiresAt != nil {
-		accessExpiresAt = tok.Data.AccessExpiresAt.UTC()
+	accessExpiresAt := time.Now().UTC().Add(time.Duration(tok.ExpiresIn) * time.Second)
+	if tok.AccessExpiresAt != nil {
+		accessExpiresAt = tok.AccessExpiresAt.UTC()
 	}
 	refreshExpiresAt := accessExpiresAt
-	if tok.Data.RefreshExpiresAt != nil {
-		refreshExpiresAt = tok.Data.RefreshExpiresAt.UTC()
-	} else if tok.Data.RefreshExpiresIn != nil && *tok.Data.RefreshExpiresIn > 0 {
-		refreshExpiresAt = time.Now().UTC().Add(time.Duration(*tok.Data.RefreshExpiresIn) * time.Second)
+	if tok.RefreshExpiresAt != nil {
+		refreshExpiresAt = tok.RefreshExpiresAt.UTC()
+	} else if tok.RefreshExpiresIn != nil && *tok.RefreshExpiresIn > 0 {
+		refreshExpiresAt = time.Now().UTC().Add(time.Duration(*tok.RefreshExpiresIn) * time.Second)
 	}
 	if err := credentials.PutContext(contextName, credentials.Entry{
 		ProviderID:               chosenID,
-		AccessToken:              tok.Data.AccessToken,
+		AccessToken:              tok.AccessToken,
 		RefreshToken:             refreshToken,
 		TokenType:                tt,
-		AccessExpiresAt:          tok.Data.AccessExpiresAt.UTC().Format(time.RFC3339),
+		AccessExpiresAt:          tok.AccessExpiresAt.UTC().Format(time.RFC3339),
 		RefreshExpiresAt:         refreshExpiresAt.UTC().Format(time.RFC3339),
 		RequestedAccessTokenTTL:  resolvedTTLString(accessTTL, requestedTTLs.AccessTTL),
 		RequestedRefreshTokenTTL: resolvedTTLString(refreshTTL, requestedTTLs.RefreshTTL),

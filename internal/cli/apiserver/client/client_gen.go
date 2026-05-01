@@ -3530,12 +3530,10 @@ func (r ListAuthRolesResponse) StatusCode() int {
 type TokenOidcResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *struct {
-		Data OAuthTokenResponse `json:"data"`
-	}
-	JSON400 *OAuthTokenError
-	JSON500 *OAuthTokenError
-	JSON503 *OAuthTokenError
+	JSON200      *OAuthTokenResponse
+	JSON400      *OAuthTokenError
+	JSON500      *OAuthTokenError
+	JSON503      *OAuthTokenError
 }
 
 // Status returns HTTPResponse.Status
@@ -4700,9 +4698,7 @@ func ParseTokenOidcResponse(rsp *http.Response) (*TokenOidcResponse, error) {
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			Data OAuthTokenResponse `json:"data"`
-		}
+		var dest OAuthTokenResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

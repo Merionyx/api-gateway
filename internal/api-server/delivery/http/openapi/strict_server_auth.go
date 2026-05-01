@@ -216,7 +216,7 @@ func (s *StrictOpenAPIServer) TokenOidc(ctx context.Context, request apiserver.T
 		}
 	}
 
-	return apiserver.TokenOidc200JSONResponse{Data: out}, nil
+	return apiserver.TokenOidc200JSONResponse(out), nil
 }
 
 func tokenFormString(fc fiber.Ctx, key string) string {
