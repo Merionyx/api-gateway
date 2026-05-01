@@ -159,7 +159,7 @@ func (u *OIDCCallbackUseCase) CompleteWithResult(ctx context.Context, code, stat
 
 	subject := interactiveSubject(idClaims)
 	if subject == "" {
-		return out, fmt.Errorf("%w: cannot derive subject from id_token (need email or sub)", apierrors.ErrInvalidInput)
+		return out, fmt.Errorf("%w: cannot derive subject from id_token (need email, preferred_username, or sub)", apierrors.ErrInvalidInput)
 	}
 
 	snap, err := claimsSnapshotFromProvider(ctx, p, idClaims, strings.TrimSpace(tr.AccessToken), u.hc)
@@ -296,6 +296,7 @@ func tokenExchangeProblemDetail(err error) string {
 }
 
 func interactiveSubject(mc jwt.MapClaims) string {
+	// Canonical subject claim priority for interactive auth flows.
 	if e, _ := mc["email"].(string); strings.TrimSpace(e) != "" {
 		return strings.TrimSpace(e)
 	}

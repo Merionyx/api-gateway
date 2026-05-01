@@ -106,7 +106,7 @@ func TestStrictInspectTokenPermissions_UsesDataWrapper(t *testing.T) {
 	}
 }
 
-func TestStrictInspectTokenPermissions_SubjectPrefersSubThenEmailFallback(t *testing.T) {
+func TestStrictInspectTokenPermissions_SubjectClaimPriority(t *testing.T) {
 	t.Parallel()
 
 	uc := testJWTUseCase(t)
@@ -129,16 +129,22 @@ func TestStrictInspectTokenPermissions_SubjectPrefersSubThenEmailFallback(t *tes
 		expectedSubject string
 	}{
 		{
-			name:            "prefers_sub_when_both_present",
+			name:            "prefers_email_over_sub",
 			subject:         "sub-123",
 			snapshot:        `{"email":"fallback@example.com"}`,
-			expectedSubject: "sub-123",
+			expectedSubject: "fallback@example.com",
 		},
 		{
-			name:            "falls_back_to_email_when_sub_missing",
-			subject:         "",
-			snapshot:        `{"email":"fallback@example.com"}`,
-			expectedSubject: "fallback@example.com",
+			name:            "prefers_preferred_username_over_sub_when_email_missing",
+			subject:         "sub-123",
+			snapshot:        `{"preferred_username":"pref-user"}`,
+			expectedSubject: "pref-user",
+		},
+		{
+			name:            "uses_sub_when_only_sub_is_present",
+			subject:         "sub-only",
+			snapshot:        `{}`,
+			expectedSubject: "sub-only",
 		},
 	}
 
@@ -402,7 +408,7 @@ func TestStrictIssueApiAccessToken_UsesDefaultTTLAndOmitsRoles(t *testing.T) {
 	}
 }
 
-func TestStrictIssueApiAccessToken_SubjectFallsBackToEmailWhenSubMissing(t *testing.T) {
+func TestStrictIssueApiAccessToken_SubjectClaimPriority(t *testing.T) {
 	t.Parallel()
 
 	uc := testJWTUseCase(t)
@@ -418,9 +424,11 @@ func TestStrictIssueApiAccessToken_SubjectFallsBackToEmailWhenSubMissing(t *test
 	}
 
 	callerClaims := jwt.MapClaims{
-		"email": "fallback@example.com",
-		"roles": []any{roles.APIAccessTokensIssue},
-		"exp":   float64(time.Now().Add(10 * time.Minute).Unix()),
+		"sub":                "sub-123",
+		"email":              "fallback@example.com",
+		"preferred_username": "pref-user",
+		"roles":              []any{roles.APIAccessTokensIssue},
+		"exp":                float64(time.Now().Add(10 * time.Minute).Unix()),
 	}
 
 	app := testStrictApp(cnt, func(c fiber.Ctx) error {

@@ -587,7 +587,7 @@ type TokenPermissionsResponse struct {
 	// Roles Role ids resolved from the token `roles` claim.
 	Roles []string `json:"roles"`
 
-	// Subject Token subject (`sub` claim, or fallback to `email`).
+	// Subject Token subject (claim priority: `email`, then `preferred_username`, then `sub`).
 	Subject string `json:"subject"`
 }
 

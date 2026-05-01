@@ -106,7 +106,7 @@ func subjectFromClaimsSnapshot(raw json.RawMessage) (string, error) {
 		return "", err
 	}
 	mc := jwt.MapClaims{}
-	for _, k := range []string{"sub", "email", "name", "preferred_username"} {
+	for _, k := range []string{"email", "preferred_username", "sub"} {
 		if v, ok := m[k]; ok {
 			if s, ok := v.(string); ok {
 				mc[k] = s

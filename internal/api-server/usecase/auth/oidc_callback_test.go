@@ -279,6 +279,50 @@ func TestMapCallbackError_MissingIDTokenDetail(t *testing.T) {
 	}
 }
 
+func TestInteractiveSubjectClaimPriority(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		in   jwt.MapClaims
+		want string
+	}{
+		{
+			name: "email_over_preferred_username_and_sub",
+			in: jwt.MapClaims{
+				"email":              "user@example.com",
+				"preferred_username": "user-1",
+				"sub":                "sub-1",
+			},
+			want: "user@example.com",
+		},
+		{
+			name: "preferred_username_over_sub_without_email",
+			in: jwt.MapClaims{
+				"preferred_username": "user-1",
+				"sub":                "sub-1",
+			},
+			want: "user-1",
+		},
+		{
+			name: "sub_when_only_sub_present",
+			in: jwt.MapClaims{
+				"sub": "sub-1",
+			},
+			want: "sub-1",
+		},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := interactiveSubject(tc.in)
+			if got != tc.want {
+				t.Fatalf("got %q want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestOIDCCallbackUseCase_Complete_GitHubFallbackWithoutIDToken(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

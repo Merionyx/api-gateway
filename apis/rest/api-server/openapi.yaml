@@ -540,7 +540,7 @@ components:
       properties:
         subject:
           type: string
-          description: Token subject (`sub` claim, or fallback to `email`).
+          description: 'Token subject (claim priority: `email`, then `preferred_username`, then `sub`).'
         roles:
           type: array
           items:

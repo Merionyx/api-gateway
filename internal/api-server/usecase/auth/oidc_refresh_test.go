@@ -37,13 +37,48 @@ func TestOurOpaqueRefreshVerifier_matchesCallbackPattern(t *testing.T) {
 
 func TestSubjectFromClaimsSnapshot(t *testing.T) {
 	t.Parallel()
-	raw, err := json.Marshal(map[string]any{"email": "a@b.c", "sub": "sub1"})
-	if err != nil {
-		t.Fatal(err)
+	cases := []struct {
+		name string
+		in   map[string]any
+		want string
+	}{
+		{
+			name: "email_over_sub",
+			in: map[string]any{
+				"email": "a@b.c",
+				"sub":   "sub1",
+			},
+			want: "a@b.c",
+		},
+		{
+			name: "preferred_username_over_sub_without_email",
+			in: map[string]any{
+				"preferred_username": "user-1",
+				"sub":                "sub1",
+			},
+			want: "user-1",
+		},
+		{
+			name: "sub_when_only_sub_present",
+			in: map[string]any{
+				"sub": "sub1",
+			},
+			want: "sub1",
+		},
 	}
-	s, err := subjectFromClaimsSnapshot(raw)
-	if err != nil || s != "a@b.c" {
-		t.Fatalf("got %q err %v", s, err)
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			raw, err := json.Marshal(tc.in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := subjectFromClaimsSnapshot(raw)
+			if err != nil || got != tc.want {
+				t.Fatalf("got %q err %v", got, err)
+			}
+		})
 	}
 }
 

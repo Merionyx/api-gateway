@@ -103,11 +103,14 @@ func modelJWKSToAPI(in *models.JWKS) (apiserver.Jwks, error) {
 }
 
 func subjectFromAPIJWTClaims(mc jwt.MapClaims) string {
-	if s, _ := mc["sub"].(string); strings.TrimSpace(s) != "" {
-		return strings.TrimSpace(s)
-	}
 	if e, _ := mc["email"].(string); strings.TrimSpace(e) != "" {
 		return strings.TrimSpace(e)
+	}
+	if p, _ := mc["preferred_username"].(string); strings.TrimSpace(p) != "" {
+		return strings.TrimSpace(p)
+	}
+	if s, _ := mc["sub"].(string); strings.TrimSpace(s) != "" {
+		return strings.TrimSpace(s)
 	}
 	return ""
 }
